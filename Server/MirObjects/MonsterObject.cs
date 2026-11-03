@@ -501,6 +501,8 @@ namespace Server.MirObjects
         public virtual bool IgnoresNoPetRestriction => false;
         
         public MonsterInfo Info;
+        // Zero means no configured faction; legacy targeting then remains unchanged.
+        public int FriendFaction { get; private set; }
         public MapRespawn Respawn;
         public MonsterType MonsterType { get; private set; } = MonsterType.Normal;
         private long NextRecallTime;
@@ -666,6 +668,7 @@ namespace Server.MirObjects
         protected internal MonsterObject(MonsterInfo info)
         {
             Info = info;
+            FriendFaction = MonsterFactionCatalog.GetFaction(info.Name);
 
             Stats = new Stats();
 
@@ -2468,6 +2471,14 @@ namespace Server.MirObjects
             if (Dead || attacker == this) return false;
             if (attacker.Race == ObjectType.Creature) return false;
 
+            // Wild monsters with explicitly configured factions are friendly to
+            // their own faction and hostile to other configured factions.
+            // Guard rules, pets, and unconfigured monsters retain their legacy AI.
+            if (Master == null && attacker.Master == null &&
+                FriendFaction > 0 && attacker.FriendFaction > 0 &&
+                attacker.Info.AI != 6 && attacker.Info.AI != 113 && attacker.Info.AI != 58)
+                return MonsterFactionRules.AreHostile(FriendFaction, attacker.FriendFaction);
+
             if (attacker.Info.AI == 6 || attacker.Info.AI == 113) // Guard
             {
                 if (Info.AI != 1 && Info.AI != 2 && Info.AI != 3 && (Master == null || Master.PKPoints >= 200)) //Not Dear/Hen/Tree/Pets or Red Master 
@@ -2562,6 +2573,9 @@ namespace Server.MirObjects
             if (Master != null) return false;
             if (ally.Race != ObjectType.Monster) return false;
             if (ally.Master != null) return false;
+
+            if (FriendFaction > 0 && ally.FriendFaction > 0)
+                return MonsterFactionRules.AreFriendly(FriendFaction, ally.FriendFaction);
 
             return true;
         }
