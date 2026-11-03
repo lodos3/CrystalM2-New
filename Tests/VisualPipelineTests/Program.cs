@@ -14,6 +14,10 @@ Check(AtmosphereColourGrade.Target(LightSetting.Night, WeatherSetting.None, 4).R
       "Warm-map lighting must preserve its map-specific atmosphere.");
 Color rain = AtmosphereColourGrade.Target(LightSetting.Day, WeatherSetting.Rain, 0);
 Check(rain.B > rain.R, "Rain should grade cooler than a clear day.");
+Check(AtmosphereColourGrade.GradeStrength(Color.White) == 0 &&
+      AtmosphereColourGrade.GradeStrength(Color.FromArgb(255, 255, 240, 226)) <
+      AtmosphereColourGrade.GradeStrength(evening),
+      "Atmosphere grading intensity must ease towards neutral daylight.");
 Check(AtmosphereColourGrade.FogStrength(WeatherSetting.Fog) > 0 &&
       AtmosphereColourGrade.FogStrength(WeatherSetting.None) == 0,
       "Fog must be opt-in according to the weather flag.");
