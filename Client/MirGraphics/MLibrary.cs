@@ -907,6 +907,7 @@ namespace Client.MirGraphics
 
         private AlphaCoverage _alphaCoverage;
         private Texture _repairedShadowTexture;
+        private int _repairedShadowBytes;
         private long _repairedShadowLastUsed;
         private bool _shadowAllocationFailed;
 
@@ -926,7 +927,7 @@ namespace Client.MirGraphics
             HasMask = ((Shadow >> 7) == 1) ? true : false;
             if (HasMask)
             {
-                reader.ReadBytes(Length);
+                SpriteFileLayout.SkipCompressedLayer(reader, Length);
                 MaskWidth = reader.ReadInt16();
                 MaskHeight = reader.ReadInt16();
                 MaskX = reader.ReadInt16();
@@ -984,8 +985,7 @@ namespace Client.MirGraphics
             {
                 Image?.Dispose();
                 MaskImage?.Dispose();
-                _repairedShadowTexture?.Dispose();
-                _repairedShadowTexture = null;
+                ReleaseRepairedShadow();
                 Image = null;
                 MaskImage = null;
                 _alphaCoverage = null;
@@ -1002,13 +1002,22 @@ namespace Client.MirGraphics
             if (_alphaCoverage == null || !_alphaCoverage.HasCheckerboard || _shadowAllocationFailed)
                 return null;
 
-            if (_repairedShadowTexture == null || _repairedShadowTexture.Disposed)
+            if (_repairedShadowTexture != null && _repairedShadowTexture.Disposed)
+                ReleaseRepairedShadow();
+
+            if (_repairedShadowTexture == null)
             {
+                int width = _alphaCoverage.ShadowWidth;
+                int height = _alphaCoverage.ShadowHeight;
+                int bytes = checked(width * height * 4);
+                // Reaching the cap is not a permanent failure: use the sprite
+                // silhouette until old masks expire and budget is available.
+                if (!DXManager.ShadowMasks.TryReserve(bytes))
+                    return null;
+
                 Texture candidate = null;
                 try
                 {
-                    int width = _alphaCoverage.ShadowWidth;
-                    int height = _alphaCoverage.ShadowHeight;
                     candidate = new Texture(DXManager.Device, width, height, 1,
                                             Usage.None, Format.A8R8G8B8, Pool.Managed);
                     DataRectangle locked = candidate.LockRectangle(0, LockFlags.None);
@@ -1024,10 +1033,12 @@ namespace Client.MirGraphics
                         candidate.UnlockRectangle(0);
                     }
                     _repairedShadowTexture = candidate;
+                    _repairedShadowBytes = bytes;
                 }
                 catch
                 {
                     candidate?.Dispose();
+                    DXManager.ShadowMasks.Release(bytes);
                     _shadowAllocationFailed = true; // Fall back to the source sprite.
                     return null;
                 }
@@ -1037,13 +1048,24 @@ namespace Client.MirGraphics
             return _repairedShadowTexture;
         }
 
+        private void ReleaseRepairedShadow()
+        {
+            if (_repairedShadowTexture != null && !_repairedShadowTexture.Disposed)
+                _repairedShadowTexture.Dispose();
+            _repairedShadowTexture = null;
+
+            if (_repairedShadowBytes != 0)
+            {
+                DXManager.ShadowMasks.Release(_repairedShadowBytes);
+                _repairedShadowBytes = 0;
+            }
+        }
+
         public void CleanRepairedShadow(long now)
         {
             if (_repairedShadowTexture == null || now - _repairedShadowLastUsed < 30000)
                 return;
-
-            if (!_repairedShadowTexture.Disposed) _repairedShadowTexture.Dispose();
-            _repairedShadowTexture = null;
+            ReleaseRepairedShadow();
         }
 
         // The caller already knows whether the manager is removing the list entry.
@@ -1053,9 +1075,7 @@ namespace Client.MirGraphics
             if (unregister)
                 DXManager.TextureList.Remove(this);
 
-            if (_repairedShadowTexture != null && !_repairedShadowTexture.Disposed)
-                _repairedShadowTexture.Dispose();
-            _repairedShadowTexture = null;
+            ReleaseRepairedShadow();
             _shadowAllocationFailed = false;
 
             if (Image != null && !Image.Disposed)
