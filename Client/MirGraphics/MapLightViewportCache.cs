@@ -4,6 +4,19 @@ using System.Drawing;
 
 namespace Client.MirGraphics
 {
+    // Metadata-only visibility check, performed before decompressing/creating GPU textures.
+    // Long arithmetic avoids overflow for corrupted sprite offsets or extreme coordinates.
+    internal static class SpriteVisibility
+    {
+        internal static bool IsVisible(int x, int y, int width, int height,
+                                       int screenWidth, int screenHeight)
+        {
+            return width > 0 && height > 0 && screenWidth > 0 && screenHeight > 0 &&
+                   x < screenWidth && y < screenHeight &&
+                   (long)x + width > 0 && (long)y + height > 0;
+        }
+    }
+
     // Cached map coordinates and decoded light data. No per-frame texture allocation.
     internal readonly struct CachedMapLight
     {
