@@ -290,7 +290,8 @@ namespace Client.MirGraphics
         // Project a frame silhouette from its ground contact point every redraw.
         // Dither repair uses a 2x-downsampled alpha texture and never changes art.
         public static void DrawProjectedShadow(Texture texture, Rectangle sourceRect,
-                                                Point topLeft, int sourceHeight, bool halfResolution)
+                                                Point topLeft, int sourceHeight, bool halfResolution,
+                                                float horizontal, float vertical)
         {
             if (texture == null || texture.Disposed || sourceHeight <= 0 ||
                 ProjectedShadowsDrawn >= MaxProjectedShadowsPerMapDraw)
@@ -301,14 +302,12 @@ namespace Client.MirGraphics
             try
             {
                 float scale = halfResolution ? 2f : 1f;
-                const float cast = 0.34f;
-                const float flatten = 0.27f;
                 Matrix projection = Matrix.Identity;
                 projection.M11 = scale;
-                projection.M21 = -cast * scale;
-                projection.M22 = flatten * scale;
-                projection.M41 = topLeft.X + cast * sourceHeight;
-                projection.M42 = topLeft.Y + (1f - flatten) * sourceHeight;
+                projection.M21 = -horizontal * scale;
+                projection.M22 = -vertical * scale;
+                projection.M41 = topLeft.X + horizontal * sourceHeight;
+                projection.M42 = topLeft.Y + (1f + vertical) * sourceHeight;
                 Sprite.Transform = projection;
                 Draw(texture, sourceRect, Vector3.Zero, Color.FromArgb(92, 0, 0, 0));
                 ProjectedShadowsDrawn++;
