@@ -10357,6 +10357,7 @@ namespace Client.MirScenes
         public LightSetting Lights;
         public bool Lightning, Fire;
         public byte MapDarkLight;
+        private readonly AmbientLightTransition _ambientLighting = new AmbientLightTransition();
         public long LightningTime, FireTime;
         public WeatherSetting Weather = WeatherSetting.None;
         public bool FloorValid, LightsValid;
@@ -10441,6 +10442,7 @@ namespace Client.MirScenes
         public void LoadMap()
         {
             ResetMap();
+            _ambientLighting.Reset();
 
             MapObject.MouseObjectID = 0;
             MapObject.TargetObjectID = 0;
@@ -10607,6 +10609,7 @@ namespace Client.MirScenes
                 DXManager.Draw(DXManager.FloorTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White);
             }
 
+            DXManager.ProjectedShadowsDrawn = 0;
             DrawObjects();
 
             //render weather
@@ -10618,10 +10621,15 @@ namespace Client.MirScenes
             //Render Death, 
 
             LightSetting setting = Lights == LightSetting.Normal ? GameScene.Scene.Lights : Lights;
+            Color targetAmbient = AmbientLightTransition.Target(setting, MapDarkLight);
+            Color ambient = _ambientLighting.Sample(targetAmbient, CMain.Time);
 
-            if (setting != LightSetting.Day || GameScene.User.Poison.HasFlag(PoisonType.Blindness))
+            // Continue the light pass when transitioning into day, then avoid
+            // its render target and blend operations once daylight is fully white.
+            if (ambient.ToArgb() != Color.White.ToArgb() ||
+                GameScene.User.Poison.HasFlag(PoisonType.Blindness))
             {
-                DrawLights(setting);
+                DrawLights(ambient);
             }
 
             if (Settings.DropView || GameScene.DropViewTime > CMain.Time)
@@ -10677,11 +10685,14 @@ namespace Client.MirScenes
 
             float oldOpacity = DXManager.Opacity;
 
-            if (MapObject.User.Dead) DXManager.SetGrayscale(true);
+            bool dead = MapObject.User.Dead;
+            if (dead) DXManager.SetGrayscale(true);
+            bool postProcessing = !dead && Settings.PostProcessing && DXManager.BeginPostProcessing();
 
             DXManager.DrawOpaque(ControlTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White, Opacity);
 
-            if (MapObject.User.Dead) DXManager.SetGrayscale(false);
+            if (postProcessing) DXManager.EndPostProcessing();
+            if (dead) DXManager.SetGrayscale(false);
 
             CleanTime = CMain.Time + Settings.CleanDelay;
         }
@@ -11052,7 +11063,7 @@ namespace Client.MirScenes
             return light;
         }
 
-        private void DrawLights(LightSetting setting)
+        private void DrawLights(Color darkness)
         {
             if (DXManager.Lights == null || DXManager.Lights.Count == 0) return;
 
@@ -11065,42 +11076,7 @@ namespace Client.MirScenes
             Surface oldSurface = DXManager.CurrentSurface;
             DXManager.SetSurface(DXManager.LightSurface);
 
-            #region Night Lights
-            Color darkness;
-
-            switch (setting)
-            {
-                case LightSetting.Night:
-                    {
-                        switch (MapDarkLight)
-                        {
-                            case 1:
-                                darkness = Color.FromArgb(255, 20, 20, 20);
-                                break;
-                            case 2:
-                                darkness = Color.LightSlateGray;
-                                break;
-                            case 3:
-                                darkness = Color.SkyBlue;
-                                break;
-                            case 4:
-                                darkness = Color.Goldenrod;
-                                break;
-                            default:
-                                darkness = Color.Black;
-                                break;
-                        }
-                    }
-                    break;
-                case LightSetting.Evening:
-                case LightSetting.Dawn:
-                    darkness = Color.FromArgb(255, 50, 50, 50);
-                    break;
-                default:
-                case LightSetting.Day:
-                    darkness = Color.FromArgb(255, 255, 255, 255);
-                    break;
-            }
+            #region Ambient Light
 
             if (MapObject.User.Poison.HasFlag(PoisonType.Blindness))
             {
@@ -11163,7 +11139,10 @@ namespace Client.MirScenes
                         lightColour = GetBlindLight(lightColour);
                     }
 
-                    if (DXManager.Lights[lightRange] != null && !DXManager.Lights[lightRange].Disposed)
+                    // Spell sprites illuminate using the animation's own alpha silhouette.
+                    // Other objects (torch, player, NPC) retain their soft radial light.
+                    bool drawnSpellShape = ob is SpellObject spell && spell.DrawLightMask();
+                    if (!drawnSpellShape && DXManager.Lights[lightRange] != null && !DXManager.Lights[lightRange].Disposed)
                     {
                         p.Offset(-(DXManager.LightSizes[lightRange].X / 2) - (CellWidth / 2), -(DXManager.LightSizes[lightRange].Y / 2) - (CellHeight / 2) - 5);
                         DXManager.Draw(DXManager.Lights[lightRange], null, new Vector3((float)p.X, (float)p.Y, 0.0F), lightColour);
@@ -11175,10 +11154,9 @@ namespace Client.MirScenes
                 for (int e = 0; e < ob.Effects.Count; e++)
                 {
                     Effect effect = ob.Effects[e];
-                    if (!effect.Blend || CMain.Time < effect.Start || (!(effect is Missile) && effect.Light < ob.Light)) continue;
+                    if (!effect.Blend || CMain.Time < effect.Start || effect.Light <= 0) continue;
 
-                    light = effect.Light;
-
+                    light = Math.Min(effect.Light, DXManager.Lights.Count - 1);
                     p = effect.DrawLocation;
 
                     var lightColour = effect.LightColour;
@@ -11188,7 +11166,11 @@ namespace Client.MirScenes
                         lightColour = GetBlindLight(lightColour);
                     }
 
-                    if (DXManager.Lights[light] != null && !DXManager.Lights[light].Disposed)
+                    if (effect.Library != null && effect.CurrentFrame >= 0 && effect.CurrentFrame < effect.Count)
+                    {
+                        effect.Library.Draw(effect.BaseIndex + effect.CurrentFrame, p, lightColour, true);
+                    }
+                    else if (DXManager.Lights[light] != null && !DXManager.Lights[light].Disposed)
                     {
                         p.Offset(-(DXManager.LightSizes[light].X / 2) - (CellWidth / 2), -(DXManager.LightSizes[light].Y / 2) - (CellHeight / 2) - 5);
                         DXManager.Draw(DXManager.Lights[light], null, new Vector3((float)p.X, (float)p.Y, 0.0F), lightColour);
@@ -11207,19 +11189,23 @@ namespace Client.MirScenes
                     Effect effect = Effects[e];
                     if (!effect.Blend || CMain.Time < effect.Start) continue;
 
-                    light = effect.Light;
-                    if (light == 0) continue;
+                    if (effect.Light <= 0) continue;
+                    light = Math.Min(effect.Light, DXManager.Lights.Count - 1);
 
                     p = effect.DrawLocation;
 
-                    var lightColour = Color.White;
+                    var lightColour = effect.LightColour;
 
                     if (MapObject.User.Poison.HasFlag(PoisonType.Blindness))
                     {
                         lightColour = GetBlindLight(lightColour);
                     }
 
-                    if (DXManager.Lights[light] != null && !DXManager.Lights[light].Disposed)
+                    if (effect.Library != null && effect.CurrentFrame >= 0 && effect.CurrentFrame < effect.Count)
+                    {
+                        effect.Library.Draw(effect.BaseIndex + effect.CurrentFrame, p, lightColour, true);
+                    }
+                    else if (DXManager.Lights[light] != null && !DXManager.Lights[light].Disposed)
                     {
                         p.Offset(-(DXManager.LightSizes[light].X / 2) - (CellWidth / 2), -(DXManager.LightSizes[light].Y / 2) - (CellHeight / 2) - 5);
                         DXManager.Draw(DXManager.Lights[light], null, new Vector3((float)p.X, (float)p.Y, 0.0F), lightColour);
@@ -11237,35 +11223,14 @@ namespace Client.MirScenes
                 {
                     if (x < 0) continue;
                     if (x >= Width) break;
+                    // Light information belongs to the cell, even without a front tile.
+                    // The original >= 10 guard prevented every coloured map light.
+                    if (!MapLightEncoding.TryDecode(M2CellInfo[x, y].Light,
+                        DXManager.Lights.Count - 1, out light, out Color lightIntensity))
+                        continue;
+
                     int imageIndex = (M2CellInfo[x, y].FrontImage & 0x7FFF) - 1;
-                    if (imageIndex == -1) continue;
                     int fileIndex = M2CellInfo[x, y].FrontIndex;
-                    if (fileIndex == -1) continue;
-                    if (M2CellInfo[x, y].Light <= 0 || M2CellInfo[x, y].Light >= 10) continue;
-                    if (M2CellInfo[x, y].Light == 0) continue;
-
-                    Color lightIntensity;
-
-                    light = (M2CellInfo[x, y].Light % 10) * 3;
-
-                    switch (M2CellInfo[x, y].Light / 10)
-                    {
-                        case 1:
-                            lightIntensity = Color.FromArgb(255, 255, 255, 255);
-                            break;
-                        case 2:
-                            lightIntensity = Color.FromArgb(255, 120, 180, 255);
-                            break;
-                        case 3:
-                            lightIntensity = Color.FromArgb(255, 255, 180, 120);
-                            break;
-                        case 4:
-                            lightIntensity = Color.FromArgb(255, 22, 160, 5);
-                            break;
-                        default:
-                            lightIntensity = Color.FromArgb(255, 255, 255, 255);
-                            break;
-                    }
 
                     if (MapObject.User.Poison.HasFlag(PoisonType.Blindness))
                     {
@@ -11277,11 +11242,8 @@ namespace Client.MirScenes
                         (y + OffSetY - MapObject.User.Movement.Y) * CellHeight + MapObject.User.OffSetMove.Y + 32);
 
 
-                    if (M2CellInfo[x, y].FrontAnimationFrame > 0)
+                    if (M2CellInfo[x, y].FrontAnimationFrame > 0 && imageIndex >= 0 && fileIndex >= 0)
                         p.Offset(Libraries.MapLibs[fileIndex].GetOffSet(imageIndex));
-
-                    if (light >= DXManager.Lights.Count)
-                        light = DXManager.Lights.Count - 1;
 
                     if (DXManager.Lights[light] != null && !DXManager.Lights[light].Disposed)
                     {
