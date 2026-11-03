@@ -7,6 +7,10 @@ on:
   pull_request:
     paths:
       - "Client/MirGraphics/MapLightEncoding.cs"
+      - "Client/MirGraphics/AtmosphereColourGrade.cs"
+      - "Client/MirGraphics/LightVisibility.cs"
+      - "Client/MirGraphics/BloomBufferLayout.cs"
+      - "Client/MirGraphics/LightBloomPass.cs"
       - "Client/MirGraphics/MapLightViewportCache.cs"
       - "Client/MirGraphics/ShadowMaskBudget.cs"
       - "Client/MirGraphics/SpriteFileLayout.cs"
@@ -34,6 +38,8 @@ jobs:
           dotnet-version: 8.0.x
       - name: Map light decoder
         run: dotnet run --project Tests/RenderingLightTests/RenderingLightTests.csproj
+      - name: Atmospheric lighting and bloom geometry
+        run: dotnet run --project Tests/VisualPipelineTests/VisualPipelineTests.csproj
       - name: Viewport map light cache and shadow projection
         run: dotnet run --project Tests/LightViewportTests/LightViewportTests.csproj
       - name: GPU shadow memory cap and LIB parsing
