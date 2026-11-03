@@ -60,7 +60,15 @@
             {
                 if (!CellObjects[i].Dead)
                 {
-                    CellObjects[i].Draw();
+                    MapObject actor = CellObjects[i];
+                    if (Settings.DynamicShadows && !actor.Hidden)
+                    {
+                        if (actor is PlayerObject player && player.BodyLibrary != null)
+                            player.BodyLibrary.DrawProjectedShadow(player.DrawFrame + player.ArmourOffSet, player.DrawLocation);
+                        else if (actor is MonsterObject monster && monster.BodyLibrary != null && monster.Frame != null)
+                            monster.BodyLibrary.DrawProjectedShadow(monster.DrawFrame, monster.DrawLocation);
+                    }
+                    actor.Draw();
                     continue;
                 }
 
