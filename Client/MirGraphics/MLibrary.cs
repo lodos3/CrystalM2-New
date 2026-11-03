@@ -555,28 +555,37 @@ namespace Client.MirGraphics
             }
         }
 
-        private bool CheckImage(int index)
+        // Read only the frame header until a frame is actually on screen.
+        // Header inspection does not create a Direct3D texture or inflate image bytes.
+        private MImage GetImageMetadata(int index)
         {
             if (!_initialized)
                 Initialize();
 
             if (_images == null || index < 0 || index >= _images.Length)
-                return false;
+                return null;
 
-            if (_images[index] == null)
+            MImage image = _images[index];
+            if (image == null)
             {
                 _fStream.Position = _indexList[index];
-                _images[index] = new MImage(_reader);
+                image = new MImage(_reader);
+                _images[index] = image;
             }
-            MImage mi = _images[index];
+            return image;
+        }
+
+        private bool CheckImage(int index)
+        {
+            MImage mi = GetImageMetadata(index);
+            if (mi == null || mi.Width <= 0 || mi.Height <= 0)
+                return false;
+
             if (!mi.TextureValid)
             {
-                if ((mi.Width == 0) || (mi.Height == 0))
-                    return false;
                 _fStream.Seek(_indexList[index] + 17, SeekOrigin.Begin);
                 mi.CreateTexture(_reader);
             }
-
             return true;
         }
 
@@ -643,12 +652,13 @@ namespace Client.MirGraphics
         public void DrawProjectedShadow(int index, Point location, Point worldCell)
         {
             if (!Settings.DynamicShadows || DXManager.Blending ||
-                DXManager.ProjectedShadowsDrawn >= DXManager.MaxProjectedShadowsPerMapDraw || !CheckImage(index))
+                DXManager.ProjectedShadowsDrawn >= DXManager.MaxProjectedShadowsPerMapDraw)
                 return;
 
-            MImage mi = _images[index];
-            if (mi.Width > 320 || mi.Height > 320)
-                return; // Avoid huge boss/structure silhouette uploads.
+            MImage mi = GetImageMetadata(index);
+            if (mi == null || mi.Width <= 0 || mi.Height <= 0 ||
+                mi.Width > 320 || mi.Height > 320)
+                return; // Reject oversized frames before their texture is uploaded.
 
             Point imagePoint = location;
             imagePoint.Offset(mi.X, mi.Y);
@@ -656,6 +666,9 @@ namespace Client.MirGraphics
                                         ?? ShadowProjection.Sunlight;
             if (!direction.IsProjectedVisible(imagePoint, mi.Width, mi.Height,
                                               Settings.ScreenWidth, Settings.ScreenHeight))
+                return;
+
+            if (!CheckImage(index))
                 return;
 
             Texture repaired = mi.GetRepairedShadowTexture();
@@ -669,15 +682,13 @@ namespace Client.MirGraphics
 
         public void Draw(int index, int x, int y)
         {
-            if (x >= Settings.ScreenWidth || y >= Settings.ScreenHeight)
+            MImage mi = GetImageMetadata(index);
+            if (mi == null ||
+                !SpriteVisibility.IsVisible(x, y, mi.Width, mi.Height,
+                                            Settings.ScreenWidth, Settings.ScreenHeight))
                 return;
 
             if (!CheckImage(index))
-                return;
-
-            MImage mi = _images[index];
-
-            if (x + mi.Width < 0 || y + mi.Height < 0)
                 return;
 
 
@@ -687,14 +698,16 @@ namespace Client.MirGraphics
         }
         public void Draw(int index, Point point, Color colour, bool offSet = false)
         {
-            if (!CheckImage(index))
-                return;
-
-            MImage mi = _images[index];
+            MImage mi = GetImageMetadata(index);
+            if (mi == null) return;
 
             if (offSet) point.Offset(mi.X, mi.Y);
 
-            if (point.X >= Settings.ScreenWidth || point.Y >= Settings.ScreenHeight || point.X + mi.Width < 0 || point.Y + mi.Height < 0)
+            if (!SpriteVisibility.IsVisible(point.X, point.Y, mi.Width, mi.Height,
+                                            Settings.ScreenWidth, Settings.ScreenHeight))
+                return;
+
+            if (!CheckImage(index))
                 return;
 
             DXManager.Draw(mi.Image, new Rectangle(0, 0, mi.Width, mi.Height), new Vector3((float)point.X, (float)point.Y, 0.0F), colour);
