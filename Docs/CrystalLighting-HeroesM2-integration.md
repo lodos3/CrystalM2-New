@@ -32,8 +32,8 @@ Each active line must consist of one monster database **Name** token and one pos
 
 ## Not implemented or not validated
 
-- Smooth day/night interpolation and screen-content-dependent ambient darkness (the legacy switch remains).
-- General HDR/bloom/post-processing pipeline, configurable additive blend modes, checkerboard alpha detection, and GPU shadow cleanup.
+- Content-dependent ambient darkness remains future work; day/night ambient interpolation is implemented with a 10-second easing transition.
+- General HDR/multi-pass bloom and advanced blend modes remain future work. A single-sample pixel-shader post-process and limited sprite-shadow checker repair are now implemented.
 - HeroesM2 player factions, saved faction membership, NPC `CHECKFACTION` / `CHANGEFACTION` script support, or client faction UI.
 - Windows x64 Direct3D9 rendering and full solution build have **not** been run in this environment (no .NET SDK/Direct3D device available).
 - Codex/chat conversation summaries are useful requirements, not recoverable source revisions. This PR should not be treated as a merge of every previous Codex session.
@@ -85,3 +85,26 @@ Test both the client with map assets and any sprites with mask layers. Compare a
 - Tests/AmbientLightTests covers initial light, all map tints, midpoint, completion, interrupted transitions, and map resets.
 - Test command: `dotnet run --project Tests/AmbientLightTests/AmbientLightTests.csproj`.
 - A 10-second fade is a visual transition, **not** a complete time-of-day simulation or any claimed 48-minute world cycle. This does not implement bloom or checkerboard/shadow cleanup. All GPU changes still require native Windows validation.
+
+
+## 2026-11-03 master consolidation: DX9 shading and runtime shadows
+
+The client now includes an optional Direct3D9 ps_2_0 post-processing shader in `Client/Data/Shaders/postprocess.ps`. The project copies it into the existing runtime `Data/Shaders` folder. The shader samples the already-rendered map exactly once, applies restrained brightness and radial vignette, and leaves the surrounding UI untouched. Its static constants are reused. The renderer falls back to the unshaded draw if the asset is missing, unsupported, or fails to assemble. This is **not** HDR or multi-pass bloom.
+
+For non-dead player and monster sprites, the active animation frame is reused as a flattened, slanted ground silhouette, recalculated when the map control redraws. The geometry is screen-space sprite projection, **not** a shadow map, environment-aware light direction or occlusion against walls. No texture readback is performed. To bound CPU/GPU state overhead, the pass draws at most 48 dynamic silhouettes per map redraw.
+
+Checkerboard detection is intentionally conservative. A sampled 8x8 patch of alternating opaque/transparent alpha enables a lazily generated half-resolution silhouette mask whose 2x2 alpha averages remove high-frequency holes **in the projected shadow only**. This does not alter sprite artwork or fix checker-patterned RGB pixels, oversized shadow metadata, baked shadows, or foreground tiles. Shadow masks expire after 30 seconds of disuse; main sprite textures keep the existing independent eviction policy.
+
+The graphics configuration in `Mir2Config.ini` has two independent options, both on by default:
+
+```ini
+[Graphics]
+PostProcessing=True
+DynamicShadows=True
+```
+
+Set either option to `False` if visual compatibility or performance requires it. For GPU/device compatibility, verify DX9 reset, window resizing, dead-player grayscale, 48+ monsters on screen, animations that change every frame, near-screen-boundary projection, missing shader assets, and a map with substantial checker-dithered sprite artwork.
+
+Regression coverage: `Tests/TextureAlphaTests/Program.cs` now includes 8x8 alternating alpha detection, unchanged source hit testing, smoothed shadow alpha and buffer validation. Run `dotnet run --project Tests/TextureAlphaTests/TextureAlphaTests.csproj` on a .NET 8 development machine and `dotnet build Client/Client.csproj -c Release` on Windows x64 with SlimDX dependencies installed. **Neither the Windows build nor in-game GPU/FPS tests were executed in the assistant environment; GitHub Actions jobs were failing before test-step execution.** Measure p50/p95 frame times, draw calls and process working set with each option disabled/enabled before declaring a performance win.
+
+Future: develop a true light-aware occlusion system (ground occluders/height data), cache-aware shadow batching, HDR/bloom via separately budgeted low-resolution surfaces, external FPS/memory profiling and additional HeroesM2 gameplay parity.
