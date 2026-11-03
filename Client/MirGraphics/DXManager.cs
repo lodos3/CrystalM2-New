@@ -45,7 +45,9 @@ namespace Client.MirGraphics
         private static readonly Vector4[] PostProcessConstants =
         {
             new Vector4(1.035f, 0.22f, 1.0f, 0.80f),
-            new Vector4(0.5f, 0.5f, 0.0f, 0.0f)
+            new Vector4(0.5f, 0.5f, 0.0f, 0.0f),
+            new Vector4(1f, 1f, 1f, 0f),
+            new Vector4(0f, 0.78f, 0.84f, 0.94f)
         };
 
         public static bool GrayScale;
@@ -272,10 +274,16 @@ namespace Client.MirGraphics
 
         // One-sample map colour grading/vignette on the existing map texture.
         // It does not shade UI or create another full-screen render target.
-        public static bool BeginPostProcessing()
+        public static bool BeginPostProcessing(Color atmosphere, float gradeStrength, float fogStrength)
         {
             if (PostProcessingPixelShader == null || PostProcessingPixelShader.Disposed)
                 return false;
+
+            PostProcessConstants[2] = new Vector4(atmosphere.R / 255f, atmosphere.G / 255f,
+                                                   atmosphere.B / 255f,
+                                                   Math.Clamp(gradeStrength, 0f, 0.4f));
+            PostProcessConstants[3] = new Vector4(Math.Clamp(fogStrength, 0f, 0.2f),
+                                                   0.78f, 0.84f, 0.94f);
             Sprite.Flush();
             Device.PixelShader = PostProcessingPixelShader;
             Device.SetPixelShaderConstant(0, PostProcessConstants);
@@ -541,6 +549,9 @@ namespace Client.MirGraphics
 
         private static void CleanUp()
         {
+            // The bloom pass owns a DEFAULT-pool target and DX9 shader objects.
+            // Release these before Device.Reset or disposing the old sprite.
+            LightBloomPass.DisposeAll();
             if (Sprite != null)
             {
                 if (!Sprite.Disposed)
