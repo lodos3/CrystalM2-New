@@ -10,6 +10,12 @@ namespace Client.MirGraphics
         private readonly byte[] _visibleBits;
         private readonly int _width;
         private readonly int _height;
+        private bool? _checkerboard;
+
+        // Run checker detection only for sprite frames that actually cast a shadow.
+        internal bool HasCheckerboard => _checkerboard ??= DetectCheckerboard();
+        internal int ShadowWidth => (_width + 1) / 2;
+        internal int ShadowHeight => (_height + 1) / 2;
 
         internal Size VisibleSize { get; }
         internal int StorageBytes => _visibleBits.Length;
@@ -60,6 +66,55 @@ namespace Client.MirGraphics
             Size size = maxX < 0 ? new Size(width, height) :
                 new Size(maxX - minX + 1, maxY - minY + 1);
             return new AlphaCoverage(width, height, bits, size);
+        }
+
+        // An 8x8 alternating alpha patch indicates binary checkerboard dithering.
+        // Do not change the original alpha coverage or visible sprite art.
+        private bool DetectCheckerboard()
+        {
+            if (_width < 8 || _height < 8) return false;
+            for (int y = 0; y <= _height - 8; y += 4)
+            {
+                for (int x = 0; x <= _width - 8; x += 4)
+                {
+                    int phaseA = 0;
+                    for (int dy = 0; dy < 8; dy++)
+                        for (int dx = 0; dx < 8; dx++)
+                            if (VisiblePixel(x + dx, y + dy) == (((dx + dy) & 1) == 0))
+                                phaseA++;
+                    if (phaseA >= 62 || phaseA <= 2)
+                        return true;
+                }
+            }
+            return false;
+        }
+
+        // A half-resolution coverage mask antialiases checkerboard holes on the
+        // projected ground shadow. Zero RGB avoids bleeding coloured sprite edges.
+        internal void WriteShadowMask(Span<byte> bgra, int pitch)
+        {
+            int width = ShadowWidth, height = ShadowHeight;
+            int rowBytes = checked(width * 4);
+            if (pitch < rowBytes || ((long)height - 1) * pitch + rowBytes > bgra.Length)
+                throw new ArgumentException("Shadow mask destination is too small.");
+
+            for (int y = 0; y < height; y++)
+            {
+                int row = y * pitch;
+                for (int x = 0; x < width; x++)
+                {
+                    int visible = 0, count = 0;
+                    for (int dy = 0; dy < 2 && y * 2 + dy < _height; dy++)
+                        for (int dx = 0; dx < 2 && x * 2 + dx < _width; dx++)
+                        {
+                            count++;
+                            if (VisiblePixel(x * 2 + dx, y * 2 + dy)) visible++;
+                        }
+                    int pixel = row + x * 4;
+                    bgra[pixel] = bgra[pixel + 1] = bgra[pixel + 2] = 0;
+                    bgra[pixel + 3] = (byte)((visible * 255 + count / 2) / count);
+                }
+            }
         }
 
         internal bool VisiblePixel(int x, int y)
