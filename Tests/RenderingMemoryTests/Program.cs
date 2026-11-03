@@ -34,6 +34,11 @@ using (var reader = new BinaryReader(new MemoryStream(bytes, writable: false)))
     catch (InvalidDataException) { }
 }
 
+Assert(SpriteFileLayout.HasSafeMask(128, 64, 100), "Ordinary LIB masks must be accepted.");
+Assert(!SpriteFileLayout.HasSafeMask(0, 64, 100), "Zero-width masks must not allocate textures.");
+Assert(!SpriteFileLayout.HasSafeMask(128, 64, 0), "Empty compressed masks must not be uploaded.");
+Assert(!SpriteFileLayout.HasSafeMask(8192, 8192, 10), "Absurd masks must be rejected before GPU allocation.");
+
 // A Direct3D9 REF device is a software rasterizer: never select it merely
 // because the GPU exposes an older vertex/pixel shader version.
 Assert(D3D9DevicePolicy.DeviceIsHardware, "Renderer must use the hardware D3D9 device.");
