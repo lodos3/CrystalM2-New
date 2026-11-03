@@ -59,4 +59,24 @@ Verify(!sunlight.IsProjectedVisible(new Point(130, 0), 60, 100, 100, 100),
        "Right-side offscreen projected shadows must be culled.");
 Verify(!sunlight.IsProjectedVisible(new Point(0, 150), 60, 100, 100, 100),
        "Below-screen projected shadows must be culled.");
+// Pixel-accurate viewport checks must happen before sprite GPU texture upload.
+// A sprite whose edge is exactly on the boundary has no visible pixels.
+Verify(SpriteVisibility.IsVisible(-9, 10, 10, 10, 100, 100),
+       "One pixel entering from the left must render.");
+Verify(!SpriteVisibility.IsVisible(-10, 10, 10, 10, 100, 100),
+       "A sprite entirely left of the viewport must not render.");
+Verify(SpriteVisibility.IsVisible(99, 20, 2, 2, 100, 100),
+       "One pixel entering from the right must render.");
+Verify(!SpriteVisibility.IsVisible(100, 20, 2, 2, 100, 100),
+       "Sprites at the right boundary must not upload.");
+Verify(!SpriteVisibility.IsVisible(10, 100, 5, 5, 100, 100),
+       "Sprites below the viewport must not upload.");
+Verify(SpriteVisibility.IsVisible(10, 99, 5, 5, 100, 100),
+       "Sprites straddling the bottom border must render.");
+Verify(!SpriteVisibility.IsVisible(0, 0, 0, 5, 100, 100),
+       "Empty frames are never visible.");
+Verify(!SpriteVisibility.IsVisible(int.MaxValue - 1, 0, 100, 5, 100, 100),
+       "Position arithmetic must not overflow into a visible area.");
+Verify(!SpriteVisibility.IsVisible(int.MinValue, 0, 100, 5, 100, 100),
+       "Negative extreme coordinates must be rejected.");
 Console.WriteLine("Viewport cache, culling, source changes and directional shadow regression checks passed.");
