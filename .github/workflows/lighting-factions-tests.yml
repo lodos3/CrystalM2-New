@@ -1,0 +1,39 @@
+name: Lighting and faction regression tests
+on:
+  push:
+    branches:
+      - master
+      - feature/lighting-map-spell-20261103
+  pull_request:
+    paths:
+      - "Client/MirGraphics/MapLightEncoding.cs"
+      - "Client/MirGraphics/AlphaCoverage.cs"
+      - "Client/Data/Shaders/**"
+      - "Client/Settings.cs"
+      - "Client/Client.csproj"
+      - "Client/MirObjects/MapCode.cs"
+      - "Client/MirGraphics/AmbientLightTransition.cs"
+      - "Client/MirScenes/GameScene.cs"
+      - "Client/MirGraphics/MLibrary.cs"
+      - "Client/MirGraphics/DXManager.cs"
+      - "Client/MirControls/MirControl.cs"
+      - "Client/Forms/CMain.cs"
+      - "Server/MirEnvir/MonsterFactionRules.cs"
+      - "Tests/**"
+      - ".github/workflows/lighting-factions-tests.yml"
+jobs:
+  pure-logic-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Map light decoder
+        run: dotnet run --project Tests/RenderingLightTests/RenderingLightTests.csproj
+      - name: Monster faction rules
+        run: dotnet run --project Tests/MonsterFactionTests/MonsterFactionTests.csproj
+      - name: Texture alpha packing and hit testing
+        run: dotnet run --project Tests/TextureAlphaTests/TextureAlphaTests.csproj
+      - name: Day-night ambient transition regression tests
+        run: dotnet run --project Tests/AmbientLightTests/AmbientLightTests.csproj
