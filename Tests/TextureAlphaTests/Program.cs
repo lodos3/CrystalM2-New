@@ -47,4 +47,27 @@ Verify(packed.VisiblePixel(16, 0) && !packed.VisiblePixel(15, 0), "Bit boundary 
 Reject(() => AlphaCoverage.Capture(new byte[4], 3, 2, 16), "Truncated source must throw.");
 Reject(() => AlphaCoverage.Capture(new byte[32], 3, 2, 8), "Pitch less than pixel width must throw.");
 Reject(() => AlphaCoverage.Capture(new byte[32], 0, 2, 16), "Zero width must throw.");
-Console.WriteLine("Packed BGRA alpha coverage regression checks passed.");
+
+
+// Checkerboard detection is deliberately limited to alpha coverage; source artwork
+// must not be recoloured or overwritten by the shadow repair.
+byte[] checker = new byte[8 * 8 * 4];
+for (int y = 0; y < 8; y++)
+    for (int x = 0; x < 8; x++)
+        checker[(y * 8 + x) * 4 + 3] = (byte)(((x + y) & 1) == 0 ? 255 : 0);
+var checkerCoverage = AlphaCoverage.Capture(checker, 8, 8, 32);
+Verify(checkerCoverage.HasCheckerboard, "Alternating 8x8 alpha must be detected.");
+Verify(checkerCoverage.VisiblePixel(0, 0) && !checkerCoverage.VisiblePixel(1, 0),
+       "Checker detection must never modify original hit-testing.");
+byte[] repaired = new byte[checkerCoverage.ShadowWidth * checkerCoverage.ShadowHeight * 4];
+checkerCoverage.WriteShadowMask(repaired, checkerCoverage.ShadowWidth * 4);
+Verify(repaired[3] == 128 && repaired[7] == 128,
+       "Downsampled checker shadow should retain half coverage, not sharp holes.");
+var solid = new byte[8 * 8 * 4];
+for (int i = 3; i < solid.Length; i += 4) solid[i] = 255;
+Verify(!AlphaCoverage.Capture(solid, 8, 8, 32).HasCheckerboard,
+       "Opaque sprites should not allocate a repaired shadow mask.");
+Reject(() => checkerCoverage.WriteShadowMask(new byte[3], 2),
+       "Truncated shadow destination must be rejected.");
+
+Console.WriteLine("Packed BGRA alpha coverage and checkerboard shadow regression checks passed.");
