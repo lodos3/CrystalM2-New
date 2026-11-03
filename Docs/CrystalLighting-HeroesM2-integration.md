@@ -75,3 +75,13 @@ dotnet build Client/Client.csproj -c Release
 Test both the client with map assets and any sprites with mask layers. Compare allocations/working set and p50/p95 frame duration before/after at the same resolution, route and number of effects (use a profiler and repeat each scenario). The regressions are committed but not compiled or executed here; GitHub Actions previously failed before running even its first step. No FPS gain or memory reduction has been measured yet.
 
 **Still outstanding:** checkerboard-key pattern detection and runtime shadow cleanup, full post-processing/bloom, smooth day/night, and player factions. Avoid enabling checkerboard removal globally until sample asset pixels demonstrate a safe, low-false-positive rule.
+
+## Ambient-light interpolation (follow-up)
+
+- Adds a deterministic 10-second visual fade between the server's unchanged Day/Dawn/Evening/Night states, with interruption-safe restarts and no new protocol fields.
+- Preserves the existing per-map night tint choices (dark grey, LightSlateGray, SkyBlue, Goldenrod).
+- On a new map load, initializes to that map's lighting immediately rather than fading from the previous location.
+- After a transition reaches pure daylight, avoids the night light render-target pass, unless blindness requires it.
+- Tests/AmbientLightTests covers initial light, all map tints, midpoint, completion, interrupted transitions, and map resets.
+- Test command: `dotnet run --project Tests/AmbientLightTests/AmbientLightTests.csproj`.
+- A 10-second fade is a visual transition, **not** a complete time-of-day simulation or any claimed 48-minute world cycle. This does not implement bloom or checkerboard/shadow cleanup. All GPU changes still require native Windows validation.

@@ -10357,6 +10357,7 @@ namespace Client.MirScenes
         public LightSetting Lights;
         public bool Lightning, Fire;
         public byte MapDarkLight;
+        private readonly AmbientLightTransition _ambientLighting = new AmbientLightTransition();
         public long LightningTime, FireTime;
         public WeatherSetting Weather = WeatherSetting.None;
         public bool FloorValid, LightsValid;
@@ -10441,6 +10442,7 @@ namespace Client.MirScenes
         public void LoadMap()
         {
             ResetMap();
+            _ambientLighting.Reset();
 
             MapObject.MouseObjectID = 0;
             MapObject.TargetObjectID = 0;
@@ -10618,10 +10620,15 @@ namespace Client.MirScenes
             //Render Death, 
 
             LightSetting setting = Lights == LightSetting.Normal ? GameScene.Scene.Lights : Lights;
+            Color targetAmbient = AmbientLightTransition.Target(setting, MapDarkLight);
+            Color ambient = _ambientLighting.Sample(targetAmbient, CMain.Time);
 
-            if (setting != LightSetting.Day || GameScene.User.Poison.HasFlag(PoisonType.Blindness))
+            // Continue the light pass when transitioning into day, then avoid
+            // its render target and blend operations once daylight is fully white.
+            if (ambient.ToArgb() != Color.White.ToArgb() ||
+                GameScene.User.Poison.HasFlag(PoisonType.Blindness))
             {
-                DrawLights(setting);
+                DrawLights(ambient);
             }
 
             if (Settings.DropView || GameScene.DropViewTime > CMain.Time)
@@ -11052,7 +11059,7 @@ namespace Client.MirScenes
             return light;
         }
 
-        private void DrawLights(LightSetting setting)
+        private void DrawLights(Color darkness)
         {
             if (DXManager.Lights == null || DXManager.Lights.Count == 0) return;
 
@@ -11065,42 +11072,7 @@ namespace Client.MirScenes
             Surface oldSurface = DXManager.CurrentSurface;
             DXManager.SetSurface(DXManager.LightSurface);
 
-            #region Night Lights
-            Color darkness;
-
-            switch (setting)
-            {
-                case LightSetting.Night:
-                    {
-                        switch (MapDarkLight)
-                        {
-                            case 1:
-                                darkness = Color.FromArgb(255, 20, 20, 20);
-                                break;
-                            case 2:
-                                darkness = Color.LightSlateGray;
-                                break;
-                            case 3:
-                                darkness = Color.SkyBlue;
-                                break;
-                            case 4:
-                                darkness = Color.Goldenrod;
-                                break;
-                            default:
-                                darkness = Color.Black;
-                                break;
-                        }
-                    }
-                    break;
-                case LightSetting.Evening:
-                case LightSetting.Dawn:
-                    darkness = Color.FromArgb(255, 50, 50, 50);
-                    break;
-                default:
-                case LightSetting.Day:
-                    darkness = Color.FromArgb(255, 255, 255, 255);
-                    break;
-            }
+            #region Ambient Light
 
             if (MapObject.User.Poison.HasFlag(PoisonType.Blindness))
             {
