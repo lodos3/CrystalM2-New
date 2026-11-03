@@ -33,4 +33,15 @@ using (var reader = new BinaryReader(new MemoryStream(bytes, writable: false)))
     try { SpriteFileLayout.SkipCompressedLayer(reader, -1); throw new Exception("Expected negative-length rejection."); }
     catch (InvalidDataException) { }
 }
-Console.WriteLine("Shadow GPU mask budget and allocation-free LIB metadata skipping checks passed.");
+
+// A Direct3D9 REF device is a software rasterizer: never select it merely
+// because the GPU exposes an older vertex/pixel shader version.
+Assert(D3D9DevicePolicy.DeviceIsHardware, "Renderer must use the hardware D3D9 device.");
+Assert(D3D9DevicePolicy.VertexProcessing(false) == D3D9VertexProcessing.Software,
+       "Older GPUs without hardware T&L must use software vertex processing.");
+Assert(D3D9DevicePolicy.VertexProcessing(true) == D3D9VertexProcessing.Hardware,
+       "Hardware T&L must remain the fast path.");
+Assert(!D3D9DevicePolicy.EnablePureDevice,
+       "PureDevice is incompatible with renderer state readbacks.");
+
+Console.WriteLine("Shadow memory, LIB parsing and hardware-device regression checks passed.");
