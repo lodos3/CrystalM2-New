@@ -652,14 +652,14 @@ namespace Client.MirGraphics
 
             Point imagePoint = location;
             imagePoint.Offset(mi.X, mi.Y);
-            if (imagePoint.X + mi.Width < 0 || imagePoint.X - mi.Height > Settings.ScreenWidth ||
-                imagePoint.Y + mi.Height < 0 || imagePoint.Y > Settings.ScreenHeight)
+            ShadowProjection direction = GameScene.Scene?.MapControl?.GetShadowProjection(worldCell)
+                                        ?? ShadowProjection.Sunlight;
+            if (!direction.IsProjectedVisible(imagePoint, mi.Width, mi.Height,
+                                              Settings.ScreenWidth, Settings.ScreenHeight))
                 return;
 
             Texture repaired = mi.GetRepairedShadowTexture();
             bool halfSize = repaired != null;
-            ShadowProjection direction = GameScene.Scene?.MapControl?.GetShadowProjection(worldCell)
-                                        ?? ShadowProjection.Sunlight;
             DXManager.DrawProjectedShadow(repaired ?? mi.Image,
                 new Rectangle(0, 0, halfSize ? (mi.Width + 1) / 2 : mi.Width,
                                     halfSize ? (mi.Height + 1) / 2 : mi.Height),
