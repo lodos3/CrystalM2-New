@@ -10609,6 +10609,7 @@ namespace Client.MirScenes
                 DXManager.Draw(DXManager.FloorTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White);
             }
 
+            DXManager.ProjectedShadowsDrawn = 0;
             DrawObjects();
 
             //render weather
