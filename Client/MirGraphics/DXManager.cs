@@ -45,6 +45,8 @@ namespace Client.MirGraphics
         };
 
         public static bool GrayScale;
+        public static int ProjectedShadowsDrawn;
+        public const int MaxProjectedShadowsPerMapDraw = 48;
 
         public static Point[] LightSizes =
         {
@@ -290,7 +292,8 @@ namespace Client.MirGraphics
         public static void DrawProjectedShadow(Texture texture, Rectangle sourceRect,
                                                 Point topLeft, int sourceHeight, bool halfResolution)
         {
-            if (texture == null || texture.Disposed || sourceHeight <= 0)
+            if (texture == null || texture.Disposed || sourceHeight <= 0 ||
+                ProjectedShadowsDrawn >= MaxProjectedShadowsPerMapDraw)
                 return;
 
             Matrix original = Sprite.Transform;
@@ -308,6 +311,7 @@ namespace Client.MirGraphics
                 projection.M42 = topLeft.Y + (1f - flatten) * sourceHeight;
                 Sprite.Transform = projection;
                 Draw(texture, sourceRect, Vector3.Zero, Color.FromArgb(92, 0, 0, 0));
+                ProjectedShadowsDrawn++;
                 Sprite.Flush();
             }
             finally
