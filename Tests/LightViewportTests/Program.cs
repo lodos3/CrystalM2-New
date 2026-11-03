@@ -50,4 +50,13 @@ var up = ShadowProjection.FromLight(new Point(40, 35), new Point(40, 40));
 Verify(down.Vertical > 0 && up.Vertical < 0, "Shadow vertical projection must follow light direction.");
 Verify(ShadowProjection.FromLight(new Point(40, 40), new Point(40, 40)).Horizontal ==
        ShadowProjection.Sunlight.Horizontal, "Co-located source must use a stable fallback.");
+var sunlight = ShadowProjection.Sunlight;
+Verify(sunlight.IsProjectedVisible(new Point(-80, 0), 60, 100, 100, 100),
+       "Projected shadow entering the viewport must not be culled by sprite origin.");
+Verify(!sunlight.IsProjectedVisible(new Point(-150, 0), 60, 100, 100, 100),
+       "Completely offscreen projected shadows must be culled.");
+Verify(!sunlight.IsProjectedVisible(new Point(130, 0), 60, 100, 100, 100),
+       "Right-side offscreen projected shadows must be culled.");
+Verify(!sunlight.IsProjectedVisible(new Point(0, 150), 60, 100, 100, 100),
+       "Below-screen projected shadows must be culled.");
 Console.WriteLine("Viewport cache, culling, source changes and directional shadow regression checks passed.");
