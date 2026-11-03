@@ -465,6 +465,13 @@ namespace Client
 
             text += string.Format(", TLC: {0}", DXManager.TextureList.Count(x => x.TextureValid));
             text += string.Format(", CLC: {0}", DXManager.ControlList.Count(x => x.IsDisposed == false));
+            text += string.Format(", Shadows: {0}/{1}", DXManager.ProjectedShadowsDrawn,
+                                  DXManager.MaxProjectedShadowsPerMapDraw);
+            text += string.Format(", ShadowMask: {0:F2}/{1:F0} MiB",
+                                  DXManager.ShadowMasks.UsedBytes / 1048576.0,
+                                  DXManager.ShadowMasks.LimitBytes / 1048576.0);
+            text += string.Format(", ManagedHeap: {0:F1} MiB",
+                                  GC.GetTotalMemory(false) / 1048576.0);
 
             if (Settings.FullScreen)
             {
