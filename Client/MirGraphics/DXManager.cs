@@ -439,7 +439,8 @@ namespace Client.MirGraphics
 
                 if (CMain.Time <= m.CleanTime) continue;
 
-                m.DisposeTexture();
+                m.DisposeTexture(false);
+                TextureList.RemoveAt(i);
             }
 
             for (int i = ControlList.Count - 1; i >= 0; i--)
@@ -454,7 +455,8 @@ namespace Client.MirGraphics
 
                 if (CMain.Time <= c.CleanTime) continue;
 
-                c.DisposeTexture();
+                c.DisposeTexture(false);
+                ControlList.RemoveAt(i);
             }
         }
 
@@ -559,7 +561,7 @@ namespace Client.MirGraphics
 
                 if (m == null) continue;
 
-                m.DisposeTexture();
+                m.DisposeTexture(false);
             }
             TextureList.Clear();
 
@@ -570,7 +572,7 @@ namespace Client.MirGraphics
 
                 if (c == null) continue;
 
-                c.DisposeTexture();
+                c.DisposeTexture(false);
             }
             ControlList.Clear();
         }

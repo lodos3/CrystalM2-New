@@ -54,3 +54,24 @@ On Windows x64 with the original Mir assets:
 5. Check shader/render-state recovery, screen resizing, missing magic library images, and performance with many simultaneous spells.
 
 The branch is intentionally **draft** until the actual Windows game client and server are built and exercised.
+
+
+## Client memory / FPS work (follow-up)
+
+- Replaces the stale MImage.Data native pointer (formerly read after UnlockRectangle) with a managed, bit-packed alpha hit-test cache. Transparent pixels remain non-clickable and visible bounds are captured once per texture upload, not repeatedly rescanned. Stores one bit per pixel instead of a full BGRA copy.
+- Handles Direct3D9 row pitch explicitly when a GPU texture lock includes row padding, preventing rows from being interpreted at the wrong stride.
+- Evicted textures discard the alpha mask. Failed texture creation releases allocated Direct3D resources.
+- Periodic texture and control cleanup removes expired entries by index, avoiding repeated linear lookup during bulk eviction.
+- SlimDX object tracking is enabled in DEBUG builds only. Existing gameplay timing and online packet formats are unchanged.
+- Tests/TextureAlphaTests contains framework-free alpha/hit-test regression cases, including padded-pitch pixels, bit boundaries, full transparency, bounds and invalid buffers.
+
+### Verification required on Windows x64
+
+```sh
+dotnet run --project Tests/TextureAlphaTests/TextureAlphaTests.csproj
+dotnet build Client/Client.csproj -c Release
+```
+
+Test both the client with map assets and any sprites with mask layers. Compare allocations/working set and p50/p95 frame duration before/after at the same resolution, route and number of effects (use a profiler and repeat each scenario). The regressions are committed but not compiled or executed here; GitHub Actions previously failed before running even its first step. No FPS gain or memory reduction has been measured yet.
+
+**Still outstanding:** checkerboard-key pattern detection and runtime shadow cleanup, full post-processing/bloom, smooth day/night, and player factions. Avoid enabling checkerboard removal globally until sample asset pixels demonstrate a safe, low-false-positive rule.

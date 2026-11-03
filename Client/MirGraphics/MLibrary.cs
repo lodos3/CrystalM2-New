@@ -875,7 +875,7 @@ namespace Client.MirGraphics
         public long CleanTime;
         public Size TrueSize;
 
-        public unsafe byte* Data;
+        private AlphaCoverage _alphaCoverage;
 
         public MImage(BinaryReader reader)
         {
@@ -904,159 +904,123 @@ namespace Client.MirGraphics
 
         public unsafe void CreateTexture(BinaryReader reader)
         {
-            int w = Width;// + (4 - Width % 4) % 4;
-            int h = Height;// + (4 - Height % 4) % 4;
+            int width = Width;
+            int height = Height;
 
-            Image = new Texture(DXManager.Device, w, h, 1, Usage.None, Format.A8R8G8B8, Pool.Managed);
-            DataRectangle stream = Image.LockRectangle(0, LockFlags.Discard);
-            Data = (byte*)stream.Data.DataPointer;
-
-            DecompressImage(reader.ReadBytes(Length), stream.Data);
-
-            stream.Data.Dispose();
-            Image.UnlockRectangle(0);
-
-            if (HasMask)
+            try
             {
-                reader.ReadBytes(12);
-                w = Width;// + (4 - Width % 4) % 4;
-                h = Height;// + (4 - Height % 4) % 4;
+                Image = new Texture(DXManager.Device, width, height, 1, Usage.None, Format.A8R8G8B8, Pool.Managed);
+                DataRectangle locked = Image.LockRectangle(0, LockFlags.Discard);
+                try
+                {
+                    DecompressBgraRows(reader.ReadBytes(Length), locked.Data, width, height, locked.Pitch);
+                    // Snapshot alpha BEFORE UnlockRectangle. Never retain the native pointer.
+                    var pixels = new ReadOnlySpan<byte>((void*)locked.Data.DataPointer, checked(locked.Pitch * height));
+                    _alphaCoverage = AlphaCoverage.Capture(pixels, width, height, locked.Pitch);
+                    TrueSize = _alphaCoverage.VisibleSize;
+                }
+                finally
+                {
+                    locked.Data.Dispose();
+                    Image.UnlockRectangle(0);
+                }
 
-                MaskImage = new Texture(DXManager.Device, w, h, 1, Usage.None, Format.A8R8G8B8, Pool.Managed);
-                stream = MaskImage.LockRectangle(0, LockFlags.Discard);
+                if (HasMask)
+                {
+                    // Keep legacy mask dimensions/layout until a separate format audit.
+                    reader.ReadBytes(12);
+                    MaskImage = new Texture(DXManager.Device, width, height, 1, Usage.None, Format.A8R8G8B8, Pool.Managed);
+                    DataRectangle maskLocked = MaskImage.LockRectangle(0, LockFlags.Discard);
+                    try
+                    {
+                        DecompressImage(reader.ReadBytes(Length), maskLocked.Data);
+                    }
+                    finally
+                    {
+                        maskLocked.Data.Dispose();
+                        MaskImage.UnlockRectangle(0);
+                    }
+                }
 
-                DecompressImage(reader.ReadBytes(Length), stream.Data);
-
-                stream.Data.Dispose();
-                MaskImage.UnlockRectangle(0);
+                DXManager.TextureList.Add(this);
+                TextureValid = true;
+                CleanTime = CMain.Time + Settings.CleanDelay;
             }
-
-            DXManager.TextureList.Add(this);
-            TextureValid = true;
-
-            CleanTime = CMain.Time + Settings.CleanDelay;
+            catch
+            {
+                Image?.Dispose();
+                MaskImage?.Dispose();
+                Image = null;
+                MaskImage = null;
+                _alphaCoverage = null;
+                TrueSize = Size.Empty;
+                TextureValid = false;
+                throw;
+            }
         }
 
-        public unsafe void DisposeTexture()
+        // The caller already knows whether the manager is removing the list entry.
+        // Avoid repeatedly searching and shifting a list while expiring many textures.
+        public void DisposeTexture(bool unregister = true)
         {
-            DXManager.TextureList.Remove(this);
+            if (unregister)
+                DXManager.TextureList.Remove(this);
 
             if (Image != null && !Image.Disposed)
-            {
                 Image.Dispose();
-            }
-
             if (MaskImage != null && !MaskImage.Disposed)
-            {
                 MaskImage.Dispose();
-            }
 
-            TextureValid = false;
             Image = null;
             MaskImage = null;
-            Data = null;
+            TextureValid = false;
+            _alphaCoverage = null;
+            TrueSize = Size.Empty;
         }
 
-        public unsafe bool VisiblePixel(Point p)
+        public bool VisiblePixel(Point point)
         {
-            if (p.X < 0 || p.Y < 0 || p.X >= Width || p.Y >= Height)
-                return false;
-
-            int w = Width;
-
-            bool result = false;
-            if (Data != null)
-            {
-                int x = p.X;
-                int y = p.Y;
-                
-                int index = (y * (w << 2)) + (x << 2) + 3;
-                
-                byte col = Data[index];
-
-                if (col == 0) return false;
-                else return true;
-            }
-            return result;
+            return TextureValid && _alphaCoverage != null &&
+                   _alphaCoverage.VisiblePixel(point.X, point.Y);
         }
 
         public Size GetTrueSize()
         {
-            if (TrueSize != Size.Empty) return TrueSize;
+            return TrueSize.IsEmpty ? new Size(Width, Height) : TrueSize;
+        }
 
-            int l = 0, t = 0, r = Width, b = Height;
+        // GZip data is tightly packed BGRA; a locked D3D9 rectangle can have
+        // padded rows. Stream row-by-row only when its native pitch requires it.
+        private static void DecompressBgraRows(byte[] data, Stream destination,
+                                               int width, int height, int pitch)
+        {
+            int rowBytes = checked(width * 4);
+            if (pitch < rowBytes)
+                throw new InvalidDataException("Invalid BGRA texture pitch.");
 
-            bool visible = false;
-            for (int x = 0; x < r; x++)
+            using (var compressed = new GZipStream(new MemoryStream(data), CompressionMode.Decompress))
             {
-                for (int y = 0; y < b; y++)
+                if (pitch == rowBytes)
                 {
-                    if (!VisiblePixel(new Point(x, y))) continue;
-
-                    visible = true;
-                    break;
+                    compressed.CopyTo(destination);
+                    return;
                 }
 
-                if (!visible) continue;
-
-                l = x;
-                break;
-            }
-
-            visible = false;
-            for (int y = 0; y < b; y++)
-            {
-                for (int x = l; x < r; x++)
+                byte[] row = new byte[rowBytes];
+                for (int y = 0; y < height; y++)
                 {
-                    if (!VisiblePixel(new Point(x, y))) continue;
-
-                    visible = true;
-                    break;
-
+                    int filled = 0;
+                    while (filled < rowBytes)
+                    {
+                        int read = compressed.Read(row, filled, rowBytes - filled);
+                        if (read == 0)
+                            throw new EndOfStreamException("Incomplete BGRA texture data.");
+                        filled += read;
+                    }
+                    destination.Position = (long)y * pitch;
+                    destination.Write(row, 0, row.Length);
                 }
-                if (!visible) continue;
-
-                t = y;
-                break;
             }
-
-            visible = false;
-            for (int x = r - 1; x >= l; x--)
-            {
-                for (int y = 0; y < b; y++)
-                {
-                    if (!VisiblePixel(new Point(x, y))) continue;
-
-                    visible = true;
-                    break;
-                }
-
-                if (!visible) continue;
-
-                r = x + 1;
-                break;
-            }
-
-            visible = false;
-            for (int y = b - 1; y >= t; y--)
-            {
-                for (int x = l; x < r; x++)
-                {
-                    if (!VisiblePixel(new Point(x, y))) continue;
-
-                    visible = true;
-                    break;
-
-                }
-                if (!visible) continue;
-
-                b = y + 1;
-                break;
-            }
-
-            TrueSize = Rectangle.FromLTRB(l, t, r, b).Size;
-
-            return TrueSize;
         }
 
         private static byte[] DecompressImage(byte[] image)

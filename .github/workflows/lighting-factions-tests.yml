@@ -6,6 +6,11 @@ on:
   pull_request:
     paths:
       - "Client/MirGraphics/MapLightEncoding.cs"
+      - "Client/MirGraphics/AlphaCoverage.cs"
+      - "Client/MirGraphics/MLibrary.cs"
+      - "Client/MirGraphics/DXManager.cs"
+      - "Client/MirControls/MirControl.cs"
+      - "Client/Forms/CMain.cs"
       - "Server/MirEnvir/MonsterFactionRules.cs"
       - "Tests/**"
       - ".github/workflows/lighting-factions-tests.yml"
@@ -21,3 +26,5 @@ jobs:
         run: dotnet run --project Tests/RenderingLightTests/RenderingLightTests.csproj
       - name: Monster faction rules
         run: dotnet run --project Tests/MonsterFactionTests/MonsterFactionTests.csproj
+      - name: Texture alpha packing and hit testing
+        run: dotnet run --project Tests/TextureAlphaTests/TextureAlphaTests.csproj
