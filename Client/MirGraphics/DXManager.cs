@@ -84,18 +84,15 @@ namespace Client.MirGraphics
             Direct3D d3d = new Direct3D();
 
             Capabilities devCaps = d3d.GetDeviceCaps(0, DeviceType.Hardware);
-            DeviceType devType = DeviceType.Reference;
-            CreateFlags devFlags = CreateFlags.HardwareVertexProcessing;
-
-            if (devCaps.VertexShaderVersion.Major >= 2 && devCaps.PixelShaderVersion.Major >= 2)
-                devType = DeviceType.Hardware;
-
-            if ((devCaps.DeviceCaps & DeviceCaps.HWTransformAndLight) != 0)
-                devFlags = CreateFlags.HardwareVertexProcessing;
-
-
-            if ((devCaps.DeviceCaps & DeviceCaps.PureDevice) != 0)
-                devFlags |= CreateFlags.PureDevice;
+            // A missing shader-model 2.0 capability must not switch the entire
+            // game to the CPU-bound Direct3D9 reference rasterizer.
+            DeviceType devType = DeviceType.Hardware;
+            bool hardwareTransform = (devCaps.DeviceCaps & DeviceCaps.HWTransformAndLight) != 0;
+            CreateFlags devFlags = D3D9DevicePolicy.VertexProcessing(hardwareTransform) ==
+                                   D3D9VertexProcessing.Hardware
+                                       ? CreateFlags.HardwareVertexProcessing
+                                       : CreateFlags.SoftwareVertexProcessing;
+            // Never enable PureDevice: this renderer reads PixelShader state.
 
 
             Device = new Device(d3d, d3d.Adapters.DefaultAdapter.Adapter, devType, Program.Form.Handle, devFlags, Parameters);
