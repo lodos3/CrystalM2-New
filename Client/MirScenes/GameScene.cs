@@ -10684,11 +10684,14 @@ namespace Client.MirScenes
 
             float oldOpacity = DXManager.Opacity;
 
-            if (MapObject.User.Dead) DXManager.SetGrayscale(true);
+            bool dead = MapObject.User.Dead;
+            if (dead) DXManager.SetGrayscale(true);
+            bool postProcessing = !dead && Settings.PostProcessing && DXManager.BeginPostProcessing();
 
             DXManager.DrawOpaque(ControlTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White, Opacity);
 
-            if (MapObject.User.Dead) DXManager.SetGrayscale(false);
+            if (postProcessing) DXManager.EndPostProcessing();
+            if (dead) DXManager.SetGrayscale(false);
 
             CleanTime = CMain.Time + Settings.CleanDelay;
         }
