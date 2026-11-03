@@ -148,7 +148,7 @@ namespace Client.MirControls
             surface.Dispose();
         }
 
-        internal void DisposeTexture()
+        internal void DisposeTexture(bool unregister = true)
         {
             if (ControlTexture == null || ControlTexture.Disposed) return;
 
@@ -157,7 +157,8 @@ namespace Client.MirControls
             TextureValid = false;
             TextureSize = Size.Empty;
 
-            DXManager.ControlList.Remove(this);
+            if (unregister)
+                DXManager.ControlList.Remove(this);
         }
         #endregion
 
