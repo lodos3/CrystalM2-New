@@ -34,6 +34,8 @@
   <ItemGroup>
     <None Include="..\.editorconfig" Link=".editorconfig" />
     <None Update="Data\Shaders\postprocess.ps" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Data\Shaders\bloom-extract.ps" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Data\Shaders\bloom-blur.ps" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
