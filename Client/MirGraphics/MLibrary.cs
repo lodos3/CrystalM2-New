@@ -637,6 +637,32 @@ namespace Client.MirGraphics
             return mi.TrueSize;
         }
 
+        // Redraw the current animation frame's alpha silhouette at ground level.
+        // Only checked/dithered sprites need an additional repaired GPU texture.
+        public void DrawProjectedShadow(int index, Point location)
+        {
+            if (!Settings.DynamicShadows || DXManager.Blending || !CheckImage(index))
+                return;
+
+            MImage mi = _images[index];
+            if (mi.Width > 320 || mi.Height > 320)
+                return; // Avoid huge boss/structure silhouette uploads.
+
+            Point imagePoint = location;
+            imagePoint.Offset(mi.X, mi.Y);
+            if (imagePoint.X + mi.Width < 0 || imagePoint.X - mi.Height > Settings.ScreenWidth ||
+                imagePoint.Y + mi.Height < 0 || imagePoint.Y > Settings.ScreenHeight)
+                return;
+
+            Texture repaired = mi.GetRepairedShadowTexture();
+            bool halfSize = repaired != null;
+            DXManager.DrawProjectedShadow(repaired ?? mi.Image,
+                new Rectangle(0, 0, halfSize ? (mi.Width + 1) / 2 : mi.Width,
+                                    halfSize ? (mi.Height + 1) / 2 : mi.Height),
+                imagePoint, mi.Height, halfSize);
+            mi.CleanTime = CMain.Time + Settings.CleanDelay;
+        }
+
         public void Draw(int index, int x, int y)
         {
             if (x >= Settings.ScreenWidth || y >= Settings.ScreenHeight)
@@ -876,6 +902,9 @@ namespace Client.MirGraphics
         public Size TrueSize;
 
         private AlphaCoverage _alphaCoverage;
+        private Texture _repairedShadowTexture;
+        private long _repairedShadowLastUsed;
+        private bool _shadowAllocationFailed;
 
         public MImage(BinaryReader reader)
         {
@@ -942,6 +971,7 @@ namespace Client.MirGraphics
                     }
                 }
 
+                _shadowAllocationFailed = false;
                 DXManager.TextureList.Add(this);
                 TextureValid = true;
                 CleanTime = CMain.Time + Settings.CleanDelay;
@@ -950,6 +980,8 @@ namespace Client.MirGraphics
             {
                 Image?.Dispose();
                 MaskImage?.Dispose();
+                _repairedShadowTexture?.Dispose();
+                _repairedShadowTexture = null;
                 Image = null;
                 MaskImage = null;
                 _alphaCoverage = null;
@@ -959,12 +991,68 @@ namespace Client.MirGraphics
             }
         }
 
+        // Generate a compact repair texture once per checked sprite frame. Original
+        // texture pixels remain untouched, including intentionally dithered art.
+        public unsafe Texture GetRepairedShadowTexture()
+        {
+            if (_alphaCoverage == null || !_alphaCoverage.HasCheckerboard || _shadowAllocationFailed)
+                return null;
+
+            if (_repairedShadowTexture == null || _repairedShadowTexture.Disposed)
+            {
+                Texture candidate = null;
+                try
+                {
+                    int width = _alphaCoverage.ShadowWidth;
+                    int height = _alphaCoverage.ShadowHeight;
+                    candidate = new Texture(DXManager.Device, width, height, 1,
+                                            Usage.None, Format.A8R8G8B8, Pool.Managed);
+                    DataRectangle locked = candidate.LockRectangle(0, LockFlags.None);
+                    try
+                    {
+                        var pixels = new Span<byte>((void*)locked.Data.DataPointer,
+                                                    checked(locked.Pitch * height));
+                        _alphaCoverage.WriteShadowMask(pixels, locked.Pitch);
+                    }
+                    finally
+                    {
+                        locked.Data.Dispose();
+                        candidate.UnlockRectangle(0);
+                    }
+                    _repairedShadowTexture = candidate;
+                }
+                catch
+                {
+                    candidate?.Dispose();
+                    _shadowAllocationFailed = true; // Fall back to the source sprite.
+                    return null;
+                }
+            }
+
+            _repairedShadowLastUsed = CMain.Time;
+            return _repairedShadowTexture;
+        }
+
+        public void CleanRepairedShadow(long now)
+        {
+            if (_repairedShadowTexture == null || now - _repairedShadowLastUsed < 30000)
+                return;
+
+            if (!_repairedShadowTexture.Disposed) _repairedShadowTexture.Dispose();
+            _repairedShadowTexture = null;
+        }
+
         // The caller already knows whether the manager is removing the list entry.
         // Avoid repeatedly searching and shifting a list while expiring many textures.
         public void DisposeTexture(bool unregister = true)
         {
             if (unregister)
                 DXManager.TextureList.Remove(this);
+
+            if (_repairedShadowTexture != null && !_repairedShadowTexture.Disposed)
+                _repairedShadowTexture.Dispose();
+            _repairedShadowTexture = null;
+            _shadowAllocationFailed = false;
 
             if (Image != null && !Image.Disposed)
                 Image.Dispose();
