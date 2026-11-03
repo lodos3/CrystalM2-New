@@ -11376,6 +11376,11 @@ namespace Client.MirScenes
 
             DXManager.Sprite.End();
             DXManager.Sprite.Begin(SpriteFlags.AlphaBlend);
+
+            // Composite extracted lights after multiplicative darkness and
+            // before UI. Missing shaders/unsupported devices retain legacy light.
+            if (Settings.LightingBloom)
+                LightBloomPass.Composite();
         }
 
         private static void OnMouseClick(object sender, EventArgs e)
