@@ -73,6 +73,8 @@ namespace Client
         public static float FontSize = 8F;
         public static bool UseMouseCursors = true;
 
+        // Lightweight map shader and animated ground shadows; independently switchable.
+        public static bool PostProcessing = true, DynamicShadows = true;
         public static bool FPSCap = true;
         public static int MaxFPS = 100;
         public static int Resolution = 1024;
@@ -214,6 +216,8 @@ namespace Client
             MouseClip = Reader.ReadBoolean("Graphics", "MouseClip", MouseClip);
             TopMost = Reader.ReadBoolean("Graphics", "AlwaysOnTop", TopMost);
             FPSCap = Reader.ReadBoolean("Graphics", "FPSCap", FPSCap);
+            PostProcessing = Reader.ReadBoolean("Graphics", "PostProcessing", PostProcessing);
+            DynamicShadows = Reader.ReadBoolean("Graphics", "DynamicShadows", DynamicShadows);
             Resolution = Reader.ReadInt32("Graphics", "Resolution", Resolution);
             DebugMode = Reader.ReadBoolean("Graphics", "DebugMode", DebugMode);
             UseMouseCursors = Reader.ReadBoolean("Graphics", "UseMouseCursors", UseMouseCursors);
@@ -340,6 +344,8 @@ namespace Client
             Reader.Write("Graphics", "MouseClip", MouseClip);
             Reader.Write("Graphics", "AlwaysOnTop", TopMost);
             Reader.Write("Graphics", "FPSCap", FPSCap);
+            Reader.Write("Graphics", "PostProcessing", PostProcessing);
+            Reader.Write("Graphics", "DynamicShadows", DynamicShadows);
             Reader.Write("Graphics", "Resolution", Resolution);
             Reader.Write("Graphics", "DebugMode", DebugMode);
             Reader.Write("Graphics", "UseMouseCursors", UseMouseCursors);
