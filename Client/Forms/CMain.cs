@@ -87,7 +87,10 @@ namespace Client
                 LoadMouseCursors();
                 SetMouseCursor(MouseCursor.Default);
 
+                // Object tracking adds overhead and is only needed during diagnostics.
+#if DEBUG
                 SlimDX.Configuration.EnableObjectTracking = true;
+#endif
 
                 DXManager.Create();
                 SoundManager.Create();
