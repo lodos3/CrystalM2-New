@@ -1,6 +1,8 @@
-// Direct3D9 ps_2_0: one texture lookup, colour grading and soft vignette.
-// c0 = (brightness, vignette strength, 1.0, minimum brightness)
-// c1 = (0.5, 0.5, 0, 0)
+// Direct3D9 ps_2_0: screen-space atmosphere, subtle vignette and daylight grade.
+// c0=(brightness, vignette strength, one, minimum vignette)
+// c1=(UV centre.x, UV centre.y, 0, 0)
+// c2=(weather/time tint.r, tint.g, tint.b, grade strength)
+// c3=(fog strength, fog tint.r, tint.g, tint.b)
 ps_2_0
 dcl t0.xy
 dcl v0
@@ -10,8 +12,12 @@ mul r0, r0, v0
 add r1.xy, t0, -c1
 mul r2.x, r1.x, r1.x
 mad r2.x, r1.y, r1.y, r2.x
+mul r3.x, r2.x, c3.x
+lrp r0.rgb, r3.x, c3.yzw, r0
 mad r2.x, -r2.x, c0.y, c0.z
 max r2.x, r2.x, c0.w
 mul r0.rgb, r0, c0.x
 mul r0.rgb, r0, r2.x
+mul r4.rgb, r0, c2
+lrp r0.rgb, c2.a, r4, r0
 mov oC0, r0
