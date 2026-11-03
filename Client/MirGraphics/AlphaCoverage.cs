@@ -80,9 +80,13 @@ namespace Client.MirGraphics
         private bool DetectCheckerboard()
         {
             if (_width < 8 || _height < 8) return false;
-            for (int y = 0; y <= _height - 8; y += 4)
+            // Bound initial detection work for large frames: at most ~13x13
+            // sampled patches rather than a full sliding-window scan.
+            int stepY = Math.Max(4, (_height - 8) / 12);
+            int stepX = Math.Max(4, (_width - 8) / 12);
+            for (int y = 0; y <= _height - 8; y += stepY)
             {
-                for (int x = 0; x <= _width - 8; x += 4)
+                for (int x = 0; x <= _width - 8; x += stepX)
                 {
                     int phaseA = 0;
                     for (int dy = 0; dy < 8; dy++)
