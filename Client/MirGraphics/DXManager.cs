@@ -11,6 +11,10 @@ namespace Client.MirGraphics
     class DXManager
     {
         public static List<MImage> TextureList = new List<MImage>();
+        // 16 MiB logical BGRA cap for lazily generated, checkerboard-repaired
+        // shadow masks; ordinary sprite textures retain their existing policy.
+        internal static readonly ShadowMaskBudget ShadowMasks =
+            new ShadowMaskBudget(16L * 1024 * 1024);
         public static List<MirControl> ControlList = new List<MirControl>();
 
         public static Device Device;
