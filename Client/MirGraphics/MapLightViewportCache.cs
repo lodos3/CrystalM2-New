@@ -135,6 +135,24 @@ namespace Client.MirGraphics
 
         internal static ShadowProjection Sunlight => new ShadowProjection(0.34f, -0.27f);
 
+        // Cull the actual slanted shadow bounds, not the source sprite rectangle.
+        // This preserves projections that enter from just outside the viewport.
+        internal bool IsProjectedVisible(Point topLeft, int width, int height,
+                                         int screenWidth, int screenHeight)
+        {
+            if (width <= 0 || height <= 0 || screenWidth <= 0 || screenHeight <= 0)
+                return false;
+            double shiftX = Horizontal * (double)height;
+            double projectedTop = topLeft.Y + (1.0 + Vertical) * height;
+            double groundY = topLeft.Y + (double)height;
+            double left = Math.Min(topLeft.X, topLeft.X + shiftX);
+            double right = Math.Max(topLeft.X + (double)width,
+                                    topLeft.X + (double)width + shiftX);
+            double top = Math.Min(projectedTop, groundY);
+            double bottom = Math.Max(projectedTop, groundY);
+            return right > 0 && left < screenWidth && bottom > 0 && top < screenHeight;
+        }
+
         internal static ShadowProjection FromLight(Point actorCell, Point lightCell)
         {
             double dx = actorCell.X - (double)lightCell.X;
