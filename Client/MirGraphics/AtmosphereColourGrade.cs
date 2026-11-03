@@ -48,6 +48,16 @@ namespace Client.MirGraphics
             return strength;
         }
 
+        // Use the interpolated tint to derive strength so entering daylight does
+        // not abruptly disable grading before the colour transition completes.
+        internal static float GradeStrength(Color interpolatedTint)
+        {
+            int spread = Math.Max(Math.Abs(interpolatedTint.R - interpolatedTint.G),
+                            Math.Max(Math.Abs(interpolatedTint.R - interpolatedTint.B),
+                                     Math.Abs(interpolatedTint.G - interpolatedTint.B)));
+            return Math.Min(0.36f, spread / 200f);
+        }
+
         internal static float FogStrength(WeatherSetting weather)
         {
             if ((weather & WeatherSetting.Fog) != 0) return 0.13f;
