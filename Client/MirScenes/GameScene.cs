@@ -10358,6 +10358,30 @@ namespace Client.MirScenes
         public bool Lightning, Fire;
         public byte MapDarkLight;
         private readonly AmbientLightTransition _ambientLighting = new AmbientLightTransition();
+        private readonly MapLightViewportCache _staticLightCache = new MapLightViewportCache();
+        private readonly Func<int, int, byte> _staticLightReader;
+
+        private byte ReadStaticLight(int x, int y) => M2CellInfo[x, y].Light;
+
+        private void UpdateStaticLights()
+        {
+            if (M2CellInfo == null || User == null) return;
+            _staticLightCache.Update(M2CellInfo, Width, Height, User.Movement.X, User.Movement.Y,
+                                     ViewRangeX, ViewRangeY,
+                                     DXManager.Lights == null ? 0 : DXManager.Lights.Count - 1,
+                                     _staticLightReader);
+        }
+
+        internal ShadowProjection GetShadowProjection(Point worldCell)
+        {
+            LightSetting setting = Lights == LightSetting.Normal ? GameScene.Scene.Lights : Lights;
+            if (AmbientLightTransition.Target(setting, MapDarkLight).ToArgb() == Color.White.ToArgb())
+                return ShadowProjection.Sunlight;
+
+            if (_staticLightCache.TryNearest(worldCell.X, worldCell.Y, 12, out CachedMapLight nearest))
+                return ShadowProjection.FromLight(worldCell, new Point(nearest.X, nearest.Y));
+            return ShadowProjection.Sunlight;
+        }
         public long LightningTime, FireTime;
         public WeatherSetting Weather = WeatherSetting.None;
         public bool FloorValid, LightsValid;
@@ -10397,6 +10421,7 @@ namespace Client.MirScenes
 
         public MapControl()
         {
+            _staticLightReader = ReadStaticLight;
             MapButtons = MouseButtons.None;
 
             OffSetX = Settings.ScreenWidth / 2 / CellWidth;
@@ -10443,6 +10468,7 @@ namespace Client.MirScenes
         {
             ResetMap();
             _ambientLighting.Reset();
+            _staticLightCache.Reset();
 
             MapObject.MouseObjectID = 0;
             MapObject.TargetObjectID = 0;
@@ -10609,6 +10635,8 @@ namespace Client.MirScenes
                 DXManager.Draw(DXManager.FloorTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White);
             }
 
+            if (Settings.DynamicShadows)
+                UpdateStaticLights();
             DXManager.ProjectedShadowsDrawn = 0;
             DrawObjects();
 
@@ -11215,41 +11243,39 @@ namespace Client.MirScenes
             #endregion
 
             #region Map Lights
-            for (int y = MapObject.User.Movement.Y - ViewRangeY - 24; y <= MapObject.User.Movement.Y + ViewRangeY + 24; y++)
+            UpdateStaticLights();
+            int centerX = MapObject.User.Movement.X, centerY = MapObject.User.Movement.Y;
+            foreach (CachedMapLight emitter in _staticLightCache.Items)
             {
-                if (y < 0) continue;
-                if (y >= Height) break;
-                for (int x = MapObject.User.Movement.X - ViewRangeX - 24; x < MapObject.User.Movement.X + ViewRangeX + 24; x++)
+                if (!_staticLightCache.InViewport(emitter, centerX, centerY, ViewRangeX, ViewRangeY))
+                    continue;
+
+                int x = emitter.X, y = emitter.Y;
+                light = emitter.Index;
+                Color lightIntensity = emitter.Colour;
+
+                int imageIndex = (M2CellInfo[x, y].FrontImage & 0x7FFF) - 1;
+                int fileIndex = M2CellInfo[x, y].FrontIndex;
+
+                if (MapObject.User.Poison.HasFlag(PoisonType.Blindness))
+                    lightIntensity = GetBlindLight(lightIntensity);
+
+                p = new Point(
+                    (x + OffSetX - centerX) * CellWidth + MapObject.User.OffSetMove.X,
+                    (y + OffSetY - centerY) * CellHeight + MapObject.User.OffSetMove.Y + 32);
+
+                if (M2CellInfo[x, y].FrontAnimationFrame > 0 && imageIndex >= 0 &&
+                    fileIndex >= 0 && fileIndex < Libraries.MapLibs.Length &&
+                    Libraries.MapLibs[fileIndex] != null)
+                    p.Offset(Libraries.MapLibs[fileIndex].GetOffSet(imageIndex));
+
+                if (light >= 0 && light < DXManager.Lights.Count &&
+                    DXManager.Lights[light] != null && !DXManager.Lights[light].Disposed)
                 {
-                    if (x < 0) continue;
-                    if (x >= Width) break;
-                    // Light information belongs to the cell, even without a front tile.
-                    // The original >= 10 guard prevented every coloured map light.
-                    if (!MapLightEncoding.TryDecode(M2CellInfo[x, y].Light,
-                        DXManager.Lights.Count - 1, out light, out Color lightIntensity))
-                        continue;
-
-                    int imageIndex = (M2CellInfo[x, y].FrontImage & 0x7FFF) - 1;
-                    int fileIndex = M2CellInfo[x, y].FrontIndex;
-
-                    if (MapObject.User.Poison.HasFlag(PoisonType.Blindness))
-                    {
-                        lightIntensity = GetBlindLight(lightIntensity);
-                    }
-
-                    p = new Point(
-                        (x + OffSetX - MapObject.User.Movement.X) * CellWidth + MapObject.User.OffSetMove.X,
-                        (y + OffSetY - MapObject.User.Movement.Y) * CellHeight + MapObject.User.OffSetMove.Y + 32);
-
-
-                    if (M2CellInfo[x, y].FrontAnimationFrame > 0 && imageIndex >= 0 && fileIndex >= 0)
-                        p.Offset(Libraries.MapLibs[fileIndex].GetOffSet(imageIndex));
-
-                    if (DXManager.Lights[light] != null && !DXManager.Lights[light].Disposed)
-                    {
-                        p.Offset(-(DXManager.LightSizes[light].X / 2) - (CellWidth / 2) + 10, -(DXManager.LightSizes[light].Y / 2) - (CellHeight / 2) - 5);
-                        DXManager.Draw(DXManager.Lights[light], null, new Vector3((float)p.X, (float)p.Y, 0.0F), lightIntensity);
-                    }
+                    p.Offset(-(DXManager.LightSizes[light].X / 2) - (CellWidth / 2) + 10,
+                             -(DXManager.LightSizes[light].Y / 2) - (CellHeight / 2) - 5);
+                    DXManager.Draw(DXManager.Lights[light], null,
+                                   new Vector3((float)p.X, (float)p.Y, 0.0F), lightIntensity);
                 }
             }
             #endregion
@@ -12244,6 +12270,7 @@ namespace Client.MirScenes
                 InputDelay = 0;
                 NextAction = 0;
 
+                _staticLightCache.Reset();
                 M2CellInfo = null;
                 Width = 0;
                 Height = 0;
