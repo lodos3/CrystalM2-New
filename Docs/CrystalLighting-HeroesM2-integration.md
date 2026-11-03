@@ -108,3 +108,32 @@ Set either option to `False` if visual compatibility or performance requires it.
 Regression coverage: `Tests/TextureAlphaTests/Program.cs` now includes 8x8 alternating alpha detection, unchanged source hit testing, smoothed shadow alpha and buffer validation. Run `dotnet run --project Tests/TextureAlphaTests/TextureAlphaTests.csproj` on a .NET 8 development machine and `dotnet build Client/Client.csproj -c Release` on Windows x64 with SlimDX dependencies installed. **Neither the Windows build nor in-game GPU/FPS tests were executed in the assistant environment; GitHub Actions jobs were failing before test-step execution.** Measure p50/p95 frame times, draw calls and process working set with each option disabled/enabled before declaring a performance win.
 
 Future: develop a true light-aware occlusion system (ground occluders/height data), cache-aware shadow batching, HDR/bloom via separately budgeted low-resolution surfaces, external FPS/memory profiling and additional HeroesM2 gameplay parity.
+
+
+## Master continuation: viewport lighting, direction-aware shadows, and bounded caches
+
+Direct commits to `master` (no new feature branches) extend the DX9 renderer:
+
+- `MapLightViewportCache` indexes only the original `±ViewRange + 24` static map-light area plus an eight-tile guard band. The map cells are decoded when the map changes, the viewport exits the cached region, the view dimensions change, or the light-texture count changes. Each redraw iterates the small emitter list and rechecks the original viewport bounds. It does **not** create a second map-sized array.
+- For non-daylight maps, a nearby static map light can steer player/monster projected-shadow direction. The algorithm searches *cached* emitters within 12 tile units and uses a normalized 2D vector away from the closest. The fallback daylight direction remains unchanged. This is **screen-space sprite projection**, not physically correct wall occlusion, height-field shadows, torch/spell occluders, or true shadow-map rendering.
+- `ShadowMaskBudget` caps the nominal BGRA payload of lazily generated half-resolution checkerboard shadow textures at **16 MiB**. Failed reservations fall back to source sprite alpha without permanently disabling shadow repair; disposed/expired textures release their reservation. Actual GPU allocation may exceed this nominal count due to driver pitch/alignment.
+- `SpriteFileLayout.SkipCompressedLayer` seeks across compressed image payloads while reading optional LIB mask headers instead of allocating a large unused `ReadBytes(Length)` buffer. Secondary mask decoding now uses the second layer's own `MaskWidth`, `MaskHeight` and `MaskLength`, bounded by a 64 MiB uncompressed per-mask safety limit. Test against actual two-layer and tinted legacy sprites before calling this visually compatible.
+- Direct3D9 device initialization no longer falls back to the CPU-bound **reference rasterizer** solely because an older GPU lacks shader model 2.0. It chooses the hardware rasterizer, software vertex processing if hardware T&L is unavailable, and excludes the `PureDevice` mode because the renderer queries pixel-shader state.
+- When `DebugMode=True`, existing FPS/DPS diagnostics now include projected-shadow draw count (budget 48), shadow-mask logical BGRA MiB and approximate managed heap size. These are diagnostics, **not** a measured performance gain.
+
+### Tests and verification
+
+```sh
+dotnet run --project Tests/LightViewportTests/LightViewportTests.csproj
+dotnet run --project Tests/RenderingMemoryTests/RenderingMemoryTests.csproj
+dotnet run --project Tests/TextureAlphaTests/TextureAlphaTests.csproj
+dotnet run --project Tests/RenderingLightTests/RenderingLightTests.csproj
+dotnet run --project Tests/AmbientLightTests/AmbientLightTests.csproj
+dotnet run --project Tests/MonsterFactionTests/MonsterFactionTests.csproj
+```
+
+Windows x64 client build: `dotnet build Client/Client.csproj -c Release` with the project's SlimDX/Windows runtime dependencies. Verify the `postprocess.ps` asset copies to the client's `Data/Shaders` output. The above tests require .NET 8; they do not validate D3D9 GPU behavior.
+
+Compare identical in-game camera routes with `DynamicShadows=False` and then `True`; leave post-processing unchanged for that comparison. Then toggle `PostProcessing` separately. Collect FPS and DPS with debug mode, plus actual process working set in Windows Task Manager. Test at night with several coloured map lights, large/dithered characters, sprite death, map transitions, resize/device reset, and 48+ simultaneous actors. Observe masked/tinted artwork for layer-alignment regressions.
+
+**Verification blocker:** no `dotnet` compiler or Windows D3D9 runtime is present in the assistant execution environment. Current GitHub Actions runs fail before providing executable steps or test logs. All runtime, build, and FPS assertions remain unverified. Do not treat this source commit series as evidence of an actual FPS uplift or pixel-perfect shadows.
