@@ -13,7 +13,14 @@ namespace Client.MirGraphics
         private bool? _checkerboard;
 
         // Run checker detection only for sprite frames that actually cast a shadow.
-        internal bool HasCheckerboard => _checkerboard ??= DetectCheckerboard();
+        internal bool HasCheckerboard
+        {
+            get
+            {
+                if (!_checkerboard.HasValue) _checkerboard = DetectCheckerboard();
+                return _checkerboard.Value;
+            }
+        }
         internal int ShadowWidth => (_width + 1) / 2;
         internal int ShadowHeight => (_height + 1) / 2;
 
