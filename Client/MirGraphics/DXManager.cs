@@ -37,6 +37,12 @@ namespace Client.MirGraphics
         public static PixelShader GrayScalePixelShader;
         public static PixelShader NormalPixelShader;
         public static PixelShader MagicPixelShader;
+        public static PixelShader PostProcessingPixelShader;
+        private static readonly Vector4[] PostProcessConstants =
+        {
+            new Vector4(1.035f, 0.22f, 1.0f, 0.80f),
+            new Vector4(0.5f, 0.5f, 0.0f, 0.0f)
+        };
 
         public static bool GrayScale;
 
@@ -114,6 +120,24 @@ namespace Client.MirGraphics
             {
                 using (var gs = ShaderBytecode.AssembleFromFile(shaderMagicPath, ShaderFlags.None))
                     MagicPixelShader = new PixelShader(Device, gs);
+            }
+
+            // This shader is optional: missing/unsupported source must not prevent
+            // startup or force an additional render target on old hardware.
+            string shaderPostPath = System.IO.Path.Combine(Settings.ShadersPath, "postprocess.ps");
+            if (System.IO.File.Exists(shaderPostPath))
+            {
+                try
+                {
+                    using (var bytecode = ShaderBytecode.AssembleFromFile(shaderPostPath, ShaderFlags.None))
+                        PostProcessingPixelShader = new PixelShader(Device, bytecode);
+                }
+                catch (Exception ex)
+                {
+                    PostProcessingPixelShader?.Dispose();
+                    PostProcessingPixelShader = null;
+                    CMain.SaveError("Optional post-processing shader disabled: " + ex.Message);
+                }
             }
         }
 
@@ -240,6 +264,55 @@ namespace Client.MirGraphics
                 if (Device.PixelShader == null) return;
                 Sprite.Flush();
                 Device.PixelShader = null;
+            }
+        }
+
+        // One-sample map colour grading/vignette on the existing map texture.
+        // It does not shade UI or create another full-screen render target.
+        public static bool BeginPostProcessing()
+        {
+            if (PostProcessingPixelShader == null || PostProcessingPixelShader.Disposed)
+                return false;
+            Sprite.Flush();
+            Device.PixelShader = PostProcessingPixelShader;
+            Device.SetPixelShaderConstant(0, PostProcessConstants);
+            return true;
+        }
+
+        public static void EndPostProcessing()
+        {
+            Sprite.Flush();
+            Device.PixelShader = null;
+        }
+
+        // Project a frame silhouette from its ground contact point every redraw.
+        // Dither repair uses a 2x-downsampled alpha texture and never changes art.
+        public static void DrawProjectedShadow(Texture texture, Rectangle sourceRect,
+                                                Point topLeft, int sourceHeight, bool halfResolution)
+        {
+            if (texture == null || texture.Disposed || sourceHeight <= 0)
+                return;
+
+            Matrix original = Sprite.Transform;
+            Sprite.Flush();
+            try
+            {
+                float scale = halfResolution ? 2f : 1f;
+                const float cast = 0.34f;
+                const float flatten = 0.27f;
+                Matrix projection = Matrix.Identity;
+                projection.M11 = scale;
+                projection.M21 = -cast * scale;
+                projection.M22 = flatten * scale;
+                projection.M41 = topLeft.X + cast * sourceHeight;
+                projection.M42 = topLeft.Y + (1f - flatten) * sourceHeight;
+                Sprite.Transform = projection;
+                Draw(texture, sourceRect, Vector3.Zero, Color.FromArgb(92, 0, 0, 0));
+                Sprite.Flush();
+            }
+            finally
+            {
+                Sprite.Transform = original;
             }
         }
 
@@ -437,6 +510,7 @@ namespace Client.MirGraphics
                     continue;
                 }
 
+                m.CleanRepairedShadow(CMain.Time);
                 if (CMain.Time <= m.CleanTime) continue;
 
                 m.DisposeTexture(false);
@@ -587,6 +661,8 @@ namespace Client.MirGraphics
             NormalPixelShader?.Dispose();
             GrayScalePixelShader?.Dispose();
             MagicPixelShader?.Dispose();
+            PostProcessingPixelShader?.Dispose();
+            PostProcessingPixelShader = null;
         }
     }
 }
