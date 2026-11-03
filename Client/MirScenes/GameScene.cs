@@ -10360,6 +10360,12 @@ namespace Client.MirScenes
         private readonly AmbientLightTransition _ambientLighting = new AmbientLightTransition();
         private readonly MapLightViewportCache _staticLightCache = new MapLightViewportCache();
         private readonly Func<int, int, byte> _staticLightReader;
+        private readonly Func<int, int, bool> _staticOccluder;
+        private readonly List<Point> _movingLights = new List<Point>(48);
+        private readonly AmbientLightTransition _atmosphereFade = new AmbientLightTransition();
+        private Color _atmosphereTint = Color.White;
+        private float _atmosphereFog;
+        private const int DynamicLightLimit = 48;
 
         private byte ReadStaticLight(int x, int y) => M2CellInfo[x, y].Light;
 
@@ -10372,15 +10378,74 @@ namespace Client.MirScenes
                                      _staticLightReader);
         }
 
+        private bool IsStaticOccluder(int x, int y)
+        {
+            if (M2CellInfo == null || x < 0 || y < 0 || x >= Width || y >= Height)
+                return true;
+
+            CellInfo cell = M2CellInfo[x, y];
+            // These are the same map-side impassability flags used by EmptyCell.
+            // They are only an approximation for visual wall height.
+            return cell == null ||
+                   (cell.BackImage & 0x20000000) != 0 ||
+                   (cell.FrontImage & 0x8000) != 0;
+        }
+
+        private void IndexMovingLights()
+        {
+            _movingLights.Clear();
+            foreach (MapObject ob in Objects.Values)
+            {
+                if (_movingLights.Count >= DynamicLightLimit) break;
+                if (ob == null || ob.Dead || ob.Light <= 0 || ob == MapObject.User)
+                    continue;
+                if (ob.Race != ObjectType.Spell && ob.Race != ObjectType.Merchant &&
+                    ob.Light < 15)
+                    continue;
+                _movingLights.Add(ob.CurrentLocation);
+            }
+        }
+
         internal ShadowProjection GetShadowProjection(Point worldCell)
         {
             LightSetting setting = Lights == LightSetting.Normal ? GameScene.Scene.Lights : Lights;
             if (AmbientLightTransition.Target(setting, MapDarkLight).ToArgb() == Color.White.ToArgb())
                 return ShadowProjection.Sunlight;
 
-            if (_staticLightCache.TryNearest(worldCell.X, worldCell.Y, 12, out CachedMapLight nearest))
-                return ShadowProjection.FromLight(worldCell, new Point(nearest.X, nearest.Y));
-            return ShadowProjection.Sunlight;
+            int bestDistance = 12 * 12;
+            Point nearest = Point.Empty;
+            bool found = false;
+
+            // Dynamic spell/light positions are already indexed once per redraw.
+            for (int i = 0; i < _movingLights.Count; i++)
+            {
+                Point light = _movingLights[i];
+                long dx = (long)light.X - worldCell.X, dy = (long)light.Y - worldCell.Y;
+                long distance = dx * dx + dy * dy;
+                if (distance > bestDistance ||
+                    (Settings.MapLightOcclusion &&
+                     !LightVisibility.Clear(light.X, light.Y, worldCell.X, worldCell.Y, _staticOccluder)))
+                    continue;
+                bestDistance = (int)distance;
+                nearest = light;
+                found = true;
+            }
+
+            foreach (CachedMapLight light in _staticLightCache.Items)
+            {
+                long dx = (long)light.X - worldCell.X, dy = (long)light.Y - worldCell.Y;
+                long distance = dx * dx + dy * dy;
+                if (distance > bestDistance ||
+                    (Settings.MapLightOcclusion &&
+                     !LightVisibility.Clear(light.X, light.Y, worldCell.X, worldCell.Y, _staticOccluder)))
+                    continue;
+                bestDistance = (int)distance;
+                nearest = new Point(light.X, light.Y);
+                found = true;
+            }
+
+            return found ? ShadowProjection.FromLight(worldCell, nearest)
+                         : ShadowProjection.Sunlight;
         }
         public long LightningTime, FireTime;
         public WeatherSetting Weather = WeatherSetting.None;
@@ -10422,6 +10487,7 @@ namespace Client.MirScenes
         public MapControl()
         {
             _staticLightReader = ReadStaticLight;
+            _staticOccluder = IsStaticOccluder;
             MapButtons = MouseButtons.None;
 
             OffSetX = Settings.ScreenWidth / 2 / CellWidth;
@@ -10468,6 +10534,10 @@ namespace Client.MirScenes
         {
             ResetMap();
             _ambientLighting.Reset();
+            _atmosphereFade.Reset();
+            _atmosphereTint = Color.White;
+            _atmosphereFog = 0;
+            _movingLights.Clear();
             _staticLightCache.Reset();
 
             MapObject.MouseObjectID = 0;
@@ -10636,7 +10706,10 @@ namespace Client.MirScenes
             }
 
             if (Settings.DynamicShadows)
+            {
                 UpdateStaticLights();
+                IndexMovingLights();
+            }
             DXManager.ProjectedShadowsDrawn = 0;
             DrawObjects();
 
@@ -10651,6 +10724,17 @@ namespace Client.MirScenes
             LightSetting setting = Lights == LightSetting.Normal ? GameScene.Scene.Lights : Lights;
             Color targetAmbient = AmbientLightTransition.Target(setting, MapDarkLight);
             Color ambient = _ambientLighting.Sample(targetAmbient, CMain.Time);
+            if (Settings.EnvironmentAtmosphere)
+            {
+                Color desiredTint = AtmosphereColourGrade.Target(setting, Weather, MapDarkLight);
+                _atmosphereTint = _atmosphereFade.Sample(desiredTint, CMain.Time);
+                _atmosphereFog = AtmosphereColourGrade.FogStrength(Weather);
+            }
+            else
+            {
+                _atmosphereTint = Color.White;
+                _atmosphereFog = 0;
+            }
 
             // Continue the light pass when transitioning into day, then avoid
             // its render target and blend operations once daylight is fully white.
@@ -10715,7 +10799,9 @@ namespace Client.MirScenes
 
             bool dead = MapObject.User.Dead;
             if (dead) DXManager.SetGrayscale(true);
-            bool postProcessing = !dead && Settings.PostProcessing && DXManager.BeginPostProcessing();
+            bool postProcessing = !dead && Settings.PostProcessing &&
+                DXManager.BeginPostProcessing(_atmosphereTint,
+                    AtmosphereColourGrade.GradeStrength(_atmosphereTint), _atmosphereFog);
 
             DXManager.DrawOpaque(ControlTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White, Opacity);
 
@@ -12271,6 +12357,7 @@ namespace Client.MirScenes
                 NextAction = 0;
 
                 _staticLightCache.Reset();
+                _movingLights.Clear();
                 M2CellInfo = null;
                 Width = 0;
                 Height = 0;
