@@ -819,9 +819,10 @@ namespace Client.MirGraphics
 
             DXManager.Draw(mi.Image, new Rectangle(0, 0, mi.Width, mi.Height), new Vector3((float)point.X, (float)point.Y, 0.0F), colour);
 
-            if (mi.HasMask)
+            if (mi.MaskImage != null && !mi.MaskImage.Disposed)
             {
-                DXManager.Draw(mi.MaskImage, new Rectangle(0, 0, mi.Width, mi.Height), new Vector3((float)point.X, (float)point.Y, 0.0F), Tint);
+                DXManager.Draw(mi.MaskImage, new Rectangle(0, 0, mi.MaskWidth, mi.MaskHeight),
+                               new Vector3((float)point.X, (float)point.Y, 0.0F), Tint);
             }
 
             mi.CleanTime = CMain.Time + Settings.CleanDelay;
@@ -961,18 +962,24 @@ namespace Client.MirGraphics
 
                 if (HasMask)
                 {
-                    // Keep legacy mask dimensions/layout until a separate format audit.
-                    reader.ReadBytes(12);
-                    MaskImage = new Texture(DXManager.Device, width, height, 1, Usage.None, Format.A8R8G8B8, Pool.Managed);
-                    DataRectangle maskLocked = MaskImage.LockRectangle(0, LockFlags.Discard);
-                    try
+                    // The second frame header is twelve bytes and has its own
+                    // dimensions and compressed length, independent of layer one.
+                    SpriteFileLayout.SkipCompressedLayer(reader, 12);
+                    if (SpriteFileLayout.HasSafeMask(MaskWidth, MaskHeight, MaskLength))
                     {
-                        DecompressImage(reader.ReadBytes(Length), maskLocked.Data);
-                    }
-                    finally
-                    {
-                        maskLocked.Data.Dispose();
-                        MaskImage.UnlockRectangle(0);
+                        MaskImage = new Texture(DXManager.Device, MaskWidth, MaskHeight, 1,
+                                                Usage.None, Format.A8R8G8B8, Pool.Managed);
+                        DataRectangle maskLocked = MaskImage.LockRectangle(0, LockFlags.None);
+                        try
+                        {
+                            DecompressBgraRows(reader.ReadBytes(MaskLength), maskLocked.Data,
+                                               MaskWidth, MaskHeight, maskLocked.Pitch);
+                        }
+                        finally
+                        {
+                            maskLocked.Data.Dispose();
+                            MaskImage.UnlockRectangle(0);
+                        }
                     }
                 }
 
