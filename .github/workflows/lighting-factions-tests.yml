@@ -8,6 +8,8 @@ on:
     paths:
       - "Client/MirGraphics/MapLightEncoding.cs"
       - "Client/MirGraphics/MapLightViewportCache.cs"
+      - "Client/MirGraphics/ShadowMaskBudget.cs"
+      - "Client/MirGraphics/SpriteFileLayout.cs"
       - "Client/MirGraphics/AlphaCoverage.cs"
       - "Client/Data/Shaders/**"
       - "Client/Settings.cs"
@@ -34,6 +36,8 @@ jobs:
         run: dotnet run --project Tests/RenderingLightTests/RenderingLightTests.csproj
       - name: Viewport map light cache and shadow projection
         run: dotnet run --project Tests/LightViewportTests/LightViewportTests.csproj
+      - name: GPU shadow memory cap and LIB parsing
+        run: dotnet run --project Tests/RenderingMemoryTests/RenderingMemoryTests.csproj
       - name: Monster faction rules
         run: dotnet run --project Tests/MonsterFactionTests/MonsterFactionTests.csproj
       - name: Texture alpha packing and hit testing
