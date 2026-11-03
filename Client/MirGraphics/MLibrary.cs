@@ -3,6 +3,7 @@ using SlimDX.Direct3D9;
 using System.IO.Compression;
 using Frame = Client.MirObjects.Frame;
 using Client.MirObjects;
+using Client.MirScenes;
 using System.Text.RegularExpressions;
 
 namespace Client.MirGraphics
@@ -639,9 +640,10 @@ namespace Client.MirGraphics
 
         // Redraw the current animation frame's alpha silhouette at ground level.
         // Only checked/dithered sprites need an additional repaired GPU texture.
-        public void DrawProjectedShadow(int index, Point location)
+        public void DrawProjectedShadow(int index, Point location, Point worldCell)
         {
-            if (!Settings.DynamicShadows || DXManager.Blending || !CheckImage(index))
+            if (!Settings.DynamicShadows || DXManager.Blending ||
+                DXManager.ProjectedShadowsDrawn >= DXManager.MaxProjectedShadowsPerMapDraw || !CheckImage(index))
                 return;
 
             MImage mi = _images[index];
@@ -656,10 +658,12 @@ namespace Client.MirGraphics
 
             Texture repaired = mi.GetRepairedShadowTexture();
             bool halfSize = repaired != null;
+            ShadowProjection direction = GameScene.Scene?.MapControl?.GetShadowProjection(worldCell)
+                                        ?? ShadowProjection.Sunlight;
             DXManager.DrawProjectedShadow(repaired ?? mi.Image,
                 new Rectangle(0, 0, halfSize ? (mi.Width + 1) / 2 : mi.Width,
                                     halfSize ? (mi.Height + 1) / 2 : mi.Height),
-                imagePoint, mi.Height, halfSize);
+                imagePoint, mi.Height, halfSize, direction.Horizontal, direction.Vertical);
             mi.CleanTime = CMain.Time + Settings.CleanDelay;
         }
 
