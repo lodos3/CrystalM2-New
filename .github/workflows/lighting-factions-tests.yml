@@ -1,13 +1,17 @@
-name: Lighting and faction regression tests
+name: Crystal rendering, atmospheric weather and faction regressions
 on:
   push:
     branches:
       - master
-      - feature/lighting-map-spell-20261103
   pull_request:
     paths:
       - "Client/MirGraphics/MapLightEncoding.cs"
       - "Client/MirGraphics/AtmosphereColourGrade.cs"
+      - "Client/MirGraphics/AtmosphericWeatherController.cs"
+      - "Client/MirGraphics/AtmosphereTileNoise.cs"
+      - "Client/MirGraphics/AtmosphereFogOverlay.cs"
+      - "Client/MirGraphics/SmoothScalarTransition.cs"
+      - "Client/MirGraphics/ParticleEngine.cs"
       - "Client/MirGraphics/LightVisibility.cs"
       - "Client/MirGraphics/BloomBufferLayout.cs"
       - "Client/MirGraphics/LightBloomPass.cs"
