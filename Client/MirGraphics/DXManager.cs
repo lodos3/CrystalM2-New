@@ -283,6 +283,9 @@ namespace Client.MirGraphics
                 return false;
 
             float intensity = AtmosphereIntensity.Scale(Settings.AtmosphereIntensityPercent);
+            PostProcessConstants[0] = new Vector4(
+                AtmosphereExposure.Brightness(weatherFrame.CloudCover, intensity),
+                0.22f, 1f, 0.80f);
             PostProcessConstants[2] = new Vector4(atmosphere.R / 255f, atmosphere.G / 255f,
                                                    atmosphere.B / 255f,
                                                    Math.Clamp(gradeStrength * intensity, 0f, 0.4f));
