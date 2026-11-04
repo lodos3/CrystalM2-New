@@ -8,6 +8,14 @@ namespace Client.MirGraphics
     {
         internal const int MaxRayCells = 24;
 
+        // Identical immutable tile flags to MapControl.EmptyCell (excluding
+        // the dynamic actors there, which should not cast wall shadows).
+        internal static bool BlocksByMapFlags(int backImage, int frontImage)
+        {
+            return (backImage & 0x20000000) != 0 ||
+                   (frontImage & 0x8000) != 0;
+        }
+
         internal static bool Clear(int sx, int sy, int tx, int ty,
                                    Func<int, int, bool> blocksLight)
         {
