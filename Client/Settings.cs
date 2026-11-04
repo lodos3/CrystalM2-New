@@ -76,6 +76,10 @@ namespace Client
         // Lightweight map shader and animated ground shadows; independently switchable.
         public static bool PostProcessing = true, DynamicShadows = true;
         public static bool EnvironmentAtmosphere = true;
+        // Optional high-detail atmosphere, disabled until DX9 hardware testing.
+        public static bool EnvironmentFogLayers = false;
+        public static bool AtmosphereWetSurfaces = false;
+        public static bool AtmosphereLightning = false;
         // Opt-in until Windows/Direct3D9 shader visual validation.
         public static bool LightingBloom = false, MapLightOcclusion = false;
         public static int BloomDivisor = 4;
@@ -223,6 +227,9 @@ namespace Client
             PostProcessing = Reader.ReadBoolean("Graphics", "PostProcessing", PostProcessing);
             DynamicShadows = Reader.ReadBoolean("Graphics", "DynamicShadows", DynamicShadows);
             EnvironmentAtmosphere = Reader.ReadBoolean("Graphics", "EnvironmentAtmosphere", EnvironmentAtmosphere);
+            EnvironmentFogLayers = Reader.ReadBoolean("Graphics", "EnvironmentFogLayers", EnvironmentFogLayers);
+            AtmosphereWetSurfaces = Reader.ReadBoolean("Graphics", "AtmosphereWetSurfaces", AtmosphereWetSurfaces);
+            AtmosphereLightning = Reader.ReadBoolean("Graphics", "AtmosphereLightning", AtmosphereLightning);
             LightingBloom = Reader.ReadBoolean("Graphics", "LightingBloom", LightingBloom);
             MapLightOcclusion = Reader.ReadBoolean("Graphics", "MapLightOcclusion", MapLightOcclusion);
             BloomDivisor = Math.Clamp(Reader.ReadInt32("Graphics", "BloomDivisor", BloomDivisor), 2, 8);
@@ -355,6 +362,9 @@ namespace Client
             Reader.Write("Graphics", "PostProcessing", PostProcessing);
             Reader.Write("Graphics", "DynamicShadows", DynamicShadows);
             Reader.Write("Graphics", "EnvironmentAtmosphere", EnvironmentAtmosphere);
+            Reader.Write("Graphics", "EnvironmentFogLayers", EnvironmentFogLayers);
+            Reader.Write("Graphics", "AtmosphereWetSurfaces", AtmosphereWetSurfaces);
+            Reader.Write("Graphics", "AtmosphereLightning", AtmosphereLightning);
             Reader.Write("Graphics", "LightingBloom", LightingBloom);
             Reader.Write("Graphics", "MapLightOcclusion", MapLightOcclusion);
             Reader.Write("Graphics", "BloomDivisor", BloomDivisor);
