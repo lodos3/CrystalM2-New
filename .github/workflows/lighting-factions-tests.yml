@@ -6,6 +6,9 @@ on:
   pull_request:
     paths:
       - "Client/MirGraphics/MapLightEncoding.cs"
+      - "Client/MirGraphics/MapMaterialMap.cs"
+      - "Client/MirGraphics/MapMaterialMapLoader.cs"
+      - "Client/MirGraphics/WetSurfacePass.cs"
       - "Client/MirGraphics/AtmosphereColourGrade.cs"
       - "Client/MirGraphics/AtmosphericWeatherController.cs"
       - "Client/MirGraphics/AtmosphereTileNoise.cs"
@@ -54,3 +57,15 @@ jobs:
         run: dotnet run --project Tests/TextureAlphaTests/TextureAlphaTests.csproj
       - name: Day-night ambient transition regression tests
         run: dotnet run --project Tests/AmbientLightTests/AmbientLightTests.csproj
+
+  windows-client-compile:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore Windows CrystalM2 client
+        run: dotnet restore Client/Client.csproj
+      - name: Compile native SlimDX client integration
+        run: dotnet build Client/Client.csproj --configuration Release --no-restore
