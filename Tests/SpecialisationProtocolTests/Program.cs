@@ -42,4 +42,15 @@ var hero = RoundTrip<ServerPackets.HeroInformation>(
         Class = MirClass.Taoist, Specialisation = CombatSpecialisation.Third }, false);
 Check(hero.Specialisation == CombatSpecialisation.Third, "Hero login state (distinct wire layout)");
 
+foreach (SpellEffect phase in new[] { SpellEffect.SignatureWindup, SpellEffect.SignatureImpact, SpellEffect.SignatureArmed })
+{
+    var sent = new ServerPackets.MapEffect
+    {
+        Effect = phase, Location = new System.Drawing.Point(10, 20), Value = (byte)Spell.CinderMine
+    };
+    var received = RoundTrip<ServerPackets.MapEffect>(sent, false);
+    Check(received.Effect == phase && received.Location == sent.Location && received.Value == (byte)Spell.CinderMine,
+        "Timed signature stages use the existing map-effect packet shape");
+}
+
 Console.WriteLine("Specialisation protocol round-trip tests passed.");

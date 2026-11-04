@@ -154,6 +154,20 @@ static class Program
         pool.Clear();
         Assertions.True(pool.Active.IsEmpty, "A map reset must drop every active particle.");
 
+        var later = particle with { Start = 400, Shape = SpellParticleShape.Halo };
+        var sooner = particle with { Start = 200, Shape = SpellParticleShape.Shard };
+        Assertions.True(pool.Schedule(later) && pool.Schedule(sooner), "Schedule layers out of order.");
+        Assertions.True(!pool.Advance(199) && pool.Active.IsEmpty, "Future layers must stay hidden.");
+        Assertions.True(pool.Advance(200) && pool.Active.Length == 1 && pool.Active[0] == sooner,
+            "An earlier layer must start even when a later one was queued first.");
+        Assertions.True(pool.Advance(450) && pool.Active.Length == 1 && pool.Active[0] == later &&
+            pool.Active[0].Age(450) == .25f, "Preserve layer age when a frame arrives late.");
+        pool.Schedule(later with { Start = 700 });
+        pool.Clear();
+        Assertions.True(!pool.Advance(750), "A map reset must cancel queued layers.");
+        pool.Schedule(sooner);
+        Assertions.True(!pool.Advance(900), "Do not replay expired layers after a frame stall.");
+
         byte[] atlas = SpellParticleAtlas.Generate();
         Assertions.Equal(SpellParticleAtlas.Width * SpellParticleAtlas.Height * 4, atlas.Length,
             "All particle masks share one BGRA texture.");

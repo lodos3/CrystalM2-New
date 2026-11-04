@@ -283,12 +283,13 @@ namespace Client.MirScenes.Dialogs
             {
                 CombatSpecialisation choice = (CombatSpecialisation)(i + 1);
                 string name = SpellCurriculum.Name(actor.Class, choice);
+                SpecialisationAbility signature = SpecialisationAbilities.Signature(actor.Class, choice);
                 var button = new MirButton
                 {
                     Parent = SkillPage,
                     Skin = UiSurface.Button,
                     Text = name,
-                    Hint = name + " - choose this permanent specialisation.",
+                    Hint = signature == null ? name : SpecialisationPreview(name, signature),
                     AutoSize = false,
                     Size = new Size(74, 24),
                     Location = new Point(8 + i * 76, 8),
@@ -313,6 +314,11 @@ namespace Client.MirScenes.Dialogs
             AddSpellPageButton(UiGlyph.Right, "Next spells", 140, _magics.Length);
         }
 
+        private static string SpecialisationPreview(string name, SpecialisationAbility signature) =>
+            $"{name}\n{signature.Name} · Level {signature.UnlockLevel}\n{signature.Description}\n" +
+            string.Join("\n", SpecialisationAbilities.TraitsFor(signature.Spell)
+                .Select(trait => $"Level {trait.Level} · {trait.Name}\n{trait.Description}"));
+
         private void ChooseSpecialisation(CombatSpecialisation requested)
         {
             if (GameScene.Observing || _actor.Specialisation != CombatSpecialisation.Unchosen) return;
@@ -324,9 +330,15 @@ namespace Client.MirScenes.Dialogs
             }
 
             string name = SpellCurriculum.Name(_actor.Class, requested);
-            var confirm = new MirMessageBox(
-                "Choose " + name + "? This choice cannot currently be changed.",
-                MirMessageBoxButtons.YesNo);
+            var signature = SpecialisationAbilities.Signature(_actor.Class, requested);
+            if (signature == null) return;
+            var confirm = new MirMessageBox(SpecialisationPreview(name, signature) +
+                "\n\nChoose this permanent specialisation?", MirMessageBoxButtons.YesNo);
+            confirm.Size = new Size(460, 306);
+            confirm.Location = new Point((Settings.ScreenWidth - 460) / 2, (Settings.ScreenHeight - 306) / 2);
+            confirm.Label.Size = new Size(412, 206);
+            confirm.YesButton.Location = new Point(confirm.YesButton.Location.X, 260);
+            confirm.NoButton.Location = new Point(confirm.NoButton.Location.X, 260);
             confirm.YesButton.Click += (_, _) =>
             {
                 Network.Enqueue(new C.SelectSpecialisation

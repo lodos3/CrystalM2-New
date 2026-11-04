@@ -48,7 +48,7 @@ public sealed partial class GameScene
 
     internal void PressSpellbookSpell(UserObject actor, ClientMagic magic)
     {
-        if (Observing || BindingActionKeys || actor == null || magic == null) return;
+        if (Observing || BindingActionKeys || actor == null || magic == null || !CanAssignActionSpell(actor, magic)) return;
         _draggedActor = actor;
         _draggedSpell = magic;
         _actionPressPoint = CMain.MPoint;
@@ -125,6 +125,7 @@ public sealed partial class GameScene
     {
         if (Observing || actor == null || magic == null || !actor.Magics.Contains(magic) || magic.Key == slot)
             return;
+        if (slot != 0 && !CanAssignActionSpell(actor, magic)) return;
         bool hero = actor == Hero;
         if (hero && (HeroSpawnState != HeroSpawnState.Summoned || actor.Dead)) return;
         if (slot != 0 && (hero ? slot is < 17 or > 24 : slot is < 1 or > 16)) return;
@@ -135,10 +136,13 @@ public sealed partial class GameScene
         SendAssignment(magic, (byte)slot, previous);
         // The first packet clears the occupant on the server. The second puts it in
         // the source slot. The old slot still identifies hero spells when clearing.
-        if (swap && displaced != null && previous != 0)
+        if (swap && displaced != null && previous != 0 && CanAssignActionSpell(actor, displaced))
             SendAssignment(displaced, previous, (byte)slot);
         RefreshActionBars();
     }
+
+    private static bool CanAssignActionSpell(UserObject actor, ClientMagic magic) =>
+        !SpellCurriculum.IsPassive(magic.Spell) && SpellCurriculum.CanUse(actor.Class, actor.Specialisation, magic.Spell);
 
     private static void SendAssignment(ClientMagic magic, byte slot, byte previous)
     {

@@ -2069,11 +2069,12 @@ namespace Client.MirScenes.Dialogs
         public void Update(ClientMagic magic, bool usable = true)
         {
             Magic = magic;
-            Usable = usable;
+            bool passive = SpellCurriculum.IsPassive(magic.Spell);
+            Usable = usable && !passive;
             SkillButton.Hint = usable ? "Drag this spell onto an action bar." :
                 "Inactive: this spell belongs to another specialisation.";
 
-            NameLabel.Text = usable ? Magic.Name : Magic.Name + " [Locked]";
+            NameLabel.Text = Magic.Name + (!usable ? " [Locked]" : passive ? " [Passive]" : "");
 
             LevelLabel.Text = Magic.Level.ToString();
             switch (Magic.Level)
@@ -2092,8 +2093,18 @@ namespace Client.MirScenes.Dialogs
                     break;
             }
 
-            KeyLabel.Text = Magic.Key is > 0 and <= 24
+            KeyLabel.Text = Usable && Magic.Key is > 0 and <= 24
                 ? GameScene.CompactActionKey(CMain.InputKeys.GetKey(GameScene.ActionKey(Magic.Key))) : "";
+
+            if (SpecialisationAbilities.TryGet(magic.Spell, out var ability))
+            {
+                int mana = magic.BaseCost + magic.Level * magic.LevelCost;
+                SkillButton.Hint = $"{ability.Description}\n{mana} MP · {magic.Delay / 1000f:0.#} s cooldown" +
+                    (magic.Range > 0 ? $" · {magic.Range} tiles" : "") +
+                    (usable ? "" : $"\nRequires {SpellCurriculum.Name(ability.Class, ability.Spec)}");
+                SetDelay();
+                return;
+            }
 
             switch (magic.Spell)
             {  //Warrior
@@ -2423,7 +2434,8 @@ namespace Client.MirScenes.Dialogs
 
 
 
-            SkillButton.Hint += "\nDrag to an action bar or click to choose a slot.";
+            SkillButton.Hint += !usable ? "\nInactive in your current specialisation." :
+                passive ? "\nPassive ability" : "\nDrag to an action bar or click to choose a slot.";
             SetDelay();
         }
 
@@ -2435,14 +2447,14 @@ namespace Client.MirScenes.Dialogs
 
             long timeLeft = Magic.CastTime + Magic.Delay - CMain.Time;
 
-            if (timeLeft < 100)
+            if (!Usable || timeLeft < 100)
             {
                 CoolDown.Visible = false;
                 return;
             }
 
-            int delayPerFrame = (int)(Magic.Delay / totalFrames);
-            int startFrame = totalFrames - (int)(timeLeft / delayPerFrame);
+            long delayPerFrame = Math.Max(1, Magic.Delay / totalFrames);
+            int startFrame = (int)Math.Clamp(totalFrames - timeLeft / delayPerFrame, 0, totalFrames);
 
             if ((CMain.Time <= Magic.CastTime + Magic.Delay))
             {

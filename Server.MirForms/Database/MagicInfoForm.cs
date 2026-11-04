@@ -50,6 +50,13 @@ namespace Server
             {
                 tabControl1.Enabled = true;
                 lblSelected.Text = "Selected Skill: " + _selectedMagicInfo.ToString();
+                if (SpecialisationAbilities.TryGet(_selectedMagicInfo.Spell, out var ability))
+                {
+                    string loadout = ability.Spec == CombatSpecialisation.Unchosen
+                        ? ability.Class.ToString()
+                        : SpellCurriculum.Name(ability.Class, ability.Spec);
+                    lblSelected.Text += $" · {loadout} · {ability.Windup} ms wind-up";
+                }
                 lblDamageExample.Text =
                     $"Damage @ Skill level 0: {GetMinPower(0):000}-{GetMaxPower(0):000}   |||   level 1: {GetMinPower(1):000}-{GetMaxPower(1):000}   |||   level 2: {GetMinPower(2):000}-{GetMaxPower(2):000}   |||   level 3: {GetMinPower(3):000}-{GetMaxPower(3):000}";
                 lblDamageExplained.Text =

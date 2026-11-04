@@ -6,7 +6,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../Shared/Enums.cs" Link="Enums.cs" />
-    <Compile Include="../../Shared/SpellCurriculum.cs" Link="SpellCurriculum.cs" />
+    <ProjectReference Include="../../Shared/Shared.csproj" />
   </ItemGroup>
 </Project>

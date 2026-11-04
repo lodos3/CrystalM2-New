@@ -1545,7 +1545,7 @@ namespace Server.MirNetwork
         }
         private void MagicKey(C.MagicKey p)
         {
-            if (Stage != GameStage.Game) return;
+            if (Stage != GameStage.Game || Player == null || p.Key > 24 || p.OldKey > 24) return;
 
             HumanObject actor = Player;
             if (p.Key > 16 || p.OldKey > 16)
@@ -1554,18 +1554,16 @@ namespace Server.MirNetwork
                 actor = Player.Hero;
             }
 
-            for (int i = 0; i < actor.Info.Magics.Count; i++)
-            {
-                UserMagic magic = actor.Info.Magics[i];
-                if (magic.Spell != p.Spell)
-                {
-                    if (magic.Key == p.Key)
-                        magic.Key = 0;
-                    continue;
-                }
+            if (p.Key != 0 && (actor is HeroObject) != (p.Key > 16)) return;
+            UserMagic selected = actor.Info.Magics.Find(magic => magic.Spell == p.Spell);
+            if (selected == null || (p.Key != 0 && (SpellCurriculum.IsPassive(p.Spell) || actor.GetMagic(p.Spell) == null)))
+                return;
 
-                magic.Key = p.Key;
-            }
+            if (p.Key != 0)
+                foreach (UserMagic magic in actor.Info.Magics)
+                    if (magic != selected && magic.Key == p.Key) magic.Key = 0;
+
+            selected.Key = p.Key;
         }
         private void Magic(C.Magic p)
         {

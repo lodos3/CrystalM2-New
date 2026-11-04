@@ -292,6 +292,33 @@ namespace Server.MirEnvir
 
         private void FillMagicInfoList()
         {
+            foreach (var ability in SpecialisationAbilities.All)
+            {
+                if (MagicExists(ability.Spell)) continue;
+                bool starter = ability.Spec == CombatSpecialisation.Unchosen;
+                MagicInfoList.Add(new MagicInfo
+                {
+                    Spell = ability.Spell,
+                    Name = ability.Name,
+                    Icon = ability.Icon,
+                    Range = ability.Range,
+                    BaseCost = ability.Mana,
+                    LevelCost = 1,
+                    Level1 = starter ? (byte)7 : (byte)25,
+                    Level2 = starter ? (byte)13 : (byte)35,
+                    Level3 = starter ? (byte)20 : (byte)45,
+                    Need1 = 180,
+                    Need2 = 420,
+                    Need3 = 900,
+                    DelayBase = ability.Cooldown,
+                    DelayReduction = 100,
+                    PowerBase = ability.Power,
+                    PowerBonus = 2,
+                    MultiplierBase = ability.Scaling,
+                    MultiplierBonus = .04f
+                });
+            }
+
             //Warrior
             if (!MagicExists(Spell.Fencing))
                 MagicInfoList.Add(new MagicInfo { Name = "Fencing", Spell = Spell.Fencing, Icon = 2, Level1 = 7, Level2 = 9, Level3 = 12, Need1 = 270, Need2 = 600, Need3 = 1300, Range = 0 });

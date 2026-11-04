@@ -153,6 +153,7 @@ namespace Client.MirObjects
             RefreshItemSetStats();
             RefreshMirSetStats();
             RefreshSkills();
+            SpecialisationAbilities.ApplyTraitStats(Stats, Class, Specialisation, Level);
             RefreshBuffs();
             RefreshGuildBuffs();
 
@@ -609,6 +610,8 @@ namespace Client.MirObjects
             for (int i = 0; i < Magics.Count; i++)
             {
                 ClientMagic magic = Magics[i];
+                if (!SpellCurriculum.CanUse(Class, Specialisation, magic.Spell)) continue;
+
                 switch (magic.Spell)
                 {
                     case Spell.Fencing:

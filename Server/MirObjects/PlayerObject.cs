@@ -643,6 +643,7 @@ namespace Server.MirObjects
 
             HP = 0;
             Dead = true;
+            ResetSignatureState();
 
             LogTime = Envir.Time;
             BrownTime = Envir.Time;
@@ -4558,6 +4559,7 @@ namespace Server.MirObjects
 
             // Switch to destination
             CurrentMap = temp;
+            if (mapChanged) ResetSignatureState();
             CurrentLocation = destination;
             CurrentMapIndex = temp.Info.Index;
 

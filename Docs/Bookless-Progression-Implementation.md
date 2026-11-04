@@ -26,4 +26,12 @@ Server magic lookup, melee spell parameters, passive stat refresh, and normal he
 
 The five-class catalogue and protocol round-trip tests are at `Tests/SpellCurriculumTests` and `Tests/SpecialisationProtocolTests`. Run `dotnet run --project Tests/SpellCurriculumTests/SpellCurriculumTests.csproj`, `dotnet run --project Tests/SpecialisationProtocolTests/SpecialisationProtocolTests.csproj`, and the complete Windows client/server builds in CI. These have not yet been verified to pass in this authoring environment.
 
-**Not yet implemented:** new unique signature spells, conditional passive mechanics beyond restricting old passive ownership, particle VFX authoring, respecs, and expanded server-editor loadout control. Do not treat this milestone as balance certification.
+## Signatures, traits and combat particles
+
+All 15 specialisations have a level-20 signature. Steel Cut, Spirit Spark and Quick Cut are shared level-1 attacks for Warrior, Taoist and Assassin. The spellbook previews the signature and traits at levels 20, 32 and 45. The first trait modifies the actor's stats. The next two add spell behaviours such as an extra relay target, poison transfer, ward sharing or mana recovery.
+
+The server validates mana, cooldown, entitlement, range, target and map before accepting a signature. It resolves wind-ups and repeat effects on the server. Spell power, mana cost, range, cooldown and proficiency gates use the existing Magic editor fields. The world database seeds missing definitions when loading and preserves edited rows. These rows use the version-118 layout.
+
+Combat particles use separate caster, target and impact layers with staggered start times. The client clears pending effects on a map reset. Ash Seal and Storm Relay resolve in timed stages. The same client renders terrain, weather and combat effects using the Vortice renderer.
+
+Run `dotnet run --project Tests/SpecialisationCombatTests/SpecialisationCombatTests.csproj` to exercise the server's spell dispatch and Magic database. The defaults are initial PvE and PvP tuning. The encounter and duel comparisons in the design audit require live gear, map and monster data.

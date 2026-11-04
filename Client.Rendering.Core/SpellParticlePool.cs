@@ -20,13 +20,16 @@ public readonly record struct SpellParticle(Vector2 Origin, Vector2 Velocity, lo
 public sealed class SpellParticlePool
 {
     private readonly SpellParticle[] _items;
+    private readonly SpellParticle[] _pending;
     private uint _random = 0x9e3779b9;
     private int _count;
+    private int _pendingCount;
 
     public SpellParticlePool(int capacity)
     {
         if (capacity <= 0) throw new ArgumentOutOfRangeException(nameof(capacity));
         _items = new SpellParticle[capacity];
+        _pending = new SpellParticle[Math.Max(1, capacity / 2)];
     }
 
     public ReadOnlySpan<SpellParticle> Active => _items.AsSpan(0, _count);
@@ -38,33 +41,52 @@ public sealed class SpellParticlePool
         return true;
     }
 
-    public bool Burst(Vector2 center, Vector2 heading, Color colour, long now, int count,
-        SpellParticleShape shape = SpellParticleShape.Spark)
+    public bool Schedule(SpellParticle particle)
     {
-        int startCount = _count;
-        for (int i = 0; i < count && _count < _items.Length; i++)
+        if (particle.Duration <= 0 || particle.Size <= 0 || _pendingCount == _pending.Length) return false;
+        _pending[_pendingCount++] = particle;
+        return true;
+    }
+
+    public bool Burst(Vector2 center, Vector2 heading, Color colour, long now, int count,
+        SpellParticleShape shape = SpellParticleShape.Spark, int delay = 0)
+    {
+        bool emitted = false;
+        for (int i = 0; i < count; i++)
         {
             float angle = NextUnit() * MathF.Tau;
             Vector2 drift = new Vector2(MathF.Cos(angle), MathF.Sin(angle) * .65f) * (10 + NextUnit() * 38);
-            TryAdd(new SpellParticle(center, drift + heading * 16, now, 260 + (int)(NextUnit() * 370),
-                8 + (int)(NextUnit() * 14), colour, i % 4 == 0 ? SpellParticleShape.Wisp : shape, 0));
+            var particle = new SpellParticle(center, drift + heading * 16, now + delay, 260 + (int)(NextUnit() * 370),
+                8 + (int)(NextUnit() * 14), colour, i % 4 == 0 ? SpellParticleShape.Wisp : shape, 0);
+            if (!(delay > 0 ? Schedule(particle) : TryAdd(particle))) break;
+            emitted = true;
         }
-        return _count != startCount;
+        return emitted;
     }
 
     // True for the last expired frame too, so cached world draws erase it.
     public bool Advance(long now)
     {
-        if (_count == 0) return false;
+        bool redraw = _count > 0;
         int alive = 0;
         for (int i = 0; i < _count; i++)
             if (now - _items[i].Start < _items[i].Duration)
                 _items[alive++] = _items[i];
         _count = alive;
-        return true;
+        int pending = 0;
+        for (int i = 0; i < _pendingCount; i++)
+        {
+            SpellParticle particle = _pending[i];
+            if (now < particle.Start)
+                _pending[pending++] = particle;
+            else if (now - particle.Start < particle.Duration)
+                redraw |= TryAdd(particle);
+        }
+        _pendingCount = pending;
+        return redraw;
     }
 
-    public void Clear() => _count = 0;
+    public void Clear() => _count = _pendingCount = 0;
 
     private float NextUnit()
     {

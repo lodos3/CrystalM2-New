@@ -1264,6 +1264,26 @@ public enum Spell : byte
     FireBounce = 154,
     MeteorShower = 155,
 
+    // Bookless starters and specialisation signatures
+    SteelCut = 156,
+    Notchbreaker = 157,
+    RedWake = 158,
+    Interpose = 159,
+    AshSeal = 160,
+    GlacialGate = 161,
+    StormRelay = 162,
+    LanternLink = 163,
+    Distil = 164,
+    SpiritCommand = 165,
+    VeilStrike = 166,
+    Riposte = 167,
+    SmokeSnare = 168,
+    Pinpoint = 169,
+    CinderMine = 170,
+    PackSignal = 171,
+    SpiritSpark = 172,
+    QuickCut = 173,
+
     //Map Events
     DigOutZombie = 200,
     Rubble = 201,
@@ -1323,7 +1343,10 @@ public enum SpellEffect : byte
     FurbolgWarriorCritical,
     Tester,
     MoonMist,
-    WeaponSpellImpact
+    WeaponSpellImpact,
+    SignatureWindup,
+    SignatureImpact,
+    SignatureArmed
 }
 
 

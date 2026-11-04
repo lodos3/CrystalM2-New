@@ -53,6 +53,7 @@ public sealed class SkillBarDialog : MirPanel
         foreach (ActionSlot slot in _slots)
             slot.Update(actor?.Magics.Find(magic =>
                 magic.Key == slot.Number &&
+                !SpellCurriculum.IsPassive(magic.Spell) &&
                 SpellCurriculum.CanUse(actor.Class, actor.Specialisation, magic.Spell)));
     }
 

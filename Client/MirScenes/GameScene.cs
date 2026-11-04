@@ -1030,7 +1030,7 @@ namespace Client.MirScenes
                 break;
             }
 
-            if (magic == null) return;
+            if (magic == null || SpellCurriculum.IsPassive(magic.Spell)) return;
             if (!SpellCurriculum.CanUse(actor.Class, actor.Specialisation, magic.Spell))
             {
                 OutputMessage("This ability is unavailable in your specialisation.");
@@ -1059,15 +1059,6 @@ namespace Client.MirScenes
             string prefix = actor == Hero ? GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.Hero) : string.Empty;
             switch (magic.Spell)
             {
-                case Spell.Fencing:
-                case Spell.FatalSword:
-                case Spell.MPEater:
-                case Spell.Hemorrhage:
-                case Spell.SpiritSword:
-                case Spell.Slaying:
-                case Spell.Focus:
-                case Spell.Meditation:
-                    return;
                 case Spell.Thrusting:
                     if (CMain.Time < ToggleTime) return;
                     actor.Thrusting = !actor.Thrusting;
@@ -2290,6 +2281,7 @@ namespace Client.MirScenes
             actor.TwinDrakeBlade = false;
             actor.FlamingSword = false;
             actor.ClearMagic();
+            actor.RefreshStats();
 
             foreach (SkillBarDialog bar in SkillBarDialogs)
                 bar.Update();
@@ -4653,7 +4645,11 @@ namespace Client.MirScenes
             if (p.Hero)
                 actor = Hero;
 
-            actor.Magics.Add(magic);
+            if (actor == null) return;
+            magic.CastTime += CMain.Time;
+            int index = actor.Magics.FindIndex(existing => existing.Spell == magic.Spell);
+            if (index >= 0) actor.Magics[index] = magic;
+            else actor.Magics.Add(magic);
             actor.RefreshStats();
             foreach (SkillBarDialog Bar in SkillBarDialogs)
             {
@@ -4701,9 +4697,9 @@ namespace Client.MirScenes
 
             if (!p.Cast) return;
 
-            MapControl.EmitSpellCast(p.Spell, User.CurrentLocation, User.Direction);
+            if (!Observing) MapControl.EmitSpellCast(p.Spell, User.CurrentLocation, p.Target, User.Direction);
             ClientMagic magic = User.GetMagic(p.Spell);
-            magic.CastTime = CMain.Time;
+            if (magic != null) magic.CastTime = CMain.Time;
         }
 
         private void MagicDelay(S.MagicDelay p)
@@ -4734,7 +4730,7 @@ namespace Client.MirScenes
 
             if (MapControl.Objects.TryGetValue(p.ObjectID, out var ob))
             {
-                if (p.Cast) MapControl.EmitSpellCast(p.Spell, p.Location, p.Direction);
+                if (p.Cast) MapControl.EmitSpellCast(p.Spell, p.Location, p.Target, p.Direction);
 
                 QueuedAction action = new QueuedAction { Action = MirAction.Spell, Direction = p.Direction, Location = p.Location, Params = new List<object>() };
                 action.Params.Add(p.Spell);
@@ -5192,6 +5188,11 @@ namespace Client.MirScenes
         {
             switch (p.Effect)
             {
+                case SpellEffect.SignatureWindup:
+                case SpellEffect.SignatureImpact:
+                case SpellEffect.SignatureArmed:
+                    MapControl.EmitSignatureEffect((Spell)p.Value, p.Location, p.Effect);
+                    break;
                 case SpellEffect.WeaponSpellImpact:
                     MapControl.EmitSpellImpact((Spell)p.Value, p.Location);
                     break;
@@ -12066,8 +12067,32 @@ namespace Client.MirScenes
 
             MapObject target = null;
 
-            //Targeting
-            switch (magic.Spell)
+            if (SpecialisationAbilities.TryGet(magic.Spell, out var ability))
+            {
+                MapObject hovered = actor.NextMagicObject;
+                switch (ability.Target)
+                {
+                    case AbilityTarget.Enemy:
+                        target = IsSignatureClientTarget(hovered, actor) ? hovered : MapObject.TargetObject;
+                        if (!IsSignatureClientTarget(target, actor))
+                        {
+                            actor.ClearMagic();
+                            return;
+                        }
+                        break;
+                    case AbilityTarget.Companion:
+                        if (IsSignatureClientTarget(hovered, actor)) target = hovered;
+                        break;
+                    case AbilityTarget.Ally:
+                        target = hovered != null && !hovered.Dead && hovered.Race is ObjectType.Player or ObjectType.Hero
+                            ? hovered : User;
+                        break;
+                    case AbilityTarget.Self:
+                        target = actor;
+                        break;
+                }
+            }
+            else switch (magic.Spell)
             {
                 case Spell.FireBall:
                 case Spell.GreatFireBall:
@@ -12223,6 +12248,7 @@ namespace Client.MirScenes
             MirDirection dir = (target == null || target == User) ? actor.NextMagicDirection : Functions.DirectionFromPoint(actor.CurrentLocation, target.CurrentLocation);
 
             Point location = target != null ? target.CurrentLocation : actor.NextMagicLocation;
+            if (target == null && ability?.Target == AbilityTarget.Companion) location = actor.CurrentLocation;
 
             uint targetID = target != null ? target.ObjectID : 0;
 
@@ -12255,6 +12281,10 @@ namespace Client.MirScenes
                 Network.Enqueue(new C.Magic { ObjectID = actor.ObjectID, Spell = magic.Spell, Direction = dir, TargetID = targetID, Location = location, SpellTargetLock = CMain.SpellTargetLock });
             }
         }
+
+        private static bool IsSignatureClientTarget(MapObject target, UserObject actor) =>
+            target != null && !target.Dead && target != actor && target != User && target != Hero &&
+            target.Race is ObjectType.Player or ObjectType.Hero or ObjectType.Monster;
 
         public static MirDirection MouseDirection(float ratio = 45F) //22.5 = 16
         {

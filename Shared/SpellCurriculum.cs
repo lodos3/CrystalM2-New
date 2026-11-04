@@ -20,6 +20,10 @@ public static class SpellCurriculum
 
     private static readonly Spell[] WarriorSpells =
     {
+        Spell.SteelCut,
+        Spell.Notchbreaker,
+        Spell.RedWake,
+        Spell.Interpose,
         Spell.Fencing,
         Spell.Slaying,
         Spell.Thrusting,
@@ -41,6 +45,9 @@ public static class SpellCurriculum
 
     private static readonly Spell[] WizardSpells =
     {
+        Spell.AshSeal,
+        Spell.GlacialGate,
+        Spell.StormRelay,
         Spell.FireBall,
         Spell.Repulsion,
         Spell.ElectricShock,
@@ -69,6 +76,10 @@ public static class SpellCurriculum
 
     private static readonly Spell[] TaoistSpells =
     {
+        Spell.SpiritSpark,
+        Spell.LanternLink,
+        Spell.Distil,
+        Spell.SpiritCommand,
         Spell.Healing,
         Spell.SpiritSword,
         Spell.Poisoning,
@@ -98,6 +109,10 @@ public static class SpellCurriculum
 
     private static readonly Spell[] AssassinSpells =
     {
+        Spell.QuickCut,
+        Spell.VeilStrike,
+        Spell.Riposte,
+        Spell.SmokeSnare,
         Spell.FatalSword,
         Spell.DoubleSlash,
         Spell.Haste,
@@ -119,6 +134,9 @@ public static class SpellCurriculum
 
     private static readonly Spell[] ArcherSpells =
     {
+        Spell.Pinpoint,
+        Spell.CinderMine,
+        Spell.PackSignal,
         Spell.Focus,
         Spell.StraightShot,
         Spell.DoubleShot,
@@ -161,6 +179,8 @@ public static class SpellCurriculum
 
     public static byte UnlockLevel(Spell spell, byte rankOneLevel)
     {
+        if (SpecialisationAbilities.TryGet(spell, out var ability)) return ability.UnlockLevel;
+
         // The starter spells unlock at rank zero; original rank levels remain unchanged.
         switch (spell)
         {
@@ -169,6 +189,8 @@ public static class SpellCurriculum
             case Spell.Healing:
             case Spell.FatalSword:
             case Spell.StraightShot: return 1;
+            case Spell.MoonLight:
+            case Spell.SummonVampire: return (byte)SpecialisationUnlockLevel;
             default: return rankOneLevel == 0 ? (byte)1 : rankOneLevel;
         }
     }
@@ -200,6 +222,7 @@ public static class SpellCurriculum
     public static CombatSpecialisation RequiredSpecialisation(MirClass actorClass, Spell spell)
     {
         if (!Owns(actorClass, spell)) return CombatSpecialisation.Unchosen;
+        if (SpecialisationAbilities.TryGet(spell, out var ability)) return ability.Spec;
 
         return spell switch
         {
@@ -252,6 +275,9 @@ public static class SpellCurriculum
             _ => CombatSpecialisation.Unchosen
         };
     }
+
+    public static bool IsPassive(Spell spell) => spell is Spell.Fencing or Spell.FatalSword or Spell.MPEater or
+        Spell.Hemorrhage or Spell.SpiritSword or Spell.Slaying or Spell.Focus or Spell.Meditation;
 
     public static bool CanUse(MirClass actorClass, CombatSpecialisation selected, Spell spell)
     {

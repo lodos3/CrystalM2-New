@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 static void Check(bool condition, string message) { if (!condition) throw new Exception(message); }
 MirClass[] classes = { MirClass.Warrior, MirClass.Wizard, MirClass.Taoist, MirClass.Assassin, MirClass.Archer };
-int[] counts = { 17, 24, 25, 17, 21 };
+int[] counts = { 21, 27, 29, 21, 24 };
 for (int i = 0; i < classes.Length; i++)
 {
     var skills = SpellCurriculum.ForClass(classes[i]);
@@ -61,6 +61,23 @@ foreach (MirClass actorClass in classes)
     }
     for (int slot = 0; slot <= 3; slot++)
         Check(required[slot] > 0, "All three specs and a shared kit have abilities");
+
+    for (int slot = 1; slot <= 3; slot++)
+    {
+        var spec = (CombatSpecialisation)slot;
+        var ability = SpecialisationAbilities.Signature(actorClass, spec);
+        Check(ability != null && ability.Windup > 0 && ability.Cooldown > ability.Windup,
+            $"Missing usable signature for {actorClass} {spec}");
+        Check(!SpellCurriculum.IsUnlocked(actorClass, ability!.Spell, 19, 25) &&
+            SpellCurriculum.IsUnlocked(actorClass, ability.Spell, 20, 25), "Separate unlock and proficiency levels");
+        var traits = SpecialisationAbilities.TraitsFor(ability.Spell);
+        Check(traits.Select(t => t.Level).SequenceEqual(new byte[] { 20, 32, 45 }), "Three trait milestones");
+        var stats = new Stats();
+        SpecialisationAbilities.ApplyTraitStats(stats, actorClass, spec, 19);
+        Check(stats.Equals(new Stats()), "Traits unlock with their spec");
+        SpecialisationAbilities.ApplyTraitStats(stats, actorClass, spec, 20);
+        Check(!stats.Equals(new Stats()), "Every specialisation applies a real stat trait");
+    }
 }
 Check(SpellCurriculum.CanUse(MirClass.Warrior, CombatSpecialisation.Unchosen, Spell.None),
     "Unarmed default attack stays available");

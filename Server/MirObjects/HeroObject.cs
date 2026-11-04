@@ -640,6 +640,7 @@ namespace Server.MirObjects
 
             HP = 0;
             Dead = true;
+            ResetSignatureState();
 
             LogTime = Envir.Time;
             BrownTime = Envir.Time;
@@ -820,11 +821,49 @@ namespace Server.MirObjects
 
         protected void ProcessAI() 
         {           
-            if (NextMagicSpell != Spell.None) return;            
+            if (NextMagicSpell != Spell.None || TryQueueSignature()) return;
             ProcessFriend();
 
             if (NextMagicSpell != Spell.None) return;
             ProcessAttack();
+        }
+
+        private bool TryQueueSignature()
+        {
+            if (!CanCast) return false;
+            var ability = SpecialisationAbilities.Signature(Info.Class, Info.Specialisation);
+            if (ability == null) return false;
+
+            UserMagic magic = GetMagic(ability.Spell);
+            if (!CanUseMagic(magic) || (magic.CastTime != 0 && Envir.Time < magic.CastTime + magic.GetDelay()))
+                return false;
+
+            MapObject target = Target;
+            switch (ability.Target)
+            {
+                case AbilityTarget.Ally:
+                    target = Owner.PercentHealth <= PercentHealth ? Owner : this;
+                    if (target.PercentHealth > 70) return false;
+                    break;
+                case AbilityTarget.Companion:
+                    if (!Pets.Any(pet => IsSignatureCompanion(pet, ability.Spell) &&
+                        Functions.InRange(CurrentLocation, pet.CurrentLocation, magic.Info.Range))) return false;
+                    break;
+                default:
+                    if (Owner.Info.HeroBehaviour == HeroBehaviour.Follow) return false;
+                    break;
+            }
+
+            if (target == null || target.Dead || target.CurrentMap != CurrentMap) return false;
+            int range = ability.Target == AbilityTarget.Self ? 1 : magic.Info.Range;
+            if (!Functions.InRange(CurrentLocation, target.CurrentLocation, range) || !CanFly(target.CurrentLocation))
+                return false;
+            if (ability.Spell == Spell.Distil && FindDistilPoison(target) == null) return false;
+
+            MirDirection direction = CurrentLocation == target.CurrentLocation ? Direction :
+                Functions.DirectionFromPoint(CurrentLocation, target.CurrentLocation);
+            BeginMagic(ability.Spell, direction, target.ObjectID, target.CurrentLocation);
+            return true;
         }
 
         protected virtual void ProcessStacking()

@@ -218,7 +218,7 @@ namespace Server.MirDatabase
 
         public long GetDelay()
         {
-            return Info.DelayBase - (Level * Info.DelayReduction);
+            return Math.Max(0, Info.DelayBase - (long)Level * Info.DelayReduction);
         }
     }
 }

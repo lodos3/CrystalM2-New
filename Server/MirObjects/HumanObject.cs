@@ -8,7 +8,7 @@ using S = ServerPackets;
 
 namespace Server.MirObjects
 {
-    public class HumanObject : MapObject
+    public partial class HumanObject : MapObject
     {
         public override ObjectType Race
         {
@@ -685,8 +685,9 @@ namespace Server.MirObjects
                             Broadcast(new S.ObjectEffect { ObjectID = ObjectID, Effect = SpellEffect.Bleeding, EffectType = 0 });
                         }
 
-                        PoisonDamage(-poison.Value, poison.Owner);
-                        BroadcastDamageIndicator(DamageType.Hit, -poison.Value);
+                        int poisonDamage = DamageAfterSignatureWard(poison.Value);
+                        PoisonDamage(-poisonDamage, poison.Owner);
+                        if (poisonDamage > 0) BroadcastDamageIndicator(DamageType.Hit, -poisonDamage);
 
                         if (Dead) break;
                         RegenTime = Envir.Time + RegenDelay;
@@ -1745,6 +1746,7 @@ namespace Server.MirObjects
             RefreshItemSetStats();
             RefreshMirSetStats();
             RefreshSkills();
+            SpecialisationAbilities.ApplyTraitStats(Stats, Info.Class, Info.Specialisation, Level);
             RefreshBuffs();
             RefreshGuildBuffs();
 
@@ -3453,6 +3455,12 @@ namespace Server.MirObjects
             if (magic == null)
             {
                 Enqueue(new S.UserLocation { Direction = Direction, Location = CurrentLocation });
+                return;
+            }
+
+            if (SpecialisationAbilities.TryGet(spell, out var ability))
+            {
+                TryCastSpecialisation(magic, ability, dir, targetID, location);
                 return;
             }
 
@@ -5946,6 +5954,12 @@ namespace Server.MirObjects
         protected void CompleteMagic(IList<object> data)
         {
             UserMagic magic = (UserMagic)data[0];
+            if (SpecialisationAbilities.TryGet(magic.Spell, out var ability))
+            {
+                CompleteSpecialisationSpell(magic, ability, (SignatureCast)data[1]);
+                return;
+            }
+
             int value;
             MapObject target;
             Point targetLocation;
@@ -7049,6 +7063,8 @@ namespace Server.MirObjects
 
             if (!base.Teleport(temp, location, effects)) return false;
 
+            if (mapChanged) ResetSignatureState();
+
             Enqueue(new S.MapChanged
             {
                 MapIndex = CurrentMap.Info.Index,
@@ -7272,10 +7288,13 @@ namespace Server.MirObjects
             Enqueue(new S.Struck { AttackerID = attacker.ObjectID });
             Broadcast(new S.ObjectStruck { ObjectID = ObjectID, AttackerID = attacker.ObjectID, Direction = Direction, Location = CurrentLocation });
 
-            BroadcastDamageIndicator(DamageType.Hit, armour - damage);
-
-            ChangeHP(armour - damage);
-            return damage - armour;
+            int remaining = DamageAfterSignatureWard(damage - armour);
+            if (remaining > 0)
+            {
+                BroadcastDamageIndicator(DamageType.Hit, -remaining);
+                ChangeHP(-remaining);
+            }
+            return remaining;
         }
         public override int Attacked(MonsterObject attacker, int damage, DefenceType type = DefenceType.ACAgility)
         {
@@ -7366,10 +7385,13 @@ namespace Server.MirObjects
                 StruckTime = Envir.Time + 500;
             }
 
-            BroadcastDamageIndicator(DamageType.Hit, armour - damage);
-
-            ChangeHP(armour - damage);
-            return damage - armour;
+            int remaining = DamageAfterSignatureWard(damage - armour);
+            if (remaining > 0)
+            {
+                BroadcastDamageIndicator(DamageType.Hit, -remaining);
+                ChangeHP(-remaining);
+            }
+            return remaining;
         }
         public override int Struck(int damage, DefenceType type = DefenceType.ACAgility)
         {
@@ -7431,8 +7453,9 @@ namespace Server.MirObjects
             Enqueue(new S.Struck { AttackerID = 0 });
             Broadcast(new S.ObjectStruck { ObjectID = ObjectID, AttackerID = 0, Direction = Direction, Location = CurrentLocation });
 
-            ChangeHP(armour - damage);
-            return damage - armour;
+            int remaining = DamageAfterSignatureWard(damage - armour);
+            ChangeHP(-remaining);
+            return remaining;
         }
 
         public override void ApplyPoison(Poison p, MapObject Caster = null, bool NoResist = false, bool ignoreDefence = true)

@@ -998,6 +998,7 @@ namespace Server.MirObjects
     public class Poison
     {
         private MapObject owner;
+        internal MapObject Source => owner;
         public MapObject Owner
         {
             get 
