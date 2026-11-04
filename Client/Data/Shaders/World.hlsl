@@ -41,6 +41,18 @@ float4 PSMagic(Output input) : SV_TARGET
     pixel.a *= C[0].a;
     return pixel;
 }
+// The emission texture contains no ambient colour. Add ambient exactly once
+// during multiplicative world composition; bloom sees only emitted light.
+float4 PSLightComposite(Output input) : SV_TARGET
+{
+    return float4(saturate(SampleStraight(input.Uv).rgb + C[0].rgb), 1);
+}
+// A separate repaired alpha mask uses linear filtering. The original sprite
+// continues to use point sampling, with its baked RGB and alpha untouched.
+float4 PSShadowMask(Output input) : SV_TARGET
+{
+    return float4(0, 0, 0, SampleStraight(input.Uv).a * input.Tint.a);
+}
 // Atmosphere runs only when compositing the world texture, before the HUD.
 float4 PSAtmosphere(Output input) : SV_TARGET
 {
@@ -64,10 +76,13 @@ float4 PSBloomExtract(Output input) : SV_TARGET
 }
 float4 PSBloomBlur(Output input) : SV_TARGET
 {
-    float3 sum = SampleStraight(input.Uv).rgb;
-    sum += SampleStraight(input.Uv + C[0].xy).rgb;
-    sum += SampleStraight(input.Uv - C[0].xy).rgb;
-    sum += SampleStraight(input.Uv + C[0].zw).rgb;
-    sum += SampleStraight(input.Uv - C[0].zw).rgb;
+    // Separable nine-tap Gaussian expressed as five bilinear samples. C0.xy
+    // supplies horizontal or vertical texel direction; C1.x is pass intensity.
+    float2 direction = C[0].xy;
+    float3 sum = SampleStraight(input.Uv).rgb * 0.2270270270;
+    sum += SampleStraight(input.Uv + direction * 1.3846153846).rgb * 0.3162162162;
+    sum += SampleStraight(input.Uv - direction * 1.3846153846).rgb * 0.3162162162;
+    sum += SampleStraight(input.Uv + direction * 3.2307692308).rgb * 0.0702702703;
+    sum += SampleStraight(input.Uv - direction * 3.2307692308).rgb * 0.0702702703;
     return float4(sum * C[1].x, 1);
 }

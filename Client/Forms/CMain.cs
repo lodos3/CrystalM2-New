@@ -403,10 +403,10 @@ namespace Client
                 if (DXManager.Device.BackBufferSize != Program.Form.ClientSize)
                     DXManager.ResetDevice();
 
-                DXManager.Device.Clear(Color.Black);
                 DXManager.Device.BeginFrame();
                 DXManager.Sprite.Begin();
                 DXManager.SetSurface(DXManager.MainSurface);
+                DXManager.Device.Clear(Color.Black);
 
                 if (MirScene.ActiveScene != null)
                     MirScene.ActiveScene.Draw();
@@ -732,6 +732,7 @@ namespace Client
                 Application.Idle -= Application_Idle;
                 DXManager.Dispose();
                 SoundManager.Dispose();
+                Graphics?.Dispose();
             }
         }
 

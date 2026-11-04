@@ -1,7 +1,7 @@
 # CrystalM2 — one Vortice Direct3D 11 client
 
 `Client/Client.csproj` is the only playable client and uses Vortice.Direct3D11
-and Vortice.D3DCompiler 3.8.3 on .NET 8, Windows x64. The isolated preview,
+and Vortice.D3DCompiler 3.8.3 on .NET 8, Windows 10/11 x64. The isolated preview,
 SlimDX binaries/reference, Direct3D9 device implementation and shader assembly
 files have been removed. There is no renderer selector or fallback client.
 
@@ -48,11 +48,33 @@ For explicitly permitted sources, checker-pattern alpha detection and the
 16 MiB repaired-shadow mask budget are retained. Repair affects the separate
 half-resolution projected mask, never the original artwork or hit-test alpha.
 Current animation frames and light-responsive projection continue to be used.
+The separate repaired masks use linear filtering for soft edges, while the
+source artwork keeps point sampling.
+
+## Environmental and light effects
+
+The HLSL world pass carries forward atmosphere colour transitions, haze,
+weather exposure, authored wet-surface overlays and optional lightning. It is
+composited before the HUD. No surface normals or materials are inferred from
+sprite colour.
+
+Emission and ambient light now have separate roles. The light buffer clears
+to black and receives explicit map/actor light draws. Ambient colour is added
+only when that buffer multiplies the world. This prevents ambient brightness
+itself from crossing the bloom threshold, including on daylight maps.
+
+`LightingBloom=True` enables emitted-light extraction followed by horizontal
+and vertical Gaussian blur. The two reduced-resolution targets follow
+`BloomDivisor` (default 4, clamped 2–8); at 1920×1080 and divisor 4 their combined
+BGRA payload is 1,036,800 bytes, excluding driver overhead. Bloom never samples
+the baked map artwork. Fog, wet surfaces, lightning and bloom remain optional
+until native visual checks have run on actual asset installations.
 
 ## Build and checks
 
 ```powershell
 dotnet build Client/Client.csproj -c Release
+dotnet publish Client/Client.csproj -c Release -r win-x64 --self-contained false -o artifacts/client
 dotnet run --project Tests/ModernRendererTests/ModernRendererTests.csproj
 dotnet run --project Tests/WindowsRendererTests/WindowsRendererTests.csproj -c Release
 ```
@@ -60,7 +82,8 @@ dotnet run --project Tests/WindowsRendererTests/WindowsRendererTests.csproj -c R
 The Windows tests compile the production renderer sources and HLSL, create a
 real Microsoft WARP D3D11 device and check alpha through a cached target,
 layer order, adjacent batching, drawing after Present, upload disposal and
-resize. WARP is explicitly selected in that test assembly; the game does not
+resize, plus ambient/bloom separation, Gaussian intensity and repaired mask
+filtering. WARP is explicitly selected in that test assembly; the game does not
 silently fall back to it. Tiny known pixel values are test inputs, not game
 assets or a substitute for visual validation with actual libraries.
 
@@ -70,13 +93,21 @@ without starting the patcher or connecting to a game server.
 ## Validation limits and remaining acceptance work
 
 The game client and Windows renderer test project compiled successfully for
-the Windows target with the .NET SDK from Linux. All eight pure rendering and
+the Windows target with the .NET SDK from Linux. Windows x64 publish also
+succeeded, producing one `Client.exe`, Vortice dependencies and the exact
+current HLSL; no retired renderer files or dependency entries were present.
+All eight pure rendering and
 faction regression suites passed. The ambient test was corrected to compare
 ARGB values rather than named-colour identity. Existing WebView2/WindowsBase and source-analysis warnings
 remain. The pure geometry/asset-policy tests run without Direct3D. Windows
 shader/compositor tests are included in CI but must actually execute before
 claiming GPU correctness. No in-game FPS gain, GPU memory reduction or exact
 pixel parity with the removed renderer is claimed without hardware results.
+
+The migration's GitHub Actions run failed before either job had a runner or
+any executed steps. Its status is not a native shader-test result. Run the
+Windows command above locally until CI can start jobs. Build/publish also
+removes known retired SlimDX and assembly-shader files from reused outputs.
 
 The former normal/grayscale/magic assembly files were supplied externally and
 are absent from this repository. The HLSL implements the current tint and

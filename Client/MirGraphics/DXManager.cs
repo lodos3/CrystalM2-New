@@ -70,6 +70,8 @@ namespace Client.MirGraphics
         {
             Device = new RendererDevice(Program.Form.Handle, Settings.ScreenWidth, Settings.ScreenHeight);
             Sprite = Device.Sprite;
+            Opacity = BlendingRate = 1f;
+            Blending = GrayScale = false;
             LoadTextures();
             DeviceLost = false;
         }
@@ -172,7 +174,7 @@ namespace Client.MirGraphics
 
         public static void SetSurface(Surface surface)
         {
-            if (CurrentSurface == surface)
+            if (CurrentSurface == surface && Device.CurrentSurface == surface)
                 return;
 
             Sprite.Flush();
@@ -241,6 +243,7 @@ namespace Client.MirGraphics
                 return;
 
             Matrix original = Sprite.Transform;
+            ShaderEffect originalShader = Device.PixelShader;
             Sprite.Flush();
             try
             {
@@ -252,6 +255,7 @@ namespace Client.MirGraphics
                 projection.M41 = topLeft.X + horizontal * sourceHeight;
                 projection.M42 = topLeft.Y + (1f + vertical) * sourceHeight;
                 Sprite.Transform = projection;
+                if (halfResolution) Device.PixelShader = ShaderEffect.ShadowMask;
                 Draw(texture, sourceRect, Vector3.Zero, Color.FromArgb(92, 0, 0, 0));
                 ProjectedShadowsDrawn++;
                 Sprite.Flush();
@@ -259,6 +263,7 @@ namespace Client.MirGraphics
             finally
             {
                 Sprite.Transform = original;
+                Device.PixelShader = originalShader;
             }
         }
 
@@ -302,6 +307,7 @@ namespace Client.MirGraphics
                 Opacity = 1f;
                 Device.Opacity = 1f;
                 Blending = false;
+                GrayScale = false;
                 Device.Blend = SpriteBlendMode.Alpha;
                 Device.PixelShader = ShaderEffect.Artwork;
             }
@@ -315,6 +321,8 @@ namespace Client.MirGraphics
             {
                 Device.PixelShader = ShaderEffect.Artwork;
                 Device.Blend = SpriteBlendMode.Alpha;
+                Device.Opacity = Opacity = 1f;
+                Blending = GrayScale = false;
                 SetSurface(MainSurface);
             }
             else DeviceLost = true;

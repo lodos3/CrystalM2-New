@@ -10694,7 +10694,7 @@ namespace Client.MirScenes
         {
             if (User == null) return;
 
-            if (!FloorValid)
+            if (!FloorValid || DXManager.FloorTexture == null || DXManager.FloorTexture.Disposed)
                 DrawFloor();
 
 
@@ -10780,6 +10780,7 @@ namespace Client.MirScenes
             // Continue the light pass when transitioning into day, then avoid
             // its render target and blend operations once daylight is fully white.
             if (ambient.ToArgb() != Color.White.ToArgb() ||
+                Settings.LightingBloom ||
                 GameScene.User.Poison.HasFlag(PoisonType.Blindness))
             {
                 DrawLights(ambient);
@@ -11239,7 +11240,9 @@ namespace Client.MirScenes
                 darkness = GetBlindLight(darkness);
             }
 
-            DXManager.Device.Clear(darkness);
+            // Keep emitted light separate from ambient. Otherwise the ambient
+            // colour itself crosses the bloom threshold on brighter maps.
+            DXManager.Device.Clear(Color.Black);
 
             #endregion
 
@@ -11411,14 +11414,21 @@ namespace Client.MirScenes
             DXManager.SetSurface(oldSurface);
 
             DXManager.Device.Blend = SpriteBlendMode.Multiply;
+            ShaderEffect previousLightShader = DXManager.Device.PixelShader;
+            DXManager.Device.PixelShader = ShaderEffect.LightComposite;
+            DXManager.Device.SetPixelShaderConstant(0, stackalloc Vector4[]
+            {
+                new Vector4(darkness.R / 255f, darkness.G / 255f, darkness.B / 255f, 1f)
+            });
 
             DXManager.Draw(DXManager.LightTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White);
 
             DXManager.Sprite.End();
+            DXManager.Device.PixelShader = previousLightShader;
             DXManager.Sprite.Begin();
 
             // Composite extracted lights after multiplicative darkness and
-            // before UI. Missing shaders/unsupported devices retain legacy light.
+            // before UI. The emission buffer contains no ambient colour.
             if (Settings.LightingBloom)
                 LightBloomPass.Composite();
         }

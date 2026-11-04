@@ -1,66 +1,68 @@
 using System;
 using System.Drawing;
-using System.IO;
 
 namespace Client.MirGraphics
 {
-    // Optional D3D11 light-mask bloom. One reduced-size texture plus two shader draws.
-    // No CPU/GPU readback and no extra full-resolution render target.
+    // Two reduced-resolution targets: extract emitted light, horizontal blur,
+    // then vertical blur while compositing. Baked map RGB never feeds bloom.
     internal static class LightBloomPass
     {
-        private static Texture _texture;
-        private static Surface _surface;
+        private static Texture _texture, _blurTexture;
+        private static Surface _surface, _blurSurface;
         private static Size _size;
         private static bool _failed;
         private static readonly Vector4[] ExtractConstants =
         {
             new Vector4(0.58f, 3.0f, 0f, 1f)
         };
-        private static readonly Vector4[] BlurConstants =
-        {
-            new Vector4(0f, 0f, 0f, 0f),
-            new Vector4(0.115f, 1f, 0f, 0f)
-        };
+        private static readonly Vector4[] BlurConstants = new Vector4[2];
 
         private static bool EnsureTarget()
         {
             Size size = BloomBufferLayout.Resolve(
                 Settings.ScreenWidth, Settings.ScreenHeight, Settings.BloomDivisor);
             if (size.IsEmpty) return false;
-            if (_texture != null && !_texture.Disposed && _surface != null &&
-                !_surface.Disposed && size == _size)
+            if (_texture != null && !_texture.Disposed &&
+                _blurTexture != null && !_blurTexture.Disposed && size == _size)
                 return true;
 
             ReleaseTarget();
             _texture = new Texture(DXManager.Device, size.Width, size.Height, true);
             _surface = _texture.GetSurface();
+            _blurTexture = new Texture(DXManager.Device, size.Width, size.Height, true);
+            _blurSurface = _blurTexture.GetSurface();
             _size = size;
             return true;
         }
 
         internal static void Composite()
         {
-            if (!Settings.LightingBloom || DXManager.DeviceLost ||
-                DXManager.LightTexture == null || DXManager.LightTexture.Disposed ||
-                _failed)
+            if (!Settings.LightingBloom)
+            {
+                ReleaseTarget();
                 return;
+            }
+            if (DXManager.DeviceLost || _failed || DXManager.LightTexture == null ||
+                DXManager.LightTexture.Disposed) return;
 
             Surface originalSurface = DXManager.CurrentSurface;
             Matrix originalTransform = DXManager.Sprite.Transform;
             ShaderEffect originalShader = DXManager.Device.PixelShader;
-            bool originalBlend = DXManager.Blending;
-            float originalRate = DXManager.BlendingRate;
-            BlendMode originalMode = DXManager.BlendingMode;
+            SpriteBlendMode originalBlend = DXManager.Device.Blend;
+            float originalRate = DXManager.Device.BlendRate;
+            float originalOpacity = DXManager.Device.Opacity;
+            Span<Vector4> originalConstants = stackalloc Vector4[6];
+            DXManager.Device.CopyPixelShaderConstants(originalConstants);
             bool failed = false;
 
             try
             {
                 if (!EnsureTarget()) return;
+                DXManager.Device.Opacity = 1;
+                DXManager.Device.Blend = SpriteBlendMode.Alpha;
 
-                // Downsample the light mask, extracting only bright pixels.
                 DXManager.SetSurface(_surface);
                 DXManager.Device.Clear(Color.Black);
-                DXManager.Sprite.Flush();
                 DXManager.Device.PixelShader = ShaderEffect.BloomExtract;
                 DXManager.Device.SetPixelShaderConstant(0, ExtractConstants);
                 DXManager.Sprite.Transform = Matrix.CreateScale(
@@ -69,49 +71,54 @@ namespace Client.MirGraphics
                 DXManager.Draw(DXManager.LightTexture,
                     new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight),
                     Vector3.Zero, Color.White);
-                DXManager.Sprite.Flush();
 
-                // Blur while upsampling. Add only light colours to the world
-                // already composed with ambient darkness, not the HUD.
-                DXManager.Sprite.Transform = originalTransform;
-                DXManager.Device.PixelShader = originalShader;
-                DXManager.SetSurface(originalSurface);
-                DXManager.SetBlend(true);
-                DXManager.Sprite.Flush();
-
-                BlurConstants[0] = new Vector4(1f / _size.Width, 0f, 0f, 1f / _size.Height);
+                DXManager.SetSurface(_blurSurface);
+                DXManager.Device.Clear(Color.Black);
                 DXManager.Device.PixelShader = ShaderEffect.BloomBlur;
+                BlurConstants[0] = new Vector4(1f / _size.Width, 0, 0, 0);
+                BlurConstants[1] = new Vector4(1, 0, 0, 0);
+                DXManager.Device.SetPixelShaderConstant(0, BlurConstants);
+                DXManager.Sprite.Transform = Matrix.Identity;
+                DXManager.Draw(_texture, new Rectangle(Point.Empty, _size), Vector3.Zero, Color.White);
+
+                DXManager.SetSurface(originalSurface);
+                DXManager.Device.Blend = SpriteBlendMode.Additive;
+                BlurConstants[0] = new Vector4(0, 1f / _size.Height, 0, 0);
+                BlurConstants[1] = new Vector4(0.575f, 0, 0, 0);
                 DXManager.Device.SetPixelShaderConstant(0, BlurConstants);
                 DXManager.Sprite.Transform = Matrix.CreateScale(
                     (float)Settings.ScreenWidth / _size.Width,
                     (float)Settings.ScreenHeight / _size.Height, 1f);
-                DXManager.Draw(_texture, new Rectangle(0, 0, _size.Width, _size.Height),
-                               Vector3.Zero, Color.White);
+                DXManager.Draw(_blurTexture, new Rectangle(Point.Empty, _size), Vector3.Zero, Color.White);
                 DXManager.Sprite.Flush();
             }
             catch (Exception ex)
             {
-                failed = true;
-                _failed = true;
-                CMain.SaveError("Optional light bloom pass disabled: " + ex);
+                failed = _failed = true;
+                DXManager.Device.DiscardPending();
+                CMain.SaveError("Optional D3D11 light bloom disabled: " + ex);
             }
             finally
             {
-                // Restore every renderer state this optional pass touched.
                 DXManager.Sprite.Transform = originalTransform;
-                DXManager.Device.PixelShader = originalShader;
                 DXManager.SetSurface(originalSurface);
-                DXManager.SetBlend(originalBlend, originalRate, originalMode);
+                DXManager.Device.PixelShader = originalShader;
+                DXManager.Device.SetPixelShaderConstant(0, originalConstants);
+                DXManager.Device.Blend = originalBlend;
+                DXManager.Device.BlendRate = originalRate;
+                DXManager.Device.Opacity = originalOpacity;
                 if (failed) ReleaseTarget();
             }
         }
 
         private static void ReleaseTarget()
         {
-            if (_surface != null && !_surface.Disposed) _surface.Dispose();
-            if (_texture != null && !_texture.Disposed) _texture.Dispose();
-            _surface = null;
-            _texture = null;
+            _surface?.Dispose();
+            _blurSurface?.Dispose();
+            _texture?.Dispose();
+            _blurTexture?.Dispose();
+            _surface = _blurSurface = null;
+            _texture = _blurTexture = null;
             _size = Size.Empty;
         }
 

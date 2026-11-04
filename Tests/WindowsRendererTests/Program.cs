@@ -15,6 +15,7 @@ internal static class Program
         using var red = Upload(device, Color.Red);
         using var blue = Upload(device, Color.Blue);
         using var translucent = Upload(device, Color.FromArgb(128, 180, 80, 20));
+        using var dim = Upload(device, Color.FromArgb(255, 20, 40, 60));
         using var intermediate = new Texture(device, 8, 8, true);
         using var surface = intermediate.GetSurface();
 
@@ -56,6 +57,58 @@ internal static class Program
         device.Sprite.Draw(blue, null, new Vector3(8, 8, 0), Vector4.One);
         using (var image = device.Capture(backBuffer))
             Near(Color.Blue, image.GetPixel(8, 8), "Backbuffer must rebind after flip-model Present.");
+
+        device.SetRenderTarget(surface);
+        device.Clear(Color.Black); // No emitted light, independent of ambient.
+        device.SetRenderTarget(backBuffer);
+        device.Clear(Color.White);
+        device.Blend = SpriteBlendMode.Multiply;
+        device.PixelShader = ShaderEffect.LightComposite;
+        device.SetPixelShaderConstant(0, new[] { new Vector4(0.2f, 0.2f, 0.2f, 1) });
+        device.Sprite.Draw(intermediate, null, Vector3.Zero, Vector4.One);
+        device.Sprite.End();
+        using (var image = device.Capture(backBuffer))
+            Near(Color.FromArgb(255, 51, 51, 51), image.GetPixel(0, 0),
+                "Ambient must be combined during light composition, not baked into the emission buffer.");
+        device.PixelShader = ShaderEffect.BloomExtract;
+        device.Blend = SpriteBlendMode.Alpha;
+        device.SetPixelShaderConstant(0, new[] { new Vector4(0.58f, 3, 0, 1) });
+        device.Clear(Color.Black);
+        device.Sprite.Draw(intermediate, null, Vector3.Zero, Vector4.One);
+        device.Sprite.End();
+        using (var image = device.Capture(backBuffer))
+            Near(Color.Black, image.GetPixel(0, 0), "Ambient darkness must never create bloom.");
+
+        device.PixelShader = ShaderEffect.BloomBlur;
+        device.SetPixelShaderConstant(0, new[]
+        {
+            new Vector4(0.5f, 0, 0, 0), new Vector4(1, 0, 0, 0)
+        });
+        device.Clear(Color.Black);
+        device.Sprite.Draw(dim, null, Vector3.Zero, Vector4.One);
+        device.Sprite.End();
+        using (var image = device.Capture(backBuffer))
+            Near(Color.FromArgb(255, 20, 40, 60), image.GetPixel(0, 0),
+                "Normalised Gaussian weights must preserve constant light intensity.");
+
+        using (var mask = new Texture(device, 2, 2))
+        {
+            var upload = mask.BeginUpload();
+            for (int row = 0; row < 2; row++)
+                upload.Data.Write(new byte[] { 0, 0, 0, 0, 0, 0, 0, 255 });
+            mask.EndUpload();
+            device.PixelShader = ShaderEffect.ShadowMask;
+            device.Clear(Color.White);
+            device.Sprite.Transform = Matrix4x4.CreateScale(4);
+            device.Sprite.Draw(mask, null, Vector3.Zero, Vector4.One);
+            device.Sprite.End();
+            using var image = device.Capture(backBuffer);
+            Color edge = image.GetPixel(3, 0);
+            Check(edge.R > 100 && edge.R < 240 && edge.R == edge.G && edge.G == edge.B,
+                "Repaired masks must use smooth alpha edges, without tinting source artwork.");
+            device.Sprite.Transform = Matrix4x4.Identity;
+        }
+        device.PixelShader = ShaderEffect.Artwork;
 
         long bytes = device.TextureBytes;
         int textures = device.TextureCount;

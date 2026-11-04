@@ -29,7 +29,7 @@ public sealed unsafe class RendererDevice : IDisposable
     private ID3D11RasterizerState _rasterizer;
     private ID3D11DepthStencilState _noDepth;
     private ID3D11Buffer _frameBuffer, _effectBuffer;
-    private readonly ID3D11PixelShader[] _shaders = new ID3D11PixelShader[7];
+    private readonly ID3D11PixelShader[] _shaders = new ID3D11PixelShader[Enum.GetValues<ShaderEffect>().Length];
     private readonly ID3D11BlendState[] _blends = new ID3D11BlendState[4];
     private readonly Vector4[] _constants = new Vector4[6];
     private readonly HashSet<Texture> _textures = new();
@@ -138,7 +138,7 @@ public sealed unsafe class RendererDevice : IDisposable
     {
         Compile("VSMain", "vs_4_0");
         foreach (ShaderEffect effect in Enum.GetValues<ShaderEffect>()) Compile("PS" + effect, "ps_4_0");
-        Console.WriteLine("All eight production D3D11 shader entry points compiled.");
+        Console.WriteLine($"All {Enum.GetValues<ShaderEffect>().Length + 1} production D3D11 shader entry points compiled.");
     }
 
     internal void Register(Texture texture)
@@ -188,6 +188,8 @@ public sealed unsafe class RendererDevice : IDisposable
         values.CopyTo(_constants.AsSpan(start));
     }
 
+    public void CopyPixelShaderConstants(Span<Vector4> destination) => _constants.AsSpan().CopyTo(destination);
+
     internal void Bind(Texture source, ID3D11Buffer vertices, uint stride)
     {
         // Flip-model Present unbinds its backbuffer; bind the current RTV every
@@ -203,7 +205,7 @@ public sealed unsafe class RendererDevice : IDisposable
         Context.VSSetShader(_vertexShader);
         Context.PSSetShader(_shaders[(int)_effect]);
         Context.PSSetShaderResource(0, source.View);
-        bool smooth = _effect is ShaderEffect.BloomBlur or ShaderEffect.BloomExtract;
+        bool smooth = _effect is ShaderEffect.BloomBlur or ShaderEffect.BloomExtract or ShaderEffect.ShadowMask;
         Context.PSSetSampler(0, smooth ? _linearSampler : _pointSampler);
         var frame = Context.Map(_frameBuffer, MapMode.WriteDiscard);
         try { frame.AsSpan<Vector4>(1)[0] = new Vector4(TargetWidth, TargetHeight, source.IsRenderTarget ? 1 : 0, 0); }

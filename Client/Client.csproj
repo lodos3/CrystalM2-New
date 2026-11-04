@@ -33,7 +33,7 @@
 
   <ItemGroup>
     <None Include="..\.editorconfig" Link=".editorconfig" />
-    <None Update="Data\Shaders\World.hlsl" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Data\Shaders\World.hlsl" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
@@ -78,4 +78,13 @@
     </None>
   </ItemGroup>
 
+  <Target Name="RemoveRetiredRendererArtifacts" AfterTargets="Build;Publish">
+    <ItemGroup>
+      <RetiredRendererArtifact Include="$(TargetDir)SlimDX.dll;$(TargetDir)SlimDX.pdb;$(TargetDir)SlimDX.xml" />
+      <RetiredRendererArtifact Include="$(TargetDir)Data\Shaders\postprocess.ps;$(TargetDir)Data\Shaders\bloom-extract.ps;$(TargetDir)Data\Shaders\bloom-blur.ps" />
+      <RetiredRendererArtifact Condition="'$(PublishDir)' != ''" Include="$(PublishDir)SlimDX.dll;$(PublishDir)SlimDX.pdb;$(PublishDir)SlimDX.xml" />
+      <RetiredRendererArtifact Condition="'$(PublishDir)' != ''" Include="$(PublishDir)Data\Shaders\postprocess.ps;$(PublishDir)Data\Shaders\bloom-extract.ps;$(PublishDir)Data\Shaders\bloom-blur.ps" />
+    </ItemGroup>
+    <Delete Files="@(RetiredRendererArtifact)" />
+  </Target>
 </Project>
