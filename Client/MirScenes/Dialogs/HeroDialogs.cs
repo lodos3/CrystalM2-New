@@ -265,7 +265,7 @@ namespace Client.MirScenes.Dialogs
             Movable = true;
             Sort = true;
             Visible = true;
-            Location = new Point(GameScene.Scene.MainDialog.Location.X + 475, Settings.ScreenHeight - 150);
+            Location = new Point(Settings.ScreenWidth - 356, Settings.ScreenHeight - 244);
 
 
             for (int i = 0; i < Key.Length; i++)
@@ -349,7 +349,7 @@ namespace Client.MirScenes.Dialogs
             else
             {
                 Index = 1921;
-                Location = new Point(GameScene.Scene.MainDialog.Location.X + 475, Settings.ScreenHeight - 150);
+                Location = new Point(Settings.ScreenWidth - 356, Settings.ScreenHeight - 244);
 
                 for (int x = 0; x < 2; x++)
                     Grid[x].Location = new Point(x * 35 + 12, 3);
@@ -393,7 +393,7 @@ namespace Client.MirScenes.Dialogs
             Size = new Size(24, 61);
             Parent = parent;
 
-            Location = new Point(((Settings.ScreenWidth / 2) - (Size.Width / 2)) + 362, Settings.ScreenHeight - Size.Height - 77);
+            Location = new Point(Settings.ScreenWidth / 2 + 77, Settings.ScreenHeight - Size.Height - 49);
 
             HeroMagicsButton = new MirButton
             {
@@ -762,7 +762,7 @@ namespace Client.MirScenes.Dialogs
             AutoSize = false;
             Size = new Size(64, 17);
             DrawImage = false;
-            Location = new Point(GameScene.Scene.MainDialog.Location.X + 165, GameScene.Scene.MainDialog.Location.Y + 37);
+            Location = new Point(Settings.ScreenWidth - 197, Settings.ScreenHeight - 259);
 
             BehaviourButtons = new MirButton[4];
 

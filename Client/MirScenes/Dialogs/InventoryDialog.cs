@@ -619,7 +619,7 @@ namespace Client.MirScenes.Dialogs
             Movable = true;
             Sort = true;
             Visible = true;
-            Location = new Point(GameScene.Scene.MainDialog.Location.X + 230, Settings.ScreenHeight - 150);
+            Location = new Point(Settings.ScreenWidth - 252, Settings.ScreenHeight - 244);
 
 
             for (int i = 0; i < Key.Length; i++)
@@ -703,7 +703,7 @@ namespace Client.MirScenes.Dialogs
             else
             {
                 Index = 1932;
-                Location = new Point(GameScene.Scene.MainDialog.Location.X + 230, Settings.ScreenHeight - 150);
+                Location = new Point(Settings.ScreenWidth - 252, Settings.ScreenHeight - 244);
 
                 for (int x = 0; x < 6; x++)
                     Grid[x].Location = new Point(x * 35 + 12, 3);

@@ -21,11 +21,11 @@ public static class DarkFantasyPalette
     public static readonly Color Experience = Color.FromArgb(166, 140, 79);
 }
 
-// One 256 KiB generated texture replaces window-sized chrome bitmaps.
+// One shared generated texture replaces window-sized chrome bitmaps.
 // No game artwork, font rasteriser, file IO or Windows API is involved.
-public static class DarkFantasyAtlas
+public static partial class DarkFantasyAtlas
 {
-    public const int Width = 256, Height = 256;
+    public const int Width = 256, Height = 384;
     private static readonly UiAtlasPart Window = new(new(0, 0, 64, 64), new(14, 14, 14, 14));
     private static readonly UiAtlasPart Inset = new(new(64, 0, 32, 32), new(5, 5, 5, 5));
     private static readonly UiAtlasPart Button = new(new(96, 0, 48, 32), new(7, 7, 7, 7));
@@ -82,6 +82,7 @@ public static class DarkFantasyAtlas
         foreach (UiGlyph glyph in Enum.GetValues<UiGlyph>())
             if (glyph != UiGlyph.None) PaintGlyph(pixels, glyph);
         Put(pixels, WhitePixel.X, WhitePixel.Y, Color.White);
+        PaintOrbs(pixels);
         return pixels;
     }
 

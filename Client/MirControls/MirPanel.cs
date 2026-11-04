@@ -28,7 +28,7 @@ public class MirPanel : MirImageControl
         Skin = UiSurface.Window;
         PanelTitle = Regex.Replace(GetType().Name.Replace("Dialog", "").Replace("Panel", ""),
             "(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", " ");
-        if (GetType().Name is "MainDialog" or "ChatDialog" or "ChatControlBar" or "SkillBarDialog" or
+        if (GetType().Name is "MainDialog" or "ChatDialog" or "SkillBarDialog" or
             "MiniMapDialog" or "BeltDialog" or "HeroBeltDialog" or "BuffDialog" or "PoisonBuffDialog")
         {
             PanelTitle = "";

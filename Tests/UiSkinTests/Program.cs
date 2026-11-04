@@ -55,5 +55,19 @@ foreach (UiGlyph glyph in Enum.GetValues<UiGlyph>().Where(x => x != UiGlyph.None
             visible |= pixels[(y * DarkFantasyAtlas.Width + x) * 4 + 3] != 0;
     Check(visible, $"{glyph} must render a visible generated icon.");
 }
+// The glass ends inside the metal frame. Empty and full levels must not
+// sample the adjacent atlas part, and partial fill must rise monotonically.
+int emptyOrb = DarkFantasyAtlas.OrbFillTop(0), fullOrb = DarkFantasyAtlas.OrbFillTop(1);
+Check(fullOrb > 0 && emptyOrb < DarkFantasyAtlas.OrbSize, "Orb fill must stay inside the glass.");
+Check(DarkFantasyAtlas.OrbFillTop(double.NaN) == emptyOrb &&
+      DarkFantasyAtlas.OrbFillTop(2) == fullOrb &&
+      DarkFantasyAtlas.OrbFillTop(.5) == (fullOrb + emptyOrb) / 2, "Orb fill must clamp and cover the expected height.");
+foreach (Rectangle part in new[] { DarkFantasyAtlas.LifeLiquid, DarkFantasyAtlas.ManaLiquid })
+{
+    int corner = (part.Y * DarkFantasyAtlas.Width + part.X) * 4;
+    int centre = ((part.Y + part.Height / 2) * DarkFantasyAtlas.Width + part.X + part.Width / 2) * 4;
+    Check(pixels[corner + 3] == 0 && pixels[centre + 3] == 255, "Liquid must be clipped to the circular glass.");
+}
+
 if (args.Length == 2 && args[0] == "--export-atlas") File.WriteAllBytes(args[1], pixels);
 Console.WriteLine("Nine-slice coverage, fixed corners, tiny controls, atlas bounds and state checks passed.");

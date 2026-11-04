@@ -405,10 +405,12 @@ public class InIReader
         Save();
     }
 
-    public void Write(string section, string key, string value)
+    public void Write(string section, string key, string value) => Write(section, key, value, true);
+
+    public void Write(string section, string key, string value, bool save)
     {
         _contents[FindIndex(section, key)] = key + "=" + value;
-        Save();
+        if (save) Save();
     }
 
     public void Write(string section, string key, char value)

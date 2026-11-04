@@ -167,14 +167,21 @@
             Reader.Write("Guide", "10", "To get the value for RequireKey look at:");
             Reader.Write("Guide", "11", "https://msdn.microsoft.com/en-us/library/system.windows.forms.keys(v=vs.110).aspx");
         
-            foreach (KeyBind Inputkey in keyList)
+            SaveBindings(keyList);
+        }
+
+        internal void SaveBindings(IEnumerable<KeyBind> keyList)
+        {
+            foreach (KeyBind key in keyList)
             {
-                Reader.Write(Inputkey.function.ToString(), "RequireAlt", Inputkey.RequireAlt);
-                Reader.Write(Inputkey.function.ToString(), "RequireShift", Inputkey.RequireShift);
-                Reader.Write(Inputkey.function.ToString(), "RequireTilde", Inputkey.RequireTilde);
-                Reader.Write(Inputkey.function.ToString(), "RequireCtrl", Inputkey.RequireCtrl);
-                Reader.Write(Inputkey.function.ToString(), "RequireKey", Inputkey.Key.ToString());
+                string section = key.function.ToString();
+                Reader.Write(section, "RequireAlt", key.RequireAlt.ToString(), false);
+                Reader.Write(section, "RequireShift", key.RequireShift.ToString(), false);
+                Reader.Write(section, "RequireTilde", key.RequireTilde.ToString(), false);
+                Reader.Write(section, "RequireCtrl", key.RequireCtrl.ToString(), false);
+                Reader.Write(section, "RequireKey", key.Key.ToString(), false);
             }
+            Reader.Save();
         }
 
         public void New(List<KeyBind> list)

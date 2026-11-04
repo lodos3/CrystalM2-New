@@ -1,5 +1,4 @@
-﻿using System.Text.RegularExpressions;
-using Client.MirControls;
+﻿using Client.MirControls;
 using Client.MirGraphics;
 using Client.MirNetwork;
 using Client.MirObjects;
@@ -19,8 +18,10 @@ namespace Client.MirScenes.Dialogs
 
         public MirImageControl ExperienceBar, WeightBar;
         public MirButton GameShopButton, MenuButton, InventoryButton, CharacterButton, SkillButton, QuestButton, OptionButton;
-        public MirControl HealthOrb;
-        public MirLabel HealthLabel, ManaLabel, TopLabel, BottomLabel, LevelLabel, CharacterName, ExperienceLabel, GoldLabel, WeightLabel, SpaceLabel, AModeLabel, PModeLabel, SModeLabel;
+        public MirControl HealthOrb, ManaOrb;
+        private readonly Rectangle _deck;
+        private readonly MirButton _bindButton, _lockButton;
+        public MirLabel HealthLabel, ManaLabel, LevelLabel, CharacterName, ExperienceLabel, GoldLabel, WeightLabel, SpaceLabel, AModeLabel, PModeLabel, SModeLabel;
         public HeroInfoPanel HeroInfoPanel;
         public HeroBehaviourPanel HeroBehaviourPanel;
 
@@ -34,21 +35,31 @@ namespace Client.MirScenes.Dialogs
         public MainDialog()
         {
             AutoSize = false;
-            Size = new Size(Settings.Resolution == 800 ? 800 : 1024, 154);
-            Location = new Point((Settings.ScreenWidth - Size.Width) / 2, Settings.ScreenHeight - Size.Height);
+            Size = new Size(Settings.ScreenWidth, 154);
+            Location = new Point(0, Settings.ScreenHeight - Size.Height);
+            DrawImage = false;
+            int center = Size.Width / 2;
+            _deck = new Rectangle(center - 268, 44, 536, 108);
+            BeforeDraw += (_, _) =>
+            {
+                Rectangle deck = _deck;
+                deck.Offset(DisplayLocation);
+                DXManager.Device.Ui.Draw(UiSurface.Window, deck);
+                DXManager.Device.Ui.Draw(UiSurface.Header,
+                    new Rectangle(DisplayLocation.X + center - 180, DisplayLocation.Y + 1, 360, 22));
+                DXManager.Device.Ui.Draw(UiSurface.Header, new Rectangle(deck.X + 61, deck.Y + 62, deck.Width - 122, 25));
+            };
 
             InventoryButton = new MirButton
             {
                 Skin = UiSurface.Button,
                 Glyph = UiGlyph.Bag,
-                HoverIndex = 1904,
-                Index = 1903,
-                Library = Libraries.Prguse,
-                Location = new Point(this.Size.Width - 96, 76),
                 Parent = this,
-                PressedIndex = 1905,
                 Sound = SoundList.ButtonA,
-                Hint = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.InventoryKey), CMain.InputKeys.GetKey(KeybindOptions.Inventory))
+                Hint = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.InventoryKey), CMain.InputKeys.GetKey(KeybindOptions.Inventory)),
+                AutoSize = false,
+                Size = new Size(22, 22),
+                Location = new Point(center -91, 108),
             };
             InventoryButton.Click += (o, e) =>
             {
@@ -62,14 +73,12 @@ namespace Client.MirScenes.Dialogs
             {
                 Skin = UiSurface.Button,
                 Glyph = UiGlyph.Person,
-                HoverIndex = 1901,
-                Index = 1900,
-                Library = Libraries.Prguse,
-                Location = new Point(this.Size.Width - 119, 76),
                 Parent = this,
-                PressedIndex = 1902,
                 Sound = SoundList.ButtonA,
-                Hint = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.CharacterKey), CMain.InputKeys.GetKey(KeybindOptions.Equipment))
+                Hint = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.CharacterKey), CMain.InputKeys.GetKey(KeybindOptions.Equipment)),
+                AutoSize = false,
+                Size = new Size(22, 22),
+                Location = new Point(center -67, 108),
             };
             CharacterButton.Click += (o, e) =>
             {
@@ -86,14 +95,12 @@ namespace Client.MirScenes.Dialogs
             {
                 Skin = UiSurface.Button,
                 Glyph = UiGlyph.Sword,
-                HoverIndex = 1907,
-                Index = 1906,
-                Library = Libraries.Prguse,
-                Location = new Point(this.Size.Width - 73, 76),
                 Parent = this,
-                PressedIndex = 1908,
                 Sound = SoundList.ButtonA,
-                Hint = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.SkillsKey), CMain.InputKeys.GetKey(KeybindOptions.Skills))
+                Hint = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.SkillsKey), CMain.InputKeys.GetKey(KeybindOptions.Skills)),
+                AutoSize = false,
+                Size = new Size(22, 22),
+                Location = new Point(center -43, 108),
             };
             SkillButton.Click += (o, e) =>
             {
@@ -110,14 +117,12 @@ namespace Client.MirScenes.Dialogs
             {
                 Skin = UiSurface.Button,
                 Glyph = UiGlyph.Book,
-                HoverIndex = 1910,
-                Index = 1909,
-                Library = Libraries.Prguse,
-                Location = new Point(this.Size.Width - 50, 76),
                 Parent = this,
-                PressedIndex = 1911,
                 Sound = SoundList.ButtonA,
-                Hint = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.QuestsKey), CMain.InputKeys.GetKey(KeybindOptions.Quests))
+                Hint = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.QuestsKey), CMain.InputKeys.GetKey(KeybindOptions.Quests)),
+                AutoSize = false,
+                Size = new Size(22, 22),
+                Location = new Point(center -19, 108),
             };
             QuestButton.Click += (o, e) =>
             {
@@ -130,14 +135,12 @@ namespace Client.MirScenes.Dialogs
             {
                 Skin = UiSurface.Button,
                 Glyph = UiGlyph.Gear,
-                HoverIndex = 1913,
-                Index = 1912,
-                Library = Libraries.Prguse,
-                Location = new Point(this.Size.Width - 27, 76),
                 Parent = this,
-                PressedIndex = 1914,
                 Sound = SoundList.ButtonA,
-                Hint = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.OptionsKey), CMain.InputKeys.GetKey(KeybindOptions.Options))
+                Hint = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.OptionsKey), CMain.InputKeys.GetKey(KeybindOptions.Options)),
+                AutoSize = false,
+                Size = new Size(22, 22),
+                Location = new Point(center +5, 108),
             };
             OptionButton.Click += (o, e) =>
             {
@@ -150,14 +153,12 @@ namespace Client.MirScenes.Dialogs
             {
                 Skin = UiSurface.Button,
                 Glyph = UiGlyph.Menu,
-                HoverIndex = 1961,
-                Index = 1960,
-                Library = Libraries.Prguse,
-                Location = new Point(this.Size.Width - 55, 35),
                 Parent = this,
-                PressedIndex = 1962,
                 Sound = SoundList.ButtonC,
-                Hint = GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.Menu)
+                Hint = GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.Menu),
+                AutoSize = false,
+                Size = new Size(22, 22),
+                Location = new Point(center +29, 108),
             };
             MenuButton.Click += (o, e) =>
             {
@@ -169,14 +170,12 @@ namespace Client.MirScenes.Dialogs
             {
                 Skin = UiSurface.Button,
                 Glyph = UiGlyph.Coin,
-                HoverIndex = 827,
-                Index = 826,
-                Library = Libraries.Prguse,
-                Location = new Point(this.Size.Width - 105, 35),
                 Parent = this,
-                PressedIndex = 828,
                 Sound = SoundList.ButtonC,
-                Hint = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.GameShopKey), CMain.InputKeys.GetKey(KeybindOptions.GameShop))
+                Hint = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.GameShopKey), CMain.InputKeys.GetKey(KeybindOptions.GameShop)),
+                AutoSize = false,
+                Size = new Size(22, 22),
+                Location = new Point(center +53, 108),
             };
             GameShopButton.Click += (o, e) =>
             {
@@ -184,90 +183,53 @@ namespace Client.MirScenes.Dialogs
                 else GameScene.Scene.GameShopDialog.Hide();
             };
 
-            HealthOrb = new MirControl
+            _bindButton = new MirButton
             {
-                Size = new Size(100, 80),
-                Parent = this,
-                Location = new Point(0, 30),
-                NotControl = true,
+                Parent = this, Skin = UiSurface.Button, AutoSize = false, Size = new Size(58, 22),
+                Location = new Point(center - 159, 108), Text = "Bind",
+                Hint = "Quick keybind mode. Hover a slot and press the shortcut."
             };
-
-            HealthOrb.BeforeDraw += HealthOrb_BeforeDraw;
-
-            HealthLabel = new MirLabel
+            _bindButton.Click += (_, _) => GameScene.Scene.ToggleActionBinding();
+            _lockButton = new MirButton
             {
-                AutoSize = true,
-                Location = new Point(0, 27),
-                Parent = HealthOrb
+                Parent = this, Skin = UiSurface.Button, AutoSize = false, Size = new Size(24, 22),
+                Location = new Point(center + 125, 108), Glyph = UiGlyph.Lock
             };
-            HealthLabel.SizeChanged += Label_SizeChanged;
-
-            ManaLabel = new MirLabel
+            _lockButton.Click += (_, _) =>
             {
-                AutoSize = true,
-                Location = new Point(0, 42),
-                Parent = HealthOrb
+                Settings.ActionBarsLocked = !Settings.ActionBarsLocked;
+                UpdateActionButtons();
             };
-            ManaLabel.SizeChanged += Label_SizeChanged;
+            UpdateActionButtons();
 
-            TopLabel = new MirLabel
-            {
-                Size = new Size(85, 30),
-                DrawFormat = TextFormatFlags.HorizontalCenter,
-                Location = new Point(9, 20),
-                Parent = HealthOrb,
-            };
+            HealthOrb = CreateOrb(_deck.Left - 49, false, out HealthLabel);
+            ManaOrb = CreateOrb(_deck.Right - 63, true, out ManaLabel);
 
-            BottomLabel = new MirLabel
-            {
-                Size = new Size(85, 30),
-                DrawFormat = TextFormatFlags.HorizontalCenter,
-                Location = new Point(9, 50),
-                Parent = HealthOrb,
-            };
-
-            LevelLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = this,
-                Location = new Point(5, 108)
-            };
-
-            CharacterName = new MirLabel
-            {
-                DrawFormat = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter,
-                Parent = this,
-                Location = new Point(6, 120),
-                Size = new Size(90, 16)
-            };
-
+            LevelLabel = AddCaption(this, "", new Rectangle(center - 174, 5, 60, 15));
+            CharacterName = AddCaption(this, "", new Rectangle(center - 111, 5, 214, 15), false);
+            CharacterName.DrawFormat |= TextFormatFlags.HorizontalCenter;
 
             ExperienceBar = new MirImageControl
             {
-                Skin = UiSurface.ScrollTrack,
                 AutoSize = false,
-                Size = new Size(Size.Width - 18, 6),
-                Location = new Point(9, 143),
+                Size = new Size(346, 7),
+                Location = new Point(center - 173, 137),
                 Parent = this,
                 DrawImage = false,
                 NotControl = true,
             };
             ExperienceBar.BeforeDraw += ExperienceBar_BeforeDraw;
 
-            ExperienceLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = ExperienceBar,
-                NotControl = true,
-            };
+            ExperienceLabel = AddCaption(this, "", new Rectangle(center + 113, 5, 61, 15));
+            ExperienceLabel.DrawFormat |= TextFormatFlags.Right;
 
             GoldLabel = new MirLabel
             {
                 DrawFormat = TextFormatFlags.VerticalCenter,
                 Font = new Font(Settings.FontName, 8F),
-                Location = new Point(this.Size.Width - 105, 119),
+                Location = new Point(center + 185, 133),
                 Parent = this,
-                Size = new Size(99, 13),
+                Size = new Size(79, 14),
                 Sound = SoundList.Gold,
             };
             GoldLabel.Click += (o, e) =>
@@ -280,8 +242,8 @@ namespace Client.MirScenes.Dialogs
             {
                 Skin = UiSurface.ScrollTrack,
                 AutoSize = false,
-                Size = new Size(99, 9),
-                Location = new Point(this.Size.Width - 105, 103),
+                Size = new Size(81, 6),
+                Location = new Point(center - 255, 139),
                 Parent = this,
                 DrawImage = false,
                 NotControl = true,
@@ -291,14 +253,14 @@ namespace Client.MirScenes.Dialogs
             WeightLabel = new MirLabel
             {
                 Parent = this,
-                Location = new Point(this.Size.Width - 105, 101),
+                Location = new Point(center - 252, 125),
                 Size = new Size(40, 14),
             };
 
             SpaceLabel = new MirLabel
             {
                 Parent = this,
-                Location = new Point(this.Size.Width - 30, 101),
+                Location = new Point(center - 212, 125),
                 Size = new Size(26, 14),
             };
 
@@ -307,15 +269,12 @@ namespace Client.MirScenes.Dialogs
                 Skin = UiSurface.Button,
                 Glyph = UiGlyph.Menu,
                 Hint = "Hero menu",
-                Index = 2164,
-                HoverIndex = 2165,
-                PressedIndex = 2166,
-                Library = Libraries.Prguse,
                 Parent = this,
-                Location = new Point(Size.Width - 160, 65),
-                Size = new Size(20, 20),
                 Sound = SoundList.ButtonA,
-                Visible = false
+                Visible = false,
+                AutoSize = false,
+                Size = new Size(22, 22),
+                Location = new Point(center +77, 108),
             };
             HeroMenuButton.Click += (o, e) =>
             {
@@ -325,16 +284,14 @@ namespace Client.MirScenes.Dialogs
             HeroSummonButton = new MirButton
             {
                 Skin = UiSurface.Button,
-                Text = "Summon",
-                Index = 2167,
-                HoverIndex = 2168,
-                PressedIndex = 2169,
-                Library = Libraries.Prguse,
+                Glyph = UiGlyph.Person,
+                Hint = "Summon hero",
                 Parent = this,
-                Location = new Point(this.Size.Width - 160, 90),
-                Size = new Size(20, 20),
                 Sound = SoundList.ButtonA,
-                Visible = false
+                Visible = false,
+                AutoSize = false,
+                Size = new Size(22, 22),
+                Location = new Point(center +101, 108),
             };
             HeroSummonButton.Click += (o, e) =>
             {
@@ -344,7 +301,7 @@ namespace Client.MirScenes.Dialogs
                 });
             };
 
-            HeroInfoPanel = new HeroInfoPanel { Parent = this, Visible = false };
+            HeroInfoPanel = new HeroInfoPanel { Parent = this, Location = new Point(Size.Width - 202, -158), Visible = false };
 
             AModeLabel = new MirLabel
             {
@@ -362,7 +319,7 @@ namespace Client.MirScenes.Dialogs
                 ForeColour = Color.Orange,
                 OutLineColour = Color.Black,
                 Parent = this,
-                Location = new Point(230, 125),
+                Location = new Point(center - 262, 101),
                 Visible = Settings.ModeView
             };
 
@@ -430,1308 +387,75 @@ namespace Client.MirScenes.Dialogs
                     break;
             }
 
-            if (Settings.HPView)
-            {
-                HealthLabel.Text = string.Format("HP {0}/{1}", User.HP, User.Stats[Stat.HP]);
-                ManaLabel.Text = HPOnly ? "" : string.Format("MP {0}/{1} ", User.MP, User.Stats[Stat.MP]);
-                TopLabel.Text = string.Empty;
-                BottomLabel.Text = string.Empty;
-            }
-            else
-            {
-                if (HPOnly)
-                {
-                    TopLabel.Text = string.Format("{0}\n" + "--", User.HP);
-                    BottomLabel.Text = string.Format("{0}", User.Stats[Stat.HP]);
-                }
-                else
-                {
-                    TopLabel.Text = string.Format(" {0}    {1} \n" + "---------------", User.HP, User.MP);
-                    BottomLabel.Text = string.Format(" {0}    {1} ", User.Stats[Stat.HP], User.Stats[Stat.MP]);
-                }
-                HealthLabel.Text = string.Empty;
-                ManaLabel.Text = string.Empty;
-            }
+            int maxHealth = User.Stats[Stat.HP], maxMana = User.Stats[Stat.MP];
+            HealthLabel.Text = ResourceText(User.HP, maxHealth);
+            ManaLabel.Text = HPOnly ? "—" : ResourceText(User.MP, maxMana);
 
-            LevelLabel.Text = User.Level.ToString();
-            ExperienceLabel.Text = string.Format("{0:#0.##%}", User.Experience / (double)User.MaxExperience);
-            ExperienceLabel.Location = new Point((ExperienceBar.Size.Width / 2) - 20, -10);
-            GoldLabel.Text = GameScene.Gold.ToString("###,###,##0");
+            LevelLabel.Text = $"Level {User.Level}";
+            ExperienceLabel.Text = $"{User.Experience / (double)Math.Max(1, User.MaxExperience):0.##%} XP";
+            GoldLabel.Text = GameScene.Gold.ToString("N0");
             CharacterName.Text = User.Name;
             SpaceLabel.Text = User.Inventory.Count(t => t == null).ToString();
             WeightLabel.Text = (MapObject.User.Stats[Stat.BagWeight] - MapObject.User.CurrentBagWeight).ToString();
         }
 
-        private void Label_SizeChanged(object sender, EventArgs e)
+        internal void UpdateActionButtons()
         {
-            if (!(sender is MirLabel l)) return;
-
-            l.Location = new Point(50 - (l.Size.Width / 2), l.Location.Y);
+            _bindButton.Text = GameScene.Scene.BindingActionKeys ? "Done" : "Bind";
+            _bindButton.Selected = GameScene.Scene.BindingActionKeys;
+            _lockButton.Selected = Settings.ActionBarsLocked;
+            _lockButton.Hint = Settings.ActionBarsLocked
+                ? "Bars locked. Shift-drag to move a spell. Click to unlock."
+                : "Bars unlocked. Drag to move a spell. Click to lock.";
+            Redraw();
         }
 
-        private void HealthOrb_BeforeDraw(object sender, EventArgs e)
+        public override bool IsMouseOver(Point point) => Visible &&
+            (_deck.Contains(point.Subtract(DisplayLocation)) || HealthOrb?.IsMouseOver(point) == true ||
+                ManaOrb?.IsMouseOver(point) == true || HeroInfoPanel?.IsMouseOver(point) == true);
+
+        private static string ResourceText(int value, int maximum) => Settings.HPView
+            ? $"{value:N0} / {maximum:N0}" : $"{value / (double)Math.Max(1, maximum):0%}";
+
+        private MirControl CreateOrb(int x, bool mana, out MirLabel value)
         {
-            if (User == null) return;
-            Rectangle hp = HealthOrb.DisplayRectangle;
-            double health = User.HP / (double)Math.Max(1, User.Stats[Stat.HP]);
-            if (HPOnly)
+            int size = CrystalM2.Rendering.Core.DarkFantasyAtlas.OrbSize;
+            var orb = new MirControl
             {
-                DXManager.Device.Ui.Progress(hp, health, DarkFantasyPalette.Health, true);
-                return;
-            }
-            hp.Width = (hp.Width - 2) / 2;
-            Rectangle mp = new(hp.Right + 2, hp.Y, hp.Width, hp.Height);
-            DXManager.Device.Ui.Progress(hp, health, DarkFantasyPalette.Health, true);
-            DXManager.Device.Ui.Progress(mp, User.MP / (double)Math.Max(1, User.Stats[Stat.MP]), DarkFantasyPalette.Mana, true);
+                Parent = this, Size = new Size(size, size), Location = new Point(x, 22),
+                Hint = mana ? "Mana" : "Life"
+            };
+            orb.BeforeDraw += (_, _) =>
+            {
+                if (User == null) return;
+                double maximum = Math.Max(1, User.Stats[mana ? Stat.MP : Stat.HP]);
+                double fraction = (mana ? User.MP : User.HP) / maximum;
+                DXManager.Device.Ui.Orb(orb.DisplayLocation, mana && HPOnly ? 0 : fraction, mana);
+            };
+            value = AddCaption(orb, "", new Rectangle(9, 51, size - 18, 20), false);
+            value.DrawFormat |= TextFormatFlags.HorizontalCenter;
+            value.OutLine = true;
+            MirLabel caption = AddCaption(orb, mana ? "MANA" : "LIFE", new Rectangle(10, 72, size - 20, 14));
+            caption.DrawFormat |= TextFormatFlags.HorizontalCenter;
+            caption.OutLine = true;
+            return orb;
         }
 
         private void ExperienceBar_BeforeDraw(object sender, EventArgs e)
         {
             if (User == null) return;
             DXManager.Device.Ui.Progress(ExperienceBar.DisplayRectangle,
-                User.Experience / (double)User.MaxExperience, DarkFantasyPalette.Experience);
+                User.Experience / (double)Math.Max(1, User.MaxExperience), DarkFantasyPalette.Experience);
         }
 
         private void WeightBar_BeforeDraw(object sender, EventArgs e)
         {
             if (User == null) return;
-            double weight = User.CurrentBagWeight / (double)User.Stats[Stat.BagWeight];
+            double weight = User.CurrentBagWeight / (double)Math.Max(1, User.Stats[Stat.BagWeight]);
             DXManager.Device.Ui.Progress(WeightBar.DisplayRectangle, weight,
                 weight > 0.75 ? DarkFantasyPalette.Health : DarkFantasyPalette.Experience);
         }
     }
-    public sealed class ChatDialog : MirPanel
-    {
-        public List<ChatHistory> FullHistory = new List<ChatHistory>();
-        public List<ChatHistory> History = new List<ChatHistory>();
-        public List<MirLabel> ChatLines = new List<MirLabel>();
-
-        public List<ChatItem> LinkedItems = new List<ChatItem>();
-        public List<MirLabel> LinkedItemButtons = new List<MirLabel>();
-
-        public MirButton HomeButton, UpButton, EndButton, DownButton, PositionBar;
-        public MirImageControl CountBar;
-        public MirTextBox ChatTextBox;
-        public Font ChatFont = new Font(Settings.FontName, 8F);
-        public string LastPM = string.Empty;
-
-        public int StartIndex, LineCount = 4, WindowSize;
-        public string ChatPrefix = "";
-
-        public bool Transparent;
-
-        public ChatDialog()
-        {
-            Index = Settings.Resolution != 800 ? 2221 : 2201;
-            Library = Libraries.Prguse;
-            Location = new Point(GameScene.Scene.MainDialog.Location.X + 230, Settings.ScreenHeight - 97);
-            PixelDetect = true;
-
-            KeyPress += ChatPanel_KeyPress;
-            KeyDown += ChatPanel_KeyDown;
-            MouseWheel += ChatPanel_MouseWheel;
-
-            ChatTextBox = new MirTextBox
-            {
-                BackColour = DarkFantasyPalette.Input,
-                ForeColour = DarkFantasyPalette.Text,
-                Parent = this,
-                Size = new Size(Settings.Resolution != 800 ? 627 : 403, 13),
-                Location = new Point(1, 54),
-                MaxLength = Globals.MaxChatLength,
-                Visible = false,
-                Font = ChatFont,
-            };
-            ChatTextBox.TextBox.KeyPress += ChatTextBox_KeyPress;
-            ChatTextBox.TextBox.KeyDown += ChatTextBox_KeyDown;
-            ChatTextBox.TextBox.KeyUp += ChatTextBox_KeyUp;
-
-            HomeButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Glyph = UiGlyph.Up,
-                Hint = "Home",
-                Index = 2018,
-                HoverIndex = 2019,
-                Library = Libraries.Prguse,
-                Location = new Point(Settings.Resolution != 800 ? 618 : 394, 1),
-                Parent = this,
-                PressedIndex = 2020,
-                Sound = SoundList.ButtonA,
-            };
-            HomeButton.Click += (o, e) =>
-            {
-                if (StartIndex == 0) return;
-                StartIndex = 0;
-                Update();
-            };
-
-
-            UpButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Glyph = UiGlyph.Up,
-                Hint = "Up",
-                Index = 2021,
-                HoverIndex = 2022,
-                Library = Libraries.Prguse,
-                Location = new Point(Settings.Resolution != 800 ? 618 : 394, 9),
-                Parent = this,
-                PressedIndex = 2023,
-                Sound = SoundList.ButtonA,
-            };
-            UpButton.Click += (o, e) =>
-            {
-                if (StartIndex == 0) return;
-                StartIndex--;
-                Update();
-            };
-
-
-            EndButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Glyph = UiGlyph.Down,
-                Hint = "End",
-                Index = 2027,
-                HoverIndex = 2028,
-                Library = Libraries.Prguse,
-                Location = new Point(Settings.Resolution != 800 ? 618 : 394, 45),
-                Parent = this,
-                PressedIndex = 2029,
-                Sound = SoundList.ButtonA,
-            };
-            EndButton.Click += (o, e) =>
-            {
-                if (StartIndex == History.Count - 1) return;
-                StartIndex = History.Count - 1;
-                Update();
-            };
-
-            DownButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Glyph = UiGlyph.Down,
-                Hint = "Down",
-                Index = 2024,
-                HoverIndex = 2025,
-                Library = Libraries.Prguse,
-                Location = new Point(Settings.Resolution != 800 ? 618 : 394, 39),
-                Parent = this,
-                PressedIndex = 2026,
-                Sound = SoundList.ButtonA,
-            };
-            DownButton.Click += (o, e) =>
-            {
-                if (StartIndex == History.Count - 1) return;
-                StartIndex++;
-                Update();
-            };
-
-
-
-            CountBar = new MirImageControl
-            {
-                Skin = UiSurface.ScrollTrack,
-                Index = 2012,
-                Library = Libraries.Prguse,
-                Location = new Point(Settings.Resolution != 800 ? 622 : 398, 16),
-                Parent = this,
-            };
-
-            PositionBar = new MirButton
-            {
-                Skin = UiSurface.ScrollThumb,
-                Glyph = UiGlyph.Grip,
-                Index = 2015,
-                HoverIndex = 2016,
-                Library = Libraries.Prguse,
-                Location = new Point(Settings.Resolution != 800 ? 619 : 395, 16),
-                Parent = this,
-                PressedIndex = 2017,
-                Movable = true,
-                Sound = SoundList.None,
-            };
-            PositionBar.OnMoving += PositionBar_OnMoving;
-        }
-
-        public void SetChatText(string newText)
-        {
-            string newMsg = ChatTextBox.Text += newText;
-
-            if (newMsg.Length > Globals.MaxChatLength) return;
-
-            ChatTextBox.Text = newMsg;
-            ChatTextBox.SetFocus();
-            ChatTextBox.Visible = true;
-            ChatTextBox.TextBox.SelectionLength = 0;
-            ChatTextBox.TextBox.SelectionStart = ChatTextBox.Text.Length;
-        }
-
-        private void ChatTextBox_KeyPress(object sender, KeyPressEventArgs e)
-        {
-            switch (e.KeyChar)
-            {
-                case (char)Keys.Enter:
-                    e.Handled = true;
-                    if (!string.IsNullOrEmpty(ChatTextBox.Text))
-                    {
-                        string msg = ChatTextBox.Text;
-
-                        if (msg.ToUpper() == "@LEVELEFFECT")
-                        {
-                            Settings.LevelEffect = !Settings.LevelEffect;
-                        }
-
-                        if (msg.ToUpper() == "@TARGETDEAD")
-                        {
-                            Settings.TargetDead = !Settings.TargetDead;
-                        }
-
-                        Network.Enqueue(new C.Chat
-                        {
-                            Message = msg,
-                            LinkedItems = new List<ChatItem>(LinkedItems)
-                        });
-
-                        if (ChatTextBox.Text[0] == '/')
-                        {
-                            string[] parts = ChatTextBox.Text.Split(' ');
-                            if (parts.Length > 0)
-                                LastPM = parts[0];
-                        }
-                    }
-                    ChatTextBox.Visible = false;
-                    ChatTextBox.Text = string.Empty;
-                    LinkedItems.Clear();
-                    break;
-                case (char)Keys.Escape:
-                    e.Handled = true;
-                    ChatTextBox.Visible = false;
-                    ChatTextBox.Text = string.Empty;
-                    LinkedItems.Clear();
-                    break;
-            }
-        }
-
-        void PositionBar_OnMoving(object sender, MouseEventArgs e)
-        {
-            int x = Settings.Resolution != 800 ? 619 : 395;
-            int y = PositionBar.Location.Y;
-            if (y >= 16 + CountBar.Size.Height - PositionBar.Size.Height) y = 16 + CountBar.Size.Height - PositionBar.Size.Height;
-            if (y < 16) y = 16;
-
-            int h = CountBar.Size.Height - PositionBar.Size.Height;
-            h = (int)((y - 16) / (h / (float)(History.Count - 1)));
-
-            if (h != StartIndex)
-            {
-                StartIndex = h;
-                Update();
-            }
-
-            PositionBar.Location = new Point(x, y);
-        }
-
-        public void ReceiveChat(string text, ChatType type)
-        {
-            Color foreColour, backColour;
-
-            switch (type)
-            {
-                case ChatType.Hint:
-                    backColour = Color.White;
-                    foreColour = Color.DarkGreen;
-                    break;
-                case ChatType.Announcement:
-                    backColour = Color.Blue;
-                    foreColour = Color.White;
-                    GameScene.Scene.ChatNoticeDialog.ShowNotice(RegexFunctions.CleanChatString(text));
-                    break;
-                case ChatType.LineMessage:
-                    backColour = Color.Blue;
-                    foreColour = Color.White;
-                    break;
-                case ChatType.Shout:
-                    backColour = Color.Yellow;
-                    foreColour = Color.Black;
-                    break;
-                case ChatType.Shout2:
-                    backColour = Color.Green;
-                    foreColour = Color.White;
-                    break;
-                case ChatType.Shout3:
-                    backColour = Color.Purple;
-                    foreColour = Color.White;
-                    break;
-                case ChatType.System:
-                    backColour = Color.Red;
-                    foreColour = Color.White;
-                    break;
-                case ChatType.System2:
-                    backColour = Color.DarkRed;
-                    foreColour = Color.White;
-                    break;
-                case ChatType.Group:
-                    backColour = Color.White;
-                    foreColour = Color.Brown;
-                    break;
-                case ChatType.WhisperOut:
-                    foreColour = Color.CornflowerBlue;
-                    backColour = Color.White;
-                    break;
-                case ChatType.WhisperIn:
-                    foreColour = Color.DarkBlue;
-                    backColour = Color.White;
-                    break;
-                case ChatType.Guild:
-                    backColour = Color.White;
-                    foreColour = Color.Green;
-                    break;
-                case ChatType.LevelUp:
-                    backColour = Color.FromArgb(255, 225, 185, 250);
-                    foreColour = Color.Blue;
-                    break;
-                case ChatType.Relationship:
-                    backColour = Color.Transparent;
-                    foreColour = Color.HotPink;
-                    break;
-                case ChatType.Mentor:
-                    backColour = Color.White;
-                    foreColour = Color.Purple;
-                    break;
-                default:
-                    backColour = Color.White;
-                    foreColour = Color.Black;
-                    break;
-            }
-
-            List<string> chat = new List<string>();
-
-            int chatWidth = Settings.Resolution != 800 ? 614 : 390;
-            int index = 0;
-
-            for (int i = 1; i < text.Length; i++)
-            {
-                if (i - index < 0) continue;
-
-                if (TextRenderer.MeasureText(CMain.Graphics, text.Substring(index, i - index), ChatFont).Width > chatWidth)
-                {
-                    int offset = i - index;
-                    int newIndex = i - 1;
-
-                    var itemLinkMatches = RegexFunctions.ChatItemLinks.Matches(text.Substring(index)).Cast<Match>();
-
-                    if (itemLinkMatches.Any())
-                    {
-                        var match = itemLinkMatches.SingleOrDefault(x => (x.Index < (i - index)) && (x.Index + x.Length > offset - 1));
-
-                        if (match != null)
-                        {
-                            offset = match.Index;
-                            newIndex = match.Index;
-                        }
-                    }
-
-                    chat.Add(text.Substring(index, offset - 1));
-                    index = newIndex;
-                }
-            }
-
-            chat.Add(text.Substring(index, text.Length - index));
-
-            if (StartIndex == History.Count - LineCount)
-                StartIndex += chat.Count;
-
-            for (int i = 0; i < chat.Count; i++)
-                FullHistory.Add(new ChatHistory { Text = chat[i], BackColour = backColour, ForeColour = foreColour, Type = type });
-
-            Update();
-        }
-
-        public void Update()
-        {
-            History = new List<ChatHistory>();
-
-            for (int i = 0; i < FullHistory.Count; i++)
-            {
-                switch (FullHistory[i].Type)
-                {
-                    case ChatType.Normal:
-                    case ChatType.LineMessage:
-                        if (Settings.FilterNormalChat) continue;
-                        break;
-                    case ChatType.WhisperIn:
-                    case ChatType.WhisperOut:
-                        if (Settings.FilterWhisperChat) continue;
-                        break;
-                    case ChatType.Shout:
-                    case ChatType.Shout2:
-                    case ChatType.Shout3:
-                        if (Settings.FilterShoutChat) continue;
-                        break;
-                    case ChatType.System:
-                    case ChatType.System2:
-                        if (Settings.FilterSystemChat) continue;
-                        break;
-                    case ChatType.Group:
-                        if (Settings.FilterGroupChat) continue;
-                        break;
-                    case ChatType.Guild:
-                        if (Settings.FilterGuildChat) continue;
-                        break;
-                }
-
-                History.Add(FullHistory[i]);
-            }
-
-            for (int i = 0; i < ChatLines.Count; i++)
-                ChatLines[i].Dispose();
-
-            for (int i = 0; i < LinkedItemButtons.Count; i++)
-                LinkedItemButtons[i].Dispose();
-
-            ChatLines.Clear();
-            LinkedItemButtons.Clear();
-
-            if (StartIndex >= History.Count) StartIndex = History.Count - 1;
-            if (StartIndex < 0) StartIndex = 0;
-
-            if (History.Count > 1)
-            {
-                int h = CountBar.Size.Height - PositionBar.Size.Height;
-                h = (int)((h / (float)(History.Count - 1)) * StartIndex);
-                PositionBar.Location = new Point(Settings.Resolution != 800 ? 619 : 395, 16 + h);
-            }
-
-            int y = 1;
-
-            for (int i = StartIndex; i < History.Count; i++)
-            {
-                MirLabel temp = new MirLabel
-                {
-                    AutoSize = true,
-                    BackColour = History[i].BackColour,
-                    ForeColour = History[i].ForeColour,
-                    Location = new Point(1, y),
-                    OutLine = false,
-                    Parent = this,
-                    Text = History[i].Text,
-                    Font = ChatFont,
-                };
-                temp.MouseWheel += ChatPanel_MouseWheel;
-                ChatLines.Add(temp);
-
-                temp.Click += (o, e) =>
-                {
-                    if (!(o is MirLabel l)) return;
-
-                    string[] parts = l.Text.Split(':', ' ');
-                    if (parts.Length == 0) return;
-
-                    string name = Regex.Replace(parts[0], "[^A-Za-z0-9]", "");
-
-                    ChatTextBox.SetFocus();
-                    ChatTextBox.Text = string.Format("/{0} ", name);
-                    ChatTextBox.Visible = true;
-                    ChatTextBox.TextBox.SelectionLength = 0;
-                    ChatTextBox.TextBox.SelectionStart = ChatTextBox.Text.Length;
-                };
-
-                string currentLine = History[i].Text;
-
-                int oldLength = currentLine.Length;
-
-                Capture capture = null;
-
-                foreach (Match match in RegexFunctions.ChatItemLinks.Matches(currentLine).Cast<Match>().OrderBy(o => o.Index).ToList())
-                {
-                    try
-                    {
-                        int offSet = oldLength - currentLine.Length;
-
-                        capture = match.Groups[1].Captures[0];
-                        string[] values = capture.Value.Split('/');
-                        currentLine = currentLine.Remove(capture.Index - 1 - offSet, capture.Length + 2).Insert(capture.Index - 1 - offSet, values[0]);
-                        string text = currentLine.Substring(0, capture.Index - 1 - offSet) + " ";
-                        Size size = TextRenderer.MeasureText(CMain.Graphics, text, temp.Font, temp.Size, TextFormatFlags.TextBoxControl);
-
-                        ChatLink(values[0], ulong.Parse(values[1]), temp.Location.Add(new Point(size.Width - 10, 0)));
-                    }
-                    catch(Exception ex)
-                    {
-                        //Temporary debug to catch unknown error
-                        CMain.SaveError(ex.ToString());
-                        CMain.SaveError(currentLine);
-                        CMain.SaveError(capture.Value);
-                        throw;
-                    }
-                }
-
-                temp.Text = currentLine;
-
-                y += 13;
-                if (i - StartIndex == LineCount - 1) break;
-            }
-
-        }
-
-        private void ChatLink(string name, ulong uniqueID, Point p)
-        {
-            UserItem item = GameScene.ChatItemList.FirstOrDefault(x => x.UniqueID == uniqueID);
-
-            if (item != null)
-            {
-                MirLabel temp = new MirLabel
-                {
-                    AutoSize = true,
-                    Visible = true,
-                    Parent = this,
-                    Location = p,
-                    Text = name,
-                    ForeColour = Color.Blue,
-                    Sound = SoundList.ButtonC,
-                    Font = ChatFont,
-                    OutLine = false,
-                };
-
-                temp.MouseEnter += (o, e) => temp.ForeColour = Color.Red;
-                temp.MouseLeave += (o, e) =>
-                {
-                    GameScene.Scene.DisposeItemLabel();
-                    temp.ForeColour = Color.Blue;
-                };
-                temp.MouseDown += (o, e) => temp.ForeColour = Color.Blue;
-                temp.MouseUp += (o, e) => temp.ForeColour = Color.Red;
-
-                temp.Click += (o, e) =>
-                {
-                    GameScene.Scene.CreateItemLabel(item);
-                };
-
-                LinkedItemButtons.Add(temp);
-            }
-        }
-
-
-        private void ChatPanel_KeyDown(object sender, KeyEventArgs e)
-        {
-            switch (e.KeyCode)
-            {
-                case Keys.Up:
-                    if (StartIndex == 0) return;
-                    StartIndex--;
-                    break;
-                case Keys.Home:
-                    if (StartIndex == 0) return;
-                    StartIndex = 0;
-                    break;
-                case Keys.Down:
-                    if (StartIndex == History.Count - 1) return;
-                    StartIndex++;
-                    break;
-                case Keys.End:
-                    if (StartIndex == History.Count - 1) return;
-                    StartIndex = History.Count - 1;
-                    break;
-                case Keys.PageUp:
-                    if (StartIndex == 0) return;
-                    StartIndex -= LineCount;
-                    break;
-                case Keys.PageDown:
-                    if (StartIndex == History.Count - 1) return;
-                    StartIndex += LineCount;
-                    break;
-                default:
-                    return;
-            }
-            Update();
-            e.Handled = true;
-        }
-        private void ChatPanel_KeyPress(object sender, KeyPressEventArgs e)
-        {
-            switch (e.KeyChar)
-            {
-                case '@':
-                case '!':
-                case ' ':
-                case (char)Keys.Enter:
-                    ChatTextBox.SetFocus();
-                    if (e.KeyChar == '!') ChatTextBox.Text = "!";
-                    if (e.KeyChar == '@') ChatTextBox.Text = "@";
-                    if (ChatPrefix != "") ChatTextBox.Text = ChatPrefix;
-
-                    ChatTextBox.Visible = true;
-                    ChatTextBox.TextBox.SelectionLength = 0;
-                    ChatTextBox.TextBox.SelectionStart = ChatTextBox.Text.Length;
-                    e.Handled = true;
-                    break;
-                case '/':
-                    ChatTextBox.SetFocus();
-                    ChatTextBox.Text = LastPM + " ";
-                    ChatTextBox.Visible = true;
-                    ChatTextBox.TextBox.SelectionLength = 0;
-                    ChatTextBox.TextBox.SelectionStart = ChatTextBox.Text.Length;
-                    e.Handled = true;
-                    break;
-            }
-        }
-        private void ChatPanel_MouseWheel(object sender, MouseEventArgs e)
-        {
-            int count = e.Delta / SystemInformation.MouseWheelScrollDelta;
-
-            if (StartIndex == 0 && count >= 0) return;
-            if (StartIndex == History.Count - 1 && count <= 0) return;
-
-            StartIndex -= count;
-            Update();
-        }
-        private void ChatTextBox_KeyUp(object sender, KeyEventArgs e)
-        {
-            CMain.Shift = e.Shift;
-            CMain.Alt = e.Alt;
-            CMain.Ctrl = e.Control;
-
-            switch (e.KeyCode)
-            {
-                case Keys.F1:
-                case Keys.F2:
-                case Keys.F3:
-                case Keys.F4:
-                case Keys.F5:
-                case Keys.F6:
-                case Keys.F7:
-                case Keys.F8:
-                case Keys.F9:
-                case Keys.F10:
-                case Keys.F11:
-                case Keys.F12:
-                case Keys.Tab:
-                    CMain.CMain_KeyUp(sender, e);
-                    break;
-
-            }
-        }
-        private void ChatTextBox_KeyDown(object sender, KeyEventArgs e)
-        {
-            CMain.Shift = e.Shift;
-            CMain.Alt = e.Alt;
-            CMain.Ctrl = e.Control;
-
-            switch (e.KeyCode)
-            {
-                case Keys.F1:
-                case Keys.F2:
-                case Keys.F3:
-                case Keys.F4:
-                case Keys.F5:
-                case Keys.F6:
-                case Keys.F7:
-                case Keys.F8:
-                case Keys.F9:
-                case Keys.F10:
-                case Keys.F11:
-                case Keys.F12:
-                case Keys.Tab:
-                    CMain.CMain_KeyDown(sender, e);
-                    break;
-
-            }
-        }
-
-
-        public void ChangeSize()
-        {
-            if (++WindowSize >= 3) WindowSize = 0;
-
-            int y = DisplayRectangle.Bottom;
-            switch (WindowSize)
-            {
-                case 0:
-                    LineCount = 4;
-                    Index = Settings.Resolution != 800 ? 2221 : 2201;
-                    CountBar.Index = 2012;
-                    DownButton.Location = new Point(Settings.Resolution != 800 ? 618 : 394, 39);
-                    EndButton.Location = new Point(Settings.Resolution != 800 ? 618 : 394, 45);
-                    ChatTextBox.Location = new Point(1, 54);
-                    break;
-                case 1:
-                    LineCount = 7;
-                    Index = Settings.Resolution != 800 ? 2224 : 2204;
-                    CountBar.Index = 2013;
-                    DownButton.Location = new Point(Settings.Resolution != 800 ? 618 : 394, 39 + 48);
-                    EndButton.Location = new Point(Settings.Resolution != 800 ? 618 : 394, 45 + 48);
-                    ChatTextBox.Location = new Point(1, 54 + 48);
-                    break;
-                case 2:
-                    LineCount = 11;
-                    Index = Settings.Resolution != 800 ? 2227 : 2207;
-                    CountBar.Index = 2014;
-                    DownButton.Location = new Point(Settings.Resolution != 800 ? 618 : 394, 39 + 96);
-                    EndButton.Location = new Point(Settings.Resolution != 800 ? 618 : 394, 45 + 96);
-                    ChatTextBox.Location = new Point(1, 54 + 96);
-                    break;
-            }
-
-            Location = new Point(Location.X, y - Size.Height);
-
-            UpdateBackground();
-
-            Update();
-        }
-
-        public void UpdateBackground()
-        {
-            int offset = Transparent ? 1 : 0;
-
-            switch (WindowSize)
-            {
-                case 0:
-                    Index = Settings.Resolution != 800 ? 2221 : 2201;
-                    break;
-                case 1:
-                    Index = Settings.Resolution != 800 ? 2224 : 2204;
-                    break;
-                case 2:
-                    Index = Settings.Resolution != 800 ? 2227 : 2207;
-                    break;
-            }
-
-            Index -= offset;
-        }
-
-        public class ChatHistory
-        {
-            public string Text;
-            public Color ForeColour, BackColour;
-            public ChatType Type;
-        }
-    }
-    public sealed class ChatControlBar : MirPanel
-    {
-        public MirButton SizeButton, SettingsButton, NormalButton, ShoutButton, WhisperButton, LoverButton, MentorButton, GroupButton, GuildButton, ReportButton, TradeButton;
-
-        public ChatControlBar()
-        {
-            Index = Settings.Resolution != 800 ? 2034 : 2035;
-            Library = Libraries.Prguse;
-            Location = new Point(GameScene.Scene.MainDialog.Location.X + 230, Settings.ScreenHeight - 112);
-
-            SizeButton = new MirButton
-            {
-                Index = 2057,
-                HoverIndex = 2058,
-                PressedIndex = 2059,
-                Library = Libraries.Prguse,
-                Parent = this,
-                Location = new Point(Settings.Resolution != 800 ? 574 : 350, 1),
-                Visible = true,
-                Sound = SoundList.ButtonA,
-                Hint = GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.Size)
-            };
-            SizeButton.Click += (o, e) =>
-            {
-                GameScene.Scene.ChatDialog.ChangeSize();
-                Location = new Point(Location.X, GameScene.Scene.ChatDialog.DisplayRectangle.Top - Size.Height);
-                if (GameScene.Scene.BeltDialog.Index == 1932)
-                    GameScene.Scene.BeltDialog.Location = new Point(GameScene.Scene.MainDialog.Location.X + 230, Location.Y - GameScene.Scene.BeltDialog.Size.Height);
-
-                if (GameScene.Scene.HeroBeltDialog != null)
-                    GameScene.Scene.HeroBeltDialog.Location = new Point(GameScene.Scene.MainDialog.Location.X + 475, Location.Y - GameScene.Scene.HeroBeltDialog.Size.Height);
-            };
-
-            SettingsButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Glyph = UiGlyph.Gear,
-                Index = 2060,
-                HoverIndex = 2061,
-                PressedIndex = 2062,
-                Library = Libraries.Prguse,
-                Parent = this,
-                Location = new Point(Settings.Resolution != 800 ? 596 : 372, 1),
-                Sound = SoundList.ButtonA,
-                Hint = GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.ChatSettings)
-            };
-            SettingsButton.Click += (o, e) =>
-            {
-                if (GameScene.Scene.ChatOptionDialog.Visible)
-                    GameScene.Scene.ChatOptionDialog.Hide();
-                else
-                    GameScene.Scene.ChatOptionDialog.Show();
-
-                //GameScene.Scene.ChatDialog.Transparent = !GameScene.Scene.ChatDialog.Transparent;
-                //GameScene.Scene.ChatDialog.UpdateBackground();
-            };
-
-            NormalButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Text = "Normal",
-                Index = 2036,
-                HoverIndex = 2037,
-                PressedIndex = 2038,
-                Library = Libraries.Prguse,
-                Parent = this,
-                Location = new Point(12, 1),
-                Sound = SoundList.ButtonA,
-                Hint = GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.Chat_All)
-            };
-            NormalButton.Click += (o, e) =>
-            {
-                ToggleChatFilter("All");
-            };
-
-            ShoutButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Text = "Shout",
-                Index = 2039,
-                HoverIndex = 2040,
-                PressedIndex = 2041,
-                Library = Libraries.Prguse,
-                Parent = this,
-                Location = new Point(34, 1),
-                Sound = SoundList.ButtonA,
-                Hint = GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.Chat_Short)
-            };
-            ShoutButton.Click += (o, e) =>
-            {
-                ToggleChatFilter("Shout");
-            };
-
-            WhisperButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Text = "Whisper",
-                Index = 2042,
-                HoverIndex = 2043,
-                PressedIndex = 2044,
-                Library = Libraries.Prguse,
-                Parent = this,
-                Location = new Point(56, 1),
-                Sound = SoundList.ButtonA,
-                Hint = GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.Chat_Whisper)
-            };
-            WhisperButton.Click += (o, e) =>
-            {
-                ToggleChatFilter("Whisper");
-            };
-
-            LoverButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Text = "Lover",
-                Index = 2045,
-                HoverIndex = 2046,
-                PressedIndex = 2047,
-                Library = Libraries.Prguse,
-                Parent = this,
-                Location = new Point(78, 1),
-                Sound = SoundList.ButtonA,
-                Hint = GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.Chat_Lover)
-            };
-            LoverButton.Click += (o, e) =>
-            {
-                ToggleChatFilter("Lover");
-            };
-
-            MentorButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Text = "Mentor",
-                Index = 2048,
-                HoverIndex = 2049,
-                PressedIndex = 2050,
-                Library = Libraries.Prguse,
-                Parent = this,
-                Location = new Point(100, 1),
-                Sound = SoundList.ButtonA,
-                Hint = GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.Chat_Mentor)
-            };
-            MentorButton.Click += (o, e) =>
-            {
-                ToggleChatFilter("Mentor");
-            };
-
-            GroupButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Glyph = UiGlyph.Up,
-                Index = 2051,
-                HoverIndex = 2052,
-                PressedIndex = 2053,
-                Library = Libraries.Prguse,
-                Parent = this,
-                Location = new Point(122, 1),
-                Sound = SoundList.ButtonA,
-                Hint = GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.Chat_Group)
-            };
-            GroupButton.Click += (o, e) =>
-            {
-                ToggleChatFilter("Group");
-            };
-
-            GuildButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Glyph = UiGlyph.Shield,
-                Index = 2054,
-                HoverIndex = 2055,
-                PressedIndex = 2056,
-                Library = Libraries.Prguse,
-                Parent = this,
-                Location = new Point(144, 1),
-                Sound = SoundList.ButtonA,
-                Hint = GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.Chat_Guild)
-            };
-            GuildButton.Click += (o, e) =>
-            {
-                Settings.ShowGuildChat = !Settings.ShowGuildChat;
-                ToggleChatFilter("Guild");
-            };
-
-            TradeButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Text = "Trade",
-                Index = 2004,
-                HoverIndex = 2005,
-                PressedIndex = 2006,
-                Library = Libraries.Prguse,
-                Location = new Point(166, 1),
-                Parent = this,
-                Sound = SoundList.ButtonC,
-                Hint = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.TradeKey), CMain.InputKeys.GetKey(KeybindOptions.Trade)),
-            };
-            TradeButton.Click += (o, e) => Network.Enqueue(new C.TradeRequest());
-
-            ReportButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Text = "Report",
-                Index = 2063,
-                HoverIndex = 2064,
-                PressedIndex = 2065,
-                Library = Libraries.Prguse,
-                Parent = this,
-                Location = new Point(Settings.Resolution != 800 ? 552 : 328, 1),
-                Sound = SoundList.ButtonA,
-                Hint = GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.Report),
-                Visible = false
-            };
-            ReportButton.Click += (o, e) =>
-            {
-                GameScene.Scene.ReportDialog.Visible = !GameScene.Scene.ReportDialog.Visible;
-            };
-
-            ToggleChatFilter("All");
-        }
-
-        public void ToggleChatFilter(string chatFilter)
-        {
-            NormalButton.Index = 2036;
-            NormalButton.HoverIndex = 2037;
-            ShoutButton.Index = 2039;
-            ShoutButton.HoverIndex = 2040;
-            WhisperButton.Index = 2042;
-            WhisperButton.HoverIndex = 2043;
-            LoverButton.Index = 2045;
-            LoverButton.HoverIndex = 2046;
-            MentorButton.Index = 2048;
-            MentorButton.HoverIndex = 2049;
-            GroupButton.Index = 2051;
-            GroupButton.HoverIndex = 2052;
-            GuildButton.Index = 2054;
-            GuildButton.HoverIndex = 2055;
-
-            GameScene.Scene.ChatDialog.ChatPrefix = "";
-
-            switch (chatFilter)
-            {
-                case "All":
-                    NormalButton.Index = 2038;
-                    NormalButton.HoverIndex = 2038;
-                    GameScene.Scene.ChatDialog.ChatPrefix = "";
-                    break;
-                case "Shout":
-                    ShoutButton.Index = 2041;
-                    ShoutButton.HoverIndex = 2041;
-                    GameScene.Scene.ChatDialog.ChatPrefix = "!";
-                    break;
-                case "Whisper":
-                    WhisperButton.Index = 2044;
-                    WhisperButton.HoverIndex = 2044;
-                    GameScene.Scene.ChatDialog.ChatPrefix = "/";
-                    break;
-                case "Group":
-                    GroupButton.Index = 2053;
-                    GroupButton.HoverIndex = 2053;
-                    GameScene.Scene.ChatDialog.ChatPrefix = "!!";
-                    break;
-                case "Guild":
-                    GuildButton.Index = 2056;
-                    GuildButton.HoverIndex = 2056;
-                    GameScene.Scene.ChatDialog.ChatPrefix = "!~";
-                    break;
-                case "Lover":
-                    LoverButton.Index = 2047;
-                    LoverButton.HoverIndex = 2047;
-                    GameScene.Scene.ChatDialog.ChatPrefix = ":)";
-                    break;
-                case "Mentor":
-                    MentorButton.Index = 2050;
-                    MentorButton.HoverIndex = 2050;
-                    GameScene.Scene.ChatDialog.ChatPrefix = "!#";
-                    break;
-            }
-        }
-    }
-
-    public sealed class SkillBarDialog : MirPanel
-    {
-        private readonly MirButton _switchBindsButton;
-
-        public bool AltBind;
-        public bool HasSkill = false;
-        public byte BarIndex;
-
-        //public bool TopBind = !Settings.SkillMode;
-        public MirImageControl[] Cells = new MirImageControl[8];
-        public MirLabel[] KeyNameLabels = new MirLabel[8];
-        public MirLabel BindNumberLabel = new MirLabel();
-
-        public MirImageControl[] CoolDowns = new MirImageControl[8];
-
-        public SkillBarDialog()
-        {
-            Index = 2190;
-            Library = Libraries.Prguse;
-            Movable = true;
-            Sort = true;
-            Location = new Point(0, BarIndex * 20);
-            Visible = true;
-
-
-            _switchBindsButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Text = "Switch bindings",
-                Index = 2247,
-                Library = Libraries.Prguse,
-                Parent = this,
-                Sound = SoundList.ButtonA,
-                Size = new Size(16, 28),
-                Location = new Point(0, 0)
-            };
-            _switchBindsButton.Click += (o, e) =>
-            {
-                //Settings.SkillSet = !Settings.SkillSet;
-
-                Update();
-            };
-
-            for (var i = 0; i < Cells.Length; i++)
-            {
-                Cells[i] = new MirImageControl
-                {
-                    Index = -1,
-                    Library = Libraries.MagIcon,
-                    Parent = this,
-                    Location = new Point(i * 25 + 15, 3),
-                };
-                int j = i + 1;
-                Cells[i].Click += (o, e) =>
-                    {
-                        GameScene.Scene.UseSpell(j + (8 * BarIndex));
-                    };
-
-                CoolDowns[i] = new MirImageControl
-                {
-                    Library = Libraries.Prguse2,
-                    Parent = this,
-                    Location = new Point(i * 25 + 15, 3),
-                    NotControl = true,
-                    UseOffSet = true,
-                    Opacity = 0.6F
-                };
-            }
-
-            BindNumberLabel = new MirLabel
-            {
-                Text = "1",
-                Font = new Font(Settings.FontName, 8F),
-                ForeColour = Color.White,
-                Parent = this,
-                Location = new Point(0, 1),
-                Size = new Size(10, 25),
-                NotControl = true
-            };
-
-            for (var i = 0; i < KeyNameLabels.Length; i++)
-            {
-                KeyNameLabels[i] = new MirLabel
-                {
-                    Text = "F" + (i + 1),
-                    Font = new Font(Settings.FontName, 8F),
-                    ForeColour = Color.White,
-                    Parent = this,
-                    Location = new Point(i * 25 + 13, 0),
-                    Size = new Size(25, 25),
-                    NotControl = true
-                };
-            }
-            OnMoving += SkillBar_OnMoving;
-        }
-
-        private void SkillBar_OnMoving(object sender, MouseEventArgs e)
-        {
-            if (BarIndex * 2 >= Settings.SkillbarLocation.Length) return;
-            Settings.SkillbarLocation[BarIndex, 0] = this.Location.X;
-            Settings.SkillbarLocation[BarIndex, 1] = this.Location.Y;
-        }
-
-        private string GetKey(int barindex, int i)
-        {
-            //KeybindOptions Type = KeybindOptions.Bar1Skill1;
-            if ((barindex == 0) && (i == 1))
-                return CMain.InputKeys.GetKey(KeybindOptions.Bar1Skill1);
-            if ((barindex == 0) && (i == 2))
-                return CMain.InputKeys.GetKey(KeybindOptions.Bar1Skill2);
-            if ((barindex == 0) && (i == 3))
-                return CMain.InputKeys.GetKey(KeybindOptions.Bar1Skill3);
-            if ((barindex == 0) && (i == 4))
-                return CMain.InputKeys.GetKey(KeybindOptions.Bar1Skill4);
-            if ((barindex == 0) && (i == 5))
-                return CMain.InputKeys.GetKey(KeybindOptions.Bar1Skill5);
-            if ((barindex == 0) && (i == 6))
-                return CMain.InputKeys.GetKey(KeybindOptions.Bar1Skill6);
-            if ((barindex == 0) && (i == 7))
-                return CMain.InputKeys.GetKey(KeybindOptions.Bar1Skill7);
-            if ((barindex == 0) && (i == 8))
-                return CMain.InputKeys.GetKey(KeybindOptions.Bar1Skill8);
-            if ((barindex == 1) && (i == 1))
-                return CMain.InputKeys.GetKey(KeybindOptions.Bar2Skill1);
-            if ((barindex == 1) && (i == 2))
-                return CMain.InputKeys.GetKey(KeybindOptions.Bar2Skill2);
-            if ((barindex == 1) && (i == 3))
-                return CMain.InputKeys.GetKey(KeybindOptions.Bar2Skill3);
-            if ((barindex == 1) && (i == 4))
-                return CMain.InputKeys.GetKey(KeybindOptions.Bar2Skill4);
-            if ((barindex == 1) && (i == 5))
-                return CMain.InputKeys.GetKey(KeybindOptions.Bar2Skill5);
-            if ((barindex == 1) && (i == 6))
-                return CMain.InputKeys.GetKey(KeybindOptions.Bar2Skill6);
-            if ((barindex == 1) && (i == 7))
-                return CMain.InputKeys.GetKey(KeybindOptions.Bar2Skill7);
-            if ((barindex == 1) && (i == 8))
-                return CMain.InputKeys.GetKey(KeybindOptions.Bar2Skill8);
-            return "";
-        }
-
-
-        public void Update()
-        {
-            HasSkill = false;
-            foreach (var m in GameScene.User.Magics)
-            {
-                if ((m.Key < (BarIndex * 8)+1) || (m.Key > ((BarIndex + 1) * 8)+1)) continue;
-                HasSkill = true;
-            }
-
-            if (!Visible) return;
-            Index = 2190;
-            _switchBindsButton.Index = 2247;
-            BindNumberLabel.Text = (BarIndex + 1).ToString();
-            BindNumberLabel.Location = new Point(0, 1);
-
-            for (var i = 1; i <= 8; i++)
-            {
-                Cells[i - 1].Index = -1;
-
-                int offset = BarIndex * 8;
-                string key = GetKey(BarIndex, i);
-                KeyNameLabels[i - 1].Text = key;
-
-                foreach (var m in GameScene.User.Magics)
-                {
-                    if (m.Key != i + offset) continue;
-                    HasSkill = true;
-                    ClientMagic magic = MapObject.User.GetMagic(m.Spell);
-                    if (magic == null) continue;
-
-                    //string key = m.Key > 8 ? string.Format("CTRL F{0}", i) : string.Format("F{0}", m.Key);
-
-                    Cells[i - 1].Index = magic.Icon * 2;
-                    Cells[i - 1].Hint = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.SkillMpCooldownKey), magic.Name,
-                        (magic.BaseCost + (magic.LevelCost * magic.Level)), Functions.PrintTimeSpanFromMilliSeconds(magic.Delay), key);
-
-                    KeyNameLabels[i - 1].Text = "";
-                }
-            }
-        }
-
-
-        public void Process()
-        {
-            ProcessSkillDelay();
-        }
-
-        private void ProcessSkillDelay()
-        {
-            if (!Visible) return;
-
-            int offset = BarIndex * 8;
-
-            for (int i = 0; i < Cells.Length; i++)
-            {
-                foreach (var magic in GameScene.User.Magics)
-                {
-                    if (magic.Key != i + offset + 1) continue;
-
-                    int totalFrames = 22;
-                    long timeLeft = magic.CastTime + magic.Delay - CMain.Time;
-
-                    if (timeLeft < 100)
-                    {
-                        if (timeLeft > 0)
-                        {
-                            CoolDowns[i].Visible = false;
-                            // CoolDowns[i].Dispose();
-                        }
-                        else
-                            continue;
-                    }
-
-                    int delayPerFrame = (int)(magic.Delay / totalFrames);
-                    int startFrame = totalFrames - (int)(timeLeft / delayPerFrame);
-
-                    if ((CMain.Time <= magic.CastTime + magic.Delay))
-                    {
-                        CoolDowns[i].Visible = true;
-                        CoolDowns[i].Index = 1260 + startFrame;
-                    }
-                }
-            }
-        }
-
-        public override void Show()
-        {
-            if (Visible) return;
-            if (!HasSkill) return;
-            Settings.SkillBar = true;
-            Visible = true;
-            Update();
-        }
-
-        public override void Hide()
-        {
-            if (!Visible) return;
-            Settings.SkillBar = false;
-            Visible = false;
-        }
-    }
-
     public sealed class MiniMapDialog : MirPanel
     {
         public MirImageControl LightSetting, NewMail;
@@ -2969,7 +1693,7 @@ namespace Client.MirScenes.Dialogs
             Index = 567;
             Parent = GameScene.Scene;
             Library = Libraries.Title;
-            Location = new Point(Settings.ScreenWidth - Size.Width, GameScene.Scene.MainDialog.Location.Y - this.Size.Height + 15);
+            Location = new Point(Settings.ScreenWidth - Size.Width, GameScene.Scene.MainDialog.Location.Y - Size.Height + 6);
             Sort = true;
             Visible = false;
             Movable = true;
@@ -3247,66 +1971,36 @@ namespace Client.MirScenes.Dialogs
         public MirImageControl CoolDown;
         public bool HeroMagic;
 
-        string[] Prefixes = new string[] { "", "CTRL", "Shift" };
-
         public MagicButton()
         {
             Size = new Size(231, 33);
 
             SkillButton = new MirButton
             {
-                Skin = UiSurface.Button,
-                Glyph = UiGlyph.Sword,
-                Hint = "Skills",
-                Index = 0,
-                PressedIndex = 1,
-                Library = Libraries.MagIcon2,
+                AutoSize = false,
+                Size = new Size(31, 31),
+                Skin = UiSurface.Slot,
+                Hint = "Drag this spell onto an action bar.",
                 Parent = this,
                 Location = new Point(36, 0),
                 Sound = SoundList.ButtonA,
             };
-            SkillButton.Click += (o, e) =>
+            SkillButton.AfterDraw += (_, _) =>
             {
-                if (HeroMagic)
-                {
-                    if (GameScene.Hero == null || GameScene.Hero.Dead)
-                        return;
-                    new AssignKeyPanel(Magic, 17, new string[]
-                        {
-                            "Shift" + Environment.NewLine + "F1",
-                            "Shift" + Environment.NewLine + "F2",
-                            "Shift" + Environment.NewLine + "F3",
-                            "Shift" + Environment.NewLine + "F4",
-                            "Shift" + Environment.NewLine + "F5",
-                            "Shift" + Environment.NewLine + "F6",
-                            "Shift" + Environment.NewLine + "F7",
-                            "Shift" + Environment.NewLine + "F8"
-                        })
-                    { Actor = GameScene.Hero };
-                }
-                else
-                {
-                    new AssignKeyPanel(Magic, 1, new string[]
-                        {
-                            "F1",
-                            "F2",
-                            "F3",
-                            "F4",
-                            "F5",
-                            "F6",
-                            "F7",
-                            "F8",
-                            "Ctrl" + Environment.NewLine + "F1",
-                            "Ctrl" + Environment.NewLine + "F2",
-                            "Ctrl" + Environment.NewLine + "F3",
-                            "Ctrl" + Environment.NewLine + "F4",
-                            "Ctrl" + Environment.NewLine + "F5",
-                            "Ctrl" + Environment.NewLine + "F6",
-                            "Ctrl" + Environment.NewLine + "F7",
-                            "Ctrl" + Environment.NewLine + "F8"
-                        })
-                    { Actor = GameScene.User };
-                }
+                if (Magic == null) return;
+                Libraries.MagIcon2.Draw(Magic.Icon * 2, SkillButton.DisplayLocation.Add(2, 2), new Size(27, 27), Color.White);
+            };
+            SkillButton.MouseDown += (_, e) =>
+            {
+                if (e.Button == MouseButtons.Left && Magic != null)
+                    GameScene.Scene.PressSpellbookSpell(HeroMagic ? GameScene.Hero : GameScene.User, Magic);
+            };
+            SkillButton.Click += (_, _) =>
+            {
+                UserObject actor = HeroMagic ? GameScene.Hero : GameScene.User;
+                if (GameScene.Observing || Magic == null || actor == null ||
+                    (HeroMagic && GameScene.Scene.HeroSpawnState != HeroSpawnState.Summoned)) return;
+                new AssignKeyPanel(actor, Magic, HeroMagic);
             };
 
             LevelImage = new MirImageControl
@@ -3393,10 +2087,8 @@ namespace Client.MirScenes.Dialogs
                     break;
             }
 
-            KeyLabel.Text = Magic.Key == 0 ? string.Empty : string.Format("{0}{1}F{2}",
-                Prefixes[(Magic.Key - 1) / 8],
-                Magic.Key > 8 ? Environment.NewLine : string.Empty,
-                (Magic.Key - 1) % 8 + 1);
+            KeyLabel.Text = Magic.Key is > 0 and <= 24
+                ? GameScene.CompactActionKey(CMain.InputKeys.GetKey(GameScene.ActionKey(Magic.Key))) : "";
 
             switch (magic.Spell)
             {  //Warrior
@@ -3725,9 +2417,8 @@ namespace Client.MirScenes.Dialogs
             }
 
 
-            SkillButton.Index = Magic.Icon * 2;
-            SkillButton.PressedIndex = Magic.Icon * 2 + 1;
 
+            SkillButton.Hint += "\nDrag to an action bar or click to choose a slot.";
             SetDelay();
         }
 
@@ -3757,129 +2448,80 @@ namespace Client.MirScenes.Dialogs
     }
     public sealed class AssignKeyPanel : MirPanel
     {
-        public MirButton SaveButton, NoneButton;
-        public UserObject Actor;
-        public MirLabel TitleLabel;
-        public MirImageControl MagicImage;
-        public MirButton[] FKeys;
+        private readonly MirButton[] _slots;
+        private readonly MirButton _clear;
+        private int _selected;
 
-        public ClientMagic Magic;
-        public byte Key;
-        public byte KeyOffset;
-
-        public AssignKeyPanel(ClientMagic magic, byte keyOffset, string[] keyStrings)
+        public AssignKeyPanel(UserObject actor, ClientMagic magic, bool hero)
         {
-            Magic = magic;
-            Key = magic.Key;
-            KeyOffset = keyOffset;
-
+            int offset = hero ? 17 : 1;
+            _selected = magic.Key;
             Modal = true;
-            Index = 710;
-            Library = Libraries.Prguse;
+            AutoSize = false;
+            Size = new Size(356, hero ? 122 : 156);
             Location = Center;
             Parent = GameScene.Scene;
-            Visible = true;
+            PanelTitle = "";
 
-            MagicImage = new MirImageControl
+            AddCaption(this, $"Place {magic.Name} on an action bar", new Rectangle(47, 11, 265, 25), false);
+            _ = new MirImageControl
             {
-                Location = new Point(16, 16),
-                Index = magic.Icon * 2,
-                Library = Libraries.MagIcon2,
-                Parent = this,
+                Parent = this, Library = Libraries.MagIcon2, Index = magic.Icon * 2, Location = new Point(12, 10)
             };
-
-            TitleLabel = new MirLabel
+            MirButton close = Button(new Point(324, 9), new Size(22, 22), "", UiGlyph.Close);
+            close.Click += (_, _) => Dispose();
+            KeyDown += (_, e) =>
             {
-                Location = new Point(49, 17),
-                Parent = this,
-                Size = new Size(230, 32),
-                DrawFormat = TextFormatFlags.HorizontalCenter | TextFormatFlags.WordBreak,
-                Text = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.SelectKey), magic.Name)
-            };
-
-            NoneButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Text = "None",
-                Index = 287, //154
-                HoverIndex = 288,
-                PressedIndex = 289,
-                Library = Libraries.Title,
-                Parent = this,
-                Location = new Point(284, 64),
-            };
-            NoneButton.Click += (o, e) => Key = 0;
-
-            SaveButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Text = "Save",
-                Library = Libraries.Title,
-                Parent = this,
-                Location = new Point(284, 101),
-                Index = 156,
-                HoverIndex = 157,
-                PressedIndex = 158,
-            };
-            SaveButton.Click += (o, e) =>
-            {
-                for (int i = 0; i < Actor.Magics.Count; i++)
-                {
-                    if (Actor.Magics[i].Key == Key)
-                        Actor.Magics[i].Key = 0;
-                }
-
-                Network.Enqueue(new C.MagicKey { Spell = Magic.Spell, Key = Key, OldKey = Magic.Key });
-                Magic.Key = Key;
-                foreach (SkillBarDialog Bar in GameScene.Scene.SkillBarDialogs)
-                    Bar.Update();
-
+                if (e.KeyCode != Keys.Escape) return;
+                e.Handled = e.SuppressKeyPress = true;
                 Dispose();
             };
 
-            FKeys = new MirButton[keyStrings.Length];
-
-            for (byte i = 0; i < FKeys.Length; i++)
+            _slots = new MirButton[hero ? 8 : 16];
+            for (int i = 0; i < _slots.Length; i++)
             {
-                FKeys[i] = new MirButton
+                int slot = offset + i;
+                string key = CMain.InputKeys.GetKey(GameScene.ActionKey(slot));
+                _slots[i] = Button(new Point(13 + 41 * (i % 8), 42 + 34 * (i / 8)), new Size(39, 29),
+                    key.Length == 0 ? (i % 8 + 1).ToString() : GameScene.CompactActionKey(key));
+                _slots[i].Hint = key.Length == 0 ? $"Slot {slot} · Unbound" : key;
+                _slots[i].Click += (_, _) =>
                 {
-                    Skin = UiSurface.Button,
-                    Index = 0,
-                    PressedIndex = 1,
-                    Library = Libraries.Prguse,
-                    Parent = this,
-                    Location = new Point(17 + 32 * (i % 8) + 5 * (i % 8 / 4), 58 + 37 * (i / 8)),
-                    Sound = SoundList.ButtonA,
-                    Text = keyStrings[i]
-                };
-                int num = i + keyOffset;
-                FKeys[i].Click += (o, e) =>
-                {
-                    Key = (byte)num;
+                    _selected = slot;
+                    UpdateSelection();
                 };
             }
 
-            BeforeDraw += AssignKeyPanel_BeforeDraw;
-        }
-
-        private void AssignKeyPanel_BeforeDraw(object sender, EventArgs e)
-        {
-            for (int i = 0; i < FKeys.Length; i++)
+            _clear = Button(new Point(13, Size.Height - 37), new Size(76, 25), "Clear");
+            _clear.Click += (_, _) =>
             {
-                FKeys[i].Index = 1656;
-                FKeys[i].HoverIndex = 1657;
-                FKeys[i].PressedIndex = 1658;
-                FKeys[i].Visible = true;
+                _selected = 0;
+                UpdateSelection();
+            };
+            MirButton save = Button(new Point(267, Size.Height - 37), new Size(76, 25), "Apply");
+            save.Click += (_, _) =>
+            {
+                GameScene.Scene.AssignActionSpell(actor, magic, _selected, false);
+                Dispose();
+            };
+            UpdateSelection();
+
+            MirButton Button(Point location, Size size, string text, UiGlyph glyph = UiGlyph.None) => new()
+            {
+                Parent = this, AutoSize = false, Location = location, Size = size,
+                Skin = UiSurface.Button, Glyph = glyph, Text = text
+            };
+
+            void UpdateSelection()
+            {
+                for (int i = 0; i < _slots.Length; i++)
+                    _slots[i].Selected = i + offset == _selected;
+                _clear.Selected = _selected == 0;
+                Redraw();
             }
-
-            int key = Key - KeyOffset;
-            if (key < 0 || key > FKeys.Length) return;
-
-            FKeys[key].Index = 1658;
-            FKeys[key].HoverIndex = 1658;
-            FKeys[key].PressedIndex = 1658;
         }
     }
+
     public sealed class DuraStatusDialog : MirPanel
     {
         public MirButton Character;

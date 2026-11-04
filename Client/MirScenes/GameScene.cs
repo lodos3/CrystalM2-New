@@ -13,7 +13,7 @@ using Client.MirGraphics.Particles;
 
 namespace Client.MirScenes
 {
-    public sealed class GameScene : MirScene
+    public sealed partial class GameScene : MirScene
     {
         public static GameScene Scene;
         public static bool Observing;
@@ -56,7 +56,6 @@ namespace Client.MirScenes
         public MapControl MapControl;
         public MainDialog MainDialog;
         public ChatDialog ChatDialog;
-        public ChatControlBar ChatControl;
         public InventoryDialog InventoryDialog;
         public CharacterDialog CharacterDialog;
         public CharacterDialog HeroDialog;
@@ -285,10 +284,10 @@ namespace Client.MirScenes
             MoveTime = CMain.Time;
 
             KeyDown += GameScene_KeyDown;
+            AfterDraw += (_, _) => DrawSpellDrag();
 
             MainDialog = new MainDialog { Parent = this };
-            ChatDialog = new ChatDialog { Parent = this };
-            ChatControl = new ChatControlBar { Parent = this };
+            ChatDialog = new ChatDialog(this);
             InventoryDialog = new InventoryDialog { Parent = this };
             BeltDialog = new BeltDialog { Parent = this };
             StorageDialog = new StorageDialog { Parent = this, Visible = false };
@@ -341,10 +340,12 @@ namespace Client.MirScenes
 
             SocketDialog = new SocketDialog { Parent = this, Visible = false };
 
-            SkillBarDialog Bar1 = new SkillBarDialog { Parent = this, Visible = false, BarIndex = 0 };
-            SkillBarDialogs.Add(Bar1);
-            SkillBarDialog Bar2 = new SkillBarDialog { Parent = this, Visible = false, BarIndex = 1 };
-            SkillBarDialogs.Add(Bar2);
+            for (int i = 0; i < 3; i++)
+            {
+                var bar = new SkillBarDialog(i) { Parent = this, Visible = false };
+                bar.Arrange();
+                SkillBarDialogs.Add(bar);
+            }
             ChatOptionDialog = new ChatOptionDialog { Parent = this, Visible = false };
             ChatNoticeDialog = new ChatNoticeDialog { Parent = this, Visible = false };
 
@@ -499,11 +500,68 @@ namespace Client.MirScenes
                 }
             }
         }
+        public override void OnMouseDown(MouseEventArgs e)
+        {
+            CancelActionPointer();
+            ChatDialog?.CancelPointer();
+            ChatDialog?.CloseChannelMenuOutside();
+            _consumeHudClick = false;
+            if (Enabled && MouseControl is ActionSlot slot && slot.IsMouseOver(CMain.MPoint))
+                PressActionSlot(slot, e);
+            base.OnMouseDown(e);
+        }
+
+        public override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            ChatDialog?.MovePointer(e);
+            MoveSpellDrag(e);
+            if (_draggingSpell) Redraw();
+        }
+
+        public override void OnMouseClick(MouseEventArgs e)
+        {
+            if (_draggingSpell || _pressedActionSlot != null || _consumeHudClick || ChatDialog?.HasPointer == true) return;
+            base.OnMouseClick(e);
+        }
+
+        public override void OnMouseUp(MouseEventArgs e)
+        {
+            if (ChatDialog?.ReleasePointer(e) == true)
+                _consumeHudClick = true;
+            else
+                ReleaseActionPointer(e);
+            base.OnMouseUp(e);
+        }
+
+        public override void OnKeyDown(KeyEventArgs e)
+        {
+            if (Enabled && CaptureActionBinding(e)) return;
+            if (_draggingSpell && e.KeyCode == Keys.Escape)
+            {
+                _consumeHudClick = true;
+                CancelActionPointer();
+                e.Handled = e.SuppressKeyPress = true;
+                return;
+            }
+            base.OnKeyDown(e);
+        }
+
+        public override void OnKeyUp(KeyEventArgs e)
+        {
+            if (BindingActionKeys && e.KeyCode == (_bindingConflict.KeyData & Keys.KeyCode))
+                _bindingKeyReleased = true;
+            base.OnKeyUp(e);
+        }
+
         private void GameScene_KeyDown(object sender, KeyEventArgs e)
         {
-            if (GameScene.Scene.KeyboardLayoutDialog.WaitingForBind != null)
+            if (e.Handled) return;
+            if (KeyboardLayoutDialog.WaitingForBind != null)
             {
-                GameScene.Scene.KeyboardLayoutDialog.CheckNewInput(e);
+                KeyboardLayoutDialog.CheckNewInput(e);
+                RefreshActionBars();
+                e.Handled = e.SuppressKeyPress = true;
                 return;
             }
 
@@ -526,33 +584,21 @@ namespace Client.MirScenes
                     continue;
                 if ((KeyCheck.RequireTilde != 2) && (KeyCheck.RequireTilde != (CMain.Tilde ? 1 : 0)))
                     continue;
-                //now run the real code
+                int actionSlot = KeyCheck.function switch
+                {
+                    >= KeybindOptions.Bar1Skill1 and <= KeybindOptions.Bar2Skill8 => KeyCheck.function - KeybindOptions.Bar1Skill1 + 1,
+                    >= KeybindOptions.HeroSkill1 and <= KeybindOptions.HeroSkill8 => KeyCheck.function - KeybindOptions.HeroSkill1 + 17,
+                    _ => 0
+                };
+                if (actionSlot != 0)
+                {
+                    UseSpell(actionSlot);
+                    e.Handled = e.SuppressKeyPress = true;
+                    return;
+                }
+
                 switch (KeyCheck.function)
                 {
-                    case KeybindOptions.Bar1Skill1: UseSpell(1); break;
-                    case KeybindOptions.Bar1Skill2: UseSpell(2); break;
-                    case KeybindOptions.Bar1Skill3: UseSpell(3); break;
-                    case KeybindOptions.Bar1Skill4: UseSpell(4); break;
-                    case KeybindOptions.Bar1Skill5: UseSpell(5); break;
-                    case KeybindOptions.Bar1Skill6: UseSpell(6); break;
-                    case KeybindOptions.Bar1Skill7: UseSpell(7); break;
-                    case KeybindOptions.Bar1Skill8: UseSpell(8); break;
-                    case KeybindOptions.Bar2Skill1: UseSpell(9); break;
-                    case KeybindOptions.Bar2Skill2: UseSpell(10); break;
-                    case KeybindOptions.Bar2Skill3: UseSpell(11); break;
-                    case KeybindOptions.Bar2Skill4: UseSpell(12); break;
-                    case KeybindOptions.Bar2Skill5: UseSpell(13); break;
-                    case KeybindOptions.Bar2Skill6: UseSpell(14); break;
-                    case KeybindOptions.Bar2Skill7: UseSpell(15); break;
-                    case KeybindOptions.Bar2Skill8: UseSpell(16); break;
-                    case KeybindOptions.HeroSkill1: UseSpell(17); break;
-                    case KeybindOptions.HeroSkill2: UseSpell(18); break;
-                    case KeybindOptions.HeroSkill3: UseSpell(19); break;
-                    case KeybindOptions.HeroSkill4: UseSpell(20); break;
-                    case KeybindOptions.HeroSkill5: UseSpell(21); break;
-                    case KeybindOptions.HeroSkill6: UseSpell(22); break;
-                    case KeybindOptions.HeroSkill7: UseSpell(23); break;
-                    case KeybindOptions.HeroSkill8: UseSpell(24); break;
                     case KeybindOptions.Inventory:
                     case KeybindOptions.Inventory2:
                         if (!InventoryDialog.Visible) InventoryDialog.Show();
@@ -620,12 +666,8 @@ namespace Client.MirScenes
                         else FishingDialog.Hide();
                         break;
                     case KeybindOptions.Skillbar:
-                        if (!Settings.SkillBar)
-                            foreach (SkillBarDialog Bar in SkillBarDialogs)
-                                Bar.Show();
-                        else
-                            foreach (SkillBarDialog Bar in SkillBarDialogs)
-                                Bar.Hide();
+                        Settings.SkillBar = !Settings.SkillBar;
+                        UpdateActionBarVisibility();
                         break;
                     case KeybindOptions.Mount:
                         if (GameScene.Scene.MountDialog.CanRide())
@@ -849,7 +891,6 @@ namespace Client.MirScenes
                             MainDialog.Show();
                             ChatDialog.Show();
                             BeltDialog.Show();
-                            ChatControl.Show();
                             MiniMapDialog.Show();
                             CharacterDuraPanel.Show();
                             DuraStatusPanel.Show();
@@ -857,10 +898,11 @@ namespace Client.MirScenes
                         }
                         else
                         {
+                            if (BindingActionKeys) ToggleActionBinding();
+                            CancelActionPointer();
                             MainDialog.Hide();
                             ChatDialog.Hide();
                             BeltDialog.Hide();
-                            ChatControl.Hide();
                             MiniMapDialog.Hide();
                             CharacterDuraPanel.Hide();
                             DuraStatusPanel.Hide();
@@ -969,7 +1011,7 @@ namespace Client.MirScenes
                 HeroSpellTime = CMain.Time + 200;
             }
 
-            if (actor.Dead || actor.RidingMount || actor.Fishing) return;
+            if (actor == null || Observing || actor.Dead || actor.RidingMount || actor.Fishing) return;
 
             if (!actor.HasClassWeapon && actor.Weapon >= 0)
             {
@@ -1310,24 +1352,7 @@ namespace Client.MirScenes
 
         public void DialogProcess()
         {
-            if (Settings.SkillBar)
-            {
-                foreach (SkillBarDialog Bar in Scene.SkillBarDialogs)
-                    Bar.Show();
-            }
-            else
-            {
-                foreach (SkillBarDialog Bar in Scene.SkillBarDialogs)
-                    Bar.Hide();
-            }
-
-            for (int i = 0; i < Scene.SkillBarDialogs.Count; i++)
-            {
-                if (i * 2 > Settings.SkillbarLocation.Length) break;
-                if ((Settings.SkillbarLocation[i, 0] > Settings.Resolution - 100) || (Settings.SkillbarLocation[i, 1] > 700))
-                    continue; //in theory you'd want the y coord to be validated based on resolution, but since client only allows for wider screens and not higher :(
-                Scene.SkillBarDialogs[i].Location = new Point(Settings.SkillbarLocation[i, 0], Settings.SkillbarLocation[i, 1]);
-            }
+            UpdateActionBarVisibility();
 
             if (Settings.DuraView)
                 CharacterDuraPanel.Show();
@@ -6174,6 +6199,7 @@ namespace Client.MirScenes
                 SetExpandedParameter = (value) => { Settings.ExpandedHeroBuffWindow = value; }
             };
             MainDialog.HeroInfoPanel.Update();
+            RefreshActionBars();
 
             Hero.RefreshStats();
         }
@@ -10211,7 +10237,6 @@ namespace Client.MirScenes
                 MapControl = null;
                 MainDialog = null;
                 ChatDialog = null;
-                ChatControl = null;
                 InventoryDialog = null;
                 CharacterDialog = null;
                 StorageDialog = null;

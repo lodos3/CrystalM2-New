@@ -175,12 +175,15 @@ namespace Client
 
         public static string Language = "English";
 
-        public static int[,] SkillbarLocation = new int[2, 2] { { 0, 0 }, { 216, 0 } };
+        public static bool ActionBarsLocked = true;
+        public static int[,] SkillbarLocation = { { -1, -1 }, { -1, -1 }, { -1, -1 } };
 
         //Quests
         public static int[] TrackedQuests = new int[5];
 
         //Chat
+        public static readonly Rectangle[] ChatWindows = new Rectangle[6];
+        public static int ActiveChatTab;
         public static bool
             ShowNormalChat = true,
             ShowYellChat = true,
@@ -273,6 +276,7 @@ namespace Client
 
             SkillMode = Reader.ReadBoolean("Game", "SkillMode", SkillMode);
             SkillBar = Reader.ReadBoolean("Game", "SkillBar", SkillBar);
+            ActionBarsLocked = Reader.ReadBoolean("Game", "ActionBarsLocked", ActionBarsLocked);
             //SkillSet = Reader.ReadBoolean("Game", "SkillSet", SkillSet);
             Effect = Reader.ReadBoolean("Game", "Effect", Effect);
             LevelEffect = Reader.ReadBoolean("Game", "LevelEffect", Effect);
@@ -298,7 +302,23 @@ namespace Client
                 SkillbarLocation[i, 1] = Reader.ReadInt32("Game", "Skillbar" + i.ToString() + "Y", SkillbarLocation[i, 1]);
             }
 
+            // The original two default positions become the new HUD anchors.
+            if (SkillbarLocation[0, 0] == 0 && SkillbarLocation[0, 1] == 0)
+                SkillbarLocation[0, 0] = SkillbarLocation[0, 1] = -1;
+            if (SkillbarLocation[1, 0] == 216 && SkillbarLocation[1, 1] == 0)
+                SkillbarLocation[1, 0] = SkillbarLocation[1, 1] = -1;
+
             //Chat
+            ActiveChatTab = Reader.ReadInt32("ChatLayout", "ActiveTab", 0, false);
+            for (int i = 0; i < ChatWindows.Length; i++)
+            {
+                string key = "Window" + i;
+                ChatWindows[i] = new Rectangle(
+                    Reader.ReadInt32("ChatLayout", key + "X", 0, false),
+                    Reader.ReadInt32("ChatLayout", key + "Y", 0, false),
+                    Reader.ReadInt32("ChatLayout", key + "Width", 0, false),
+                    Reader.ReadInt32("ChatLayout", key + "Height", 0, false));
+            }
             ShowNormalChat = Reader.ReadBoolean("Chat", "ShowNormalChat", ShowNormalChat);
             ShowYellChat = Reader.ReadBoolean("Chat", "ShowYellChat", ShowYellChat);
             ShowWhisperChat = Reader.ReadBoolean("Chat", "ShowWhisperChat", ShowWhisperChat);
@@ -395,6 +415,7 @@ namespace Client
             Reader.Write("Game", "Password", Password);
             Reader.Write("Game", "SkillMode", SkillMode);
             Reader.Write("Game", "SkillBar", SkillBar);
+            Reader.Write("Game", "ActionBarsLocked", ActionBarsLocked);
             //Reader.Write("Game", "SkillSet", SkillSet);
             Reader.Write("Game", "Effect", Effect);
             Reader.Write("Game", "LevelEffect", LevelEffect);
@@ -422,6 +443,16 @@ namespace Client
             }
 
             //Chat
+            Reader.Write("ChatLayout", "ActiveTab", ActiveChatTab);
+            for (int i = 0; i < ChatWindows.Length; i++)
+            {
+                string key = "Window" + i;
+                Rectangle window = ChatWindows[i];
+                Reader.Write("ChatLayout", key + "X", window.X);
+                Reader.Write("ChatLayout", key + "Y", window.Y);
+                Reader.Write("ChatLayout", key + "Width", window.Width);
+                Reader.Write("ChatLayout", key + "Height", window.Height);
+            }
             Reader.Write("Chat", "ShowNormalChat", ShowNormalChat);
             Reader.Write("Chat", "ShowYellChat", ShowYellChat);
             Reader.Write("Chat", "ShowWhisperChat", ShowWhisperChat);

@@ -125,6 +125,11 @@ namespace Client
 
         private static void CMain_Deactivate(object sender, EventArgs e)
         {
+            if (MirScene.ActiveScene is GameScene game)
+            {
+                game.CancelActionPointer();
+                game.ChatDialog?.CancelPointer();
+            }
             MapControl.MapButtons = MouseButtons.None;
             Shift = false;
             Alt = false;
