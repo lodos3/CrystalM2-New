@@ -11,5 +11,7 @@
     <Compile Include="../../Client/MirGraphics/LightVisibility.cs" Link="LightVisibility.cs" />
     <Compile Include="../../Client/MirGraphics/BloomBufferLayout.cs" Link="BloomBufferLayout.cs" />
     <Compile Include="../../Client/MirGraphics/SmoothScalarTransition.cs" Link="SmoothScalarTransition.cs" />
+    <Compile Include="../../Client/MirGraphics/AtmosphericWeatherController.cs" Link="AtmosphericWeatherController.cs" />
+    <Compile Include="../../Client/MirGraphics/AtmosphereTileNoise.cs" Link="AtmosphereTileNoise.cs" />
   </ItemGroup>
 </Project>
