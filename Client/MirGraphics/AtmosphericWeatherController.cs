@@ -73,10 +73,12 @@ namespace Client.MirGraphics
             float wetness = _wetness.Sample(rain ? 0.9f : 0, now);
             float cloudCover = _clouds.Sample(rain ? 0.72f :
                                               snow ? 0.55f :
-                                              foggy ? 0.35f : 0, now);
+                                              foggy ? 0.35f :
+                                              embers ? 0.28f : 0, now);
             float fogCover = _fog.Sample(foggy ? 0.75f :
                                          rain ? 0.23f :
-                                         snow ? 0.16f : 0, now);
+                                         snow ? 0.16f :
+                                         embers ? 0.30f : 0, now);
 
             // Smooth wind field: variation occurs on 12s+ cycles. Rates are
             // deliberately modest; only the 64 KiB procedural cloud tile moves.
