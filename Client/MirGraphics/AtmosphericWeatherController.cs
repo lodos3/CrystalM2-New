@@ -1,0 +1,85 @@
+using System;
+
+namespace Client.MirGraphics
+{
+    // Frame values contain no textures, references, or runtime allocations.
+    internal readonly struct AtmosphericWeatherFrame
+    {
+        internal readonly float Wetness;
+        internal readonly float CloudCover;
+        internal readonly float FogCover;
+        internal readonly float WindPixelsPerSecondX;
+        internal readonly float WindPixelsPerSecondY;
+        internal readonly float LightningFlash;
+
+        internal AtmosphericWeatherFrame(float wetness, float cloudCover, float fogCover,
+                                         float windX, float windY, float lightning)
+        {
+            Wetness = wetness;
+            CloudCover = cloudCover;
+            FogCover = fogCover;
+            WindPixelsPerSecondX = windX;
+            WindPixelsPerSecondY = windY;
+            LightningFlash = lightning;
+        }
+    }
+
+    // Deterministic, interruption-safe environmental accumulation. Wetness
+    // persists after rain stops; clouds and fog dissolve more quickly.
+    internal sealed class AtmosphericWeatherController
+    {
+        private readonly SmoothScalarTransition _wetness = new SmoothScalarTransition(30000);
+        private readonly SmoothScalarTransition _clouds = new SmoothScalarTransition(16000);
+        private readonly SmoothScalarTransition _fog = new SmoothScalarTransition(14000);
+
+        internal void Reset()
+        {
+            _wetness.Reset();
+            _clouds.Reset();
+            _fog.Reset();
+        }
+
+        internal AtmosphericWeatherFrame Sample(WeatherSetting weather, long now,
+                                                bool lightningEnabled, int mapSeed)
+        {
+            bool rain = (weather & WeatherSetting.Rain) != 0;
+            bool snow = (weather & WeatherSetting.Snow) != 0;
+            bool foggy = (weather & WeatherSetting.Fog) != 0;
+            bool embers = (weather & (WeatherSetting.RedEmber |
+                                      WeatherSetting.FireParticle)) != 0;
+
+            float wetness = _wetness.Sample(rain ? 0.9f : 0, now);
+            float cloudCover = _clouds.Sample(rain ? 0.72f :
+                                              snow ? 0.55f :
+                                              foggy ? 0.35f : 0, now);
+            float fogCover = _fog.Sample(foggy ? 0.75f :
+                                         rain ? 0.23f :
+                                         snow ? 0.16f : 0, now);
+
+            // Smooth wind field: variation occurs on 12s+ cycles. Rates are
+            // deliberately modest; only the 64 KiB procedural cloud tile moves.
+            double seconds = (now >= 0 ? now : 0) / 1000.0;
+            double phase = mapSeed * 0.013;
+            float baseWind = rain ? 13f : snow ? 7f : foggy ? 4f : embers ? 10f : 0f;
+            float windX = baseWind * (0.85f + 0.15f * (float)Math.Sin(seconds / 19.0 + phase));
+            float windY = baseWind * (0.25f + 0.12f * (float)Math.Sin(seconds / 27.0 - phase));
+            float flash = rain ? LightningFlashAt(now, lightningEnabled, true, mapSeed) : 0;
+
+            return new AtmosphericWeatherFrame(wetness, cloudCover, fogCover,
+                                               windX, windY, flash);
+        }
+
+        // A rare, optional and deliberately restrained lightning exposure bump.
+        // No strobing/white-screen flash, no extra lights, no RNG allocations.
+        internal static float LightningFlashAt(long now, bool optIn,
+                                               bool mapAllowsLightning, int mapSeed)
+        {
+            if (!optIn || !mapAllowsLightning || now < 0) return 0;
+            const long interval = 35000;
+            long phase = (now + (long)(uint)mapSeed * 7919L % interval) % interval;
+            if (phase >= 150) return 0;
+            float fraction = 1f - phase / 150f;
+            return 0.12f * fraction * fraction;
+        }
+    }
+}
