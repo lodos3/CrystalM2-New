@@ -7,47 +7,47 @@ namespace Client.MirScenes.Dialogs
 {
     public sealed class CharacterDialog : MirPanel
     {
-        public MirButton CloseButton, CharacterButton, StatusButton, StateButton, SkillButton;
-        public MirImageControl CharacterPage, StatusPage, StatePage, SkillPage, ClassImage;
+        private const int Margin = 8, GearWidth = 248, StatsWidth = 202, BodyTop = 90, BodyHeight = 282;
+        private const int StatsLeft = Margin * 2 + GearWidth, WideWidth = StatsLeft + (StatsWidth + Margin) * 2;
 
-        public MirLabel NameLabel, GuildLabel, LoverLabel;
-        public MirLabel ACLabel, MACLabel, DCLabel, MCLabel, SCLabel, HealthLabel, ManaLabel;
-        public MirLabel CritRLabel, CritDLabel, LuckLabel, AttkSpdLabel, AccLabel, AgilLabel;
-        public MirLabel ExpPLabel, BagWLabel, WearWLabel, HandWLabel, MagicRLabel, PoisonRecLabel, HealthRLabel, ManaRLabel, PoisonResLabel, HolyTLabel, FreezeLabel, PoisonAtkLabel;
-        public MirLabel HeadingLabel, StatLabel;
-        public MirButton NextButton, BackButton;
+        public readonly MirImageControl CharacterPage, SkillPage;
+        public readonly MirItemCell[] Grid;
 
-        public MirItemCell[] Grid;
-        private MirGridType GridType;
-        public MagicButton[] Magics;
-
-        public int StartIndex;
-        private UserObject Actor;
+        private readonly MirButton _characterButton, _skillButton;
+        private readonly MirImageControl _classImage;
+        private readonly MirLabel _nameLabel, _identityLabel;
+        private readonly CharacterStatsPane _combat, _attributes;
+        private readonly MagicButton[] _magics;
+        private readonly UserObject _actor;
+        private int _spellOffset;
 
         public CharacterDialog(MirGridType gridType, UserObject actor)
         {
-            Actor = actor;
-            GridType = gridType;
+            _actor = actor;
 
+            // Leave the standard inventory's width clear at both supported layout sizes.
+            bool wide = Settings.ScreenWidth >= WideWidth + 318 + Margin;
             AutoSize = false;
-            Size = new Size(264, 382);
-            Location = new Point(Settings.ScreenWidth - 264, 0);
+            Size = new Size(wide ? WideWidth : StatsLeft + StatsWidth + Margin, BodyTop + BodyHeight + 10);
+            Location = new Point(Settings.ScreenWidth - Size.Width, 0);
             Movable = true;
-            Sort = true;            
+            Sort = true;
+            PanelTitle = "";
 
-            BeforeDraw += (o, e) => RefreshInterface();
+            BeforeDraw += (_, _) => RefreshInterface();
 
             CharacterPage = new MirImageControl
             {
                 Index = 340,
                 Parent = this,
                 Library = Libraries.Prguse,
-                Location = new Point(8, 90),
+                AutoSize = false,
+                Size = new Size(GearWidth, BodyHeight),
+                Location = new Point(Margin, BodyTop),
             };
             CharacterPage.AfterDraw += (o, e) =>
             {
                 if (Libraries.StateItems == null) return;
-                ItemInfo RealItem = null;
                 if (Grid[(int)EquipmentSlot.Armour].Item != null)
                 {
                     if (actor.WingEffect == 1 || actor.WingEffect == 2)
@@ -59,14 +59,14 @@ namespace Client.MirScenes.Dialogs
                         Libraries.Prguse2.DrawBlend(1200 + wingOffset + genderOffset, DisplayLocation, Color.White, true, 1F);
                     }
 
-                    RealItem = Functions.GetRealItem(Grid[(int)EquipmentSlot.Armour].Item.Info, actor.Level, actor.Class, GameScene.ItemInfoList);
-                    Libraries.StateItems.Draw(RealItem.Image, DisplayLocation, Color.White, true, 1F);
+                    ItemInfo realItem = Functions.GetRealItem(Grid[(int)EquipmentSlot.Armour].Item.Info, actor.Level, actor.Class, GameScene.ItemInfoList);
+                    Libraries.StateItems.Draw(realItem.Image, DisplayLocation, Color.White, true, 1F);
 
                 }
                 if (Grid[(int)EquipmentSlot.Weapon].Item != null)
                 {
-                    RealItem = Functions.GetRealItem(Grid[(int)EquipmentSlot.Weapon].Item.Info, actor.Level, actor.Class, GameScene.ItemInfoList);
-                    Libraries.StateItems.Draw(RealItem.Image, DisplayLocation, Color.White, true, 1F);
+                    ItemInfo realItem = Functions.GetRealItem(Grid[(int)EquipmentSlot.Weapon].Item.Info, actor.Level, actor.Class, GameScene.ItemInfoList);
+                    Libraries.StateItems.Draw(realItem.Image, DisplayLocation, Color.White, true, 1F);
 
                 }
 
@@ -83,160 +83,71 @@ namespace Client.MirScenes.Dialogs
                 }
             };
 
-            StatusPage = new MirImageControl
-            {
-                Skin = UiSurface.Inset,
-                AutoSize = false,
-                Size = new Size(248, 282),
-                Parent = this,
-                Location = new Point(8, 90),
-                Visible = false,
-            };
-            StatusPage.BeforeDraw += (o, e) =>
-            {
-                ACLabel.Text = string.Format("{0}-{1}", actor.Stats[Stat.MinAC], actor.Stats[Stat.MaxAC]);
-                MACLabel.Text = string.Format("{0}-{1}", actor.Stats[Stat.MinMAC], actor.Stats[Stat.MaxMAC]);
-                DCLabel.Text = string.Format("{0}-{1}", actor.Stats[Stat.MinDC], actor.Stats[Stat.MaxDC]);
-                MCLabel.Text = string.Format("{0}-{1}", actor.Stats[Stat.MinMC], actor.Stats[Stat.MaxMC]);
-                SCLabel.Text = string.Format("{0}-{1}", actor.Stats[Stat.MinSC], actor.Stats[Stat.MaxSC]);
-                HealthLabel.Text = string.Format("{0}/{1}", actor.HP, actor.Stats[Stat.HP]);
-                ManaLabel.Text = string.Format("{0}/{1}", actor.MP, actor.Stats[Stat.MP]);
-                CritRLabel.Text = string.Format("{0}%", actor.Stats[Stat.CriticalRate]);
-                CritDLabel.Text = string.Format("{0}", actor.Stats[Stat.CriticalDamage]);
-                AttkSpdLabel.Text = string.Format("{0}", actor.Stats[Stat.AttackSpeed]);
-                AccLabel.Text = string.Format("+{0}", actor.Stats[Stat.Accuracy]);
-                AgilLabel.Text = string.Format("+{0}", actor.Stats[Stat.Agility]);
-                LuckLabel.Text = string.Format("{0}", actor.Stats[Stat.Luck]);
-            };
-
-            StatePage = new MirImageControl
-            {
-                Skin = UiSurface.Inset,
-                AutoSize = false,
-                Size = new Size(248, 282),
-                Parent = this,
-                Location = new Point(8, 90),
-                Visible = false
-            };
-            StatePage.BeforeDraw += (o, e) =>
-            {
-                ExpPLabel.Text = string.Format("{0:0.##%}", actor.Experience / (double)actor.MaxExperience);
-                BagWLabel.Text = string.Format("{0}/{1}", actor.CurrentBagWeight, actor.Stats[Stat.BagWeight]);
-                WearWLabel.Text = string.Format("{0}/{1}", actor.CurrentWearWeight, actor.Stats[Stat.WearWeight]);
-                HandWLabel.Text = string.Format("{0}/{1}", actor.CurrentHandWeight, actor.Stats[Stat.HandWeight]);
-                MagicRLabel.Text = string.Format("+{0}", actor.Stats[Stat.MagicResist]);
-                PoisonResLabel.Text = string.Format("+{0}", actor.Stats[Stat.PoisonResist]);
-                HealthRLabel.Text = string.Format("+{0}", actor.Stats[Stat.HealthRecovery]);
-                ManaRLabel.Text = string.Format("+{0}", actor.Stats[Stat.SpellRecovery]);
-                PoisonRecLabel.Text = string.Format("+{0}", actor.Stats[Stat.PoisonRecovery]);
-                HolyTLabel.Text = string.Format("+{0}", actor.Stats[Stat.Holy]);
-                FreezeLabel.Text = string.Format("+{0}", actor.Stats[Stat.Freezing]);
-                PoisonAtkLabel.Text = string.Format("+{0}", actor.Stats[Stat.PoisonAttack]);
-            };
-
-
             SkillPage = new MirImageControl
             {
                 Skin = UiSurface.Inset,
                 AutoSize = false,
-                Size = new Size(248, 282),
+                Size = new Size(GearWidth, BodyHeight),
                 Parent = this,
-                Location = new Point(8, 90),
+                Location = new Point(Margin, BodyTop),
                 Visible = false
             };
 
+            var header = new MirImageControl
+            {
+                Parent = this, Skin = UiSurface.Header, NotControl = true, AutoSize = false,
+                Location = new Point(Margin, 8), Size = new Size(Size.Width - Margin * 2, 49)
+            };
+            _nameLabel = AddCaption(header, "", new Rectangle(46, 3, header.Size.Width - 83, 22), false);
+            _nameLabel.Font = new Font(FontFamily.GenericSerif, 10f, FontStyle.Bold);
+            _nameLabel.DrawFormat |= TextFormatFlags.NoPrefix;
+            _identityLabel = AddCaption(header, "", new Rectangle(46, 25, header.Size.Width - 83, 18));
+            _identityLabel.DrawFormat |= TextFormatFlags.NoPrefix;
+            _classImage = new MirImageControl
+            {
+                Index = 100, Library = Libraries.Prguse, Parent = header, Location = new Point(8, 13), NotControl = true
+            };
 
-            CharacterButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Text = "Equipment",
-                Index = 500,
-                Library = Libraries.Title,
-                Location = new Point(8, 70),
-                Parent = this,
-                PressedIndex = 500,
-                Size = new Size(64, 20),
-                Sound = SoundList.ButtonA,
-            };
-            CharacterButton.Click += (o, e) => ShowCharacterPage();
-            StatusButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Text = "Stats",
-                Library = Libraries.Title,
-                Location = new Point(70, 70),
-                Parent = this,
-                PressedIndex = 501,
-                Size = new Size(64, 20),
-                Sound = SoundList.ButtonA
-            };
-            StatusButton.Click += (o, e) => ShowStatusPage();
+            _characterButton = CreateTab("Equipment", Margin, 122);
+            _characterButton.Click += (_, _) => ShowCharacterPage();
+            _characterButton.Selected = true;
+            _skillButton = CreateTab("Skills", Margin + 126, 122);
+            _skillButton.Click += (_, _) => ShowSkillPage();
 
-            StateButton = new MirButton
+            var close = new MirButton
             {
-                Skin = UiSurface.Button,
-                Text = "Attributes",
-                Library = Libraries.Title,
-                Location = new Point(132, 70),
-                Parent = this,
-                PressedIndex = 502,
-                Size = new Size(64, 20),
-                Sound = SoundList.ButtonA
+                Skin = UiSurface.Button, Glyph = UiGlyph.Close, Hint = "Close",
+                AutoSize = false, Size = new Size(22, 22), Location = new Point(Size.Width - 36, 14),
+                Parent = this, Sound = SoundList.ButtonA
             };
-            StateButton.Click += (o, e) => ShowStatePage();
+            close.Click += (_, _) => Hide();
 
-            SkillButton = new MirButton
+            int attributesLeft = wide ? StatsLeft + StatsWidth + Margin : StatsLeft;
+            _combat = new CharacterStatsPane(actor, new Rectangle(StatsLeft, BodyTop, StatsWidth, BodyHeight), false)
+                { Parent = this };
+            _attributes = new CharacterStatsPane(actor, new Rectangle(attributesLeft, BodyTop, StatsWidth, BodyHeight), true)
+                { Parent = this, Visible = wide };
+            if (wide)
             {
-                Skin = UiSurface.Button,
-                Text = "Skills",
-                Library = Libraries.Title,
-                Location = new Point(194, 70),
-                Parent = this,
-                PressedIndex = 503,
-                Size = new Size(64, 20),
-                Sound = SoundList.ButtonA
-            };
-            SkillButton.Click += (o, e) => ShowSkillPage();
+                AddSectionHeading("Combat", StatsLeft);
+                AddSectionHeading("Attributes", attributesLeft);
+            }
+            else
+            {
+                var combatTab = CreateTab("Combat", StatsLeft, 98);
+                var attributeTab = CreateTab("Attributes", StatsLeft + 102, 100);
+                combatTab.Selected = true;
+                combatTab.Click += (_, _) => ShowAttributes(false);
+                attributeTab.Click += (_, _) => ShowAttributes(true);
 
-            CloseButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Glyph = UiGlyph.Close,
-                Hint = "Close",
-                HoverIndex = 361,
-                Index = 360,
-                Location = new Point(241, 3),
-                Library = Libraries.Prguse2,
-                Parent = this,
-                PressedIndex = 362,
-                Sound = SoundList.ButtonA,
-            };
-            CloseButton.Click += (o, e) => Hide();
-
-            NameLabel = new MirLabel
-            {
-                DrawFormat = TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter,
-                Parent = this,
-                Location = new Point(0, 12),
-                Size = new Size(264, 20),
-                NotControl = true,
-            };
-            GuildLabel = new MirLabel
-            {
-                DrawFormat = TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter,
-                Parent = this,
-                Location = new Point(0, 33),
-                Size = new Size(264, 30),
-                NotControl = true,
-            };
-            ClassImage = new MirImageControl
-            {
-                Index = 100,
-                Library = Libraries.Prguse,
-                Location = new Point(15, 33),
-                Parent = this,
-                NotControl = true,
-            };
+                void ShowAttributes(bool show)
+                {
+                    _combat.Visible = combatTab.Selected = !show;
+                    _attributes.Visible = attributeTab.Selected = show;
+                    Process();
+                    Redraw();
+                }
+            }
 
             Grid = new MirItemCell[Enum.GetNames(typeof(EquipmentSlot)).Length];
 
@@ -361,275 +272,51 @@ namespace Client.MirScenes.Dialogs
                 Location = new Point(203, 62),
             };
 
-            // STATS I
-            HealthLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatusPage,
-                Location = new Point(126, 20),
-                NotControl = true,
-                Text = "0-0",
-            };
-
-            ManaLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatusPage,
-                Location = new Point(126, 38),
-                NotControl = true,
-                Text = "0-0",
-            };
-
-            ACLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatusPage,
-                Location = new Point(126, 56),
-                NotControl = true,
-                Text = "0-0",
-            };
-
-            MACLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatusPage,
-                Location = new Point(126, 74),
-                NotControl = true,
-                Text = "0-0",
-            };
-            DCLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatusPage,
-                Location = new Point(126, 92),
-                NotControl = true,
-                Text = "0-0"
-            };
-            MCLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatusPage,
-                Location = new Point(126, 110),
-                NotControl = true,
-                Text = "0/0"
-            };
-            SCLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatusPage,
-                Location = new Point(126, 128),
-                NotControl = true,
-                Text = "0/0"
-            };
-            //Breezer - New Labels
-            CritRLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatusPage,
-                Location = new Point(126, 146),
-                NotControl = true
-            };
-            CritDLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatusPage,
-                Location = new Point(126, 164),
-                NotControl = true
-            };
-            AttkSpdLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatusPage,
-                Location = new Point(126, 182),
-                NotControl = true
-            };
-            AccLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatusPage,
-                Location = new Point(126, 200),
-                NotControl = true
-            };
-            AgilLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatusPage,
-                Location = new Point(126, 218),
-                NotControl = true
-            };
-            LuckLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatusPage,
-                Location = new Point(126, 236),
-                NotControl = true
-            };
-            // STATS II 
-            ExpPLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatePage,
-                Location = new Point(126, 20),
-                NotControl = true,
-                Text = "0-0",
-            };
-
-            BagWLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatePage,
-                Location = new Point(126, 38),
-                NotControl = true,
-                Text = "0-0",
-            };
-
-            WearWLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatePage,
-                Location = new Point(126, 56),
-                NotControl = true,
-                Text = "0-0",
-            };
-
-            HandWLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatePage,
-                Location = new Point(126, 74),
-                NotControl = true,
-                Text = "0-0",
-            };
-            MagicRLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatePage,
-                Location = new Point(126, 92),
-                NotControl = true,
-                Text = "0-0"
-            };
-            PoisonResLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatePage,
-                Location = new Point(126, 110),
-                NotControl = true,
-                Text = "0/0"
-            };
-            HealthRLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatePage,
-                Location = new Point(126, 128),
-                NotControl = true,
-                Text = "0/0"
-            };
-            //Breezer
-            ManaRLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatePage,
-                Location = new Point(126, 146),
-                NotControl = true
-            };
-            PoisonRecLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatePage,
-                Location = new Point(126, 164),
-                NotControl = true
-            };
-            HolyTLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatePage,
-                Location = new Point(126, 182),
-                NotControl = true
-            };
-            FreezeLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatePage,
-                Location = new Point(126, 200),
-                NotControl = true
-            };
-            PoisonAtkLabel = new MirLabel
-            {
-                AutoSize = true,
-                Parent = StatePage,
-                Location = new Point(126, 218),
-                NotControl = true
-            };
-
-            Magics = new MagicButton[7];
-
-            for (int i = 0; i < Magics.Length; i++)
-                Magics[i] = new MagicButton 
-                { 
-                    Parent = SkillPage, 
-                    Visible = false, 
+            _magics = new MagicButton[7];
+            for (int i = 0; i < _magics.Length; i++)
+                _magics[i] = new MagicButton
+                {
+                    Parent = SkillPage,
+                    Visible = false,
                     Location = new Point(8, 8 + i * 33),
                     HeroMagic = gridType == MirGridType.HeroEquipment
                 };
 
-            NextButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Glyph = UiGlyph.Right,
-                Hint = "Next",
-                Index = 396,
-                Location = new Point(140, 250),
-                Library = Libraries.Prguse,
-                Parent = SkillPage,
-                PressedIndex = 397,
-                Sound = SoundList.ButtonA,
-            };
-            NextButton.Click += (o, e) =>
-            {
-                if (StartIndex + 7 >= actor.Magics.Count) return;
-
-                StartIndex += 7;
-                RefreshInterface();
-            };
-
-            BackButton = new MirButton
-            {
-                Skin = UiSurface.Button,
-                Glyph = UiGlyph.Left,
-                Hint = "Back",
-                Index = 398,
-                Location = new Point(90, 250),
-                Library = Libraries.Prguse,
-                Parent = SkillPage,
-                PressedIndex = 399,
-                Sound = SoundList.ButtonA,
-            };
-            BackButton.Click += (o, e) =>
-            {
-                if (StartIndex - 7 < 0) return;
-
-                StartIndex -= 7;
-                RefreshInterface();
-            };
-
-            CharacterButton.Selected = true;
-            foreach (var row in new[]
-            {
-                (HealthLabel, "Health"), (ManaLabel, "Mana"), (ACLabel, "Armour"), (MACLabel, "Magic armour"),
-                (DCLabel, "Attack"), (MCLabel, "Magic"), (SCLabel, "Spirit"), (CritRLabel, "Critical chance"),
-                (CritDLabel, "Critical damage"), (AttkSpdLabel, "Attack speed"), (AccLabel, "Accuracy"),
-                (AgilLabel, "Agility"), (LuckLabel, "Luck"), (ExpPLabel, "Experience"), (BagWLabel, "Bag weight"),
-                (WearWLabel, "Wear weight"), (HandWLabel, "Hand weight"), (MagicRLabel, "Magic resistance"),
-                (PoisonResLabel, "Poison resistance"), (HealthRLabel, "Health recovery"), (ManaRLabel, "Mana recovery"),
-                (PoisonRecLabel, "Poison recovery"), (HolyTLabel, "Holy"), (FreezeLabel, "Freezing"),
-                (PoisonAtkLabel, "Poison attack")
-            }) AddCaption(row.Item1.Parent, row.Item2, new Rectangle(11, row.Item1.Location.Y, 112, 16));
+            AddSpellPageButton(UiGlyph.Left, "Previous spells", 90, -_magics.Length);
+            AddSpellPageButton(UiGlyph.Right, "Next spells", 140, _magics.Length);
         }
 
-        public override void Show()
+        private MirButton CreateTab(string text, int left, int width) => new()
         {
-            if (Visible) return;
-            Visible = true;
+            Skin = UiSurface.Button, Text = text, Parent = this, AutoSize = false,
+            Location = new Point(left, 65), Size = new Size(width, 22), Sound = SoundList.ButtonA
+        };
+
+        private void AddSectionHeading(string text, int left)
+        {
+            var header = new MirImageControl
+            {
+                Parent = this, Skin = UiSurface.Header, NotControl = true, AutoSize = false,
+                Location = new Point(left, 65), Size = new Size(StatsWidth, 22)
+            };
+            AddCaption(header, text, new Rectangle(10, 1, StatsWidth - 20, 20), false);
+        }
+
+        private void AddSpellPageButton(UiGlyph glyph, string hint, int left, int delta)
+        {
+            var button = new MirButton
+            {
+                Skin = UiSurface.Button, Glyph = glyph, Hint = hint, Parent = SkillPage,
+                AutoSize = false, Size = new Size(22, 22), Location = new Point(left, 250),
+                Sound = SoundList.ButtonA
+            };
+            button.Click += (_, _) =>
+            {
+                int next = _spellOffset + delta;
+                if (next < 0 || (delta > 0 && next >= _actor.Magics.Count)) return;
+                _spellOffset = next;
+                RefreshSpells();
+            };
         }
 
         public override void Hide()
@@ -638,109 +325,50 @@ namespace Client.MirScenes.Dialogs
             base.Hide();
         }
 
-        public void ShowCharacterPage()
+        public void ShowCharacterPage() => ShowSkills(false);
+
+        public void ShowSkillPage() => ShowSkills(true);
+
+        private void ShowSkills(bool show)
         {
-            CharacterPage.Visible = true;
-            StatusPage.Visible = false;
-            StatePage.Visible = false;
-            SkillPage.Visible = false;
-            CharacterButton.Index = 500;
-            CharacterButton.Selected = true;
-            StatusButton.Index = -1;
-            StatusButton.Selected = false;
-            StateButton.Index = -1;
-            StateButton.Selected = false;
-            SkillButton.Index = -1;
-            SkillButton.Selected = false;
+            CharacterPage.Visible = _characterButton.Selected = !show;
+            SkillPage.Visible = _skillButton.Selected = show;
+            Redraw();
         }
 
-        private void ShowStatusPage()
+        public void Process()
         {
-            CharacterPage.Visible = false;
-            StatusPage.Visible = true;
-            StatePage.Visible = false;
-            SkillPage.Visible = false;
-            CharacterButton.Index = -1;
-            CharacterButton.Selected = false;
-            StatusButton.Index = 501;
-            StatusButton.Selected = true;
-            StateButton.Index = -1;
-            StateButton.Selected = false;
-            SkillButton.Index = -1;
-            SkillButton.Selected = false;
-        }
-
-        private void ShowStatePage()
-        {
-            CharacterPage.Visible = false;
-            StatusPage.Visible = false;
-            StatePage.Visible = true;
-            SkillPage.Visible = false;
-            CharacterButton.Index = -1;
-            CharacterButton.Selected = false;
-            StatusButton.Index = -1;
-            StatusButton.Selected = false;
-            StateButton.Index = 502;
-            StateButton.Selected = true;
-            SkillButton.Index = -1;
-            SkillButton.Selected = false;
-        }
-
-        public void ShowSkillPage()
-        {
-            CharacterPage.Visible = false;
-            StatusPage.Visible = false;
-            StatePage.Visible = false;
-            SkillPage.Visible = true;
-            CharacterButton.Index = -1;
-            CharacterButton.Selected = false;
-            StatusButton.Index = -1;
-            StatusButton.Selected = false;
-            StateButton.Index = -1;
-            StateButton.Selected = false;
-            SkillButton.Index = 503;
-            SkillButton.Selected = true;
-            //StartIndex = 0;
+            _combat.RefreshValues();
+            _attributes.RefreshValues();
         }
 
         private void RefreshInterface()
         {
-            int offSet = Actor.Gender == MirGender.Male ? 0 : 1;
-
-            CharacterPage.Index = 340 + offSet;
-
-            switch (Actor.Class)
+            CharacterPage.Index = _actor.Gender == MirGender.Male ? 340 : 341;
+            _classImage.Index = _actor.Class switch
             {
-                case MirClass.Warrior:
-                    ClassImage.Index = 100;// + offSet * 5;
-                    break;
-                case MirClass.Wizard:
-                    ClassImage.Index = 101;// + offSet * 5;
-                    break;
-                case MirClass.Taoist:
-                    ClassImage.Index = 102;// + offSet * 5;
-                    break;
-                case MirClass.Assassin:
-                    ClassImage.Index = 103;// + offSet * 5;
-                    break;
-                case MirClass.Archer:
-                    ClassImage.Index = 104;// + offSet * 5;
-                    break;
-            }
+                MirClass.Wizard => 101,
+                MirClass.Taoist => 102,
+                MirClass.Assassin => 103,
+                MirClass.Archer => 104,
+                _ => 100
+            };
+            _nameLabel.Text = _actor.Name;
+            string identity = $"Level {_actor.Level} · {_actor.Class}";
+            if (!string.IsNullOrEmpty(_actor.GuildName))
+                identity += $" · {_actor.GuildName} {_actor.GuildRankName}";
+            _identityLabel.Text = identity;
 
-            NameLabel.Text = Actor.Name;
-            GuildLabel.Text = Actor.GuildName + " " + Actor.GuildRankName;
+            if (SkillPage.Visible) RefreshSpells();
+        }
 
-            for (int i = 0; i < Magics.Length; i++)
+        private void RefreshSpells()
+        {
+            for (int i = 0; i < _magics.Length; i++)
             {
-                if (i + StartIndex >= Actor.Magics.Count)
-                {
-                    Magics[i].Visible = false;
-                    continue;
-                }
-
-                Magics[i].Visible = true;
-                Magics[i].Update(Actor.Magics[i + StartIndex]);
+                int index = i + _spellOffset;
+                _magics[i].Visible = index < _actor.Magics.Count;
+                if (_magics[i].Visible) _magics[i].Update(_actor.Magics[index]);
             }
         }
 

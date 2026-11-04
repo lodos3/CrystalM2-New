@@ -1331,6 +1331,8 @@ namespace Client.MirScenes
 
             MapControl.Process();
             MainDialog.Process();
+            CharacterDialog?.Process();
+            HeroDialog?.Process();
             InventoryDialog.Process();
             GameShopDialog.Process();
             MiniMapDialog.Process();
