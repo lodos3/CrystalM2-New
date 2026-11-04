@@ -567,6 +567,7 @@ namespace Client.MirGraphics
             // Release these before Device.Reset or disposing the old sprite.
             LightBloomPass.DisposeAll();
             AtmosphereFogOverlay.DisposeAll();
+            WetSurfacePass.DisposeAll();
             if (Sprite != null)
             {
                 if (!Sprite.Disposed)
