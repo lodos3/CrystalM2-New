@@ -15,9 +15,13 @@ namespace Client.MirGraphics
                 case LightSetting.Dawn: tint = Color.FromArgb(255, 255, 228, 197); break;
                 case LightSetting.Evening: tint = Color.FromArgb(255, 255, 209, 177); break;
                 case LightSetting.Night:
-                    tint = mapDarkLight == 4
-                        ? Color.FromArgb(255, 255, 220, 172)
-                        : Color.FromArgb(255, 194, 212, 255);
+                    switch (mapDarkLight)
+                    {
+                        case 2: tint = Color.FromArgb(255, 211, 219, 233); break;
+                        case 3: tint = Color.FromArgb(255, 174, 206, 255); break;
+                        case 4: tint = Color.FromArgb(255, 255, 220, 172); break;
+                        default: tint = Color.FromArgb(255, 194, 212, 255); break;
+                    }
                     break;
                 default: tint = Color.White; break;
             }
@@ -66,7 +70,7 @@ namespace Client.MirGraphics
 
         // Fog colour follows weather, rather than applying blue distance haze
         // to every environment, including fire/ash maps.
-        internal static Color FogTint(WeatherSetting weather)
+        internal static Color FogTint(WeatherSetting weather, byte mapDarkLight = 0)
         {
             if ((weather & (WeatherSetting.RedEmber | WeatherSetting.FireParticle)) != 0)
                 return Color.FromArgb(255, 224, 177, 144);
@@ -78,6 +82,8 @@ namespace Client.MirGraphics
                 return Color.FromArgb(255, 205, 222, 249);
             if ((weather & WeatherSetting.Rain) != 0)
                 return Color.FromArgb(255, 182, 201, 226);
+            if (mapDarkLight == 4)
+                return Color.FromArgb(255, 239, 213, 183);
             return Color.FromArgb(255, 198, 214, 240);
         }
 
