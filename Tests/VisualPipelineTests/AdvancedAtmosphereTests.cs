@@ -72,6 +72,13 @@ internal static class AdvancedAtmosphereTests
         }
         catch (ArgumentException) { }
 
+        Check(AtmosphereIntensity.ClampPercent(-100) == 0 &&
+              AtmosphereIntensity.ClampPercent(300) == 100 &&
+              AtmosphereIntensity.Scale(0) == 0f &&
+              AtmosphereIntensity.Scale(50) == 0.5f &&
+              AtmosphereIntensity.Scale(100) == 1f,
+              "Environmental quality intensity must be bounded and reversible.");
+
         Check(WeatherParticleBudget.Clamp(10) == 64 &&
               WeatherParticleBudget.Clamp(5000) == 1024,
               "Environmental particle settings must have safe hardware bounds.");
