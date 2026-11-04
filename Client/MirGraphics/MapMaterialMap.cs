@@ -108,7 +108,9 @@ namespace Client.MirGraphics
                             !region.TryGetProperty("material", out JsonElement named) ||
                             named.ValueKind != JsonValueKind.String ||
                             !Enum.TryParse(named.GetString(), true, out MapMaterial material) ||
-                            !Enum.IsDefined(material) || material == MapMaterial.Unknown)
+                            !Enum.IsDefined(material) || material == MapMaterial.Unknown ||
+                            !string.Equals(named.GetString(), Enum.GetName(material),
+                                           StringComparison.OrdinalIgnoreCase))
                         {
                             error = "Invalid material name or out-of-bounds rectangle.";
                             return false;
@@ -119,7 +121,7 @@ namespace Client.MirGraphics
                         {
                             if (wet.ValueKind != JsonValueKind.Number ||
                                 !wet.TryGetSingle(out wetResponse) ||
-                                float.IsNaN(wetResponse) ||
+                                !float.IsFinite(wetResponse) ||
                                 wetResponse < 0f || wetResponse > 1f)
                             {
                                 error = "Wet response must be a number from 0 through 1.";
