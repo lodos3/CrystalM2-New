@@ -1,0 +1,67 @@
+using System;
+using System.Drawing;
+using Client.MirGraphics;
+
+internal static class AdvancedAtmosphereTests
+{
+    internal static void Run()
+    {
+        static void Check(bool value, string reason)
+        {
+            if (!value) throw new Exception(reason);
+        }
+
+        var climate = new AtmosphericWeatherController();
+        var clear = climate.Sample(WeatherSetting.None, 0, false, 0);
+        Check(clear.Wetness == 0 && clear.CloudCover == 0 && clear.LightningFlash == 0,
+              "Clear weather must not introduce cloud shadows or rain reflections.");
+
+        var rainStart = climate.Sample(WeatherSetting.Rain, 1000, false, 0);
+        Check(rainStart.Wetness == 0 && rainStart.CloudCover == 0,
+              "A sudden shower must not snap to full intensity.");
+        var halfway = climate.Sample(WeatherSetting.Rain, 16000, false, 0);
+        Check(halfway.Wetness > 0.2f && halfway.Wetness < 0.8f &&
+              halfway.CloudCover > 0, "Clouds and wetness should accumulate smoothly.");
+        var soaked = climate.Sample(WeatherSetting.Rain, 41000, false, 0);
+        Check(soaked.Wetness > 0.8f && soaked.CloudCover > 0.3f,
+              "Sustained rain must increase wetness and overcast.");
+        var dryStart = climate.Sample(WeatherSetting.None, 42000, false, 0);
+        Check(dryStart.Wetness > 0.8f, "Wet ground must not instantly dry.");
+        var drying = climate.Sample(WeatherSetting.None, 70000, false, 0);
+        Check(drying.Wetness < dryStart.Wetness, "Ground wetness must fade after rain.");
+
+        var snow = new AtmosphericWeatherController().Sample(WeatherSetting.Snow, 0, false, 0);
+        Check(snow.Wetness == 0, "Snow must not automatically be treated as liquid rain.");
+        Check(AtmosphericWeatherController.LightningFlashAt(35000, false, true, 0) == 0,
+              "Lightning must require explicit user opt-in.");
+        Check(AtmosphericWeatherController.LightningFlashAt(35000, true, false, 0) == 0,
+              "Lightning must require an actual lightning-enabled weather map.");
+        float flash = AtmosphericWeatherController.LightningFlashAt(35000, true, true, 0);
+        Check(flash > 0 && flash <= 0.15f, "Atmospheric lightning must be subtle and rate-limited.");
+        Check(AtmosphericWeatherController.LightningFlashAt(36000, true, true, 0) == 0,
+              "Lightning pulse cannot persist for a full second.");
+
+        float sample = AtmosphereTileNoise.Sample(11, 24, 128, 128, 17);
+        Check(sample == AtmosphereTileNoise.Sample(139, 24, 128, 128, 17) &&
+              sample == AtmosphereTileNoise.Sample(11, 152, 128, 128, 17),
+              "Procedural noise must tile without a seam.");
+        Check(sample >= 0 && sample <= 1, "Noise must remain normalised.");
+        byte[] rgba = new byte[32 * 32 * 4];
+        AtmosphereTileNoise.WriteBgra(rgba, 32, 32, 128, 3);
+        Check(rgba[3] > 0 && rgba[3] < 255 && rgba[2] == 255,
+              "Generated atmosphere should have bounded alpha and white colour channels.");
+        try
+        {
+            AtmosphereTileNoise.WriteBgra(new byte[15], 32, 32, 128, 3);
+            throw new Exception("Undersized texture destination should throw.");
+        }
+        catch (ArgumentException) { }
+
+        Check(AtmosphereOverlayLayout.TryCountTiles(1920, 1080, 512, out int count) &&
+              count > 0 && count <= AtmosphereOverlayLayout.MaxTilesPerLayer,
+              "Common resolutions must fit inside fog draw budget.");
+        Check(!AtmosphereOverlayLayout.TryCountTiles(8192, 8192, 384, out _),
+              "Huge windows must disable unbounded texture tiling.");
+        Console.WriteLine("Advanced atmosphere, wetness, cloud/fog, lightning and tiling checks passed.");
+    }
+}
