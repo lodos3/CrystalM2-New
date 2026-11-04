@@ -15,6 +15,7 @@ namespace Server.MirDatabase
         public int Index;
         public string Name;
         public ushort Level;
+        public CombatSpecialisation Specialisation;
         public MirClass Class;
         public MirGender Gender;
         public byte Hair;
@@ -386,6 +387,12 @@ namespace Server.MirDatabase
 
             if (version > 100)
                 HeroBehaviour = (HeroBehaviour)reader.ReadByte();
+            if (version >= 118)
+            {
+                Specialisation = (CombatSpecialisation)reader.ReadByte();
+                if (!SpellCurriculum.IsValid(Specialisation))
+                    Specialisation = CombatSpecialisation.Unchosen;
+            }
         }
 
         public virtual void Save(BinaryWriter writer)
@@ -567,6 +574,7 @@ namespace Server.MirDatabase
             writer.Write(CurrentHeroIndex);
             writer.Write(HeroSpawned);
             writer.Write((byte)HeroBehaviour);
+            writer.Write((byte)Specialisation);
         }
 
         public SelectInfo ToSelectInfo()

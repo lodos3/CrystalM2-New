@@ -92,7 +92,12 @@ namespace Server.MirDatabase
 
             if (version > 101)
                 SealCount = reader.ReadUInt16();
-
+            if (version >= 118)
+            {
+                Specialisation = (CombatSpecialisation)reader.ReadByte();
+                if (!SpellCurriculum.IsValid(Specialisation))
+                    Specialisation = CombatSpecialisation.Unchosen;
+            }
         }
 
         public override void Save(BinaryWriter writer)
@@ -144,6 +149,7 @@ namespace Server.MirDatabase
             writer.Write(AutoHPPercent);
             writer.Write(AutoMPPercent);
             writer.Write(SealCount);
+            writer.Write((byte)Specialisation);
         }
 
         public override int ResizeInventory()

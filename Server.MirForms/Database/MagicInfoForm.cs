@@ -74,16 +74,8 @@ namespace Server
                 if (field != 2)
                     txtDmgMultBoost.Text = _selectedMagicInfo.MultiplierBonus.ToString();
                 txtRange.Text = _selectedMagicInfo.Range.ToString();
-                ItemInfo Book = Envir.GetBook((short)_selectedMagicInfo.Spell);
-                if (Book != null)
-                {
-                    lblBookValid.Text = Book.Name;
-                }
-                else
-                {
-                    lblBookValid.Text = "No book found";
-                    lblBookValid.BackColor = Color.Red;
-                }
+                lblBookValid.Text = "Auto unlock: level " +
+                    SpellCurriculum.UnlockLevel(_selectedMagicInfo.Spell, _selectedMagicInfo.Level1);
                 textBoxName.Text = _selectedMagicInfo.Name;
             }
         }
@@ -226,7 +218,7 @@ namespace Server
             label23.Name = "label23";
             label23.Size = new Size(37, 15);
             label23.TabIndex = 11;
-            label23.Text = "book:";
+            label23.Text = "Progression:";
             // 
             // textBoxName
             // 

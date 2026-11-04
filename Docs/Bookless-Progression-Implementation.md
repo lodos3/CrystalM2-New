@@ -5,3 +5,9 @@ The shared catalog enumerates all 104 seeded base-class spell IDs, grouped into 
 This commit is a **foundation only**. It does not modify the save schema, disable books, make spec selection available, grant skills at login, enforce spec casting eligibility, implement passives or update the character UI/VFX. These changes must be integrated together to avoid a playable client/server mismatch.
 
 Run `dotnet run --project Tests/SpellCurriculumTests/SpellCurriculumTests.csproj` on .NET SDK 8. No Windows or dotnet runtime tests were executed in the authoring environment.
+
+## Migration metadata (118)
+
+Server `Envir.Version` is now 118. Player and hero save records each append a separate selected specialisation byte at their own record boundary. Older (117 or earlier) records default to `Unchosen`, and invalid byte values are normalised on read. The MagicInfo editor now displays automatic unlock level instead of missing-book status. Neither selection UI nor gameplay gating is active yet.
+
+**Deployment:** Back up your live `Server.MirDB` and all character/hero data before starting the upgraded server. The upgraded server writes version 118, which is not compatible with earlier server executables.
