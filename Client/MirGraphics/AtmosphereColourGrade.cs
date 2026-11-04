@@ -29,7 +29,13 @@ namespace Client.MirGraphics
             if ((weather & WeatherSetting.Snow) != 0)
                 tint = Mix(tint, Color.FromArgb(255, 226, 239, 255), 0.65);
             if ((weather & (WeatherSetting.RedEmber | WeatherSetting.FireParticle)) != 0)
-                tint = Mix(tint, Color.FromArgb(255, 255, 205, 171), 0.5);
+                tint = Mix(tint, Color.FromArgb(255, 255, 194, 157), 0.66);
+            if ((weather & WeatherSetting.YellowEmber) != 0)
+                tint = Mix(tint, Color.FromArgb(255, 255, 231, 176), 0.45);
+            if ((weather & WeatherSetting.PurpleLeaves) != 0)
+                tint = Mix(tint, Color.FromArgb(255, 224, 199, 243), 0.36);
+            if ((weather & WeatherSetting.Leaves) != 0)
+                tint = Mix(tint, Color.FromArgb(255, 252, 234, 196), 0.24);
             return tint;
         }
 
@@ -62,6 +68,10 @@ namespace Client.MirGraphics
         {
             if ((weather & WeatherSetting.Fog) != 0) return 0.13f;
             if ((weather & (WeatherSetting.Rain | WeatherSetting.Snow)) != 0) return 0.045f;
+            if ((weather & (WeatherSetting.RedEmber | WeatherSetting.FireParticle)) != 0)
+                return 0.065f;
+            if ((weather & (WeatherSetting.YellowEmber | WeatherSetting.PurpleLeaves)) != 0)
+                return 0.025f;
             return 0;
         }
 
