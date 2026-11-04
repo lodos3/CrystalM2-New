@@ -1,3 +1,7 @@
+> Historical implementation notes. The current client uses only Vortice D3D11;
+> follow [the current renderer guide](Direct3D11-BakedArt-Migration.md). Old
+> SlimDX build instructions and the unrestricted shadow defaults below are obsolete.
+
 # CrystalM2 rendering and HeroesM2 integration status
 
 This branch is based on `lodos3/CrystalM2-New` (C# .NET 8 Windows, SlimDX/Direct3D9).

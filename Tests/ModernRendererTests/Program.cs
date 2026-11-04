@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Drawing;
+using System.Numerics;
 using CrystalM2.Rendering.Core;
 
 static class Assertions
@@ -22,6 +24,35 @@ static class Program
 {
     private static void Main()
     {
+        Span<SpriteVertex> vertices = stackalloc SpriteVertex[6];
+        Assertions.True(SpriteGeometry.WriteQuad(vertices, new Rectangle(16, 8, 32, 24),
+            64, 64, new Vector2(7, -3), Matrix4x4.Identity, Vector4.One, 100, 100),
+            "A partly visible offset frame must survive viewport culling.");
+        Assertions.True(vertices[0].Position == new Vector2(7, -3) &&
+                        vertices[5].Position == new Vector2(7, 21),
+            "Offset and crop size must survive vertex generation.");
+        Assertions.True(vertices[0].Uv == new Vector2(0.25f, 0.125f) &&
+                        vertices[4].Uv == new Vector2(0.75f, 0.5f),
+            "Source rectangles must sample the original atlas region.");
+        Assertions.True(!SpriteGeometry.WriteQuad(vertices, new Rectangle(0, 0, 20, 20),
+            20, 20, new Vector2(101, 0), Matrix4x4.Identity, Vector4.One, 100, 100),
+            "Fully offscreen sprites must not consume a batch slot.");
+        var shear = Matrix4x4.Identity;
+        shear.M21 = -2;
+        Assertions.True(SpriteGeometry.WriteQuad(vertices, new Rectangle(0, 0, 20, 20),
+            20, 20, new Vector2(110, 5), shear, Vector4.One, 100, 100),
+            "Projected shadows intersecting the viewport must not be culled by their origin.");
+        Assertions.True(!SpriteGeometry.WriteQuad(vertices, new Rectangle(0, 0, 20, 20),
+            20, 20, new Vector2(float.NaN, 0), Matrix4x4.Identity, Vector4.One, 100, 100),
+            "Non-finite vertices must never reach the GPU.");
+        Assertions.True(!new ShadowSourcePolicy("").Allows("Data/Human/000000.Lib"),
+            "Baked artwork must not acquire replacement shadows by default.");
+        var unshadowed = new ShadowSourcePolicy("Data/Human/000000.Lib;Data/Monster/01.Lib");
+        Assertions.True(unshadowed.Allows(@".\data\human\000000.lib") &&
+                        !unshadowed.Allows("Data/NPC/000000.Lib") &&
+                        !unshadowed.Allows("Data/Human/../NPC/000000.Lib"),
+            "Shadow permission must be explicit for the exact library, without filename collisions.");
+
         // The Mir sprite already contains its original artist-painted lighting
         // and shadows. Raw BGRA pixels, offsets and alpha must be preserved.
         byte[] source = { 13, 24, 230, 255, 2, 60, 87, 128, 0, 0, 0, 0, 90, 45, 22, 90 };

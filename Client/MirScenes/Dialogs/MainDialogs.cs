@@ -4,7 +4,6 @@ using Client.MirGraphics;
 using Client.MirNetwork;
 using Client.MirObjects;
 using Client.MirSounds;
-using SlimDX;
 using Font = System.Drawing.Font;
 using C = ClientPackets;
 

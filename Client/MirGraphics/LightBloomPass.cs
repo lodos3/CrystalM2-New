@@ -1,20 +1,17 @@
 using System;
 using System.Drawing;
 using System.IO;
-using SlimDX;
-using SlimDX.Direct3D9;
 
 namespace Client.MirGraphics
 {
-    // Optional Direct3D9 bloom. One reduced-size texture plus two shader draws.
+    // Optional D3D11 light-mask bloom. One reduced-size texture plus two shader draws.
     // No CPU/GPU readback and no extra full-resolution render target.
     internal static class LightBloomPass
     {
         private static Texture _texture;
         private static Surface _surface;
-        private static PixelShader _extractShader, _blurShader;
         private static Size _size;
-        private static bool _attemptedShaders, _failed;
+        private static bool _failed;
         private static readonly Vector4[] ExtractConstants =
         {
             new Vector4(0.58f, 3.0f, 0f, 1f)
@@ -24,38 +21,6 @@ namespace Client.MirGraphics
             new Vector4(0f, 0f, 0f, 0f),
             new Vector4(0.115f, 1f, 0f, 0f)
         };
-
-        private static bool LoadShaders()
-        {
-            if (_attemptedShaders)
-                return !_failed && _extractShader != null && _blurShader != null;
-            _attemptedShaders = true;
-            try
-            {
-                string extractPath = Path.Combine(Settings.ShadersPath, "bloom-extract.ps");
-                string blurPath = Path.Combine(Settings.ShadersPath, "bloom-blur.ps");
-                if (!File.Exists(extractPath) || !File.Exists(blurPath))
-                {
-                    _failed = true;
-                    return false;
-                }
-
-                using (ShaderBytecode shader = ShaderBytecode.AssembleFromFile(extractPath, ShaderFlags.None))
-                    _extractShader = new PixelShader(DXManager.Device, shader);
-                using (ShaderBytecode shader = ShaderBytecode.AssembleFromFile(blurPath, ShaderFlags.None))
-                    _blurShader = new PixelShader(DXManager.Device, shader);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _failed = true;
-                _extractShader?.Dispose();
-                _blurShader?.Dispose();
-                _extractShader = _blurShader = null;
-                CMain.SaveError("Optional bloom shaders disabled: " + ex);
-                return false;
-            }
-        }
 
         private static bool EnsureTarget()
         {
@@ -67,9 +32,8 @@ namespace Client.MirGraphics
                 return true;
 
             ReleaseTarget();
-            _texture = new Texture(DXManager.Device, size.Width, size.Height, 1,
-                                   Usage.RenderTarget, Format.A8R8G8B8, Pool.Default);
-            _surface = _texture.GetSurfaceLevel(0);
+            _texture = new Texture(DXManager.Device, size.Width, size.Height, true);
+            _surface = _texture.GetSurface();
             _size = size;
             return true;
         }
@@ -78,12 +42,12 @@ namespace Client.MirGraphics
         {
             if (!Settings.LightingBloom || DXManager.DeviceLost ||
                 DXManager.LightTexture == null || DXManager.LightTexture.Disposed ||
-                !LoadShaders())
+                _failed)
                 return;
 
             Surface originalSurface = DXManager.CurrentSurface;
             Matrix originalTransform = DXManager.Sprite.Transform;
-            PixelShader originalShader = DXManager.Device.PixelShader;
+            ShaderEffect originalShader = DXManager.Device.PixelShader;
             bool originalBlend = DXManager.Blending;
             float originalRate = DXManager.BlendingRate;
             BlendMode originalMode = DXManager.BlendingMode;
@@ -95,11 +59,11 @@ namespace Client.MirGraphics
 
                 // Downsample the light mask, extracting only bright pixels.
                 DXManager.SetSurface(_surface);
-                DXManager.Device.Clear(ClearFlags.Target, Color.Black, 0f, 0);
+                DXManager.Device.Clear(Color.Black);
                 DXManager.Sprite.Flush();
-                DXManager.Device.PixelShader = _extractShader;
+                DXManager.Device.PixelShader = ShaderEffect.BloomExtract;
                 DXManager.Device.SetPixelShaderConstant(0, ExtractConstants);
-                DXManager.Sprite.Transform = Matrix.Scaling(
+                DXManager.Sprite.Transform = Matrix.CreateScale(
                     (float)_size.Width / Settings.ScreenWidth,
                     (float)_size.Height / Settings.ScreenHeight, 1f);
                 DXManager.Draw(DXManager.LightTexture,
@@ -116,9 +80,9 @@ namespace Client.MirGraphics
                 DXManager.Sprite.Flush();
 
                 BlurConstants[0] = new Vector4(1f / _size.Width, 0f, 0f, 1f / _size.Height);
-                DXManager.Device.PixelShader = _blurShader;
+                DXManager.Device.PixelShader = ShaderEffect.BloomBlur;
                 DXManager.Device.SetPixelShaderConstant(0, BlurConstants);
-                DXManager.Sprite.Transform = Matrix.Scaling(
+                DXManager.Sprite.Transform = Matrix.CreateScale(
                     (float)Settings.ScreenWidth / _size.Width,
                     (float)Settings.ScreenHeight / _size.Height, 1f);
                 DXManager.Draw(_texture, new Rectangle(0, 0, _size.Width, _size.Height),
@@ -154,10 +118,6 @@ namespace Client.MirGraphics
         internal static void DisposeAll()
         {
             ReleaseTarget();
-            if (_extractShader != null && !_extractShader.Disposed) _extractShader.Dispose();
-            if (_blurShader != null && !_blurShader.Disposed) _blurShader.Dispose();
-            _extractShader = _blurShader = null;
-            _attemptedShaders = false;
             _failed = false;
         }
     }

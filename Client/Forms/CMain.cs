@@ -10,13 +10,11 @@ using Client.MirGraphics;
 using Client.MirNetwork;
 using Client.MirScenes;
 using Client.MirSounds;
-using SlimDX.Direct3D9;
-using SlimDX.Windows;
 using Font = System.Drawing.Font;
 
 namespace Client
 {
-    public partial class CMain : RenderForm
+    public partial class CMain : Form
     {
         public static MirControl DebugBaseLabel, HintBaseLabel;
         public static MirLabel DebugTextLabel, HintTextLabel, ScreenshotTextLabel;
@@ -87,10 +85,6 @@ namespace Client
                 LoadMouseCursors();
                 SetMouseCursor(MouseCursor.Default);
 
-                // Object tracking adds overhead and is only needed during diagnostics.
-#if DEBUG
-                SlimDX.Configuration.EnableObjectTracking = true;
-#endif
 
                 DXManager.Create();
                 SoundManager.Create();
@@ -99,6 +93,9 @@ namespace Client
             catch (Exception ex)
             {
                 SaveError(ex.ToString());
+                MessageBox.Show("Unable to start the Direct3D 11 client: " + ex.Message,
+                    "CrystalM2 graphics", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Close();
             }
         }
 
@@ -116,6 +113,7 @@ namespace Client
                         RenderEnvironment();
                         UpdateFrameTime();
                     }
+                    else Thread.Sleep(1);
                 }
 
             }
@@ -389,6 +387,12 @@ namespace Client
         {
             try
             {
+                if (Program.Form.WindowState == FormWindowState.Minimized ||
+                    Program.Form.ClientSize.Width <= 0 || Program.Form.ClientSize.Height <= 0)
+                {
+                    Thread.Sleep(10);
+                    return;
+                }
                 if (DXManager.DeviceLost)
                 {
                     DXManager.AttemptReset();
@@ -396,19 +400,21 @@ namespace Client
                     return;
                 }
 
-                DXManager.Device.Clear(ClearFlags.Target, Color.Black, 0, 0);
-                DXManager.Device.BeginScene();
-                DXManager.Sprite.Begin(SpriteFlags.AlphaBlend);
+                if (DXManager.Device.BackBufferSize != Program.Form.ClientSize)
+                    DXManager.ResetDevice();
+
+                DXManager.Device.Clear(Color.Black);
+                DXManager.Device.BeginFrame();
+                DXManager.Sprite.Begin();
                 DXManager.SetSurface(DXManager.MainSurface);
 
                 if (MirScene.ActiveScene != null)
                     MirScene.ActiveScene.Draw();
 
                 DXManager.Sprite.End();
-                DXManager.Device.EndScene();
-                DXManager.Device.Present();
+                DXManager.Device.Present(Settings.FPSCap);
             }
-            catch (Direct3D9Exception ex)
+            catch (SharpGen.Runtime.SharpGenException ex)
             {
                 DXManager.DeviceLost = true;
                 SaveError(ex.ToString());
@@ -430,6 +436,8 @@ namespace Client
                 text = string.Format("FPS: {0}", FPS);
 
                 text += string.Format(", DPS: {0}", DPS);
+                text += string.Format(", DX11 draws: {0}, texture MiB: {1:F1}",
+                    DXManager.Device.DrawCalls, DXManager.Device.TextureBytes / 1048576.0);
 
                 text += string.Format(", Time: {0:HH:mm:ss UTC}", Now);
 
@@ -592,8 +600,6 @@ namespace Client
 
             Program.Form.TopMost = Settings.FullScreen;
 
-            DXManager.Parameters.Windowed = !Settings.FullScreen;
-
             Program.Form.ClientSize = new Size(Settings.ScreenWidth, Settings.ScreenHeight);
 
             DXManager.ResetDevice();
@@ -615,11 +621,10 @@ namespace Client
                 Now.ToShortDateString(),
                 Now.TimeOfDay);
 
-            Surface backbuffer = DXManager.Device.GetBackBuffer(0, 0);
+            using Surface backbuffer = DXManager.Device.GetBackBuffer();
 
-            using (var stream = Surface.ToStream(backbuffer, ImageFileFormat.Png))
+            using (Bitmap image = DXManager.Device.Capture(backbuffer))
             {
-                Bitmap image = new Bitmap(stream);
 
                 using (Graphics graphics = Graphics.FromImage(image))
                 {
@@ -669,8 +674,8 @@ namespace Client
             Settings.ScreenHeight = height;
             Program.Form.ClientSize = new Size(width, height);
 
-            DXManager.Device.Clear(ClearFlags.Target, Color.Black, 0, 0);
-            DXManager.Device.Present();
+            DXManager.Device.Clear(Color.Black);
+            DXManager.Device.Present(Settings.FPSCap);
             DXManager.ResetDevice();
 
             if (!Settings.FullScreen)
@@ -724,6 +729,7 @@ namespace Client
             {
                 Settings.Save();
 
+                Application.Idle -= Application_Idle;
                 DXManager.Dispose();
                 SoundManager.Dispose();
             }

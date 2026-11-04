@@ -3,8 +3,6 @@ using Client.MirGraphics;
 using Client.MirNetwork;
 using Client.MirObjects;
 using Client.MirSounds;
-using SlimDX;
-using SlimDX.Direct3D9;
 using Font = System.Drawing.Font;
 using S = ServerPackets;
 using C = ClientPackets;
@@ -10706,14 +10704,14 @@ namespace Client.MirScenes
             if (ControlTexture == null || ControlTexture.Disposed)
             {
                 DXManager.ControlList.Add(this);
-                ControlTexture = new Texture(DXManager.Device, Size.Width, Size.Height, 1, Usage.RenderTarget, Format.A8R8G8B8, Pool.Default);
+                ControlTexture = new Texture(DXManager.Device, Size.Width, Size.Height, true);
                 TextureSize = Size;
             }
 
             Surface oldSurface = DXManager.CurrentSurface;
-            Surface surface = ControlTexture.GetSurfaceLevel(0);
+            Surface surface = ControlTexture.GetSurface();
             DXManager.SetSurface(surface);
-            DXManager.Device.Clear(ClearFlags.Target, BackColour, 0, 0);
+            DXManager.Device.Clear(BackColour);
 
             DrawBackground();
 
@@ -10859,13 +10857,13 @@ namespace Client.MirScenes
         {
             if (DXManager.FloorTexture == null || DXManager.FloorTexture.Disposed)
             {
-                DXManager.FloorTexture = new Texture(DXManager.Device, Settings.ScreenWidth, Settings.ScreenHeight, 1, Usage.RenderTarget, Format.A8R8G8B8, Pool.Default);
-                DXManager.FloorSurface = DXManager.FloorTexture.GetSurfaceLevel(0);
+                DXManager.FloorTexture = new Texture(DXManager.Device, Settings.ScreenWidth, Settings.ScreenHeight, true);
+                DXManager.FloorSurface = DXManager.FloorTexture.GetSurface();
             }
 
             Surface oldSurface = DXManager.CurrentSurface;
             DXManager.SetSurface(DXManager.FloorSurface);
-            DXManager.Device.Clear(ClearFlags.Target, Color.Empty, 0, 0);
+            DXManager.Device.Clear(Color.Empty);
 
 
             int startX = User.Movement.X - ViewRangeX;
@@ -11227,8 +11225,8 @@ namespace Client.MirScenes
 
             if (DXManager.LightTexture == null || DXManager.LightTexture.Disposed)
             {
-                DXManager.LightTexture = new Texture(DXManager.Device, Settings.ScreenWidth, Settings.ScreenHeight, 1, Usage.RenderTarget, Format.A8R8G8B8, Pool.Default);
-                DXManager.LightSurface = DXManager.LightTexture.GetSurfaceLevel(0);
+                DXManager.LightTexture = new Texture(DXManager.Device, Settings.ScreenWidth, Settings.ScreenHeight, true);
+                DXManager.LightSurface = DXManager.LightTexture.GetSurface();
             }
 
             Surface oldSurface = DXManager.CurrentSurface;
@@ -11241,15 +11239,14 @@ namespace Client.MirScenes
                 darkness = GetBlindLight(darkness);
             }
 
-            DXManager.Device.Clear(ClearFlags.Target, darkness, 0, 0);
+            DXManager.Device.Clear(darkness);
 
             #endregion
 
             int light;
             Point p;
             DXManager.SetBlend(true);
-            DXManager.Device.SetRenderState(RenderState.SourceBlend, Blend.SourceAlpha);
-            DXManager.Device.SetRenderState(RenderState.DestinationBlend, Blend.One);
+            DXManager.Device.Blend = SpriteBlendMode.Additive;
 
             #region Object Lights (Player/Mob/NPC)
             foreach (var ob in Objects.Values)
@@ -11413,13 +11410,12 @@ namespace Client.MirScenes
             DXManager.SetBlend(false);
             DXManager.SetSurface(oldSurface);
 
-            DXManager.Device.SetRenderState(RenderState.SourceBlend, Blend.Zero);
-            DXManager.Device.SetRenderState(RenderState.DestinationBlend, Blend.SourceColor);
+            DXManager.Device.Blend = SpriteBlendMode.Multiply;
 
             DXManager.Draw(DXManager.LightTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White);
 
             DXManager.Sprite.End();
-            DXManager.Sprite.Begin(SpriteFlags.AlphaBlend);
+            DXManager.Sprite.Begin();
 
             // Composite extracted lights after multiplicative darkness and
             // before UI. Missing shaders/unsupported devices retain legacy light.

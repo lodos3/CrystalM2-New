@@ -16,7 +16,7 @@ Assert(AmbientLightTransition.Target(LightSetting.Night, 4) == Color.Goldenrod, 
 
 var fade = new AmbientLightTransition();
 Assert(fade.Sample(Color.White, 0) == Color.White, "Initial state must not fade from black.");
-Assert(fade.Sample(Color.Black, 1000) == Color.White, "Changing target should start from current colour.");
+Assert(fade.Sample(Color.Black, 1000).ToArgb() == Color.White.ToArgb(), "Changing target should start from current colour.");
 Color middle = fade.Sample(Color.Black, 6000);
 Assert(middle.R > 0 && middle.R < 255 && middle.R == middle.G && middle.G == middle.B,
        "Halfway colour should interpolate all channels.");

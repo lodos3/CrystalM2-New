@@ -1,8 +1,6 @@
 using System;
 using System.Drawing;
 using Client.MirScenes;
-using SlimDX;
-using SlimDX.Direct3D9;
 
 namespace Client.MirGraphics
 {
@@ -25,9 +23,8 @@ namespace Client.MirGraphics
             Texture candidate = null;
             try
             {
-                candidate = new Texture(DXManager.Device, TileWidth, TileHeight, 1,
-                                        Usage.None, Format.A8R8G8B8, Pool.Managed);
-                DataRectangle locked = candidate.LockRectangle(0, LockFlags.None);
+                candidate = new Texture(DXManager.Device, TileWidth, TileHeight);
+                DataRectangle locked = candidate.BeginUpload();
                 try
                 {
                     unsafe
@@ -41,7 +38,7 @@ namespace Client.MirGraphics
                 finally
                 {
                     locked.Data.Dispose();
-                    candidate.UnlockRectangle(0);
+                    candidate.EndUpload();
                 }
                 _sheen = candidate;
                 return true;

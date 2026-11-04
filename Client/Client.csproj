@@ -33,26 +33,23 @@
 
   <ItemGroup>
     <None Include="..\.editorconfig" Link=".editorconfig" />
-    <None Update="Data\Shaders\postprocess.ps" CopyToOutputDirectory="PreserveNewest" />
-    <None Update="Data\Shaders\bloom-extract.ps" CopyToOutputDirectory="PreserveNewest" />
-    <None Update="Data\Shaders\bloom-blur.ps" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Data\Shaders\World.hlsl" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="6.0.0" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
     <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
+    <PackageReference Include="Vortice.D3DCompiler" Version="3.8.3" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Shared\Shared.csproj" />
+    <ProjectReference Include="..\Client.Rendering.Core\Client.Rendering.Core.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Reference Include="SlimDX">
-      <HintPath>..\Components\SlimDX.dll</HintPath>
-    </Reference>
-  </ItemGroup>
+
 
   <ItemGroup>
     <Compile Update="Resources\Images.Designer.cs">

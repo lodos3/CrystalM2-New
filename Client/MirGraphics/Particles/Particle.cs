@@ -1,6 +1,5 @@
 ﻿using Client.MirObjects;
 using Client.MirScenes;
-using SlimDX;
 using System;
 using System.Collections.Generic;
 using System.Drawing;

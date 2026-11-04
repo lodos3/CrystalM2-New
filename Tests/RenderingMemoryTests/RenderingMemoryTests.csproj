@@ -8,6 +8,5 @@
   <ItemGroup>
     <Compile Include="../../Client/MirGraphics/ShadowMaskBudget.cs" Link="ShadowMaskBudget.cs" />
     <Compile Include="../../Client/MirGraphics/SpriteFileLayout.cs" Link="SpriteFileLayout.cs" />
-    <Compile Include="../../Client/MirGraphics/D3D9DevicePolicy.cs" Link="D3D9DevicePolicy.cs" />
   </ItemGroup>
 </Project>

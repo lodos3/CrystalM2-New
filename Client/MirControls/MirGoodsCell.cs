@@ -1,6 +1,5 @@
 ﻿using Client.MirGraphics;
 using Client.MirScenes;
-using SlimDX;
 
 namespace Client.MirControls
 {

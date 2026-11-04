@@ -1,3 +1,13 @@
+# CrystalM2 New
+
+The playable client is **`Client/Client.csproj`**, using **Vortice / Direct3D 11**.
+There is one client implementation; the old SlimDX backend and the separate
+D3D11 preview have been removed. Original Mir artwork retains its baked
+lighting, offsets and masks.
+
+See [the current renderer guide](Docs/Direct3D11-BakedArt-Migration.md) for
+build commands, visual settings, shadow permissions and verification limits.
+
 <h1 align="center">
 Legend of Mir 2 - Official Public Crystal Source
 </h2>

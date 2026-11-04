@@ -1,6 +1,4 @@
 ﻿using Client.MirGraphics;
-using SlimDX;
-using SlimDX.Direct3D9;
 using System.Drawing.Imaging;
 
 namespace Client.MirControls
@@ -317,13 +315,13 @@ namespace Client.MirControls
             {
                 DXManager.ControlList.Add(this);
 
-                ControlTexture = new Texture(DXManager.Device, Size.Width, Size.Height, 1, Usage.None, Format.A8R8G8B8, Pool.Managed);
+                ControlTexture = new Texture(DXManager.Device, Size.Width, Size.Height);
                 TextureSize = Size;
             }
 
             Point caret = GetCaretPosition();
 
-            DataRectangle stream = ControlTexture.LockRectangle(0, LockFlags.Discard);
+            DataRectangle stream = ControlTexture.BeginUpload();
             using (Bitmap bm = new Bitmap(Size.Width, Size.Height, Size.Width * 4, PixelFormat.Format32bppArgb, stream.Data.DataPointer))
             {
                 TextBox.DrawToBitmap(bm, new Rectangle(0, 0, Size.Width, Size.Height));
@@ -335,7 +333,7 @@ namespace Client.MirControls
                 }
 
             }
-            ControlTexture.UnlockRectangle(0);
+            ControlTexture.EndUpload();
             DXManager.Sprite.Flush();
             TextureValid = true;
         }

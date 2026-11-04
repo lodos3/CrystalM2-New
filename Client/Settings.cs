@@ -73,14 +73,17 @@ namespace Client
         public static float FontSize = 8F;
         public static bool UseMouseCursors = true;
 
-        // Lightweight map shader and animated ground shadows; independently switchable.
-        public static bool PostProcessing = true, DynamicShadows = true;
+        // Artwork keeps its baked lighting. Extra projected shadows require
+        // both this switch and an explicitly authorised source library.
+        public static bool PostProcessing = true, DynamicShadows = false;
+        public static string ProjectedShadowLibraries = "";
+        internal static CrystalM2.Rendering.Core.ShadowSourcePolicy ShadowSources = new("");
         public static bool EnvironmentAtmosphere = true;
-        // Optional high-detail atmosphere, disabled until DX9 hardware testing.
+        // Optional atmospheric overlays, pending Windows visual comparison.
         public static bool EnvironmentFogLayers = false;
         public static bool AtmosphereWetSurfaces = false;
         public static bool AtmosphereLightning = false;
-        // Opt-in until Windows/Direct3D9 shader visual validation.
+        // Opt-in until Windows shader visual validation.
         public static bool LightingBloom = false, MapLightOcclusion = false;
         public static int BloomDivisor = 4;
         public static int WeatherParticleCap = 256;
@@ -228,6 +231,8 @@ namespace Client
             FPSCap = Reader.ReadBoolean("Graphics", "FPSCap", FPSCap);
             PostProcessing = Reader.ReadBoolean("Graphics", "PostProcessing", PostProcessing);
             DynamicShadows = Reader.ReadBoolean("Graphics", "DynamicShadows", DynamicShadows);
+            ProjectedShadowLibraries = Reader.ReadString("Graphics", "ProjectedShadowLibraries", ProjectedShadowLibraries);
+            ShadowSources = new(ProjectedShadowLibraries);
             EnvironmentAtmosphere = Reader.ReadBoolean("Graphics", "EnvironmentAtmosphere", EnvironmentAtmosphere);
             EnvironmentFogLayers = Reader.ReadBoolean("Graphics", "EnvironmentFogLayers", EnvironmentFogLayers);
             AtmosphereWetSurfaces = Reader.ReadBoolean("Graphics", "AtmosphereWetSurfaces", AtmosphereWetSurfaces);
@@ -365,6 +370,7 @@ namespace Client
             Reader.Write("Graphics", "FPSCap", FPSCap);
             Reader.Write("Graphics", "PostProcessing", PostProcessing);
             Reader.Write("Graphics", "DynamicShadows", DynamicShadows);
+            Reader.Write("Graphics", "ProjectedShadowLibraries", ProjectedShadowLibraries);
             Reader.Write("Graphics", "EnvironmentAtmosphere", EnvironmentAtmosphere);
             Reader.Write("Graphics", "EnvironmentFogLayers", EnvironmentFogLayers);
             Reader.Write("Graphics", "AtmosphereWetSurfaces", AtmosphereWetSurfaces);

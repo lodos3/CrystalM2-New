@@ -1,6 +1,4 @@
-﻿using SlimDX;
-using SlimDX.Direct3D9;
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using Frame = Client.MirObjects.Frame;
 using Client.MirObjects;
 using Client.MirScenes;
@@ -651,7 +649,7 @@ namespace Client.MirGraphics
         // Only checked/dithered sprites need an additional repaired GPU texture.
         public void DrawProjectedShadow(int index, Point location, Point worldCell)
         {
-            if (!Settings.DynamicShadows || DXManager.Blending ||
+            if (!Settings.DynamicShadows || !Settings.ShadowSources.Allows(_fileName) || DXManager.Blending ||
                 DXManager.ProjectedShadowsDrawn >= DXManager.MaxProjectedShadowsPerMapDraw)
                 return;
 
@@ -809,7 +807,7 @@ namespace Client.MirGraphics
             float scaleX = (float)size.Width / mi.Width;
             float scaleY = (float)size.Height / mi.Height;
 
-            Matrix matrix = Matrix.Scaling(scaleX, scaleY, 0);
+            Matrix matrix = Matrix.CreateScale(scaleX, scaleY, 0);
             DXManager.Sprite.Transform = matrix;
             DXManager.Draw(mi.Image, new Rectangle(0, 0, mi.Width, mi.Height), new Vector3((float)point.X / scaleX, (float)point.Y / scaleY, 0.0F), Color.White); 
 
@@ -957,8 +955,8 @@ namespace Client.MirGraphics
 
             try
             {
-                Image = new Texture(DXManager.Device, width, height, 1, Usage.None, Format.A8R8G8B8, Pool.Managed);
-                DataRectangle locked = Image.LockRectangle(0, LockFlags.Discard);
+                Image = new Texture(DXManager.Device, width, height);
+                DataRectangle locked = Image.BeginUpload();
                 try
                 {
                     DecompressBgraRows(reader.ReadBytes(Length), locked.Data, width, height, locked.Pitch);
@@ -970,7 +968,7 @@ namespace Client.MirGraphics
                 finally
                 {
                     locked.Data.Dispose();
-                    Image.UnlockRectangle(0);
+                    Image.EndUpload();
                 }
 
                 if (HasMask)
@@ -980,9 +978,8 @@ namespace Client.MirGraphics
                     SpriteFileLayout.SkipCompressedLayer(reader, 12);
                     if (SpriteFileLayout.HasSafeMask(MaskWidth, MaskHeight, MaskLength))
                     {
-                        MaskImage = new Texture(DXManager.Device, MaskWidth, MaskHeight, 1,
-                                                Usage.None, Format.A8R8G8B8, Pool.Managed);
-                        DataRectangle maskLocked = MaskImage.LockRectangle(0, LockFlags.None);
+                        MaskImage = new Texture(DXManager.Device, MaskWidth, MaskHeight);
+                        DataRectangle maskLocked = MaskImage.BeginUpload();
                         try
                         {
                             DecompressBgraRows(reader.ReadBytes(MaskLength), maskLocked.Data,
@@ -991,7 +988,7 @@ namespace Client.MirGraphics
                         finally
                         {
                             maskLocked.Data.Dispose();
-                            MaskImage.UnlockRectangle(0);
+                            MaskImage.EndUpload();
                         }
                     }
                 }
@@ -1038,9 +1035,8 @@ namespace Client.MirGraphics
                 Texture candidate = null;
                 try
                 {
-                    candidate = new Texture(DXManager.Device, width, height, 1,
-                                            Usage.None, Format.A8R8G8B8, Pool.Managed);
-                    DataRectangle locked = candidate.LockRectangle(0, LockFlags.None);
+                    candidate = new Texture(DXManager.Device, width, height);
+                    DataRectangle locked = candidate.BeginUpload();
                     try
                     {
                         var pixels = new Span<byte>((void*)locked.Data.DataPointer,
@@ -1050,7 +1046,7 @@ namespace Client.MirGraphics
                     finally
                     {
                         locked.Data.Dispose();
-                        candidate.UnlockRectangle(0);
+                        candidate.EndUpload();
                     }
                     _repairedShadowTexture = candidate;
                     _repairedShadowBytes = bytes;
@@ -1121,7 +1117,7 @@ namespace Client.MirGraphics
             return TrueSize.IsEmpty ? new Size(Width, Height) : TrueSize;
         }
 
-        // GZip data is tightly packed BGRA; a locked D3D9 rectangle can have
+        // GZip data is tightly packed BGRA; an upload rectangle can have
         // padded rows. Stream row-by-row only when its native pitch requires it.
         private static void DecompressBgraRows(byte[] data, Stream destination,
                                                int width, int height, int pitch)
@@ -1135,6 +1131,8 @@ namespace Client.MirGraphics
                 if (pitch == rowBytes)
                 {
                     compressed.CopyTo(destination);
+                    if (destination.Position != (long)rowBytes * height)
+                        throw new EndOfStreamException("Incomplete BGRA texture data.");
                     return;
                 }
 

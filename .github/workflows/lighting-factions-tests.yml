@@ -6,7 +6,7 @@ on:
   pull_request:
     paths:
       - "Client.Rendering.Core/**"
-      - "Client.Rendering.D3D11Preview/**"
+      - "Client/Rendering/**"
       - "Client/MirGraphics/MapLightEncoding.cs"
       - "Client/MirGraphics/MapMaterialMap.cs"
       - "Client/MirGraphics/MapMaterialMapLoader.cs"
@@ -71,7 +71,7 @@ jobs:
           dotnet-version: 8.0.x
       - name: Restore Windows CrystalM2 client
         run: dotnet restore Client/Client.csproj
-      - name: Compile native SlimDX client integration
+      - name: Compile the sole Vortice D3D11 game client
         run: dotnet build Client/Client.csproj --configuration Release --no-restore
-      - name: Compile independent hardware Direct3D11 LIB preview
-        run: dotnet build Client.Rendering.D3D11Preview/Client.Rendering.D3D11Preview.csproj --configuration Release
+      - name: Validate production D3D11 shaders and compositor on real WARP
+        run: dotnet run --project Tests/WindowsRendererTests/WindowsRendererTests.csproj --configuration Release

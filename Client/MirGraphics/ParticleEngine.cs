@@ -1,6 +1,5 @@
 ﻿using Client.MirGraphics.Particles;
 using Client.MirScenes;
-using SlimDX;
 using System;
 using System.Collections.Generic;
 using System.Drawing;

@@ -2,9 +2,6 @@
 using System.Drawing.Imaging;
 using Client.MirControls;
 using Client.MirScenes;
-using SlimDX;
-using SlimDX.Direct3D9;
-using Blend = SlimDX.Direct3D9.Blend;
 
 namespace Client.MirGraphics
 {
@@ -17,13 +14,11 @@ namespace Client.MirGraphics
             new ShadowMaskBudget(16L * 1024 * 1024);
         public static List<MirControl> ControlList = new List<MirControl>();
 
-        public static Device Device;
-        public static Sprite Sprite;
-        public static Line Line;
+        public static RendererDevice Device;
+        public static SpriteBatch Sprite;
 
         public static Surface CurrentSurface;
         public static Surface MainSurface;
-        public static PresentParameters Parameters;
         public static bool DeviceLost;
         public static float Opacity = 1F;
         public static bool Blending;
@@ -38,10 +33,10 @@ namespace Client.MirGraphics
         public static Texture FloorTexture, LightTexture;
         public static Surface FloorSurface, LightSurface;
 
-        public static PixelShader GrayScalePixelShader;
-        public static PixelShader NormalPixelShader;
-        public static PixelShader MagicPixelShader;
-        public static PixelShader PostProcessingPixelShader;
+        public const ShaderEffect GrayScalePixelShader = ShaderEffect.Grayscale;
+        public const ShaderEffect NormalPixelShader = ShaderEffect.Normal;
+        public const ShaderEffect MagicPixelShader = ShaderEffect.Magic;
+        public const ShaderEffect PostProcessingPixelShader = ShaderEffect.Atmosphere;
         private static readonly Vector4[] PostProcessConstants =
         {
             new Vector4(1.035f, 0.22f, 1.0f, 0.80f),
@@ -73,109 +68,37 @@ namespace Client.MirGraphics
 
         public static void Create()
         {
-            Parameters = new PresentParameters
-            {
-                BackBufferFormat = Format.X8R8G8B8,
-                PresentFlags = PresentFlags.LockableBackBuffer,
-                BackBufferWidth = Settings.ScreenWidth,
-                BackBufferHeight = Settings.ScreenHeight,
-                SwapEffect = SwapEffect.Discard,
-                PresentationInterval = Settings.FPSCap ? PresentInterval.One : PresentInterval.Immediate,
-                Windowed = !Settings.FullScreen,
-            };
-
-
-            Direct3D d3d = new Direct3D();
-
-            Capabilities devCaps = d3d.GetDeviceCaps(0, DeviceType.Hardware);
-            // A missing shader-model 2.0 capability must not switch the entire
-            // game to the CPU-bound Direct3D9 reference rasterizer.
-            DeviceType devType = DeviceType.Hardware;
-            bool hardwareTransform = (devCaps.DeviceCaps & DeviceCaps.HWTransformAndLight) != 0;
-            CreateFlags devFlags = D3D9DevicePolicy.VertexProcessing(hardwareTransform) ==
-                                   D3D9VertexProcessing.Hardware
-                                       ? CreateFlags.HardwareVertexProcessing
-                                       : CreateFlags.SoftwareVertexProcessing;
-            // Never enable PureDevice: this renderer reads PixelShader state.
-
-
-            Device = new Device(d3d, d3d.Adapters.DefaultAdapter.Adapter, devType, Program.Form.Handle, devFlags, Parameters);
-
-            Device.SetDialogBoxMode(true);
-
+            Device = new RendererDevice(Program.Form.Handle, Settings.ScreenWidth, Settings.ScreenHeight);
+            Sprite = Device.Sprite;
             LoadTextures();
-            LoadPixelsShaders();
-        }
-
-        private static unsafe void LoadPixelsShaders()
-        {
-            var shaderNormalPath = Settings.ShadersPath + "normal.ps";
-            var shaderGrayScalePath = Settings.ShadersPath + "grayscale.ps";
-            var shaderMagicPath = Settings.ShadersPath + "magic.ps";
-
-            if (System.IO.File.Exists(shaderNormalPath))
-            {
-                using (var gs = ShaderBytecode.AssembleFromFile(shaderNormalPath, ShaderFlags.None))
-                    NormalPixelShader = new PixelShader(Device, gs);
-            }
-            if (System.IO.File.Exists(shaderGrayScalePath))
-            {
-                using (var gs = ShaderBytecode.AssembleFromFile(shaderGrayScalePath, ShaderFlags.None))
-                    GrayScalePixelShader = new PixelShader(Device, gs);
-            }
-            if (System.IO.File.Exists(shaderMagicPath))
-            {
-                using (var gs = ShaderBytecode.AssembleFromFile(shaderMagicPath, ShaderFlags.None))
-                    MagicPixelShader = new PixelShader(Device, gs);
-            }
-
-            // This shader is optional: missing/unsupported source must not prevent
-            // startup or force an additional render target on old hardware.
-            string shaderPostPath = System.IO.Path.Combine(Settings.ShadersPath, "postprocess.ps");
-            if (System.IO.File.Exists(shaderPostPath))
-            {
-                try
-                {
-                    using (var bytecode = ShaderBytecode.AssembleFromFile(shaderPostPath, ShaderFlags.None))
-                        PostProcessingPixelShader = new PixelShader(Device, bytecode);
-                }
-                catch (Exception ex)
-                {
-                    PostProcessingPixelShader?.Dispose();
-                    PostProcessingPixelShader = null;
-                    CMain.SaveError("Optional post-processing shader disabled: " + ex.Message);
-                }
-            }
+            DeviceLost = false;
         }
 
         private static unsafe void LoadTextures()
         {
-            Sprite = new Sprite(Device);
-            Line = new Line(Device) { Width = 1F };
-
-            MainSurface = Device.GetBackBuffer(0, 0);
+            MainSurface = Device.GetBackBuffer();
             CurrentSurface = MainSurface;
-            Device.SetRenderTarget(0, MainSurface);
+            Device.SetRenderTarget(MainSurface);
 
             if (RadarTexture == null || RadarTexture.Disposed)
             {
-                RadarTexture = new Texture(Device, 2, 2, 1, Usage.None, Format.A8R8G8B8, Pool.Managed);
+                RadarTexture = new Texture(Device, 2, 2);
 
-                DataRectangle stream = RadarTexture.LockRectangle(0, LockFlags.Discard);
+                DataRectangle stream = RadarTexture.BeginUpload();
                 using (Bitmap image = new Bitmap(2, 2, 8, PixelFormat.Format32bppArgb, stream.Data.DataPointer))
                 using (Graphics graphics = Graphics.FromImage(image))
                     graphics.Clear(Color.White);
-                RadarTexture.UnlockRectangle(0);
+                RadarTexture.EndUpload();
             }
             if (PoisonDotBackground == null || PoisonDotBackground.Disposed)
             {
-                PoisonDotBackground = new Texture(Device, 5, 5, 1, Usage.None, Format.A8R8G8B8, Pool.Managed);
+                PoisonDotBackground = new Texture(Device, 5, 5);
 
-                DataRectangle stream = PoisonDotBackground.LockRectangle(0, LockFlags.Discard);
+                DataRectangle stream = PoisonDotBackground.BeginUpload();
                 using (Bitmap image = new Bitmap(5, 5, 20, PixelFormat.Format32bppArgb, stream.Data.DataPointer))
                 using (Graphics graphics = Graphics.FromImage(image))
                     graphics.Clear(Color.White);
-                PoisonDotBackground.UnlockRectangle(0);
+                PoisonDotBackground.EndUpload();
             }
             CreateLights();
         }
@@ -195,9 +118,9 @@ namespace Client.MirGraphics
                 int width = LightSizes[i].X;
                 int height = LightSizes[i].Y;
 
-                Texture light = new Texture(Device, width, height, 1, Usage.None, Format.A8R8G8B8, Pool.Managed);
+                Texture light = new Texture(Device, width, height);
 
-                DataRectangle stream = light.LockRectangle(0, LockFlags.Discard);
+                DataRectangle stream = light.BeginUpload();
                 using (Bitmap image = new Bitmap(width, height, width * 4, PixelFormat.Format32bppArgb, stream.Data.DataPointer))
                 {
                     using (Graphics graphics = Graphics.FromImage(image))
@@ -241,7 +164,7 @@ namespace Client.MirGraphics
                     }
                 }
 
-                light.UnlockRectangle(0);
+                light.EndUpload();
                 //light.Disposing += (o, e) => Lights.Remove(light);
                 Lights.Add(light);
             }
@@ -254,7 +177,7 @@ namespace Client.MirGraphics
 
             Sprite.Flush();
             CurrentSurface = surface;
-            Device.SetRenderTarget(0, surface);
+            Device.SetRenderTarget(surface);
         }
         public static void SetGrayscale(bool value)
         {
@@ -268,9 +191,9 @@ namespace Client.MirGraphics
             }
             else
             {
-                if (Device.PixelShader == null) return;
+                if (Device.PixelShader == ShaderEffect.Artwork) return;
                 Sprite.Flush();
-                Device.PixelShader = null;
+                Device.PixelShader = ShaderEffect.Artwork;
             }
         }
 
@@ -279,9 +202,6 @@ namespace Client.MirGraphics
         public static bool BeginPostProcessing(Color atmosphere, float gradeStrength, float fogStrength,
                                                AtmosphericWeatherFrame weatherFrame, Color hazeTint)
         {
-            if (PostProcessingPixelShader == null || PostProcessingPixelShader.Disposed)
-                return false;
-
             float intensity = AtmosphereIntensity.Scale(Settings.AtmosphereIntensityPercent);
             PostProcessConstants[0] = new Vector4(
                 AtmosphereExposure.Brightness(weatherFrame.CloudCover, intensity),
@@ -307,7 +227,7 @@ namespace Client.MirGraphics
         public static void EndPostProcessing()
         {
             Sprite.Flush();
-            Device.PixelShader = null;
+            Device.PixelShader = ShaderEffect.Artwork;
         }
 
         // Project a frame silhouette from its ground contact point every redraw.
@@ -342,185 +262,104 @@ namespace Client.MirGraphics
             }
         }
 
-        public static void DrawOpaque(Texture texture, Rectangle? sourceRect, Vector3? position, Color4 color, float opacity)
+        public static void DrawOpaque(Texture texture, Rectangle? sourceRect, Vector3? position, Color color, float opacity)
         {
-            color.Alpha = opacity;
+            color = Color.FromArgb((int)(Math.Clamp(opacity, 0f, 1f) * 255), color.R, color.G, color.B);
             Draw(texture, sourceRect, position, color);
         }
 
-        public static void Draw(Texture texture, Rectangle? sourceRect, Vector3? position, Color4 color)
+        public static void Draw(Texture texture, Rectangle? sourceRect, Vector3? position, Color color)
         {
-            Sprite.Draw(texture, sourceRect, Vector3.Zero, position, color);
+            Sprite.Draw(texture, sourceRect, position, RendererDevice.ToVector(color));
             CMain.DPSCounter++;
         }
 
         public static void AttemptReset()
         {
-            try
-            {
-                Result result = DXManager.Device.TestCooperativeLevel();
-
-                if (result.Code == ResultCode.DeviceLost.Code) return;
-
-                if (result.Code == ResultCode.DeviceNotReset.Code)
-                {
-                    DXManager.ResetDevice();
-                    return;
-                }
-
-                if (result.Code != ResultCode.Success.Code) return;
-
-                DXManager.DeviceLost = false;
-            }
-            catch
-            {
-            }
+            try { ResetDevice(); }
+            catch (Exception ex) { CMain.SaveError("D3D11 recovery failed: " + ex); }
         }
 
         public static void ResetDevice()
         {
-            DXManager.CleanUp();
-            DXManager.DeviceLost = true;
-
-            if (DXManager.Parameters == null) return;
-
-            Size clientSize = Program.Form.ClientSize;
-
-            if (clientSize.Width == 0 || clientSize.Height == 0) return;
-
-            DXManager.Parameters.Windowed = !Settings.FullScreen;
-            DXManager.Parameters.BackBufferWidth = clientSize.Width;
-            DXManager.Parameters.BackBufferHeight = clientSize.Height;
-            DXManager.Parameters.PresentationInterval = Settings.FPSCap ? PresentInterval.Default : PresentInterval.Immediate;
-            DXManager.Device.Reset(DXManager.Parameters);
-
-            DXManager.LoadTextures();
+            Size size = Program.Form.ClientSize;
+            if (size.Width <= 0 || size.Height <= 0) return;
+            Settings.ScreenWidth = size.Width;
+            Settings.ScreenHeight = size.Height;
+            DeviceLost = true;
+            bool removed = Device == null || Device.IsRemoved;
+            CleanUp();
+            if (removed)
+            {
+                Device?.Dispose();
+                Device = null;
+                Create();
+            }
+            else
+            {
+                Device.Resize(size.Width, size.Height);
+                LoadTextures();
+                Opacity = 1f;
+                Device.Opacity = 1f;
+                Blending = false;
+                Device.Blend = SpriteBlendMode.Alpha;
+                Device.PixelShader = ShaderEffect.Artwork;
+            }
+            DeviceLost = false;
         }
 
         public static void AttemptRecovery()
         {
-            try
+            Device?.DiscardPending();
+            if (Device != null && !Device.IsRemoved && MainSurface != null)
             {
-                Sprite.End();
+                Device.PixelShader = ShaderEffect.Artwork;
+                Device.Blend = SpriteBlendMode.Alpha;
+                SetSurface(MainSurface);
             }
-            catch
-            {
-            }
-
-            try
-            {
-                Device.EndScene();
-            }
-            catch
-            {
-            }
-
-            try
-            {
-                MainSurface = Device.GetBackBuffer(0, 0);
-                CurrentSurface = MainSurface;
-                Device.SetRenderTarget(0, MainSurface);
-            }
-            catch
-            {
-            }
+            else DeviceLost = true;
         }
+
         public static void SetOpacity(float opacity)
         {
-            if (Opacity == opacity)
-                return;
-
-            Sprite.Flush();
-            Device.SetRenderState(RenderState.AlphaBlendEnable, true);
-            if (opacity >= 1 || opacity < 0)
-            {
-                Device.SetRenderState(RenderState.SourceBlend, SlimDX.Direct3D9.Blend.SourceAlpha);
-                Device.SetRenderState(RenderState.DestinationBlend, SlimDX.Direct3D9.Blend.InverseSourceAlpha);
-                Device.SetRenderState(RenderState.SourceBlendAlpha, Blend.One);
-                Device.SetRenderState(RenderState.BlendFactor, Color.FromArgb(255, 255, 255, 255).ToArgb());
-            }
-            else
-            {
-                Device.SetRenderState(RenderState.SourceBlend, Blend.BlendFactor);
-                Device.SetRenderState(RenderState.DestinationBlend, Blend.InverseBlendFactor);
-                Device.SetRenderState(RenderState.SourceBlendAlpha, Blend.SourceAlpha);
-                Device.SetRenderState(RenderState.BlendFactor, Color.FromArgb((byte)(255 * opacity), (byte)(255 * opacity), (byte)(255 * opacity), (byte)(255 * opacity)).ToArgb());
-            }
-            Opacity = opacity;
-            Sprite.Flush();
+            Opacity = opacity >= 1 || opacity < 0 ? 1f : opacity;
+            Device.Opacity = Opacity;
         }
+
         public static void SetBlend(bool value, float rate = 1F, BlendMode mode = BlendMode.NORMAL)
         {
-            if (value == Blending && BlendingRate == rate && BlendingMode == mode) return;
-
             Blending = value;
             BlendingRate = rate;
             BlendingMode = mode;
-
-            Sprite.Flush();
-
-            Sprite.End();
-
-            if (Blending)
-            {
-                Sprite.Begin(SpriteFlags.DoNotSaveState);
-                Device.SetRenderState(RenderState.AlphaBlendEnable, true);
-
-                switch (BlendingMode)
-                {
-                    case BlendMode.INVLIGHT:
-                        Device.SetRenderState(RenderState.BlendOperation, BlendOperation.Add);
-                        Device.SetRenderState(RenderState.SourceBlend, Blend.BlendFactor);
-                        Device.SetRenderState(RenderState.DestinationBlend, Blend.InverseSourceColor);
-                        break;
-                    default:
-                        Device.SetRenderState(RenderState.SourceBlend, Blend.SourceAlpha);
-                        Device.SetRenderState(RenderState.DestinationBlend, Blend.One);
-                        break;
-                }
-
-                Device.SetRenderState(RenderState.BlendFactor, Color.FromArgb((byte)(255 * BlendingRate), (byte)(255 * BlendingRate),
-                                                                (byte)(255 * BlendingRate), (byte)(255 * BlendingRate)).ToArgb());
-            }
-            else
-                Sprite.Begin(SpriteFlags.AlphaBlend);
-
-            Device.SetRenderTarget(0, CurrentSurface);
+            Device.BlendRate = rate;
+            Device.Blend = !value ? SpriteBlendMode.Alpha :
+                mode == BlendMode.INVLIGHT ? SpriteBlendMode.InverseLight : SpriteBlendMode.Additive;
         }
 
         public static void SetNormal(float blend, Color tintcolor)
         {
-            if (Device.PixelShader == NormalPixelShader)
-                return;
-
             Sprite.Flush();
             Device.PixelShader = NormalPixelShader;
             Device.SetPixelShaderConstant(0, new Vector4[] { new Vector4(1.0F, 1.0F, 1.0F, blend) });
-            Device.SetPixelShaderConstant(1, new Vector4[] { new Vector4(tintcolor.R / 255, tintcolor.G / 255, tintcolor.B / 255, 1.0F) });
+            Device.SetPixelShaderConstant(1, new Vector4[] { new Vector4(tintcolor.R / 255f, tintcolor.G / 255f, tintcolor.B / 255f, 1.0F) });
             Sprite.Flush();
         }
 
         public static void SetGrayscale(float blend, Color tintcolor)
         {
-            if (Device.PixelShader == GrayScalePixelShader)
-                return;
-
             Sprite.Flush();
             Device.PixelShader = GrayScalePixelShader;
             Device.SetPixelShaderConstant(0, new Vector4[] { new Vector4(1.0F, 1.0F, 1.0F, blend) });
-            Device.SetPixelShaderConstant(1, new Vector4[] { new Vector4(tintcolor.R / 255, tintcolor.G / 255, tintcolor.B / 255, 1.0F) });
+            Device.SetPixelShaderConstant(1, new Vector4[] { new Vector4(tintcolor.R / 255f, tintcolor.G / 255f, tintcolor.B / 255f, 1.0F) });
             Sprite.Flush();
         }
 
         public static void SetBlendMagic(float blend, Color tintcolor)
         {
-            if (Device.PixelShader == MagicPixelShader || MagicPixelShader == null)
-                return;
-
             Sprite.Flush();
             Device.PixelShader = MagicPixelShader;
             Device.SetPixelShaderConstant(0, new Vector4[] { new Vector4(1.0F, 1.0F, 1.0F, blend) });
-            Device.SetPixelShaderConstant(1, new Vector4[] { new Vector4(tintcolor.R / 255, tintcolor.G / 255, tintcolor.B / 255, 1.0F) });
+            Device.SetPixelShaderConstant(1, new Vector4[] { new Vector4(tintcolor.R / 255f, tintcolor.G / 255f, tintcolor.B / 255f, 1.0F) });
             Sprite.Flush();
         }
 
@@ -563,30 +402,12 @@ namespace Client.MirGraphics
 
         private static void CleanUp()
         {
-            // The bloom pass owns a DEFAULT-pool target and DX9 shader objects.
-            // Release these before Device.Reset or disposing the old sprite.
+            Device?.DiscardPending();
             LightBloomPass.DisposeAll();
             AtmosphereFogOverlay.DisposeAll();
             WetSurfacePass.DisposeAll();
-            if (Sprite != null)
-            {
-                if (!Sprite.Disposed)
-                {
-                    Sprite.Dispose();
-                }
-
-                Sprite = null;
-            }
-
-            if (Line != null)
-            {
-                if (!Line.Disposed)
-                {
-                    Line.Dispose();
-                }
-
-                Line = null;
-            }
+            MainSurface?.Dispose();
+            MainSurface = null;
 
             if (CurrentSurface != null)
             {
@@ -686,14 +507,9 @@ namespace Client.MirGraphics
         {
             CleanUp();
 
-            Device?.Direct3D?.Dispose();
             Device?.Dispose();
-
-            NormalPixelShader?.Dispose();
-            GrayScalePixelShader?.Dispose();
-            MagicPixelShader?.Dispose();
-            PostProcessingPixelShader?.Dispose();
-            PostProcessingPixelShader = null;
+            Device = null;
+            Sprite = null;
         }
     }
 }

@@ -1,8 +1,6 @@
 using System;
 using System.Drawing;
 using Client.MirScenes;
-using SlimDX;
-using SlimDX.Direct3D9;
 
 namespace Client.MirGraphics
 {
@@ -23,9 +21,8 @@ namespace Client.MirGraphics
             Texture candidate = null;
             try
             {
-                candidate = new Texture(DXManager.Device, TilePixels, TilePixels, 1,
-                                        Usage.None, Format.A8R8G8B8, Pool.Managed);
-                DataRectangle data = candidate.LockRectangle(0, LockFlags.None);
+                candidate = new Texture(DXManager.Device, TilePixels, TilePixels);
+                DataRectangle data = candidate.BeginUpload();
                 try
                 {
                     unsafe
@@ -39,7 +36,7 @@ namespace Client.MirGraphics
                 finally
                 {
                     data.Data.Dispose();
-                    candidate.UnlockRectangle(0);
+                    candidate.EndUpload();
                 }
                 _tile = candidate;
                 return true;
@@ -130,7 +127,7 @@ namespace Client.MirGraphics
             float offsetX = driftX % tileSize;
             float offsetY = driftY % tileSize;
             DXManager.Sprite.Flush();
-            DXManager.Sprite.Transform = Matrix.Scaling(scale, scale, 1f);
+            DXManager.Sprite.Transform = Matrix.CreateScale(scale, scale, 1f);
 
             for (float y = offsetY - tileSize; y < Settings.ScreenHeight; y += tileSize)
                 for (float x = offsetX - tileSize; x < Settings.ScreenWidth; x += tileSize)

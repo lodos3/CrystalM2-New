@@ -1,103 +1,98 @@
-# CrystalM2 Direct3D11 renderer migration — phase 1
+# CrystalM2 — one Vortice Direct3D 11 client
 
-Status: **isolated source-level preview**, not the production game renderer.
-The existing SlimDX/Direct3D9 client remains the default and is unchanged by
-the new projects. No server, network protocol, database, map format, or existing
-gameplay rendering switch has been changed.
+`Client/Client.csproj` is the only playable client and uses Vortice.Direct3D11
+and Vortice.D3DCompiler 3.8.3 on .NET 8, Windows x64. The isolated preview,
+SlimDX binaries/reference, Direct3D9 device implementation and shader assembly
+files have been removed. There is no renderer selector or fallback client.
 
-## Why preserve baked art?
+## Rendering contract
 
-Mir 2 and Mir 3 sprites contain much of the original artist-authored light,
-ambient shading, diffuse detail, highlights and ground shadows. A naive
-normal-map/PBR pass that relights every RGB pixel will introduce double
-shading, washed-out scenes, incorrect highlights and darkness.
+- Original Mir 2/Mir 3 LIB BGRA bytes, independent mask layers, X/Y offsets,
+  transparency and painter's order are preserved during upload and drawing.
+- Original artwork uses point-clamped BGRA8 UNORM sampling, without automatic
+  normal maps, sRGB conversion, inferred materials or per-sprite relighting.
+- Intermediate map/UI textures accumulate premultiplied RGB and correct alpha.
+  When sampled they are converted back to straight alpha in the shader, so
+  cached transparent edges are not multiplied twice.
+- Only adjacent compatible sprites share a draw. A fixed dynamic vertex buffer
+  holds at most 2,048 quads per upload. Global texture sorting is prohibited.
+- Existing map, actors, foreground, weather, ambient lighting and UI retain
+  their actual call order. Atmospheric post-processing applies to the world
+  texture before the UI.
+- Texture upload memory is allocated only while decoding/writing and freed on
+  upload completion or disposal. There is no second full-size CPU pixel cache.
+- Resize clears context references before releasing backbuffer/RTV resources.
+  Device removal invalidates cached textures and recreates the same D3D11
+  backend. The production constructor explicitly requests hardware rendering.
+- Screenshots use a temporary staging texture and its real row pitch. Ordinary
+  frames never read back GPU pixels.
 
-For that reason this migration imposes these rules:
+## Baked shadows and checker masks
 
-1. **Opaque source pixels are preserved**: the `.Lib` decoder reads original
-   gzip-compressed, tightly packed BGRA bytes without colour correction,
-   alpha-premultiplication, RGB dithering, sharpening or texture repacking.
-2. **Straight alpha compositing**: the D3D11 preview uses BGRA8 UNORM,
-   point-clamped sampling, and non-premultiplied SourceAlpha/InverseSourceAlpha
-   blending. No implicit sRGB conversion or normal-map shader is used.
-3. **Sprite geometry** retains the original LIB X/Y offsets. Optional authored
-   mask layers remain separate; they are not merged into baked RGB.
-4. **Do not generate replacement shadows** for every sprite: an existing
-   texture shadow must not be darkened again. Additional contact shadows and
-   casts require an opt-in authored source flag and visual verification.
-5. **Additional lighting is additive and separate**, applied to an appropriate
-   explicit light/effect texture, not by tinting the original baked sprite.
-6. **Layer order is sacred**: batches combine only adjacent compatible
-   commands. Global texture sorting is prohibited because it changes
-   map->character->foreground transparency order.
-7. Environment metadata is opt-in. Image colour is not sufficient to infer
-   physically meaningful materials, building heights or wall normals.
+Projected shadows are disabled by default. Enabling `DynamicShadows=True`
+alone does not authorise another shadow on already shaded artwork. List the
+exact libraries that an artist has verified contain no baked ground shadow:
 
-This is an art-preservation policy, NOT a claim that current Direct3D9 pixel
-output is bitwise identical. GPU blending and filtering need Windows captures
-from both renderers for an objective comparison.
-
-## New projects
-
-| Path | Purpose |
-|---|---|
-| `Client.Rendering.Core/` | Cross-platform .NET 8 baked-art policy, adjacent-only command batching plan, original `.Lib` v2/v3 frame reader |
-| `Client.Rendering.D3D11Preview/` | Independent Windows Forms Direct3D11 hardware preview using Vortice.NET and Shader Model 4 HLSL |
-| `Tests/ModernRendererTests/` | Pure logic regressions for exact BGRA, alpha, offsets, gzip decoding and layer-safe batches |
-
-The preview uses **Vortice.Direct3D11 3.8.3** and
-**Vortice.D3DCompiler 3.8.3** (both official NuGet packages compatible with
-.NET 8). It requests a real hardware Direct3D11 device and does not silently
-fall back to WARP/CPU rendering.
-
-## Run on Windows x64
-
-From the repository root, with the .NET 8 SDK and Direct3D11-capable GPU:
-
-```powershell
-dotnet run --project Tests/ModernRendererTests/ModernRendererTests.csproj
-dotnet build Client.Rendering.D3D11Preview/Client.Rendering.D3D11Preview.csproj -c Release
-dotnet run --project Client.Rendering.D3D11Preview/Client.Rendering.D3D11Preview.csproj -- "C:\path\to\your\Magic.Lib" 0
+```ini
+[Graphics]
+DynamicShadows=True
+ProjectedShadowLibraries=Data/Human/000000.Lib;Data/Monster/01.Lib
 ```
 
-The window provides an **Open .Lib** action and a frame picker. Select a real
-local client `.Lib` asset. The application does **not** download game assets,
-copy them into the repository or write to the LIB file.
+Those paths are examples of the configuration syntax, not a claim about which
+libraries in a particular asset installation are safe. Use the actual path
+relative to the client working directory. Matching ignores case and slash
+style; similarly named libraries in other folders do not inherit permission.
 
-The preview deliberately draws only the selected real sprite frame against
-a neutral background. It is not a full map renderer. Its optional second
-artistic mask is parsed by the core decoder but not composited by this first
-preview because tint/blend rules must be verified against original art first.
+For explicitly permitted sources, checker-pattern alpha detection and the
+16 MiB repaired-shadow mask budget are retained. Repair affects the separate
+half-resolution projected mask, never the original artwork or hit-test alpha.
+Current animation frames and light-responsive projection continue to be used.
 
-**Important:** the regression suite generates a clearly labeled test-only
-binary fixture corresponding to the archive layout confirmed in CrystalM2's
-legacy `MLibrary` reader. The fixture is not a substitute for checking
-representative actual Mir 2/Mir 3 libraries.
+## Build and checks
 
-## Next migration gates (do not flip production yet)
+```powershell
+dotnet build Client/Client.csproj -c Release
+dotnet run --project Tests/ModernRendererTests/ModernRendererTests.csproj
+dotnet run --project Tests/WindowsRendererTests/WindowsRendererTests.csproj -c Release
+```
 
-1. Compile the new preview and core tests on Windows. Fix actual Vortice API,
-   HLSL compilation, and reset errors before expanding the shader pipeline.
-2. Run source-identical real assets from Mir 2 and Mir 3 libraries.
-   Capture the legacy D3D9 and preview D3D11 versions at identical pixel
-   coordinates and composite settings. Check both opaque pixels and
-   transparent/antialiased sprite edges.
-3. Implement a map layer command collector that matches **the repository's
-   actual** back, middle, front, animated, player, monster and spell order.
-4. Add bounded texture caching, dynamic batched quad uploads and device-lost
-   recovery. Measure latency, draw calls, managed/unmanaged memory and FPS.
-5. Add *selective*, artist-authorized lighting/material channels (normal or
-   emissive maps only where explicitly supplied), plus separate spell glow,
-   rain reflections and occluder-aware shadows. Never globally relight
-   legacy sprites with already baked directional highlights.
-6. Only after a full baseline and in-game regression suite should a
-   `GraphicsBackend` selector be introduced in the production client.
+The Windows tests compile the production renderer sources and HLSL, create a
+real Microsoft WARP D3D11 device and check alpha through a cached target,
+layer order, adjacent batching, drawing after Present, upload disposal and
+resize. WARP is explicitly selected in that test assembly; the game does not
+silently fall back to it. Tiny known pixel values are test inputs, not game
+assets or a substitute for visual validation with actual libraries.
 
-## Compatibility and verification caveat
+`Client.exe --validate-shaders` compiles all production shader entry points
+without starting the patcher or connecting to a game server.
 
-At the time of writing, GitHub Actions for this repository has failed before
-recording any executed steps, even for pure tests; the added Windows build
-step may also fail without useful build logs. Therefore **no successful
-Windows compile, on-device shader assembly, visual parity or FPS gain is
-claimed by this source commit**. On a Windows workstation, run the commands
-above and preserve the compiler output and comparison screenshots.
+## Validation limits and remaining acceptance work
+
+The game client and Windows renderer test project compiled successfully for
+the Windows target with the .NET SDK from Linux. All eight pure rendering and
+faction regression suites passed. The ambient test was corrected to compare
+ARGB values rather than named-colour identity. Existing WebView2/WindowsBase and source-analysis warnings
+remain. The pure geometry/asset-policy tests run without Direct3D. Windows
+shader/compositor tests are included in CI but must actually execute before
+claiming GPU correctness. No in-game FPS gain, GPU memory reduction or exact
+pixel parity with the removed renderer is claimed without hardware results.
+
+The former normal/grayscale/magic assembly files were supplied externally and
+are absent from this repository. The HLSL implements the current tint and
+blend parameters, but parity with customised external shader files is
+unverified. Compare death rendering, magic blending and character tints.
+
+On a Windows workstation with representative real Mir 2/Mir 3 data, check
+login/selection/gameplay, animated masks, foreground occlusion, UI text and
+borders, weather transitions, optional bloom/occlusion, screenshots, Alt+Enter,
+resolution changes and repeated map changes. Compare identical cameras and
+record frame-time percentiles, draw calls, process working set and actual GPU
+memory. Debug mode exposes real submitted D3D11 draw calls and logical texture
+bytes; logical texture bytes are not an actual VRAM allocation measurement.
+
+## Primary references
+
+- [Vortice.Windows](https://github.com/amerkoleci/Vortice.Windows)
+- [Microsoft flip-model guidance](https://learn.microsoft.com/windows/win32/direct3ddxgi/for-best-performance--use-dxgi-flip-model)
+- [ResizeBuffers reference lifetime requirements](https://learn.microsoft.com/windows/win32/api/dxgi/nf-dxgi-idxgiswapchain-resizebuffers)

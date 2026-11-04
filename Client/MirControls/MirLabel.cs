@@ -2,8 +2,6 @@
 using System.Drawing.Imaging;
 using System.Drawing.Text;
 using Client.MirGraphics;
-using SlimDX;
-using SlimDX.Direct3D9;
 using Font = System.Drawing.Font;
 
 namespace Client.MirControls
@@ -199,11 +197,11 @@ namespace Client.MirControls
             {
                 DXManager.ControlList.Add(this);
 
-                ControlTexture = new Texture(DXManager.Device, Size.Width, Size.Height, 1, Usage.None, Format.A8R8G8B8, Pool.Managed);
+                ControlTexture = new Texture(DXManager.Device, Size.Width, Size.Height);
                 TextureSize = Size;
             }
 
-            DataRectangle stream = ControlTexture.LockRectangle(0, LockFlags.Discard);
+            DataRectangle stream = ControlTexture.BeginUpload();
             using (Bitmap image = new Bitmap(Size.Width, Size.Height, Size.Width * 4, PixelFormat.Format32bppArgb, stream.Data.DataPointer))
             {
                 using (Graphics graphics = Graphics.FromImage(image))
@@ -234,7 +232,7 @@ namespace Client.MirControls
                 }
             }
 
-            ControlTexture.UnlockRectangle(0);
+            ControlTexture.EndUpload();
             DXManager.Sprite.Flush();
             TextureValid = true;
         }
