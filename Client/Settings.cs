@@ -83,6 +83,7 @@ namespace Client
         // Opt-in until Windows/Direct3D9 shader visual validation.
         public static bool LightingBloom = false, MapLightOcclusion = false;
         public static int BloomDivisor = 4;
+        public static int WeatherParticleCap = 256;
         public static bool FPSCap = true;
         public static int MaxFPS = 100;
         public static int Resolution = 1024;
@@ -233,6 +234,7 @@ namespace Client
             LightingBloom = Reader.ReadBoolean("Graphics", "LightingBloom", LightingBloom);
             MapLightOcclusion = Reader.ReadBoolean("Graphics", "MapLightOcclusion", MapLightOcclusion);
             BloomDivisor = Math.Clamp(Reader.ReadInt32("Graphics", "BloomDivisor", BloomDivisor), 2, 8);
+            WeatherParticleCap = Math.Clamp(Reader.ReadInt32("Graphics", "WeatherParticleCap", WeatherParticleCap), 64, 1024);
             Resolution = Reader.ReadInt32("Graphics", "Resolution", Resolution);
             DebugMode = Reader.ReadBoolean("Graphics", "DebugMode", DebugMode);
             UseMouseCursors = Reader.ReadBoolean("Graphics", "UseMouseCursors", UseMouseCursors);
@@ -368,6 +370,7 @@ namespace Client
             Reader.Write("Graphics", "LightingBloom", LightingBloom);
             Reader.Write("Graphics", "MapLightOcclusion", MapLightOcclusion);
             Reader.Write("Graphics", "BloomDivisor", BloomDivisor);
+            Reader.Write("Graphics", "WeatherParticleCap", WeatherParticleCap);
             Reader.Write("Graphics", "Resolution", Resolution);
             Reader.Write("Graphics", "DebugMode", DebugMode);
             Reader.Write("Graphics", "UseMouseCursors", UseMouseCursors);
