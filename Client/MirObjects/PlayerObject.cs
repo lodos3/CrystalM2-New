@@ -2829,6 +2829,7 @@ namespace Client.MirObjects
                             {
 
                                 MapObject ob = MapControl.GetObject(TargetID);
+                                GameScene.Scene.MapControl.EmitDirectSpellEffect(Spell, CurrentLocation, TargetPoint, ob?.CurrentLocation);
 
                                 Missile missile;
                                 Effect effect;
@@ -3561,6 +3562,9 @@ namespace Client.MirObjects
                 Light = lightDistance,
                 LightColour = lightColour == null ? Color.White : (Color)lightColour
             };
+
+            if ((CurrentAction is MirAction.Spell or MirAction.AttackRange2) && MapControl.HasSpellTrail(Spell))
+                missile.TrackSpellParticles(Spell);
 
             Effects.Add(missile);
 

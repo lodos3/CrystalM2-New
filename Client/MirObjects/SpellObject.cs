@@ -21,6 +21,8 @@ namespace Client.MirObjects
         public Point AnimationOffset = new(0, 0);
         public int FrameCount, FrameInterval, FrameIndex;
         public bool Repeat, Ended;
+        private long _nextParticleTime;
+        private bool _emitParticles;
         
 
         public SpellObject(uint objectID) : base(objectID)
@@ -36,6 +38,8 @@ namespace Client.MirObjects
             Direction = info.Direction;
             Repeat = true;
             Ended = false;
+            _emitParticles = MapControl.HasGroundSpellParticles(Spell);
+            _nextParticleTime = CMain.Time + ObjectID % 180;
 
             switch (Spell)
             {
@@ -118,6 +122,7 @@ namespace Client.MirObjects
                         FrameCount = 9;
                         Repeat = false;
                         SoundManager.PlaySound(20000 + 124 * 10 + 5);//Boom for all players in range
+                        GameScene.Scene.MapControl.EmitSpellImpact(Spell, CurrentLocation);
                     }
                     else
                     {
@@ -291,6 +296,12 @@ namespace Client.MirObjects
 
         public override void Process()
         {
+            if (_emitParticles && CMain.Time >= _nextParticleTime && (Repeat || FrameIndex < FrameCount))
+            {
+                _nextParticleTime = CMain.Time + 240;
+                GameScene.Scene.MapControl.EmitGroundSpellParticles(Spell, CurrentLocation);
+            }
+
             if (CMain.Time >= NextMotion)
             {
                 if (++FrameIndex >= FrameCount && Repeat)

@@ -130,7 +130,45 @@ static class Program
         catch (InvalidDataException) { rejected = true; }
         Assertions.True(rejected, "Malformed compressed frame must be rejected.");
 
-        Console.WriteLine("Baked-art fidelity, order-preserving batching and real LIB layout checks passed.");
+        CheckSpellParticles();
+        Console.WriteLine("Baked-art fidelity, batching, LIB layout and spell particle checks passed.");
+    }
+
+    private static void CheckSpellParticles()
+    {
+        var pool = new SpellParticlePool(512);
+        Vector2 origin = new(120, 96);
+        var particle = new SpellParticle(origin, new Vector2(32, 0), 100, 200, 12,
+            Color.OrangeRed, SpellParticleShape.Spark, 0);
+        Assertions.True(!pool.TryAdd(particle with { Duration = 0 }), "Reject invalid particle lifetimes.");
+        Assertions.True(pool.TryAdd(particle), "An active spell should occupy one pool slot.");
+        Assertions.Equal(new Vector2(144, 96), particle.Position(200), "World motion must use the game clock.");
+        Assertions.True(pool.Burst(origin, Vector2.Zero, Color.CornflowerBlue, 100, 700, SpellParticleShape.Shard),
+            "Accept an oversized burst up to the fixed scene budget.");
+        Assertions.Equal(512, pool.Active.Length, "Pool capacity must remain fixed.");
+        Assertions.True(!pool.Burst(origin, Vector2.Zero, Color.White, 100, 1), "Reject overflow in a full scene.");
+        Assertions.True(pool.Advance(300) && pool.Active[0] != particle, "Remove expired particles in place.");
+        Assertions.True(pool.Advance(730) && pool.Active.IsEmpty && !pool.Advance(731),
+            "Redraw once when the last particle expires.");
+        pool.TryAdd(particle);
+        pool.Clear();
+        Assertions.True(pool.Active.IsEmpty, "A map reset must drop every active particle.");
+
+        byte[] atlas = SpellParticleAtlas.Generate();
+        Assertions.Equal(SpellParticleAtlas.Width * SpellParticleAtlas.Height * 4, atlas.Length,
+            "All particle masks share one BGRA texture.");
+        Assertions.True(atlas.SequenceEqual(SpellParticleAtlas.Generate()), "Particle masks must be deterministic.");
+        for (byte direction = 0; direction < 8; direction++)
+        {
+            Rectangle part = SpellParticleAtlas.Part(SpellParticleShape.Slash, direction);
+            Assertions.True(part.Right <= SpellParticleAtlas.Width && part.Bottom <= SpellParticleAtlas.Height,
+                "Every directional slash must fit inside the shared atlas.");
+            bool hasAlpha = false;
+            for (int y = part.Top; y < part.Bottom; y++)
+            for (int x = part.Left; x < part.Right; x++)
+                hasAlpha |= atlas[(y * SpellParticleAtlas.Width + x) * 4 + 3] > 0;
+            Assertions.True(hasAlpha, "Each facing must have a visible slash mask.");
+        }
     }
 
     private static byte[] MakeTestLib(byte[] bgra, bool includeMask = false)

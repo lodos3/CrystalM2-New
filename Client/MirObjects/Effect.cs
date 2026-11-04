@@ -147,7 +147,15 @@ namespace Client.MirObjects
         public int Interval, FrameCount, Skip;
         public int Direction;
         public bool Explode;
+        private Spell _particleSpell;
+        private int _particleMapGeneration;
+        private long _nextParticleTime;
 
+        internal void TrackSpellParticles(Spell spell)
+        {
+            _particleSpell = spell;
+            _particleMapGeneration = GameScene.Scene.MapControl.SpellParticleMapGeneration;
+        }
 
         public Missile(MLibrary library, int baseIndex, int count, int duration, MapObject owner, Point target, bool direction16 = true)
             : base(library, baseIndex, count, duration, owner)
@@ -187,6 +195,21 @@ namespace Client.MirObjects
             if (Count == 0) Count = 1;
 
             base.Process();
+
+            if (_particleSpell == Spell.None || !Settings.Effect) return;
+
+            MapControl map = GameScene.Scene.MapControl;
+            if (_particleMapGeneration != map.SpellParticleMapGeneration) return;
+
+            if (CurrentFrame >= Count)
+            {
+                if (Target != null || Explode) map.EmitSpellImpact(_particleSpell, Destination);
+            }
+            else if (CMain.Time >= _nextParticleTime)
+            {
+                _nextParticleTime = CMain.Time + 32;
+                map.EmitSpellTrail(_particleSpell, Source, Destination, (float)CurrentFrame / Count);
+            }
         }
         public override void Remove()
         {

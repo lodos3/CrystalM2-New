@@ -1322,7 +1322,8 @@ public enum SpellEffect : byte
     FlamingMutantWeb,
     FurbolgWarriorCritical,
     Tester,
-    MoonMist
+    MoonMist,
+    WeaponSpellImpact
 }
 
 

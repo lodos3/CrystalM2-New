@@ -3194,7 +3194,7 @@ namespace Server.MirObjects
 
                         if (defence == DefenceType.ACAgility) defence = DefenceType.MACAgility;
 
-                        action = new DelayedAction(DelayedType.Damage, Envir.Time + 400, ob, damageFinal, DefenceType.Agility, false);
+                        action = new DelayedAction(DelayedType.Damage, Envir.Time + 400, ob, damageFinal, DefenceType.Agility, false, magic);
                         ActionList.Add(action);
                         LevelMagic(magic);
                         break;
@@ -3236,7 +3236,9 @@ namespace Server.MirObjects
                 }
 
                 //if (ob.Attacked(this, damage, defence) <= 0) break;
-                action = new DelayedAction(DelayedType.Damage, Envir.Time + 300, ob, damageFinal, defence, true);
+                action = spell == Spell.None
+                    ? new DelayedAction(DelayedType.Damage, Envir.Time + 300, ob, damageFinal, defence, true)
+                    : new DelayedAction(DelayedType.Damage, Envir.Time + 300, ob, damageFinal, defence, true, magic);
                 ActionList.Add(action);
                 break;
             }
@@ -3260,9 +3262,10 @@ namespace Server.MirObjects
 
                     magic = GetMagic(spell);
                     damageFinal = magic.GetDamage(damageBase);
-                    ob.Attacked(this, damageFinal,
-                        ob is MonsterObject monster && (monster.Info.AI == 49) ? DefenceType.Repulsion : DefenceType.Agility, 
-                        false);
+                    if (ob.Attacked(this, damageFinal,
+                        ob is MonsterObject monster && monster.Info.AI == 49 ? DefenceType.Repulsion : DefenceType.Agility,
+                        false) > 0)
+                        BroadcastWeaponSpellImpact(ob.CurrentLocation, spell);
                     break;
                 }
 
@@ -3293,7 +3296,8 @@ namespace Server.MirObjects
                         if (ob.Race != ObjectType.Player && ob.Race != ObjectType.Monster) continue;
                         if (!ob.IsAttackTarget(this)) continue;
 
-                        ob.Attacked(this, damageFinal, DefenceType.Agility, false);
+                        if (ob.Attacked(this, damageFinal, DefenceType.Agility, false) > 0)
+                            BroadcastWeaponSpellImpact(ob.CurrentLocation, spell);
                         break;
                     }
                 }
@@ -3322,7 +3326,8 @@ namespace Server.MirObjects
                         if (ob.Race != ObjectType.Player && ob.Race != ObjectType.Monster) continue;
                         if (!ob.IsAttackTarget(this)) continue;
 
-                        ob.Attacked(this, damageFinal, DefenceType.Agility, false);
+                        if (ob.Attacked(this, damageFinal, DefenceType.Agility, false) > 0)
+                            BroadcastWeaponSpellImpact(ob.CurrentLocation, spell);
                         break;
                     }
                 }
@@ -5265,7 +5270,7 @@ namespace Server.MirObjects
             if (Functions.InRange(CurrentLocation, target.CurrentLocation, 1) == false) return;
             if (Envir.Random.Next(10) > magic.Level + 6) return;
             Enqueue(new S.ObjectMagic { ObjectID = ObjectID, Direction = Direction, Location = CurrentLocation, Spell = Spell.CounterAttack, TargetID = target.ObjectID, Target = target.CurrentLocation, Cast = true, Level = GetMagic(Spell.CounterAttack).Level, SelfBroadcast = true });
-            DelayedAction action = new DelayedAction(DelayedType.Damage, AttackTime, target, damageFinal, DefenceType.AC, true);
+            DelayedAction action = new DelayedAction(DelayedType.Damage, AttackTime, target, damageFinal, DefenceType.AC, true, magic);
             ActionList.Add(action);
             LevelMagic(magic);
             CounterAttack = false;
@@ -5436,7 +5441,7 @@ namespace Server.MirObjects
                                 //Only targets
                                 if (target.IsAttackTarget(this))
                                 {
-                                    DelayedAction action = new DelayedAction(DelayedType.Damage, Envir.Time + AttackSpeed, target, damageFinal, DefenceType.AC, true);
+                                    DelayedAction action = new DelayedAction(DelayedType.Damage, Envir.Time + AttackSpeed, target, damageFinal, DefenceType.AC, true, magic);
                                     ActionList.Add(action);
                                 }
                                 break;
@@ -5516,7 +5521,7 @@ namespace Server.MirObjects
                                 //Only targets
                                 if (ob.IsAttackTarget(this))
                                 {
-                                    DelayedAction action = new DelayedAction(DelayedType.Damage, AttackTime, ob, magic.GetDamage(GetAttackPower(Stats[Stat.MinDC], Stats[Stat.MaxDC])), DefenceType.AC, true);
+                                    DelayedAction action = new DelayedAction(DelayedType.Damage, AttackTime, ob, magic.GetDamage(GetAttackPower(Stats[Stat.MinDC], Stats[Stat.MaxDC])), DefenceType.AC, true, magic);
                                     ActionList.Add(action);
                                     success = true;
                                     if ((((ob.Race != ObjectType.Player) || Settings.PvpCanResistPoison) && (Envir.Random.Next(Settings.PoisonAttackWeight) >= ob.Stats[Stat.PoisonResist])) && (Envir.Random.Next(15) <= magic.Level + 1))
@@ -6828,6 +6833,8 @@ namespace Server.MirObjects
                 defence = DefenceType.Agility;
 
             if (target.Attacked(this, damage, defence, damageWeapon) <= 0) return;
+            if (userMagic != null) BroadcastWeaponSpellImpact(target.CurrentLocation, userMagic.Spell);
+
             if (FatalSword)
             {
                 S.ObjectEffect p = new S.ObjectEffect { ObjectID = target.ObjectID, Effect = SpellEffect.FatalSword };
@@ -6862,6 +6869,16 @@ namespace Server.MirObjects
                 }
             }
         }
+        private void BroadcastWeaponSpellImpact(Point location, Spell spell)
+        {
+            CurrentMap.Broadcast(new S.MapEffect
+            {
+                Location = location,
+                Effect = SpellEffect.WeaponSpellImpact,
+                Value = (byte)spell
+            }, location);
+        }
+
         protected void CompleteDamageIndicator(IList<object> data)
         {
             MapObject target = (MapObject)data[0];

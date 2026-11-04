@@ -1,4 +1,5 @@
 using Client.Rendering;
+using CrystalM2.Rendering.Core;
 using System.Numerics;
 using Vortice.Direct3D;
 
@@ -133,6 +134,26 @@ internal static class Program
         device.Sprite.End();
         Check(device.TextureCount == textures && device.TextureBytes == bytes,
             "Resizing or hovering generated controls must not allocate per-control textures.");
+        device.BeginFrame();
+        device.Clear(Color.Black);
+        var particles = new SpellParticlePool(512);
+        particles.Burst(new Vector2(160, 96), Vector2.Zero, Color.Orange, 100, 20);
+        textures = device.TextureCount;
+        bytes = device.TextureBytes;
+        var savedBlend = device.Blend;
+        var savedShader = device.PixelShader;
+        var camera = new Vector2(-128, -64);
+        device.SpellParticles.Draw(particles.Active, camera, 100, ground: false);
+        using (var image = device.Capture(backBuffer))
+            Check(image.GetPixel(32, 32).R > 0 && image.GetPixel(0, 0).R == 0,
+                "Pooled particles must use the world camera projection.");
+        Check(device.Blend == savedBlend && device.PixelShader == savedShader && device.DrawCalls == 1 &&
+            device.TextureCount == textures + 1 &&
+            device.TextureBytes == bytes + SpellParticleAtlas.Width * SpellParticleAtlas.Height * 4,
+            "Particles must restore render state and batch into a single shared atlas texture.");
+        device.SpellParticles.Draw(particles.Active, camera, 100, ground: false);
+        device.Sprite.End();
+        Check(device.TextureCount == textures + 1, "Subsequent particle draws must reuse the atlas.");
         device.Resize(80, 60);
         using Surface resized = device.GetBackBuffer();
         device.Clear(Color.Black);

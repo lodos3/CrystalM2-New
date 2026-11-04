@@ -41,6 +41,8 @@ public sealed unsafe class RendererDevice : IDisposable
     private float _blendRate = 1, _opacity = 1;
     public SpriteBatch Sprite { get; private set; }
     private UiSkinRenderer _ui;
+    private SpellParticleRenderer _spellParticles;
+    internal SpellParticleRenderer SpellParticles => _spellParticles ??= new SpellParticleRenderer(this);
     public UiSkinRenderer Ui => _ui ??= new UiSkinRenderer(this);
     public Surface CurrentSurface { get; private set; }
     public int TargetWidth => CurrentSurface?.Texture.Width ?? 0;

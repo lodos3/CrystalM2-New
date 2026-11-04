@@ -4701,6 +4701,7 @@ namespace Client.MirScenes
 
             if (!p.Cast) return;
 
+            MapControl.EmitSpellCast(p.Spell, User.CurrentLocation, User.Direction);
             ClientMagic magic = User.GetMagic(p.Spell);
             magic.CastTime = CMain.Time;
         }
@@ -4733,6 +4734,8 @@ namespace Client.MirScenes
 
             if (MapControl.Objects.TryGetValue(p.ObjectID, out var ob))
             {
+                if (p.Cast) MapControl.EmitSpellCast(p.Spell, p.Location, p.Direction);
+
                 QueuedAction action = new QueuedAction { Action = MirAction.Spell, Direction = p.Direction, Location = p.Location, Params = new List<object>() };
                 action.Params.Add(p.Spell);
                 action.Params.Add(p.TargetID);
@@ -4758,6 +4761,7 @@ namespace Client.MirScenes
                         SoundManager.PlaySound(20000 + (ushort)Spell.GreatFireBall * 10 + 1);
 
                         Missile missile = source.CreateProjectile(410, Libraries.Magic, true, 6, 30, 4, targetID: p.Destination);
+                        missile.TrackSpellParticles(p.Spell);
 
                         if (missile.Target != null)
                         {
@@ -4788,6 +4792,7 @@ namespace Client.MirScenes
                         SoundManager.PlaySound(20000 + (ushort)Spell.FatalSword * 10);
                         break;
                     case SpellEffect.FatalSword:
+                        MapControl.EmitSpellImpact(Spell.FatalSword, ob.CurrentLocation);
                         ob.Effects.Add(new Effect(Libraries.Magic2, 1940, 4, 400, ob));
                         SoundManager.PlaySound(20000 + (ushort)Spell.FatalSword * 10);
                         break;
@@ -5187,6 +5192,9 @@ namespace Client.MirScenes
         {
             switch (p.Effect)
             {
+                case SpellEffect.WeaponSpellImpact:
+                    MapControl.EmitSpellImpact((Spell)p.Value, p.Location);
+                    break;
                 case SpellEffect.Mine:
                     SoundManager.PlaySound(10091);
                     Effect HitWall = new Effect(Libraries.Effect, 8 * p.Value, 3, 240, p.Location) { Light = 0 };
@@ -10333,7 +10341,7 @@ namespace Client.MirScenes
 
     }
 
-    public sealed class MapControl : MirControl
+    public sealed partial class MapControl : MirControl
     {
         public static UserObject User
         {
@@ -10591,6 +10599,7 @@ namespace Client.MirScenes
             Objects.Clear();
             ObjectsList.Clear();
             Effects.Clear();
+            ResetSpellParticles();
             Doors.Clear();
 
             if (User != null)
@@ -10652,6 +10661,7 @@ namespace Client.MirScenes
         public void Process()
         {
             Processdoors();
+            if (_spellParticles.Advance(CMain.Time)) TextureValid = false;
             User.Process();
             for (int i = ObjectsList.Count - 1; i >= 0; i--)
             {
@@ -10805,7 +10815,9 @@ namespace Client.MirScenes
                 WetSurfacePass.Draw(_mapMaterials, _weatherFrame, User.Movement,
                                     User.OffSetMove, OffSetX, OffSetY,
                                     ViewRangeX, ViewRangeY, Width, Height);
+            DrawSpellParticles(ground: true);
             DrawObjects();
+            DrawSpellParticles(ground: false);
 
             //render weather
             foreach (ParticleEngine engine in GameScene.Scene.ParticleEngines)
