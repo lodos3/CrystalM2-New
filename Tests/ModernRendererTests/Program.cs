@@ -69,6 +69,22 @@ static class Program
         Assertions.Equal(-3, frame.OffsetY, "Original sprite draw offset must be preserved.");
         Assertions.True(frame.Bgra.SequenceEqual(source), "Gzip BGRA pixels must be preserved.");
         Assertions.True(frame.Mask == null, "Unmasked frames stay unmasked.");
+
+        // Mir3 two-layer sprites carry an independent authored auxiliary mask.
+        // The new renderer must decode it without altering the baked base RGB.
+        using var maskedArchive = new MemoryStream(MakeTestLib(source, includeMask: true));
+        using var maskedLib = new LegacyMirLibReader(maskedArchive);
+        LegacySpriteFrame layered = maskedLib.ReadFrame(0, includeMask: true);
+        Assertions.True(layered.Bgra.SequenceEqual(source),
+            "Reading a mask must not rewrite the base image.");
+        Assertions.True(layered.Mask != null && layered.Mask.Bgra.SequenceEqual(source),
+            "Second-layer mask BGRA must decompress independently.");
+        Assertions.Equal(4, layered.Mask!.OffsetX,
+            "Authored mask offsets must be preserved.");
+        Assertions.Equal(-6, layered.Mask.OffsetY,
+            "Authored mask offsets must be preserved.");
+        Assertions.True(maskedLib.ReadFrame(0).Mask == null,
+            "Mask decoding must remain opt-in.");
         Assertions.True(file.CanRead, "LeaveOpen must respect stream ownership.");
         Assertions.True(!lib.TryReadFrame(-1, out _) &&
                         !lib.TryReadFrame(4, out _), "Invalid image indices must fail safely.");
@@ -86,11 +102,17 @@ static class Program
         Console.WriteLine("Baked-art fidelity, order-preserving batching and real LIB layout checks passed.");
     }
 
-    private static byte[] MakeTestLib(byte[] bgra)
+    private static byte[] MakeTestLib(byte[] bgra, bool includeMask = false)
     {
         using var compressed = new MemoryStream();
         using (var gzip = new GZipStream(compressed, CompressionLevel.NoCompression, leaveOpen: true))
             gzip.Write(bgra);
+        using var compressedMask = new MemoryStream();
+        if (includeMask)
+        {
+            using var gzip = new GZipStream(compressedMask, CompressionLevel.NoCompression, leaveOpen: true);
+            gzip.Write(bgra);
+        }
 
         using var raw = new MemoryStream();
         using (var writer = new BinaryWriter(raw, System.Text.Encoding.UTF8, leaveOpen: true))
@@ -105,9 +127,18 @@ static class Program
             writer.Write((short)-3);
             writer.Write((short)0); // baked shadow offset x
             writer.Write((short)0); // baked shadow offset y
-            writer.Write((byte)0);
+            writer.Write(includeMask ? (byte)0x80 : (byte)0);
             writer.Write(checked((int)compressed.Length));
             writer.Write(compressed.ToArray());
+            if (includeMask)
+            {
+                writer.Write((short)2); // mask width
+                writer.Write((short)2); // mask height
+                writer.Write((short)4); // authored mask x
+                writer.Write((short)-6); // authored mask y
+                writer.Write(checked((int)compressedMask.Length));
+                writer.Write(compressedMask.ToArray());
+            }
         }
         return raw.ToArray();
     }
