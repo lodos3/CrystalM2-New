@@ -139,13 +139,22 @@ namespace Client.MirControls
         #endregion
 
         #region Size
+        protected virtual int LayoutIndex => Index;
         public override Size Size
         {
             set { base.Size = value; }
             get
             {
-                if (AutoSize && Library != null && Index >= 0)
-                    return Library.GetTrueSize(Index);
+                if (Skin != UiSurface.None && base.Size.Width > 0 && base.Size.Height > 0)
+                    return base.Size;
+                int frame = Skin == UiSurface.None ? Index : LayoutIndex;
+                if (AutoSize && Library != null && frame >= 0)
+                {
+                    // Chrome needs only header dimensions, never an uploaded
+                    // full-window bitmap or a scan of its alpha pixels.
+                    Size measured = Skin == UiSurface.None ? Library.GetTrueSize(frame) : Library.GetSize(frame);
+                    if (!measured.IsEmpty) return measured;
+                }
                 return base.Size;
             }
         }
@@ -154,7 +163,7 @@ namespace Client.MirControls
         {
             get
             {
-                if (Library != null && Index >= 0)
+                if (Skin == UiSurface.None && Library != null && Index >= 0)
                     return Library.GetTrueSize(Index);
                 return base.TrueSize;
             }
@@ -173,6 +182,12 @@ namespace Client.MirControls
         protected internal override void DrawControl()
         {
             base.DrawControl();
+
+            if (Skin != UiSurface.None)
+            {
+                if (DrawImage) DrawSkin();
+                return;
+            }
 
             if (DrawImage && Library != null)
             {
@@ -194,7 +209,8 @@ namespace Client.MirControls
 
         public override bool IsMouseOver(Point p)
         {
-            return base.IsMouseOver(p) && (!_pixelDetect || Library.VisiblePixel(Index, p.Subtract(DisplayLocation),true) || Moving);
+            return base.IsMouseOver(p) && (Skin != UiSurface.None || !_pixelDetect ||
+                Library.VisiblePixel(Index, p.Subtract(DisplayLocation),true) || Moving);
         }
 
         #region Disposable

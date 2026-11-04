@@ -8,7 +8,7 @@ using C = ClientPackets;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class BigMapDialog : MirImageControl
+    public sealed class BigMapDialog : MirPanel
     {
         MirLabel CoordinateLabel, TitleLabel;
         public MirButton CloseButton, ScrollUpButton, ScrollDownButton, ScrollBar, WorldButton, MyLocationButton, TeleportToButton, SearchButton;
@@ -99,6 +99,9 @@ namespace Client.MirScenes.Dialogs
 
             ScrollUpButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
+                Hint = "Scroll Up",
                 Index = 197,
                 HoverIndex = 198,
                 PressedIndex = 199,
@@ -111,6 +114,9 @@ namespace Client.MirScenes.Dialogs
 
             ScrollDownButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Down,
+                Hint = "Scroll Down",
                 Index = 207,
                 HoverIndex = 208,
                 PressedIndex = 209,
@@ -123,6 +129,8 @@ namespace Client.MirScenes.Dialogs
 
             ScrollBar = new MirButton
             {
+                Skin = UiSurface.ScrollThumb,
+                Glyph = UiGlyph.Grip,
                 Index = 205,
                 HoverIndex = 206,
                 PressedIndex = 206,
@@ -147,6 +155,9 @@ namespace Client.MirScenes.Dialogs
 
             WorldButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Map,
+                Hint = "World",
                 Index = 827,
                 HoverIndex = 828,
                 PressedIndex = 829,
@@ -159,6 +170,9 @@ namespace Client.MirScenes.Dialogs
 
             MyLocationButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Map,
+                Hint = "My Location",
                 Index = 824,
                 HoverIndex = 825,
                 PressedIndex = 826,
@@ -172,6 +186,8 @@ namespace Client.MirScenes.Dialogs
 
             TeleportToButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Teleport To",
                 Index = 821,
                 HoverIndex = 822,
                 PressedIndex = 823,
@@ -186,6 +202,8 @@ namespace Client.MirScenes.Dialogs
 
             SearchButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Search,
                 Index = 1340,
                 HoverIndex = 1341,
                 PressedIndex = 1342,
@@ -240,6 +258,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(Size.Width - 25, 3),

@@ -73,6 +73,9 @@ namespace Client.MirControls
 
         public MirCheckBox()
         {
+            Skin = UiSurface.Slot;
+            AutoSize = false;
+            Size = new Size(14, 14);
             TickedIndex = -1;
             UnTickedIndex = -1;
             Index = -1;
@@ -90,6 +93,16 @@ namespace Client.MirControls
                 Parent = this
             };
         }
+
+        protected internal override void DrawControl()
+        {
+            Selected = Checked;
+            Glyph = Checked ? UiGlyph.Check : UiGlyph.None;
+            base.DrawControl();
+        }
+
+        public override bool IsMouseOver(Point p) => base.IsMouseOver(p) ||
+            Visible && Enabled && !IsDisposed && _label?.Visible == true && _label.DisplayRectangle.Contains(p);
 
         private void MirCheckBox_Click(object sender, EventArgs e)
         {

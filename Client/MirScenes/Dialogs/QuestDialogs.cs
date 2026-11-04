@@ -11,7 +11,7 @@ using Font = System.Drawing.Font;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class QuestListDialog : MirImageControl
+    public sealed class QuestListDialog : MirPanel
     {
         private readonly MirButton _acceptButton, _finishButton;
         private MirLabel _availableQuestLabel;
@@ -50,6 +50,9 @@ namespace Client.MirScenes.Dialogs
 
             MirButton upQuestButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
+                Hint = "Up Quest",
                 Index = 951,
                 HoverIndex = 952,
                 PressedIndex = 953,
@@ -75,6 +78,9 @@ namespace Client.MirScenes.Dialogs
 
             MirButton downQuestButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Down,
+                Hint = "Down Quest",
                 Index = 957,
                 HoverIndex = 958,
                 PressedIndex = 959,
@@ -103,6 +109,8 @@ namespace Client.MirScenes.Dialogs
 
             _acceptButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Accept",
                 Index = 270,
                 HoverIndex = 271,
                 PressedIndex = 272,
@@ -121,6 +129,8 @@ namespace Client.MirScenes.Dialogs
 
             _finishButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Finish",
                 Index = 273,
                 HoverIndex = 274,
                 PressedIndex = 275,
@@ -147,6 +157,8 @@ namespace Client.MirScenes.Dialogs
 
             MirButton leaveButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Leave",
                 Index = 276,
                 HoverIndex = 277,
                 PressedIndex = 278,
@@ -163,6 +175,9 @@ namespace Client.MirScenes.Dialogs
 
             MirButton upButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
+                Hint = "Up",
                 Index = 197,
                 HoverIndex = 198,
                 PressedIndex = 199,
@@ -176,6 +191,9 @@ namespace Client.MirScenes.Dialogs
 
             MirButton downButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Down,
+                Hint = "Down",
                 Index = 207,
                 HoverIndex = 208,
                 Library = Libraries.Prguse2,
@@ -189,6 +207,8 @@ namespace Client.MirScenes.Dialogs
 
             MirButton positionBar = new MirButton
             {
+                Skin = UiSurface.ScrollThumb,
+                Glyph = UiGlyph.Grip,
                 Index = 205,
                 HoverIndex = 206,
                 PressedIndex = 206,
@@ -234,6 +254,9 @@ namespace Client.MirScenes.Dialogs
 
             MirButton closeButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 Index = 360,
                 HoverIndex = 361,
                 PressedIndex = 362,
@@ -246,6 +269,9 @@ namespace Client.MirScenes.Dialogs
 
             MirButton helpButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Help,
+                Hint = "Help",
                 Index = 257,
                 HoverIndex = 258,
                 PressedIndex = 259,
@@ -459,7 +485,7 @@ namespace Client.MirScenes.Dialogs
         }
 
     }
-    public sealed class QuestDetailDialog : MirImageControl
+    public sealed class QuestDetailDialog : MirPanel
     {
         private readonly MirButton _shareButton, _pauseButton, _cancelButton;
 
@@ -487,6 +513,9 @@ namespace Client.MirScenes.Dialogs
 
             MirButton upButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
+                Hint = "Up",
                 Index = 197,
                 HoverIndex = 198,
                 PressedIndex = 199,
@@ -500,6 +529,9 @@ namespace Client.MirScenes.Dialogs
 
             MirButton downButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Down,
+                Hint = "Down",
                 Index = 207,
                 HoverIndex = 208,
                 Library = Libraries.Prguse2,
@@ -513,6 +545,8 @@ namespace Client.MirScenes.Dialogs
 
             MirButton positionBar = new MirButton
             {
+                Skin = UiSurface.ScrollThumb,
+                Glyph = UiGlyph.Grip,
                 Index = 205,
                 HoverIndex = 206,
                 PressedIndex = 206,
@@ -551,6 +585,8 @@ namespace Client.MirScenes.Dialogs
 
             _shareButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Share",
                 Index = 616,
                 HoverIndex = 617,
                 PressedIndex = 618,
@@ -566,6 +602,8 @@ namespace Client.MirScenes.Dialogs
 
             _pauseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Pause",
                 Index = 270,
                 HoverIndex = 271,
                 PressedIndex = 272,
@@ -578,6 +616,8 @@ namespace Client.MirScenes.Dialogs
 
             _cancelButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Cancel",
                 Index = 203,
                 HoverIndex = 204,
                 PressedIndex = 205,
@@ -602,6 +642,9 @@ namespace Client.MirScenes.Dialogs
 
             MirButton closeButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 Index = 360,
                 HoverIndex = 361,
                 PressedIndex = 362,
@@ -638,7 +681,7 @@ namespace Client.MirScenes.Dialogs
         }
 
     }
-    public sealed class QuestDiaryDialog : MirImageControl
+    public sealed class QuestDiaryDialog : MirPanel
     {
         public List<ClientQuestProgress> Quests = new List<ClientQuestProgress>();
         public List<QuestGroupQuestItem> TaskGroups = new List<QuestGroupQuestItem>();
@@ -674,6 +717,9 @@ namespace Client.MirScenes.Dialogs
 
             _closeButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 Index = 193,
                 HoverIndex = 194,
                 PressedIndex = 195,
@@ -686,6 +732,9 @@ namespace Client.MirScenes.Dialogs
 
             MirButton closeButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 Index = 360,
                 HoverIndex = 361,
                 PressedIndex = 362,
@@ -792,7 +841,7 @@ namespace Client.MirScenes.Dialogs
             ClearLog();
         }
     }
-    public sealed class QuestTrackingDialog : MirImageControl
+    public sealed class QuestTrackingDialog : MirPanel
     {
         public List<int> TrackedQuestsIds = new List<int>();
         public List<MirLabel> TaskLines = new List<MirLabel>();
@@ -1773,6 +1822,8 @@ namespace Client.MirScenes.Dialogs
 
             _expandButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Expand",
                 Index = Expanded ? 917 : 918,
                 Library = Libraries.Prguse,
                 Parent = this,

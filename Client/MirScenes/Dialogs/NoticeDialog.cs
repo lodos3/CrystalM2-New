@@ -7,7 +7,7 @@ using System.Diagnostics;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class NoticeDialog : MirImageControl
+    public sealed class NoticeDialog : MirPanel
     {
         public static Regex C = new Regex(@"{((.*?)\/(.*?))}");
         public static Regex L = new Regex(@"\(((.*?)\/(.*?))\)");
@@ -50,6 +50,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 Index = 360,
                 HoverIndex = 361,
                 PressedIndex = 362,
@@ -62,6 +65,8 @@ namespace Client.MirScenes.Dialogs
 
             OkButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "OK",
                 Enabled = true,
                 HoverIndex = 194,
                 Index = 193,
@@ -74,6 +79,9 @@ namespace Client.MirScenes.Dialogs
 
             UpButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
+                Hint = "Up",
                 Index = 470,
                 HoverIndex = 471,
                 PressedIndex = 472,
@@ -96,6 +104,9 @@ namespace Client.MirScenes.Dialogs
 
             DownButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Down,
+                Hint = "Down",
                 Index = 473,
                 HoverIndex = 474,
                 Library = Libraries.Prguse2,
@@ -118,6 +129,8 @@ namespace Client.MirScenes.Dialogs
 
             PositionBar = new MirButton
             {
+                Skin = UiSurface.ScrollThumb,
+                Glyph = UiGlyph.Grip,
                 Index = 205,
                 HoverIndex = 206,
                 PressedIndex = 206,

@@ -320,47 +320,28 @@ namespace Client.MirScenes
                 };
         }
 
-        public sealed class LoginDialog : MirImageControl
+        public sealed class LoginDialog : MirPanel
         {
-            public MirImageControl TitleLabel, AccountIDLabel, PassLabel;
+            public MirLabel TitleLabel, AccountIDLabel, PassLabel;
             public MirButton AccountButton, CloseButton, OKButton, PassButton, ViewKeyButton;
             public MirTextBox AccountIDTextBox, PasswordTextBox;
             private bool _accountIDValid, _passwordValid;
 
             public LoginDialog()
             {
-                Index = 1084;
-                Library = Libraries.Prguse;
-                Location = new Point((Settings.ScreenWidth - Size.Width)/2, (Settings.ScreenHeight - Size.Height)/2);
-                PixelDetect = false;
+                AutoSize = false;
                 Size = new Size(328, 220);
-
-                TitleLabel = new MirImageControl
-                    {
-                        Index = 30,
-                        Library = Libraries.Title,
-                        Parent = this,
-                    };
-                TitleLabel.Location = new Point((Size.Width - TitleLabel.Size.Width)/2, 12);
-
-                AccountIDLabel = new MirImageControl
-                    {
-                        Index = 31,
-                        Library = Libraries.Title,
-                        Parent = this,
-                        Location = new Point(52, 83),
-                    };
-
-                PassLabel = new MirImageControl
-                    {
-                        Index = 32,
-                        Library = Libraries.Title,
-                        Parent = this,
-                        Location = new Point(43, 105)
-                    };
+                Location = new Point((Settings.ScreenWidth - Size.Width) / 2, (Settings.ScreenHeight - Size.Height) / 2);
+                PanelTitle = "";
+                TitleLabel = AddCaption(this, "Sign in", new Rectangle(24, 12, 280, 24), false);
+                TitleLabel.DrawFormat = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter;
+                AccountIDLabel = AddCaption(this, "Account ID", new Rectangle(22, 80, 86, 20));
+                PassLabel = AddCaption(this, "Password", new Rectangle(22, 102, 86, 20));
 
                 OKButton = new MirButton
                     {
+                        Skin = UiSurface.Button,
+                        Text = "Sign in",
                         Enabled = false,
                         Size = new Size(42,42),
                         HoverIndex = 321,
@@ -374,6 +355,8 @@ namespace Client.MirScenes
 
                 AccountButton = new MirButton
                     {
+                        Skin = UiSurface.Button,
+                        Text = "Create account",
                         HoverIndex = 324,
                         Index = 323,
                         Library = Libraries.Title,
@@ -384,6 +367,8 @@ namespace Client.MirScenes
 
                 PassButton = new MirButton
                     {
+                        Skin = UiSurface.Button,
+                        Text = "Change password",
                         HoverIndex = 327,
                         Index = 326,
                         Library = Libraries.Title,
@@ -394,6 +379,8 @@ namespace Client.MirScenes
 
                 ViewKeyButton = new MirButton
                 {
+                    Skin = UiSurface.Button,
+                    Text = "Show",
                     HoverIndex = 333,
                     Index = 332,
                     Library = Libraries.Title,
@@ -404,6 +391,9 @@ namespace Client.MirScenes
 
                 CloseButton = new MirButton
                     {
+                        Skin = UiSurface.Button,
+                        Glyph = UiGlyph.Close,
+                        Hint = "Close",
                         HoverIndex = 330,
                         Index = 329,
                         Library = Libraries.Title,
@@ -550,7 +540,7 @@ namespace Client.MirScenes
             #endregion
         }
 
-        public sealed class InputKeyDialog : MirImageControl
+        public sealed class InputKeyDialog : MirPanel
         {
             public readonly MirButton KeyEscButton, KeyDelButton, KeyRandButton, KeyEnterButton;
 
@@ -572,6 +562,7 @@ namespace Client.MirScenes
 
                 KeyEscButton = new MirButton
                 {
+                    Skin = UiSurface.Button,
                     Text = GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.BtnEsc),
                     HoverIndex = 301,
                     Index = 300,
@@ -585,6 +576,7 @@ namespace Client.MirScenes
 
                 KeyDelButton = new MirButton
                 {
+                    Skin = UiSurface.Button,
                     Text = GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.BtnDelete),
                     HoverIndex = 304,
                     Index = 303,
@@ -598,6 +590,7 @@ namespace Client.MirScenes
 
                 KeyEnterButton = new MirButton
                 {
+                    Skin = UiSurface.Button,
                     Text = GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.BtnEnter),
                     HoverIndex = 307,
                     Index = 306,
@@ -617,6 +610,7 @@ namespace Client.MirScenes
 
                 KeyRandButton = new MirButton
                 {
+                    Skin = UiSurface.Button,
                     Text = GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.BtnRandom),
                     HoverIndex = 310,
                     Index = 309,
@@ -655,6 +649,7 @@ namespace Client.MirScenes
 
                     MirButton numButton = new MirButton
                     {
+                        Skin = UiSurface.Button,
                         HoverIndex = 1082,
                         Index = 1081,
                         Size = new Size(32, 30),
@@ -676,6 +671,7 @@ namespace Client.MirScenes
 
                     MirButton alphButton = new MirButton
                     {
+                        Skin = UiSurface.Button,
                         HoverIndex = 1082,
                         Index = 1081,
                         Size = new Size(32, 30),
@@ -743,7 +739,7 @@ namespace Client.MirScenes
             #endregion
         }
 
-        public sealed class NewAccountDialog : MirImageControl
+        public sealed class NewAccountDialog : MirPanel
         {
             public MirButton OKButton, CancelButton;
 
@@ -777,6 +773,8 @@ namespace Client.MirScenes
 
                 CancelButton = new MirButton
                 {
+                    Skin = UiSurface.Button,
+                    Text = "Cancel",
                     HoverIndex = 204,
                     Index = 203,
                     Library = Libraries.Title,
@@ -788,6 +786,8 @@ namespace Client.MirScenes
 
                 OKButton = new MirButton
                 {
+                    Skin = UiSurface.Button,
+                    Text = "OK",
                     Enabled = false,
                     HoverIndex = 201,
                     Index = 200,
@@ -801,7 +801,7 @@ namespace Client.MirScenes
                 Password1TextBox = new MirTextBox
                 {
                     Border = true,
-                    BorderColour = Color.Gray,
+                    BorderColour = DarkFantasyPalette.Border,
                     Location = new Point(226, 129),
                     MaxLength = Globals.MaxPasswordLength,
                     Parent = this,
@@ -815,7 +815,7 @@ namespace Client.MirScenes
                 Password2TextBox = new MirTextBox
                 {
                     Border = true,
-                    BorderColour = Color.Gray,
+                    BorderColour = DarkFantasyPalette.Border,
                     Location = new Point(226, 155),
                     MaxLength = Globals.MaxPasswordLength,
                     Parent = this,
@@ -829,7 +829,7 @@ namespace Client.MirScenes
                 UserNameTextBox = new MirTextBox
                 {
                     Border = true,
-                    BorderColour = Color.Gray,
+                    BorderColour = DarkFantasyPalette.Border,
                     Location = new Point(226, 189),
                     MaxLength = 20,
                     Parent = this,
@@ -843,7 +843,7 @@ namespace Client.MirScenes
                 BirthDateTextBox = new MirTextBox
                 {
                     Border = true,
-                    BorderColour = Color.Gray,
+                    BorderColour = DarkFantasyPalette.Border,
                     Location = new Point(226, 215),
                     MaxLength = 10,
                     Parent = this,
@@ -856,7 +856,7 @@ namespace Client.MirScenes
                 QuestionTextBox = new MirTextBox
                 {
                     Border = true,
-                    BorderColour = Color.Gray,
+                    BorderColour = DarkFantasyPalette.Border,
                     Location = new Point(226, 250),
                     MaxLength = 30,
                     Parent = this,
@@ -869,7 +869,7 @@ namespace Client.MirScenes
                 AnswerTextBox = new MirTextBox
                 {
                     Border = true,
-                    BorderColour = Color.Gray,
+                    BorderColour = DarkFantasyPalette.Border,
                     Location = new Point(226, 276),
                     MaxLength = 30,
                     Parent = this,
@@ -882,7 +882,7 @@ namespace Client.MirScenes
                 EMailTextBox = new MirTextBox
                 {
                     Border = true,
-                    BorderColour = Color.Gray,
+                    BorderColour = DarkFantasyPalette.Border,
                     Location = new Point(226, 311),
                     MaxLength = 50,
                     Parent = this,
@@ -906,7 +906,7 @@ namespace Client.MirScenes
                 AccountIDTextBox = new MirTextBox
                 {
                     Border = true,
-                    BorderColour = Color.Gray,
+                    BorderColour = DarkFantasyPalette.Border,
                     Location = new Point(226, 103),
                     MaxLength = Globals.MaxAccountIDLength,
                     Parent = this,
@@ -1159,7 +1159,7 @@ namespace Client.MirScenes
             #endregion
         }
 
-        public sealed class ChangePasswordDialog : MirImageControl
+        public sealed class ChangePasswordDialog : MirPanel
         {
             public readonly MirButton OKButton,
                                       CancelButton;
@@ -1182,6 +1182,8 @@ namespace Client.MirScenes
 
                 CancelButton = new MirButton
                 {
+                    Skin = UiSurface.Button,
+                    Text = "Cancel",
                     HoverIndex = 111,
                     Index = 110,
                     Library = Libraries.Title,
@@ -1193,6 +1195,8 @@ namespace Client.MirScenes
 
                 OKButton = new MirButton
                 {
+                    Skin = UiSurface.Button,
+                    Text = "OK",
                     Enabled = false,
                     HoverIndex = 108,
                     Index = 107,
@@ -1207,7 +1211,7 @@ namespace Client.MirScenes
                 AccountIDTextBox = new MirTextBox
                 {
                     Border = true,
-                    BorderColour = Color.Gray,
+                    BorderColour = DarkFantasyPalette.Border,
                     Location = new Point(178, 75),
                     MaxLength = Globals.MaxAccountIDLength,
                     Parent = this,
@@ -1220,7 +1224,7 @@ namespace Client.MirScenes
                 CurrentPasswordTextBox = new MirTextBox
                 {
                     Border = true,
-                    BorderColour = Color.Gray,
+                    BorderColour = DarkFantasyPalette.Border,
                     Location = new Point(178, 113),
                     MaxLength = Globals.MaxPasswordLength,
                     Parent = this,
@@ -1233,7 +1237,7 @@ namespace Client.MirScenes
                 NewPassword1TextBox = new MirTextBox
                 {
                     Border = true,
-                    BorderColour = Color.Gray,
+                    BorderColour = DarkFantasyPalette.Border,
                     Location = new Point(178, 151),
                     MaxLength = Globals.MaxPasswordLength,
                     Parent = this,
@@ -1246,7 +1250,7 @@ namespace Client.MirScenes
                 NewPassword2TextBox = new MirTextBox
                 {
                     Border = true,
-                    BorderColour = Color.Gray,
+                    BorderColour = DarkFantasyPalette.Border,
                     Location = new Point(178, 188),
                     MaxLength = Globals.MaxPasswordLength,
                     Parent = this,

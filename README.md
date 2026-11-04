@@ -7,6 +7,7 @@ lighting, offsets and masks.
 
 See [the current renderer guide](Docs/Direct3D11-BakedArt-Migration.md) for
 build commands, visual settings, shadow permissions and verification limits.
+The in-game interface uses [generated dark fantasy nine-slice chrome](Docs/Procedural-Dark-Fantasy-UI.md).
 
 <h1 align="center">
 Legend of Mir 2 - Official Public Crystal Source

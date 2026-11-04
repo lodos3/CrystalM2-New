@@ -7,7 +7,7 @@ using C = ClientPackets;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class InventoryDialog : MirImageControl
+    public sealed class InventoryDialog : MirPanel
     {
         public MirImageControl WeightBar;
         public MirImageControl[] LockBar = new MirImageControl[10];
@@ -24,16 +24,18 @@ namespace Client.MirScenes.Dialogs
 
         public InventoryDialog()
         {
-            Index = 196;
-            Library = Libraries.Title;
+            AutoSize = false;
+            Size = new Size(318, 244);
             Movable = true;
             Sort = true;
             Visible = false;
+            PanelTitle = "";
 
             WeightBar = new MirImageControl
             {
-                Index = 24,
-                Library = Libraries.Prguse,
+                Skin = UiSurface.ScrollTrack,
+                AutoSize = false,
+                Size = new Size(104, 7),
                 Location = new Point(182, 217),
                 Parent = this,
                 DrawImage = false,
@@ -42,6 +44,8 @@ namespace Client.MirScenes.Dialogs
 
             ItemButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Bag I",
                 Index = 197,
                 Library = Libraries.Title,
                 Location = new Point(6, 7),
@@ -49,10 +53,13 @@ namespace Client.MirScenes.Dialogs
                 Size = new Size(72, 23),
                 Sound = SoundList.ButtonA,
             };
+            ItemButton.Selected = true;
             ItemButton.Click += Button_Click;
 
             ItemButton2 = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Bag II",
                 Index = 738,
                 Library = Libraries.Title,
                 Location = new Point(76, 7),
@@ -64,6 +71,8 @@ namespace Client.MirScenes.Dialogs
 
             QuestButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Quests",
                 Index = 739,
                 Library = Libraries.Title,
                 Location = new Point(146, 7),
@@ -75,6 +84,8 @@ namespace Client.MirScenes.Dialogs
 
             AddButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Expand bag",
                 Index = 483,
                 HoverIndex = 484,
                 PressedIndex = 485,
@@ -100,6 +111,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(289, 3),
@@ -112,6 +126,9 @@ namespace Client.MirScenes.Dialogs
 
             DelItemButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Trash,
+                Hint = "Delete item",
                 Index = 366,
                 HoverIndex = 367,
                 PressedIndex = 368,
@@ -125,11 +142,14 @@ namespace Client.MirScenes.Dialogs
             _deleteCursorIcon = new MirImageControl
             {
                 Parent = GameScene.Scene,
-                Library = Libraries.Prguse2,
-                Index = 366,
+                AutoSize = false,
+                Size = DelItemButton.Size,
+                DrawImage = false,
                 NotControl = true,
                 Visible = false
             };
+            _deleteCursorIcon.AfterDraw += (o, e) => DXManager.Device.Ui.Glyph(UiGlyph.Trash,
+                _deleteCursorIcon.DisplayRectangle, DarkFantasyPalette.Health);
 
             GoldLabel = new MirLabel
             {
@@ -138,6 +158,7 @@ namespace Client.MirScenes.Dialogs
                 Size = new Size(111, 14),
                 Sound = SoundList.Gold,
             };
+            AddCaption(this, "Gold", new Rectangle(9, 210, 30, 17));
             GoldLabel.Click += (o, e) =>
             {
                 if (GameScene.SelectedCell == null)
@@ -196,13 +217,20 @@ namespace Client.MirScenes.Dialogs
             {
                 LockBar[i] = new MirImageControl
                 {
-                    Index = 307,
-                    Library = Libraries.Prguse2,
+                    Skin = UiSurface.Inset,
+                    AutoSize = false,
+                    Size = new Size(146, 32),
                     Location = new Point(9 + i % 2 * 148, 37 + i / 2 * 33),
                     Parent = this,
                     DrawImage = true,
                     NotControl = true,
                     Visible = false,
+                };
+                LockBar[i].AfterDraw += (o, e) =>
+                {
+                    var row = (MirImageControl)o;
+                    DXManager.Device.Ui.Glyph(UiGlyph.Lock, new Rectangle(row.DisplayLocation.X + 65,
+                        row.DisplayLocation.Y + 8, 16, 16), DarkFantasyPalette.MutedText);
                 };
             }
 
@@ -254,6 +282,8 @@ namespace Client.MirScenes.Dialogs
                     ItemButton.Index = 737;
                     ItemButton2.Index = 738;
                     QuestButton.Index = 198;
+                    ItemButton.Selected = ItemButton2.Selected = false;
+                    QuestButton.Selected = true;
 
                     if (GameScene.User.Inventory.Length == 46)
                     {
@@ -339,6 +369,8 @@ namespace Client.MirScenes.Dialogs
             Reset();
 
             ItemButton.Index = 197;
+            ItemButton.Selected = true;
+            ItemButton2.Selected = QuestButton.Selected = false;
             ItemButton2.Index = 738;
             QuestButton.Index = 739;
 
@@ -362,6 +394,8 @@ namespace Client.MirScenes.Dialogs
 
             ItemButton.Index = 737;
             ItemButton2.Index = 168;
+            ItemButton2.Selected = true;
+            ItemButton.Selected = QuestButton.Selected = false;
             QuestButton.Index = 739;
 
             foreach (var grid in Grid)
@@ -395,35 +429,10 @@ namespace Client.MirScenes.Dialogs
 
         private void WeightBar_BeforeDraw(object sender, EventArgs e)
         {
-            if (WeightBar.Library == null) return;
-
-            double percent = MapObject.User.CurrentBagWeight / (double)MapObject.User.Stats[Stat.BagWeight];
-            if (percent > 1) percent = 1;
-            if (percent <= 0) return;
-
-            // Weight bar art based on fill
-            if (percent <= 0.50)
-            {
-                WeightBar.Library = Libraries.Prguse;
-                WeightBar.Index = 24;
-            }
-            else if (percent <= 0.75)
-            {
-                WeightBar.Library = Libraries.UI_32bit;
-                WeightBar.Index = 471;
-            }
-            else
-            {
-                WeightBar.Library = Libraries.UI_32bit;
-                WeightBar.Index = 470;
-            }
-
-            Rectangle section = new Rectangle
-            {
-                Size = new Size((int)((WeightBar.Size.Width - 3) * percent), WeightBar.Size.Height)
-            };
-
-            WeightBar.Library.Draw(WeightBar.Index, section, WeightBar.DisplayLocation, Color.White, false);
+            if (GameScene.User == null) return;
+            double fraction = GameScene.User.CurrentBagWeight / (double)GameScene.User.Stats[Stat.BagWeight];
+            DXManager.Device.Ui.Progress(WeightBar.DisplayRectangle, fraction,
+                fraction > 0.75 ? DarkFantasyPalette.Health : DarkFantasyPalette.Experience);
         }
 
 
@@ -507,7 +516,7 @@ namespace Client.MirScenes.Dialogs
         {
             _deleteMode = on;
 
-            DelItemButton.Index = on ? 368 : 366;
+            DelItemButton.Selected = on;
 
             if (_deleteCursorIcon != null)
             {
@@ -597,7 +606,7 @@ namespace Client.MirScenes.Dialogs
             Network.Enqueue(new C.DeleteItem { UniqueID = uniqueId, Count = count, HeroInventory = heroInventory });
         }
     }
-    public sealed class BeltDialog : MirImageControl
+    public sealed class BeltDialog : MirPanel
     {
         public MirLabel[] Key = new MirLabel[6];
         public MirButton CloseButton, RotateButton;
@@ -612,7 +621,6 @@ namespace Client.MirScenes.Dialogs
             Visible = true;
             Location = new Point(GameScene.Scene.MainDialog.Location.X + 230, Settings.ScreenHeight - 150);
 
-            BeforeDraw += BeltPanel_BeforeDraw;
 
             for (int i = 0; i < Key.Length; i++)
             {
@@ -640,6 +648,8 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
                 HoverIndex = 1924,
                 Index = 1923,
                 Location = new Point(222, 19),
@@ -666,14 +676,6 @@ namespace Client.MirScenes.Dialogs
                 };
             }
 
-        }
-
-        private void BeltPanel_BeforeDraw(object sender, EventArgs e)
-        {
-            //if Transparent return
-
-            if (Libraries.Prguse != null)
-                Libraries.Prguse.Draw(Index + 1, DisplayLocation, Color.White, false, 0.5F);
         }
 
         public void Flip()

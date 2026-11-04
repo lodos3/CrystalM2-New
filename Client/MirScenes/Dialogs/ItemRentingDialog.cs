@@ -7,7 +7,7 @@ using C = ClientPackets;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class ItemRentingDialog : MirImageControl
+    public sealed class ItemRentingDialog : MirPanel
     {
         public static UserItem RentalItem;
 
@@ -30,6 +30,8 @@ namespace Client.MirScenes.Dialogs
 
             _confirmButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Confirm",
                 Index = 10,
                 HoverIndex = 11,
                 Location = new Point(130, 76),
@@ -49,6 +51,9 @@ namespace Client.MirScenes.Dialogs
 
             var closeButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(180, 3),
@@ -66,6 +71,9 @@ namespace Client.MirScenes.Dialogs
 
             _lockButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Lock,
+                Hint = "Lock",
                 Index = 250,
                 HoverIndex = 251,
                 Location = new Point(18, 76),
@@ -87,6 +95,8 @@ namespace Client.MirScenes.Dialogs
 
             _setRentalPeriodButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Duration",
                 Index = 7,
                 HoverIndex = 8,
                 Location = new Point(46, 76),
@@ -218,7 +228,7 @@ namespace Client.MirScenes.Dialogs
         }
     }
 
-    public sealed class GuestItemRentingDialog : MirImageControl
+    public sealed class GuestItemRentingDialog : MirPanel
     {
         public static UserItem GuestLoanItem;
 
@@ -241,6 +251,9 @@ namespace Client.MirScenes.Dialogs
 
             _lockButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Lock,
+                Hint = "Lock",
                 Index = 250,
                 Location = new Point(18, 76),
                 Size = new Size(28, 25),
@@ -251,6 +264,8 @@ namespace Client.MirScenes.Dialogs
 
             _setRentalPeriodButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Duration",
                 Index = 7,
                 Location = new Point(46, 76),
                 Size = new Size(84, 28),
@@ -261,6 +276,8 @@ namespace Client.MirScenes.Dialogs
 
             _confirmButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Confirm",
                 Index = 10,
                 Location = new Point(130, 76),
                 Size = new Size(58, 28),

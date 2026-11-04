@@ -6,7 +6,7 @@ using C = ClientPackets;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class TradeDialog : MirImageControl
+    public sealed class TradeDialog : MirPanel
     {
         public MirItemCell[] Grid;
         public MirLabel NameLabel, GoldLabel;
@@ -24,6 +24,8 @@ namespace Client.MirScenes.Dialogs
             #region Buttons
             ConfirmButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Lock",
                 Index = 520,
                 HoverIndex = 521,
                 Location = new Point(135, 120),
@@ -41,6 +43,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(Size.Width - 23, 3),
@@ -122,6 +127,8 @@ namespace Client.MirScenes.Dialogs
         public void ChangeLockState(bool lockState, bool cancelled = false)
         {
             GameScene.User.TradeLocked = lockState;
+            ConfirmButton.Selected = lockState;
+            ConfirmButton.Text = lockState ? "Unlock" : "Lock";
 
             if (GameScene.User.TradeLocked)
             {
@@ -191,7 +198,7 @@ namespace Client.MirScenes.Dialogs
             return null;
         }
     }
-    public sealed class GuestTradeDialog : MirImageControl
+    public sealed class GuestTradeDialog : MirPanel
     {
         public MirItemCell[] GuestGrid;
         public static UserItem[] GuestItems = new UserItem[10];

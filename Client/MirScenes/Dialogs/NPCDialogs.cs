@@ -13,7 +13,7 @@ using System.Diagnostics;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class NPCDialog : MirImageControl
+    public sealed class NPCDialog : MirPanel
     {
         public static Regex R = new Regex(@"<((.*?)\/(\@.*?))>");
         public static Regex C = new Regex(@"{((.*?)\/(.*?))}");
@@ -77,6 +77,9 @@ namespace Client.MirScenes.Dialogs
 
             UpButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
+                Hint = "Up",
                 Index = 197,
                 HoverIndex = 198,
                 PressedIndex = 199,
@@ -99,6 +102,9 @@ namespace Client.MirScenes.Dialogs
 
             DownButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Down,
+                Hint = "Down",
                 Index = 207,
                 HoverIndex = 208,
                 Library = Libraries.Prguse2,
@@ -121,6 +127,8 @@ namespace Client.MirScenes.Dialogs
 
             PositionBar = new MirButton
             {
+                Skin = UiSurface.ScrollThumb,
+                Glyph = UiGlyph.Grip,
                 Index = 205,
                 HoverIndex = 206,
                 PressedIndex = 206,
@@ -135,6 +143,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(413, 3),
@@ -147,6 +158,9 @@ namespace Client.MirScenes.Dialogs
 
             HelpButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Help,
+                Hint = "Help",
                 Index = 257,
                 HoverIndex = 258,
                 PressedIndex = 259,
@@ -164,6 +178,9 @@ namespace Client.MirScenes.Dialogs
 
             QuestButton = new MirAnimatedButton()
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Book,
+                Hint = "Quests",
                 Animated = true,
                 AnimationCount = 10,
                 Loop = true,
@@ -1048,7 +1065,7 @@ namespace Client.MirScenes.Dialogs
         }
 
     }
-    public sealed class NPCGoodsDialog : MirImageControl
+    public sealed class NPCGoodsDialog : MirPanel
     {
         public PanelType PType;
         public bool UsePearls;
@@ -1109,6 +1126,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(217, 3),
@@ -1121,6 +1141,8 @@ namespace Client.MirScenes.Dialogs
 
             BuyButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Buy",
                 HoverIndex = 313,
                 Index = 312,
                 Location = new Point(77, 304),
@@ -1147,6 +1169,9 @@ namespace Client.MirScenes.Dialogs
 
             UpButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
+                Hint = "Up",
                 Index = 197,
                 HoverIndex = 198,
                 Library = Libraries.Prguse2,
@@ -1164,6 +1189,9 @@ namespace Client.MirScenes.Dialogs
 
             DownButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Down,
+                Hint = "Down",
                 Index = 207,
                 HoverIndex = 208,
                 Library = Libraries.Prguse2,
@@ -1183,6 +1211,8 @@ namespace Client.MirScenes.Dialogs
 
             PositionBar = new MirButton
             {
+                Skin = UiSurface.ScrollThumb,
+                Glyph = UiGlyph.Grip,
                 Index = 205,
                 HoverIndex = 206,
                 Library = Libraries.Prguse2,
@@ -1430,7 +1460,7 @@ namespace Client.MirScenes.Dialogs
             GameScene.Scene.InventoryDialog.Show();
         }
     }
-    public sealed class NPCDropDialog : MirImageControl
+    public sealed class NPCDropDialog : MirPanel
     {
 
         public readonly MirButton ConfirmButton, HoldButton;
@@ -1454,6 +1484,8 @@ namespace Client.MirScenes.Dialogs
 
             HoldButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Hold",
                 HoverIndex = 294,
                 Index = 293,
                 Location = new Point(114, 36),
@@ -1466,6 +1498,8 @@ namespace Client.MirScenes.Dialogs
 
             ConfirmButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Confirm",
                 HoverIndex = 291,
                 Index = 290,
                 Location = new Point(114, 62),
@@ -1864,7 +1898,7 @@ namespace Client.MirScenes.Dialogs
             Visible = true;
         }
     }
-    public sealed class NPCAwakeDialog : MirImageControl
+    public sealed class NPCAwakeDialog : MirPanel
     {
 
         public MirButton UpgradeButton, CloseButton;
@@ -1910,6 +1944,8 @@ namespace Client.MirScenes.Dialogs
 
             UpgradeButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Upgrade",
                 HoverIndex = 713,
                 Index = 712,
                 Location = new Point(115, 391), //new Point(181, 135),
@@ -1922,6 +1958,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(284, 4),
@@ -2253,7 +2292,7 @@ namespace Client.MirScenes.Dialogs
             GameScene.Scene.InventoryDialog.Show();
         }
     }
-    public sealed class CraftDialog : MirImageControl
+    public sealed class CraftDialog : MirPanel
     {
         public UserItem RecipeItem;
         public ClientRecipeInfo Recipe;
@@ -2354,6 +2393,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 Index = 360,
                 HoverIndex = 361,
                 PressedIndex = 362,
@@ -2366,6 +2408,8 @@ namespace Client.MirScenes.Dialogs
 
             AutoFillButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Auto Fill",
                 HoverIndex = 181,
                 Index = 180,
                 Location = new Point(165, 185),
@@ -2378,6 +2422,8 @@ namespace Client.MirScenes.Dialogs
 
             CraftButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Craft",
                 HoverIndex = 337,
                 Index = 336,
                 Location = new Point(215, 185),
@@ -2723,7 +2769,7 @@ namespace Client.MirScenes.Dialogs
             }
         }
     }
-    public sealed class RefineDialog : MirImageControl
+    public sealed class RefineDialog : MirPanel
     {
         public MirItemCell[] Grid;
         public MirButton RefineButton;
@@ -2795,7 +2841,7 @@ namespace Client.MirScenes.Dialogs
         }
 
     }
-    public sealed class StorageDialog : MirImageControl
+    public sealed class StorageDialog : MirPanel
     {
         public MirItemCell[] Grid;
         public MirButton Storage1Button, Storage2Button, RentButton, ProtectButton, CloseButton;
@@ -2822,6 +2868,7 @@ namespace Client.MirScenes.Dialogs
 
             LockedPage = new MirImageControl
             {
+                Skin = UiSurface.Inset,
                 Index = 2443,
                 Library = Libraries.Prguse,
                 Location = new Point(8, 59),
@@ -2831,6 +2878,8 @@ namespace Client.MirScenes.Dialogs
 
             Storage1Button = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Storage1",
                 HoverIndex = 743,
                 Index = 743,
                 Location = new Point(8, 36),
@@ -2846,6 +2895,8 @@ namespace Client.MirScenes.Dialogs
 
             Storage2Button = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Storage2",
                 HoverIndex = 746,
                 Index = 746,
                 Location = new Point(80, 36),
@@ -2861,6 +2912,8 @@ namespace Client.MirScenes.Dialogs
             };
             RentButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Rent",
                 Index = 483,
                 HoverIndex = 484,
                 PressedIndex = 485,
@@ -2888,6 +2941,8 @@ namespace Client.MirScenes.Dialogs
 
             ProtectButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Protect",
                 HoverIndex = 114,
                 Index = 113,
                 Location = new Point(328, 33),
@@ -2900,6 +2955,9 @@ namespace Client.MirScenes.Dialogs
             ProtectButton.Click += (o, e) => ManageStoragePassword();
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(363, 3),
@@ -3307,7 +3365,7 @@ namespace Client.MirScenes.Dialogs
             return null;
         }
     }
-    public sealed class BigButtonDialog : MirImageControl
+    public sealed class BigButtonDialog : MirPanel
     {
         const int MaximumRows = 8;
         private List<BigButton> CurrentButtons;
@@ -3334,6 +3392,7 @@ namespace Client.MirScenes.Dialogs
             {
                 MirImageControl background = new MirImageControl()
                 {
+                    Skin = UiSurface.Inset,
                     Parent = this,
                     Library = Libraries.Title,
                     Location = new Point(buttons.Count == 1 ? -1 : 0, Size.Height),
@@ -3362,6 +3421,9 @@ namespace Client.MirScenes.Dialogs
             {
                 MirButton upButton = new MirButton
                 {
+                    Skin = UiSurface.Button,
+                    Glyph = UiGlyph.Up,
+                    Hint = "Up",
                     Index = 197,
                     HoverIndex = 198,
                     PressedIndex = 199,
@@ -3378,6 +3440,9 @@ namespace Client.MirScenes.Dialogs
 
                 MirButton downButton = new MirButton
                 {
+                    Skin = UiSurface.Button,
+                    Glyph = UiGlyph.Down,
+                    Hint = "Down",
                     Index = 207,
                     HoverIndex = 208,
                     Library = Libraries.Prguse2,

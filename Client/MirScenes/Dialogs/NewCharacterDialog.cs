@@ -5,7 +5,7 @@ using Client.MirSounds;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class NewCharacterDialog : MirImageControl
+    public sealed class NewCharacterDialog : MirPanel
     {
         private static readonly Regex Reg = new Regex(@"^[A-Za-z0-9]|[\u4e00-\u9fa5]{" + Globals.MinCharacterNameLength + "," + Globals.MaxCharacterNameLength + "}$");
 
@@ -60,6 +60,8 @@ namespace Client.MirScenes.Dialogs
 
             CancelButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Cancel",
                 HoverIndex = 281,
                 Index = 280,
                 Library = Libraries.Title,
@@ -71,6 +73,8 @@ namespace Client.MirScenes.Dialogs
 
             OKButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "OK",
                 Enabled = false,
                 HoverIndex = 361,
                 Index = 360,
@@ -112,6 +116,8 @@ namespace Client.MirScenes.Dialogs
 
             WarriorButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Warrior",
                 HoverIndex = 2427,
                 Index = 2427,
                 Library = Libraries.Prguse,
@@ -129,6 +135,8 @@ namespace Client.MirScenes.Dialogs
 
             WizardButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Wizard",
                 HoverIndex = 2430,
                 Index = 2429,
                 Library = Libraries.Prguse,
@@ -146,6 +154,8 @@ namespace Client.MirScenes.Dialogs
 
             TaoistButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Taoist",
                 HoverIndex = 2433,
                 Index = 2432,
                 Library = Libraries.Prguse,
@@ -162,6 +172,8 @@ namespace Client.MirScenes.Dialogs
 
             AssassinButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Assassin",
                 HoverIndex = 2436,
                 Index = 2435,
                 Library = Libraries.Prguse,
@@ -178,6 +190,8 @@ namespace Client.MirScenes.Dialogs
 
             ArcherButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Archer",
                 HoverIndex = 2439,
                 Index = 2438,
                 Library = Libraries.Prguse,
@@ -195,6 +209,8 @@ namespace Client.MirScenes.Dialogs
 
             MaleButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Male",
                 HoverIndex = 2421,
                 Index = 2421,
                 Library = Libraries.Prguse,
@@ -211,6 +227,8 @@ namespace Client.MirScenes.Dialogs
 
             FemaleButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Female",
                 HoverIndex = 2424,
                 Index = 2423,
                 Library = Libraries.Prguse,

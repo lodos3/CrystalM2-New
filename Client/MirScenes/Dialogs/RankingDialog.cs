@@ -4,7 +4,7 @@ using Client.MirSounds;
 
 namespace Client.MirScenes.Dialogs
 {
-    public class RankingDialog : MirImageControl
+    public class RankingDialog : MirPanel
     {
         public MirButton AllButton, WarButton, WizButton, TaoButton, SinButton, ArchButton, Tab7, NextButton, PrevButton, ScrollBar;
         public MirButton CloseButton;
@@ -46,6 +46,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(300, 3),
@@ -58,6 +61,8 @@ namespace Client.MirScenes.Dialogs
 
             AllButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "All",
                 Index = 751,
                 PressedIndex = 752,
                 HoverIndex = 753,
@@ -70,6 +75,8 @@ namespace Client.MirScenes.Dialogs
             AllButton.Click += (o, e) => SelectRank(0);
             TaoButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Taoist",
                 Index = 760,
                 PressedIndex = 761,
                 HoverIndex = 762,
@@ -82,6 +89,8 @@ namespace Client.MirScenes.Dialogs
             TaoButton.Click += (o, e) => SelectRank(3);
             WarButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Warrior",
                 Index = 754,
                 PressedIndex = 755,
                 HoverIndex = 756,
@@ -94,6 +103,8 @@ namespace Client.MirScenes.Dialogs
             WarButton.Click += (o, e) => SelectRank(1);
             WizButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Wizard",
                 Index = 763,
                 PressedIndex = 764,
                 HoverIndex = 765,
@@ -106,6 +117,8 @@ namespace Client.MirScenes.Dialogs
             WizButton.Click += (o, e) => SelectRank(2);
             SinButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Assassin",
                 Index = 757,
                 PressedIndex = 758,
                 HoverIndex = 759,
@@ -118,6 +131,8 @@ namespace Client.MirScenes.Dialogs
             SinButton.Click += (o, e) => SelectRank(4);
             ArchButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Archer",
                 Index = 766,
                 PressedIndex = 767,
                 HoverIndex = 768,
@@ -131,6 +146,9 @@ namespace Client.MirScenes.Dialogs
 
             NextButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Right,
+                Hint = "Next",
                 Index = 207,
                 HoverIndex = 208,
                 PressedIndex = 209,
@@ -143,6 +161,9 @@ namespace Client.MirScenes.Dialogs
 
             PrevButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Left,
+                Hint = "Prev",
                 Index = 197,
                 HoverIndex = 198,
                 PressedIndex = 199,
@@ -157,6 +178,8 @@ namespace Client.MirScenes.Dialogs
 
             ScrollBar = new MirButton
             {
+                Skin = UiSurface.ScrollThumb,
+                Glyph = UiGlyph.Grip,
                 Index = 205,
                 HoverIndex = 206,
                 PressedIndex = 206,

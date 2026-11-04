@@ -6,7 +6,7 @@ using C = ClientPackets;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class FriendDialog : MirImageControl
+    public sealed class FriendDialog : MirPanel
     {
         public MirImageControl TitleLabel, FriendLabel, BlacklistLabel;
         public MirLabel PageNumberLabel;
@@ -80,6 +80,9 @@ namespace Client.MirScenes.Dialogs
 
             PreviousButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Left,
+                Hint = "Previous",
                 Index = 240,
                 HoverIndex = 241,
                 PressedIndex = 242,
@@ -99,6 +102,9 @@ namespace Client.MirScenes.Dialogs
 
             NextButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Right,
+                Hint = "Next",
                 Index = 243,
                 HoverIndex = 244,
                 PressedIndex = 245,
@@ -119,6 +125,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(237, 3),
@@ -131,6 +140,8 @@ namespace Client.MirScenes.Dialogs
 
             AddButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Add friend",
                 Index = 554,
                 HoverIndex = 555,
                 PressedIndex = 556,
@@ -161,6 +172,8 @@ namespace Client.MirScenes.Dialogs
 
             RemoveButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Remove",
                 Index = 557,
                 HoverIndex = 558,
                 PressedIndex = 559,
@@ -187,6 +200,8 @@ namespace Client.MirScenes.Dialogs
 
             MemoButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Memo",
                 Index = 560,
                 HoverIndex = 561,
                 PressedIndex = 562,
@@ -207,6 +222,8 @@ namespace Client.MirScenes.Dialogs
 
             EmailButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Email",
                 Index = 563,
                 HoverIndex = 564,
                 PressedIndex = 565,
@@ -225,6 +242,8 @@ namespace Client.MirScenes.Dialogs
 
             WhisperButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Whisper",
                 Index = 566,
                 HoverIndex = 567,
                 PressedIndex = 568,
@@ -477,7 +496,7 @@ namespace Client.MirScenes.Dialogs
             Selected = false;
         }
     }
-    public sealed class MemoDialog : MirImageControl
+    public sealed class MemoDialog : MirPanel
     {
         //public MirImageControl TitleLabel;
         public MirTextBox MemoTextBox;
@@ -495,7 +514,7 @@ namespace Client.MirScenes.Dialogs
 
             MemoTextBox = new MirTextBox
             {
-                ForeColour = Color.White,
+                ForeColour = DarkFantasyPalette.Text,
                 Parent = this,
                 Font = new Font(Settings.FontName, 8F),
                 Location = new Point(15, 30),
@@ -505,6 +524,8 @@ namespace Client.MirScenes.Dialogs
 
             OKButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "OK",
                 Index = 382,
                 HoverIndex = 383,
                 PressedIndex = 384,
@@ -521,6 +542,8 @@ namespace Client.MirScenes.Dialogs
 
             CancelButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Cancel",
                 Index = 385,
                 HoverIndex = 386,
                 PressedIndex = 387,
@@ -535,6 +558,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(168, 3),

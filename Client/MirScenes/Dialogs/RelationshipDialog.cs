@@ -6,7 +6,7 @@ using C = ClientPackets;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class RelationshipDialog : MirImageControl
+    public sealed class RelationshipDialog : MirPanel
     {
         public MirImageControl TitleLabel;
         public MirButton CloseButton, AllowButton, RequestButton, DivorceButton, MailButton, WhisperButton;
@@ -37,6 +37,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(260, 3),
@@ -49,6 +52,8 @@ namespace Client.MirScenes.Dialogs
 
             AllowButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Allow",
                 HoverIndex = 611,
                 Index = 610,
                 Location = new Point(50, 164),
@@ -62,6 +67,8 @@ namespace Client.MirScenes.Dialogs
 
             RequestButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Request",
                 HoverIndex = 601,
                 Index = 600,
                 Location = new Point(85, 164),
@@ -84,6 +91,8 @@ namespace Client.MirScenes.Dialogs
 
             DivorceButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Divorce",
                 HoverIndex = 617,
                 Index = 616,
                 Location = new Point(120, 164),
@@ -106,6 +115,8 @@ namespace Client.MirScenes.Dialogs
 
             MailButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Mail,
                 HoverIndex = 438,
                 Index = 437,
                 Location = new Point(155, 164),
@@ -128,6 +139,8 @@ namespace Client.MirScenes.Dialogs
 
             WhisperButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Whisper",
                 HoverIndex = 567,
                 Index = 566,
                 Location = new Point(190, 164),

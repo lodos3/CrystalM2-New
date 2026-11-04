@@ -259,7 +259,9 @@ namespace Client.MirControls
 
         public MirTextBox()
         {
-            BackColour = Color.Black;
+            BackColour = DarkFantasyPalette.Input;
+            ForeColour = DarkFantasyPalette.Text;
+            BorderColour = DarkFantasyPalette.Border;
 
             DrawControlTexture = true;
             TextureValid = false;
@@ -295,6 +297,18 @@ namespace Client.MirControls
 
             Shown += MirTextBox_Shown;
             TextBox.MouseMove += CMain.CMain_MouseMove;
+        }
+
+        protected override void DrawBorder()
+        {
+            if (!Border || Size.IsEmpty) return;
+            Rectangle bounds = DisplayRectangle;
+            Color edge = TextBox.Focused ? DarkFantasyPalette.Accent : BorderColour;
+            var ui = DXManager.Device.Ui;
+            ui.Fill(new Rectangle(bounds.Left - 1, bounds.Top - 1, bounds.Width + 2, 1), edge);
+            ui.Fill(new Rectangle(bounds.Left - 1, bounds.Bottom, bounds.Width + 2, 1), edge);
+            ui.Fill(new Rectangle(bounds.Left - 1, bounds.Top, 1, bounds.Height), edge);
+            ui.Fill(new Rectangle(bounds.Right, bounds.Top, 1, bounds.Height), edge);
         }
 
         private void TextBox_NeedRedraw(object sender, EventArgs e)

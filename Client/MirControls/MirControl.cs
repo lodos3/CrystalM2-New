@@ -11,6 +11,13 @@ namespace Client.MirControls
         public Rectangle DisplayRectangle { get { return new Rectangle(DisplayLocation, Size); } }
 
         public bool GrayScale { get; set; }
+        public UiSurface Skin { get; set; }
+        protected virtual UiVisualState SkinState => !Enabled ? UiVisualState.Disabled :
+            MouseControl == this ? UiVisualState.Hover : UiVisualState.Normal;
+        protected void DrawSkin()
+        {
+            DXManager.Device.Ui.Draw(Skin, DisplayRectangle, SkinState, Opacity);
+        }
         public bool Blending { get; set; }
         public float BlendingRate { get; set; }
         public BlendMode BlendMode { get; set; }
@@ -729,10 +736,14 @@ namespace Client.MirControls
         }
         protected void DrawChildControls()
         {
-            if (Controls != null)
-                for (int i = 0; i < Controls.Count; i++)
-                    if (Controls[i] != null)
-                        Controls[i].Draw();
+            if (Controls == null) return;
+            // Submit the grid frames together before item textures interrupt
+            // the shared-atlas batch. Item order and hit boxes stay unchanged.
+            for (int i = 0; i < Controls.Count; i++)
+                if (Controls[i] is MirItemCell cell && cell.Visible && !cell.IsDisposed)
+                    cell.DrawSlotFrame();
+            for (int i = 0; i < Controls.Count; i++)
+                Controls[i]?.Draw();
         }
         protected virtual void DrawBorder()
         {

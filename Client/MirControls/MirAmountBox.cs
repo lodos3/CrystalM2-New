@@ -3,7 +3,7 @@ using Client.MirSounds;
 
 namespace Client.MirControls
 {
-    public sealed class MirAmountBox : MirImageControl
+    public sealed class MirAmountBox : MirPanel
     {
         public MirLabel TitleLabel, TextLabel;
         public MirButton OKButton, CancelButton, CloseButton;
@@ -37,6 +37,9 @@ namespace Client.MirControls
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(180, 3),
@@ -57,6 +60,8 @@ namespace Client.MirControls
 
             OKButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "OK",
                 HoverIndex = 201,
                 Index = 200,
                 Library = Libraries.Title,
@@ -68,6 +73,8 @@ namespace Client.MirControls
 
             CancelButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Cancel",
                 HoverIndex = 204,
                 Index = 203,
                 Library = Libraries.Title,
@@ -81,7 +88,7 @@ namespace Client.MirControls
             {
                 Parent = this,
                 Border = true,
-                BorderColour = Color.Lime,
+                BorderColour = DarkFantasyPalette.Border,
                 Location = new Point(58, 43),
                 Size = new Size(132, 19),
             };
@@ -128,6 +135,9 @@ namespace Client.MirControls
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(180, 3),
@@ -148,6 +158,8 @@ namespace Client.MirControls
 
             OKButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "OK",
                 HoverIndex = 201,
                 Index = 200,
                 Library = Libraries.Title,
@@ -159,6 +171,8 @@ namespace Client.MirControls
 
             CancelButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Cancel",
                 HoverIndex = 204,
                 Index = 203,
                 Library = Libraries.Title,

@@ -4,7 +4,7 @@ using Client.MirSounds;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class SocketDialog : MirImageControl
+    public sealed class SocketDialog : MirPanel
     {
         public MirItemCell[] Grid;
         public MirButton CloseButton;
@@ -38,6 +38,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(Size.Width - 23, 3),

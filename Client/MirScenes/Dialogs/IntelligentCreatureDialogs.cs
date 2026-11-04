@@ -7,7 +7,7 @@ using C = ClientPackets;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class IntelligentCreatureDialog : MirImageControl
+    public sealed class IntelligentCreatureDialog : MirPanel
     {
         public MirImageControl FullnessBG, FullnessFG, FullnessMin, FullnessNow;
         public MirImageControl PearlImage, BlackStoneImageBG, BlackStoneImageFG;
@@ -41,6 +41,9 @@ namespace Client.MirScenes.Dialogs
             #region CreatureButtons
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(Size.Width - 25, 3),
@@ -53,6 +56,8 @@ namespace Client.MirScenes.Dialogs
 
             HelpPetButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Help Pet",
                 HoverIndex = 258,
                 Index = 257,
                 Location = new Point(Size.Width - 48, 3),
@@ -64,6 +69,8 @@ namespace Client.MirScenes.Dialogs
 
             CreatureRenameButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Creature Rename",
                 HoverIndex = 571,
                 Index = 570,
                 Location = new Point(344, 50),
@@ -77,6 +84,8 @@ namespace Client.MirScenes.Dialogs
 
             SummonButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Summon",
                 Index = 576,
                 HoverIndex = 577,
                 PressedIndex = 578,
@@ -89,6 +98,8 @@ namespace Client.MirScenes.Dialogs
 
             DismissButton = new MirButton//Dismiss the summoned pet
             {
+                Skin = UiSurface.Button,
+                Text = "Dismiss",
                 HoverIndex = 581,
                 Index = 580,
                 Location = new Point(113, 217),
@@ -101,6 +112,8 @@ namespace Client.MirScenes.Dialogs
 
             ReleaseButton = new MirButton//Removes the selected pet
             {
+                Skin = UiSurface.Button,
+                Text = "Release",
                 HoverIndex = 584,
                 Index = 583,
                 Location = new Point(255, 217),
@@ -113,6 +126,8 @@ namespace Client.MirScenes.Dialogs
 
             OptionsMenuButton = new MirButton//Options
             {
+                Skin = UiSurface.Button,
+                Text = "Options Menu",
                 HoverIndex = 574,
                 Index = 573,
                 Location = new Point(375, 160),
@@ -125,6 +140,8 @@ namespace Client.MirScenes.Dialogs
 
             AutomaticModeButton = new MirButton//image is wrongly translated should be "Auto" instaid of "Enable"
             {
+                Skin = UiSurface.Button,
+                Text = "Automatic Mode",
                 HoverIndex = 611,
                 Index = 610,
                 Location = new Point(375, 187),
@@ -137,6 +154,8 @@ namespace Client.MirScenes.Dialogs
 
             SemiAutoModeButton = new MirButton//image is wrongly translated should be "SemiAuto" instaid of "Disable"
             {
+                Skin = UiSurface.Button,
+                Text = "Semi Auto Mode",
                 HoverIndex = 614,
                 Index = 613,
                 Location = new Point(375, 187),
@@ -879,6 +898,8 @@ namespace Client.MirScenes.Dialogs
 
             PetButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Pet",
                 Index = 0,
                 PressedIndex = 1,
                 Library = Libraries.Prguse2,
@@ -1125,7 +1146,7 @@ namespace Client.MirScenes.Dialogs
             }
         }
     }
-    public sealed class IntelligentCreatureOptionsDialog : MirImageControl
+    public sealed class IntelligentCreatureOptionsDialog : MirPanel
     {
         public readonly string[] OptionNames =
         {
@@ -1165,6 +1186,8 @@ namespace Client.MirScenes.Dialogs
 
             OptionsSaveButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Options Save",
                 HoverIndex = 587,
                 Index = 586,
                 Location = new Point(10, 280),
@@ -1177,6 +1200,8 @@ namespace Client.MirScenes.Dialogs
 
             OptionsCancelButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Options Cancel",
                 HoverIndex = 591,
                 Index = 590,
                 Location = new Point(60, 280),
@@ -1273,7 +1298,7 @@ namespace Client.MirScenes.Dialogs
             RefreshFilter();
         }
     }
-    public sealed class IntelligentCreatureOptionsGradeDialog : MirImageControl
+    public sealed class IntelligentCreatureOptionsGradeDialog : MirPanel
     {
         private string[] GradeStrings =
         {
@@ -1303,6 +1328,9 @@ namespace Client.MirScenes.Dialogs
 
             NextButton = new MirButton()
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Right,
+                Hint = "Next",
                 HoverIndex = 396,
                 Index = 396,
                 Location = new Point(96, 5),
@@ -1315,6 +1343,9 @@ namespace Client.MirScenes.Dialogs
 
             PrevButton = new MirButton()
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Left,
+                Hint = "Prev",
                 HoverIndex = 398,
                 Index = 398,
                 Location = new Point(76, 5),

@@ -6,7 +6,7 @@ using C = ClientPackets;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class MentorDialog : MirImageControl
+    public sealed class MentorDialog : MirPanel
     {
         public MirImageControl TitleLabel;
         public MirButton CloseButton, AllowButton, AddButton, RemoveButton;
@@ -38,6 +38,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(219, 3),
@@ -50,6 +53,8 @@ namespace Client.MirScenes.Dialogs
 
             AllowButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Allow",
                 HoverIndex = 115,
                 Index = 114,
                 Location = new Point(30, 178),
@@ -80,6 +85,8 @@ namespace Client.MirScenes.Dialogs
 
             AddButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Invite",
                 HoverIndex = 214,
                 Index = 213,
                 Location = new Point(60, 178),
@@ -113,6 +120,8 @@ namespace Client.MirScenes.Dialogs
 
             RemoveButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Remove",
                 HoverIndex = 217,
                 Index = 216,
                 Location = new Point(135, 178),

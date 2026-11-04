@@ -3,7 +3,7 @@ using Client.MirGraphics;
 
 namespace Client.MirScenes.Dialogs
 {
-    public class ChatNoticeDialog : MirImageControl
+    public class ChatNoticeDialog : MirPanel
     {
         public MirImageControl Layout;
         public MirLabel TextLabel1, TextLabel2;

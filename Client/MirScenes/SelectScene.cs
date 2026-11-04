@@ -59,6 +59,8 @@ namespace Client.MirScenes
 
             StartGameButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Enter world",
                 Enabled = false,
                 HoverIndex = 341,
                 Index = 340,
@@ -71,6 +73,8 @@ namespace Client.MirScenes
 
             NewCharacterButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "New Character",
                 HoverIndex = 344,
                 Index = 343,
                 Library = Libraries.Title,
@@ -82,6 +86,8 @@ namespace Client.MirScenes
 
             DeleteCharacterButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Delete Character",
                 HoverIndex = 347,
                 Index = 346,
                 Library = Libraries.Title,
@@ -94,6 +100,8 @@ namespace Client.MirScenes
 
             CreditsButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Credits",
                 HoverIndex = 350,
                 Index = 349,
                 Library = Libraries.Title,
@@ -108,6 +116,8 @@ namespace Client.MirScenes
 
             ExitGame = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Exit game",
                 HoverIndex = 353,
                 Index = 352,
                 Library = Libraries.Title,

@@ -7,7 +7,7 @@ using C = ClientPackets;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class GroupDialog : MirImageControl
+    public sealed class GroupDialog : MirPanel
     {
         public static bool AllowGroup;
         public static List<string> GroupList = new List<string>();
@@ -56,6 +56,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(206, 3),
@@ -68,6 +71,8 @@ namespace Client.MirScenes.Dialogs
 
             SwitchButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Switch",
                 HoverIndex = 115,
                 Index = 114,
                 Location = new Point(25, 219),
@@ -81,6 +86,8 @@ namespace Client.MirScenes.Dialogs
 
             AddButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Invite",
                 HoverIndex = 134,
                 Index = 133,
                 Location = new Point(70, 219),
@@ -94,6 +101,8 @@ namespace Client.MirScenes.Dialogs
 
             DelButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Trash,
                 HoverIndex = 137,
                 Index = 136,
                 Location = new Point(140, 219),

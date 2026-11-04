@@ -10,7 +10,7 @@ using C = ClientPackets;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class TrustMerchantDialog : MirImageControl
+    public sealed class TrustMerchantDialog : MirPanel
     {
         public static bool UserMode = false;
         public static MarketPanelType MarketType;
@@ -95,6 +95,8 @@ namespace Client.MirScenes.Dialogs
 
             MarketButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Market",
                 Index = 789,
                 PressedIndex = 788,
                 Library = Libraries.Title,
@@ -114,6 +116,8 @@ namespace Client.MirScenes.Dialogs
 
             ConsignmentButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Consignment",
                 Index = 791,
                 PressedIndex = 790,
                 Library = Libraries.Title,
@@ -128,6 +132,8 @@ namespace Client.MirScenes.Dialogs
 
             AuctionButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Auction",
                 Index = 817,
                 PressedIndex = 816,
                 Library = Libraries.Title,
@@ -142,6 +148,9 @@ namespace Client.MirScenes.Dialogs
 
             GameShopButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Coin,
+                Hint = "Game Shop",
                 Index = 819,
                 PressedIndex = 818,
                 Library = Libraries.Title,
@@ -156,6 +165,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 Index = 360,
                 HoverIndex = 361,
                 PressedIndex = 362,
@@ -181,6 +193,9 @@ namespace Client.MirScenes.Dialogs
 
             BackButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Left,
+                Hint = "Back",
                 Index = 240,
                 HoverIndex = 241,
                 PressedIndex = 242,
@@ -199,6 +214,9 @@ namespace Client.MirScenes.Dialogs
 
             NextButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Right,
+                Hint = "Next",
                 Index = 243,
                 HoverIndex = 244,
                 PressedIndex = 245,
@@ -233,6 +251,9 @@ namespace Client.MirScenes.Dialogs
 
             UpButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
+                Hint = "Up",
                 Index = 197,
                 HoverIndex = 198,
                 PressedIndex = 199,
@@ -257,6 +278,9 @@ namespace Client.MirScenes.Dialogs
 
             DownButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Down,
+                Hint = "Down",
                 Index = 207,
                 HoverIndex = 208,
                 Library = Libraries.Prguse2,
@@ -280,6 +304,8 @@ namespace Client.MirScenes.Dialogs
 
             PositionBar = new MirButton
             {
+                Skin = UiSurface.ScrollThumb,
+                Glyph = UiGlyph.Grip,
                 Index = 205,
                 HoverIndex = 206,
                 PressedIndex = 206,
@@ -308,6 +334,9 @@ namespace Client.MirScenes.Dialogs
 
             MailButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Mail,
+                Hint = "Mail",
                 Index = 437,
                 HoverIndex = 438,
                 PressedIndex = 439,
@@ -327,6 +356,8 @@ namespace Client.MirScenes.Dialogs
 
             RefreshButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Refresh",
                 Index = 663,
                 HoverIndex = 664,
                 PressedIndex = 665,
@@ -349,6 +380,8 @@ namespace Client.MirScenes.Dialogs
 
             BuyButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Buy",
                 Index = 703,
                 HoverIndex = 704,
                 PressedIndex = 705,
@@ -441,6 +474,8 @@ namespace Client.MirScenes.Dialogs
 
             SellNowButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Sell Now",
                 Index = 700,
                 HoverIndex = 701,
                 PressedIndex = 702,
@@ -459,6 +494,8 @@ namespace Client.MirScenes.Dialogs
 
             CollectSoldButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Collect Sold",
                 Index = 680,
                 HoverIndex = 681,
                 PressedIndex = 682,
@@ -499,6 +536,8 @@ namespace Client.MirScenes.Dialogs
 
             FindButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Find",
                 Index = 480,
                 HoverIndex = 481,
                 PressedIndex = 482,
@@ -567,6 +606,8 @@ namespace Client.MirScenes.Dialogs
 
             SellItemButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Sell",
                 Index = 700,
                 PressedIndex = 702,
                 HoverIndex = 701,

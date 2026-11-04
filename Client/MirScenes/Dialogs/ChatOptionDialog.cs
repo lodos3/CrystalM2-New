@@ -4,7 +4,7 @@ using Client.MirSounds;
 
 namespace Client.MirScenes.Dialogs
 {
-    public class ChatOptionDialog : MirImageControl
+    public class ChatOptionDialog : MirPanel
     {
         public MirButton FilterTabButton, ChatTabButton;
         public MirButton CloseButton;
@@ -27,6 +27,8 @@ namespace Client.MirScenes.Dialogs
 
             FilterTabButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Filter Tab",
                 Index = 463,
                 PressedIndex = 462,
                 Parent = this,
@@ -38,6 +40,8 @@ namespace Client.MirScenes.Dialogs
 
             ChatTabButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Chat Tab",
                 Index = 464,
                 PressedIndex = 465,
                 Parent = this,
@@ -49,6 +53,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(198, 3),
@@ -63,6 +70,8 @@ namespace Client.MirScenes.Dialogs
 
             AllButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "All",
                 Index = 2087,
                 Library = Libraries.Prguse,
                 Parent = this,
@@ -74,6 +83,8 @@ namespace Client.MirScenes.Dialogs
 
             GeneralButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "General",
                 Index = 2071,
                 Library = Libraries.Prguse,
                 Parent = this,
@@ -88,6 +99,8 @@ namespace Client.MirScenes.Dialogs
 
             WhisperButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Whisper",
                 Index = 2075,
                 Library = Libraries.Prguse,
                 Parent = this,
@@ -102,6 +115,8 @@ namespace Client.MirScenes.Dialogs
 
             ShoutButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Shout",
                 Index = 2073,
                 Library = Libraries.Prguse,
                 Parent = this,
@@ -116,6 +131,8 @@ namespace Client.MirScenes.Dialogs
 
             SystemButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "System",
                 Index = 2085,
                 Library = Libraries.Prguse,
                 Parent = this,
@@ -130,6 +147,8 @@ namespace Client.MirScenes.Dialogs
 
             LoverButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Lover",
                 Index = 2077,
                 Library = Libraries.Prguse,
                 Parent = this,
@@ -144,6 +163,8 @@ namespace Client.MirScenes.Dialogs
 
             MentorButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Mentor",
                 Index = 2079,
                 Library = Libraries.Prguse,
                 Parent = this,
@@ -158,6 +179,9 @@ namespace Client.MirScenes.Dialogs
 
             GroupButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
+                Hint = "Group",
                 Index = 2081,
                 Library = Libraries.Prguse,
                 Parent = this,
@@ -172,6 +196,9 @@ namespace Client.MirScenes.Dialogs
 
             GuildButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Shield,
+                Hint = "Guild",
                 Index = 2083,
                 Library = Libraries.Prguse,
                 Parent = this,
@@ -190,6 +217,8 @@ namespace Client.MirScenes.Dialogs
 
             TransparencyOffButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Transparency Off",
                 Index = 471,
                 HoverIndex = 472,
                 PressedIndex = 470,
@@ -207,6 +236,8 @@ namespace Client.MirScenes.Dialogs
 
             TransparencyOnButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Transparency On",
                 Index = 474,
                 HoverIndex = 475,
                 PressedIndex = 473,

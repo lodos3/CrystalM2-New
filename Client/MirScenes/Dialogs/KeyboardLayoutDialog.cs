@@ -4,7 +4,7 @@ using Client.MirSounds;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class KeyboardLayoutDialog : MirImageControl
+    public sealed class KeyboardLayoutDialog : MirPanel
     {
         public MirImageControl TitleLabel, EnforceButtonChecked;
         public MirLabel PageLabel, EnforceButtonLabel;
@@ -52,6 +52,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(489, 3),
@@ -69,6 +72,9 @@ namespace Client.MirScenes.Dialogs
 
             ScrollUpButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
+                Hint = "Scroll Up",
                 Index = 197,
                 HoverIndex = 198,
                 PressedIndex = 199,
@@ -92,6 +98,9 @@ namespace Client.MirScenes.Dialogs
 
             ScrollDownButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Down,
+                Hint = "Scroll Down",
                 Index = 207,
                 HoverIndex = 208,
                 Library = Libraries.Prguse2,
@@ -115,6 +124,8 @@ namespace Client.MirScenes.Dialogs
 
             PositionBar = new MirButton
             {
+                Skin = UiSurface.ScrollThumb,
+                Glyph = UiGlyph.Grip,
                 Index = 205,
                 HoverIndex = 206,
                 PressedIndex = 206,
@@ -130,6 +141,8 @@ namespace Client.MirScenes.Dialogs
 
             ResetButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Reset",
                 Index = 120,
                 HoverIndex = 121,
                 PressedIndex = 122,
@@ -166,6 +179,8 @@ namespace Client.MirScenes.Dialogs
 
             EnforceButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Enforce",
                 Visible = true,
                 Index = 1346,
                 Library = Libraries.Prguse,
@@ -366,6 +381,7 @@ namespace Client.MirScenes.Dialogs
 
             CurrentBindButton = new MirButton
             {
+                Skin = UiSurface.Button,
                 Parent = this,
                 Text = string.Format("  {0}", CMain.InputKeys.GetKey(option, false)),
                 Location = new Point(340, 0),

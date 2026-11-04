@@ -4,7 +4,7 @@ namespace Client.MirControls
 {
     public enum MirMessageBoxButtons { OK, OKCancel, YesNo, YesNoCancel, Cancel }
 
-    public sealed class MirMessageBox : MirImageControl
+    public sealed class MirMessageBox : MirPanel
     {
         public MirLabel Label;
         public MirButton OKButton, CancelButton, NoButton, YesButton;
@@ -13,132 +13,48 @@ namespace Client.MirControls
 
         public MirMessageBox(string message, MirMessageBoxButtons b = MirMessageBoxButtons.OK, bool allowKeys = true)
         {
-            DrawImage = true;
-            ForeColour = Color.White;
             Buttons = b;
             Modal = true;
-            Movable = false;
             AllowKeyPress = allowKeys;
-
-            Index = 360;
-            Library = Libraries.Prguse;
-
+            AutoSize = false;
+            Size = new Size(460, 204);
+            PanelTitle = b is MirMessageBoxButtons.YesNo or MirMessageBoxButtons.YesNoCancel or MirMessageBoxButtons.OKCancel
+                ? "Confirm" : "Notice";
             Location = new Point((Settings.ScreenWidth - Size.Width) / 2, (Settings.ScreenHeight - Size.Height) / 2);
-
-
             Label = new MirLabel
             {
-                AutoSize = false,
-               // DrawFormat = StringFormatFlags.FitBlackBox,
-                Location = new Point(35, 35),
-                Size = new Size(390, 110),
-                Parent = this,
-                Text = message
+                Parent = this, Text = message, AutoSize = false, NotControl = true,
+                Location = new Point(24, 46), Size = new Size(412, 104),
+                ForeColour = DarkFantasyPalette.Text, OutLine = false,
+                DrawFormat = TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis
             };
 
-            
-            switch (Buttons)
+            string[] labels = b switch
             {
-                case MirMessageBoxButtons.OK:
-                    OKButton = new MirButton
-                    {
-                        HoverIndex = 201,
-                        Index = 200,
-                        Library = Libraries.Title,
-                        Location = new Point(360, 157),
-                        Parent = this,
-                        PressedIndex = 202,
-                    };
-                    OKButton.Click += (o, e) => Dispose();
-                    break;
-                case MirMessageBoxButtons.OKCancel:
-                    OKButton = new MirButton
-                    {
-                        HoverIndex = 201,
-                        Index = 200,
-                        Library = Libraries.Title,
-                        Location = new Point(260, 157),
-                        Parent = this,
-                        PressedIndex = 202,
-                    };
-                    OKButton.Click += (o, e) => Dispose();
-                    CancelButton = new MirButton
-                    {
-                        HoverIndex = 204,
-                        Index = 203,
-                        Library = Libraries.Title,
-                        Location = new Point(360, 157),
-                        Parent = this,
-                        PressedIndex = 205,
-                    };
-                    CancelButton.Click += (o, e) => Dispose();
-                    break;
-                case MirMessageBoxButtons.YesNo:
-                    YesButton = new MirButton
-                    {
-                        HoverIndex = 207,
-                        Index = 206,
-                        Library = Libraries.Title,
-                        Location = new Point(260, 157),
-                        Parent = this,
-                        PressedIndex = 208,
-                    };
-                    YesButton.Click += (o, e) => Dispose();
-                    NoButton = new MirButton
-                    {
-                        HoverIndex = 211,
-                        Index = 210,
-                        Library = Libraries.Title,
-                        Location = new Point(360, 157),
-                        Parent = this,
-                        PressedIndex = 212,
-                    };
-                    NoButton.Click += (o, e) => Dispose();
-                    break;
-                case MirMessageBoxButtons.YesNoCancel:
-                    YesButton = new MirButton
-                    {
-                        HoverIndex = 207,
-                        Index = 206,
-                        Library = Libraries.Title,
-                        Location = new Point(160, 157),
-                        Parent = this,
-                        PressedIndex = 208,
-                    };
-                    YesButton.Click += (o, e) => Dispose();
-                    NoButton = new MirButton
-                    {
-                        HoverIndex = 211,
-                        Index = 210,
-                        Library = Libraries.Title,
-                        Location = new Point(260, 157),
-                        Parent = this,
-                        PressedIndex = 212,
-                    };
-                    NoButton.Click += (o, e) => Dispose();
-                    CancelButton = new MirButton
-                    {
-                        HoverIndex = 204,
-                        Index = 203,
-                        Library = Libraries.Title,
-                        Location = new Point(360, 157),
-                        Parent = this,
-                        PressedIndex = 205,
-                    };
-                    CancelButton.Click += (o, e) => Dispose();
-                    break;
-                case MirMessageBoxButtons.Cancel:
-                    CancelButton = new MirButton
-                    {
-                        HoverIndex = 204,
-                        Index = 203,
-                        Library = Libraries.Title,
-                        Location = new Point(360, 157),
-                        Parent = this,
-                        PressedIndex = 205,
-                    };
-                    CancelButton.Click += (o, e) => Dispose();
-                    break;
+                MirMessageBoxButtons.OK => new[] { "OK" },
+                MirMessageBoxButtons.OKCancel => new[] { "OK", "Cancel" },
+                MirMessageBoxButtons.YesNo => new[] { "Yes", "No" },
+                MirMessageBoxButtons.YesNoCancel => new[] { "Yes", "No", "Cancel" },
+                _ => new[] { "Cancel" }
+            };
+            int x = Size.Width - 20 - (labels.Length * 92 + (labels.Length - 1) * 10);
+            foreach (string text in labels)
+            {
+                var action = new MirButton
+                {
+                    Skin = UiSurface.Button, AutoSize = false, Size = new Size(92, 28),
+                    Parent = this, Text = text, Location = new Point(x, 158),
+                    Selected = text is "OK" or "Yes"
+                };
+                action.Click += (o, e) => Dispose();
+                switch (text)
+                {
+                    case "OK": OKButton = action; break;
+                    case "Yes": YesButton = action; break;
+                    case "No": NoButton = action; break;
+                    case "Cancel": CancelButton = action; break;
+                }
+                x += 102;
             }
         }
 
@@ -189,6 +105,7 @@ namespace Client.MirControls
                             if (OKButton != null && !OKButton.IsDisposed) OKButton.InvokeMouseClick(null);
                             break;
                         case MirMessageBoxButtons.OKCancel:
+                        case MirMessageBoxButtons.Cancel:
                         case MirMessageBoxButtons.YesNoCancel:
                             if (CancelButton != null && !CancelButton.IsDisposed) CancelButton.InvokeMouseClick(null);
                             break;

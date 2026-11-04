@@ -6,7 +6,7 @@ using C = ClientPackets;
 
 namespace Client.MirScenes.Dialogs
 {
-    public class MailListDialog : MirImageControl
+    public class MailListDialog : MirPanel
     {
         MirImageControl TitleLabel;
         MirButton HelpButton, CloseButton;
@@ -74,6 +74,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(Size.Width - 24, 3),
@@ -86,6 +89,9 @@ namespace Client.MirScenes.Dialogs
 
             HelpButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Help,
+                Hint = "Help",
                 Index = 257,
                 HoverIndex = 258,
                 PressedIndex = 259,
@@ -98,6 +104,9 @@ namespace Client.MirScenes.Dialogs
 
             PreviousButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Left,
+                Hint = "Previous",
                 Index = 240,
                 HoverIndex = 241,
                 PressedIndex = 242,
@@ -130,6 +139,9 @@ namespace Client.MirScenes.Dialogs
 
             NextButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Right,
+                Hint = "Next",
                 Index = 243,
                 HoverIndex = 244,
                 PressedIndex = 245,
@@ -153,6 +165,8 @@ namespace Client.MirScenes.Dialogs
             #region Action Buttons
             SendButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Send",
                 Index = 563,
                 HoverIndex = 564,
                 PressedIndex = 565,
@@ -179,6 +193,8 @@ namespace Client.MirScenes.Dialogs
 
             ReplyButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Reply",
                 Index = 569,
                 HoverIndex = 570,
                 PressedIndex = 571,
@@ -197,6 +213,8 @@ namespace Client.MirScenes.Dialogs
 
             ReadButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Read",
                 Index = 572,
                 HoverIndex = 573,
                 PressedIndex = 574,
@@ -222,6 +240,8 @@ namespace Client.MirScenes.Dialogs
 
             DeleteButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Trash,
                 Index = 557,
                 HoverIndex = 558,
                 PressedIndex = 559,
@@ -256,6 +276,8 @@ namespace Client.MirScenes.Dialogs
 
             BlockListButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Block List",
                 Index = 520,
                 HoverIndex = 521,
                 PressedIndex = 522,
@@ -270,6 +292,8 @@ namespace Client.MirScenes.Dialogs
 
             BugReportButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Bug Report",
                 Index = 523,
                 HoverIndex = 524,
                 PressedIndex = 525,
@@ -593,7 +617,7 @@ namespace Client.MirScenes.Dialogs
         }
     }
 
-    public class MailComposeLetterDialog : MirImageControl
+    public class MailComposeLetterDialog : MirPanel
     {
         MirLabel RecipientNameLabel;
         MirTextBox MessageTextBox;
@@ -610,6 +634,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(Size.Width - 27, 3),
@@ -634,7 +661,7 @@ namespace Client.MirScenes.Dialogs
 
             MessageTextBox = new MirTextBox
             {
-                ForeColour = Color.White,
+                ForeColour = DarkFantasyPalette.Text,
                 Parent = this,
                 Font = new Font(Settings.FontName, 8F),
                 Location = new Point(15, 92),
@@ -645,6 +672,8 @@ namespace Client.MirScenes.Dialogs
 
             SendButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Send",
                 Index = 607,
                 HoverIndex = 608,
                 PressedIndex = 609,
@@ -661,6 +690,8 @@ namespace Client.MirScenes.Dialogs
 
             CancelButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Cancel",
                 Index = 193,
                 HoverIndex = 194,
                 PressedIndex = 195,
@@ -684,7 +715,7 @@ namespace Client.MirScenes.Dialogs
             Visible = true;
         }
     }
-    public class MailComposeParcelDialog : MirImageControl
+    public class MailComposeParcelDialog : MirPanel
     {
         public MirLabel RecipientNameLabel, ParcelCostLabel, GoldSendLabel;
         MirTextBox MessageTextBox;
@@ -712,6 +743,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(Size.Width - 27, 3),
@@ -739,7 +773,7 @@ namespace Client.MirScenes.Dialogs
 
             MessageTextBox = new MirTextBox
             {
-                ForeColour = Color.White,
+                ForeColour = DarkFantasyPalette.Text,
                 Parent = this,
                 Font = new Font(Settings.FontName, 8F),
                 Location = new Point(15, 98),
@@ -750,6 +784,8 @@ namespace Client.MirScenes.Dialogs
 
             StampButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Stamp",
                 Index = 203,
                 HoverIndex = 203,
                 PressedIndex = 203,
@@ -831,6 +867,8 @@ namespace Client.MirScenes.Dialogs
 
             SendButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Send",
                 Index = 607,
                 HoverIndex = 608,
                 PressedIndex = 609,
@@ -846,6 +884,8 @@ namespace Client.MirScenes.Dialogs
 
             CancelButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Cancel",
                 Index = 193,
                 HoverIndex = 194,
                 PressedIndex = 195,
@@ -976,7 +1016,7 @@ namespace Client.MirScenes.Dialogs
         }
     }
 
-    public class MailReadLetterDialog : MirImageControl
+    public class MailReadLetterDialog : MirPanel
     {
         MirLabel SenderNameLabel, DateSentLabel, MessageLabel;
 
@@ -995,6 +1035,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(Size.Width - 27, 3),
@@ -1036,6 +1079,9 @@ namespace Client.MirScenes.Dialogs
 
             DeleteButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Trash,
+                Hint = "Delete",
                 Index = 540,
                 HoverIndex = 541,
                 PressedIndex = 542,
@@ -1057,6 +1103,9 @@ namespace Client.MirScenes.Dialogs
 
             LockButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Lock,
+                Hint = "Lock",
                 Index = 686,
                 HoverIndex = 687,
                 PressedIndex = 688,
@@ -1076,6 +1125,8 @@ namespace Client.MirScenes.Dialogs
 
             CancelButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Cancel",
                 Index = 193,
                 HoverIndex = 194,
                 PressedIndex = 195,
@@ -1105,7 +1156,7 @@ namespace Client.MirScenes.Dialogs
             Visible = true;
         }
     }
-    public class MailReadParcelDialog : MirImageControl
+    public class MailReadParcelDialog : MirPanel
     {
         MirLabel SenderNameLabel, DateSentLabel, MessageLabel, GoldSendLabel;
 
@@ -1126,6 +1177,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(Size.Width - 27, 3),
@@ -1176,6 +1230,8 @@ namespace Client.MirScenes.Dialogs
 
             CollectButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Collect",
                 Index = 370,
                 HoverIndex = 371,
                 PressedIndex = 372,
@@ -1191,6 +1247,8 @@ namespace Client.MirScenes.Dialogs
 
             CancelButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Cancel",
                 Index = 193,
                 HoverIndex = 194,
                 PressedIndex = 195,

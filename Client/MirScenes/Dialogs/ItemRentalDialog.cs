@@ -8,7 +8,7 @@ using C = ClientPackets;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class ItemRentalDialog : MirImageControl
+    public sealed class ItemRentalDialog : MirPanel
     {
         private readonly ItemRow[] _itemRows = new ItemRow[3];
         private DateTime _lastRequestTime = CMain.Now;
@@ -36,6 +36,8 @@ namespace Client.MirScenes.Dialogs
 
             var rentedTabButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Rented Tab",
                 Index = 2,
                 HoverIndex = 2,
                 Location = new Point(8, 32),
@@ -51,6 +53,8 @@ namespace Client.MirScenes.Dialogs
 
             var borrowedTabButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Borrowed Tab",
                 Index = 3,
                 Location = new Point(81, 32),
                 Size = new Size(84, 23),
@@ -64,6 +68,8 @@ namespace Client.MirScenes.Dialogs
 
             var rentItemButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Rent Item",
                 Index = 4,
                 HoverIndex = 5,
                 Location = new Point(295, 144),
@@ -82,6 +88,9 @@ namespace Client.MirScenes.Dialogs
 
             var closeButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(375, 3),

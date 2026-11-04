@@ -30,6 +30,20 @@ public sealed unsafe class SpriteBatch : IDisposable
 
     public void End() => Flush();
 
+    public void Draw(Texture texture, Rectangle source, Rectangle destination, Vector4 colour)
+    {
+        if (source.Width <= 0 || source.Height <= 0 || destination.Width <= 0 || destination.Height <= 0) return;
+        Matrix4x4 old = Transform;
+        try
+        {
+            Transform = Matrix4x4.CreateScale((float)destination.Width / source.Width,
+                (float)destination.Height / source.Height, 1) *
+                Matrix4x4.CreateTranslation(destination.X, destination.Y, 0) * old;
+            Draw(texture, source, Vector3.Zero, colour);
+        }
+        finally { Transform = old; }
+    }
+
     public void Draw(Texture texture, Rectangle? source, Vector3? position, Vector4 colour)
     {
         if (texture == null || texture.Disposed || colour.W <= 0) return;

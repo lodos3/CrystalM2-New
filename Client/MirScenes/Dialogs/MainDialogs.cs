@@ -9,7 +9,7 @@ using C = ClientPackets;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class MainDialog : MirImageControl
+    public sealed class MainDialog : MirPanel
     {
         public static UserObject User
         {
@@ -17,7 +17,7 @@ namespace Client.MirScenes.Dialogs
             set { MapObject.User = value; }
         }
 
-        public MirImageControl ExperienceBar, WeightBar, LeftCap, RightCap;
+        public MirImageControl ExperienceBar, WeightBar;
         public MirButton GameShopButton, MenuButton, InventoryButton, CharacterButton, SkillButton, QuestButton, OptionButton;
         public MirControl HealthOrb;
         public MirLabel HealthLabel, ManaLabel, TopLabel, BottomLabel, LevelLabel, CharacterName, ExperienceLabel, GoldLabel, WeightLabel, SpaceLabel, AModeLabel, PModeLabel, SModeLabel;
@@ -33,36 +33,14 @@ namespace Client.MirScenes.Dialogs
 
         public MainDialog()
         {
-            Index = Settings.Resolution == 800 ? 0 : Settings.Resolution == 1024 ? 1 : 2;
-            Library = Libraries.Prguse;
-            Location = new Point(((Settings.ScreenWidth / 2) - (Size.Width / 2)), Settings.ScreenHeight - Size.Height);
-            PixelDetect = true;
-
-            LeftCap = new MirImageControl
-            {
-                Index = 12,
-                Library = Libraries.Prguse,
-                Location = new Point(-67, this.Size.Height - 96),
-                Parent = this,
-                Visible = false
-            };
-            RightCap = new MirImageControl
-            {
-                Index = 13,
-                Library = Libraries.Prguse,
-                Location = new Point(1024, this.Size.Height - 104),
-                Parent = this,
-                Visible = false
-            };
-
-            if (Settings.Resolution > 1024)
-            {
-                LeftCap.Visible = true;
-                RightCap.Visible = true;
-            }
+            AutoSize = false;
+            Size = new Size(Settings.Resolution == 800 ? 800 : 1024, 154);
+            Location = new Point((Settings.ScreenWidth - Size.Width) / 2, Settings.ScreenHeight - Size.Height);
 
             InventoryButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Bag,
                 HoverIndex = 1904,
                 Index = 1903,
                 Library = Libraries.Prguse,
@@ -82,6 +60,8 @@ namespace Client.MirScenes.Dialogs
 
             CharacterButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Person,
                 HoverIndex = 1901,
                 Index = 1900,
                 Library = Libraries.Prguse,
@@ -104,6 +84,8 @@ namespace Client.MirScenes.Dialogs
 
             SkillButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Sword,
                 HoverIndex = 1907,
                 Index = 1906,
                 Library = Libraries.Prguse,
@@ -126,6 +108,8 @@ namespace Client.MirScenes.Dialogs
 
             QuestButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Book,
                 HoverIndex = 1910,
                 Index = 1909,
                 Library = Libraries.Prguse,
@@ -144,6 +128,8 @@ namespace Client.MirScenes.Dialogs
 
             OptionButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Gear,
                 HoverIndex = 1913,
                 Index = 1912,
                 Library = Libraries.Prguse,
@@ -162,6 +148,8 @@ namespace Client.MirScenes.Dialogs
 
             MenuButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Menu,
                 HoverIndex = 1961,
                 Index = 1960,
                 Library = Libraries.Prguse,
@@ -179,6 +167,8 @@ namespace Client.MirScenes.Dialogs
 
             GameShopButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Coin,
                 HoverIndex = 827,
                 Index = 826,
                 Library = Libraries.Prguse,
@@ -196,6 +186,7 @@ namespace Client.MirScenes.Dialogs
 
             HealthOrb = new MirControl
             {
+                Size = new Size(100, 80),
                 Parent = this,
                 Location = new Point(0, 30),
                 NotControl = true,
@@ -253,8 +244,9 @@ namespace Client.MirScenes.Dialogs
 
             ExperienceBar = new MirImageControl
             {
-                Index = Settings.Resolution != 800 ? 8 : 7,
-                Library = Libraries.Prguse,
+                Skin = UiSurface.ScrollTrack,
+                AutoSize = false,
+                Size = new Size(Size.Width - 18, 6),
                 Location = new Point(9, 143),
                 Parent = this,
                 DrawImage = false,
@@ -286,8 +278,9 @@ namespace Client.MirScenes.Dialogs
 
             WeightBar = new MirImageControl
             {
-                Index = 76,
-                Library = Libraries.Prguse,
+                Skin = UiSurface.ScrollTrack,
+                AutoSize = false,
+                Size = new Size(99, 9),
                 Location = new Point(this.Size.Width - 105, 103),
                 Parent = this,
                 DrawImage = false,
@@ -311,6 +304,9 @@ namespace Client.MirScenes.Dialogs
 
             HeroMenuButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Menu,
+                Hint = "Hero menu",
                 Index = 2164,
                 HoverIndex = 2165,
                 PressedIndex = 2166,
@@ -328,6 +324,8 @@ namespace Client.MirScenes.Dialogs
 
             HeroSummonButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Summon",
                 Index = 2167,
                 HoverIndex = 2168,
                 PressedIndex = 2169,
@@ -473,93 +471,36 @@ namespace Client.MirScenes.Dialogs
 
         private void HealthOrb_BeforeDraw(object sender, EventArgs e)
         {
-            if (Libraries.Prguse == null) return;
-
-            int height;
-            if (User != null && User.HP != User.Stats[Stat.HP])
-                height = (int)(80 * User.HP / (float)User.Stats[Stat.HP]);
-            else
-                height = 80;
-
-            if (height < 0) height = 0;
-            if (height > 80) height = 80;
-
-            int orbImage = 4;
-
-            bool hpOnly = false;
-
+            if (User == null) return;
+            Rectangle hp = HealthOrb.DisplayRectangle;
+            double health = User.HP / (double)Math.Max(1, User.Stats[Stat.HP]);
             if (HPOnly)
             {
-                hpOnly = true;
-                orbImage = 6;
+                DXManager.Device.Ui.Progress(hp, health, DarkFantasyPalette.Health, true);
+                return;
             }
-
-            Rectangle r = new Rectangle(0, 80 - height, hpOnly ? 100 : 50, height);
-            Libraries.Prguse.Draw(orbImage, r, new Point(((Settings.ScreenWidth / 2) - (Size.Width / 2)), HealthOrb.DisplayLocation.Y + 80 - height), Color.White, false);
-
-            if (hpOnly) return;
-
-            if (User.MP != User.Stats[Stat.MP])
-                height = (int)(80 * User.MP / (float)User.Stats[Stat.MP]);
-            else
-                height = 80;
-
-            if (height < 0) height = 0;
-            if (height > 80) height = 80;
-            r = new Rectangle(51, 80 - height, 50, height);
-
-            Libraries.Prguse.Draw(4, r, new Point(((Settings.ScreenWidth / 2) - (Size.Width / 2)) + 51, HealthOrb.DisplayLocation.Y + 80 - height), Color.White, false);
+            hp.Width = (hp.Width - 2) / 2;
+            Rectangle mp = new(hp.Right + 2, hp.Y, hp.Width, hp.Height);
+            DXManager.Device.Ui.Progress(hp, health, DarkFantasyPalette.Health, true);
+            DXManager.Device.Ui.Progress(mp, User.MP / (double)Math.Max(1, User.Stats[Stat.MP]), DarkFantasyPalette.Mana, true);
         }
 
         private void ExperienceBar_BeforeDraw(object sender, EventArgs e)
         {
-            if (ExperienceBar.Library == null) return;
-
-            double percent = MapObject.User.Experience / (double)MapObject.User.MaxExperience;
-            if (percent > 1) percent = 1;
-            if (percent <= 0) return;
-
-            Rectangle section = new Rectangle
-            {
-                Size = new Size((int)((ExperienceBar.Size.Width - 3) * percent), ExperienceBar.Size.Height)
-            };
-
-            ExperienceBar.Library.Draw(ExperienceBar.Index, section, ExperienceBar.DisplayLocation, Color.White, false);
+            if (User == null) return;
+            DXManager.Device.Ui.Progress(ExperienceBar.DisplayRectangle,
+                User.Experience / (double)User.MaxExperience, DarkFantasyPalette.Experience);
         }
 
         private void WeightBar_BeforeDraw(object sender, EventArgs e)
         {
-            if (WeightBar.Library == null) return;
-            double percent = MapObject.User.CurrentBagWeight / (double)MapObject.User.Stats[Stat.BagWeight];
-            if (percent > 1) percent = 1;
-            if (percent <= 0) return;
-
-            // Weight bar art based on fill
-            if (percent <= 0.50)
-            {
-                WeightBar.Library = Libraries.Prguse;
-                WeightBar.Index = 76;
-            }
-            else if (percent <= 0.75)
-            {
-                WeightBar.Library = Libraries.UI_32bit;
-                WeightBar.Index = 473;
-            }
-            else
-            {
-                WeightBar.Library = Libraries.UI_32bit;
-                WeightBar.Index = 472;
-            }
-
-            Rectangle section = new Rectangle
-            {
-                Size = new Size((int)((WeightBar.Size.Width - 2) * percent), WeightBar.Size.Height)
-            };
-
-            WeightBar.Library.Draw(WeightBar.Index, section, WeightBar.DisplayLocation, Color.White, false);
+            if (User == null) return;
+            double weight = User.CurrentBagWeight / (double)User.Stats[Stat.BagWeight];
+            DXManager.Device.Ui.Progress(WeightBar.DisplayRectangle, weight,
+                weight > 0.75 ? DarkFantasyPalette.Health : DarkFantasyPalette.Experience);
         }
     }
-    public sealed class ChatDialog : MirImageControl
+    public sealed class ChatDialog : MirPanel
     {
         public List<ChatHistory> FullHistory = new List<ChatHistory>();
         public List<ChatHistory> History = new List<ChatHistory>();
@@ -592,8 +533,8 @@ namespace Client.MirScenes.Dialogs
 
             ChatTextBox = new MirTextBox
             {
-                BackColour = Color.DarkGray,
-                ForeColour = Color.Black,
+                BackColour = DarkFantasyPalette.Input,
+                ForeColour = DarkFantasyPalette.Text,
                 Parent = this,
                 Size = new Size(Settings.Resolution != 800 ? 627 : 403, 13),
                 Location = new Point(1, 54),
@@ -607,6 +548,9 @@ namespace Client.MirScenes.Dialogs
 
             HomeButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
+                Hint = "Home",
                 Index = 2018,
                 HoverIndex = 2019,
                 Library = Libraries.Prguse,
@@ -625,6 +569,9 @@ namespace Client.MirScenes.Dialogs
 
             UpButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
+                Hint = "Up",
                 Index = 2021,
                 HoverIndex = 2022,
                 Library = Libraries.Prguse,
@@ -643,6 +590,9 @@ namespace Client.MirScenes.Dialogs
 
             EndButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Down,
+                Hint = "End",
                 Index = 2027,
                 HoverIndex = 2028,
                 Library = Libraries.Prguse,
@@ -660,6 +610,9 @@ namespace Client.MirScenes.Dialogs
 
             DownButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Down,
+                Hint = "Down",
                 Index = 2024,
                 HoverIndex = 2025,
                 Library = Libraries.Prguse,
@@ -679,6 +632,7 @@ namespace Client.MirScenes.Dialogs
 
             CountBar = new MirImageControl
             {
+                Skin = UiSurface.ScrollTrack,
                 Index = 2012,
                 Library = Libraries.Prguse,
                 Location = new Point(Settings.Resolution != 800 ? 622 : 398, 16),
@@ -687,6 +641,8 @@ namespace Client.MirScenes.Dialogs
 
             PositionBar = new MirButton
             {
+                Skin = UiSurface.ScrollThumb,
+                Glyph = UiGlyph.Grip,
                 Index = 2015,
                 HoverIndex = 2016,
                 Library = Libraries.Prguse,
@@ -1251,7 +1207,7 @@ namespace Client.MirScenes.Dialogs
             public ChatType Type;
         }
     }
-    public sealed class ChatControlBar : MirImageControl
+    public sealed class ChatControlBar : MirPanel
     {
         public MirButton SizeButton, SettingsButton, NormalButton, ShoutButton, WhisperButton, LoverButton, MentorButton, GroupButton, GuildButton, ReportButton, TradeButton;
 
@@ -1286,6 +1242,8 @@ namespace Client.MirScenes.Dialogs
 
             SettingsButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Gear,
                 Index = 2060,
                 HoverIndex = 2061,
                 PressedIndex = 2062,
@@ -1308,6 +1266,8 @@ namespace Client.MirScenes.Dialogs
 
             NormalButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Normal",
                 Index = 2036,
                 HoverIndex = 2037,
                 PressedIndex = 2038,
@@ -1324,6 +1284,8 @@ namespace Client.MirScenes.Dialogs
 
             ShoutButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Shout",
                 Index = 2039,
                 HoverIndex = 2040,
                 PressedIndex = 2041,
@@ -1340,6 +1302,8 @@ namespace Client.MirScenes.Dialogs
 
             WhisperButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Whisper",
                 Index = 2042,
                 HoverIndex = 2043,
                 PressedIndex = 2044,
@@ -1356,6 +1320,8 @@ namespace Client.MirScenes.Dialogs
 
             LoverButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Lover",
                 Index = 2045,
                 HoverIndex = 2046,
                 PressedIndex = 2047,
@@ -1372,6 +1338,8 @@ namespace Client.MirScenes.Dialogs
 
             MentorButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Mentor",
                 Index = 2048,
                 HoverIndex = 2049,
                 PressedIndex = 2050,
@@ -1388,6 +1356,8 @@ namespace Client.MirScenes.Dialogs
 
             GroupButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
                 Index = 2051,
                 HoverIndex = 2052,
                 PressedIndex = 2053,
@@ -1404,6 +1374,8 @@ namespace Client.MirScenes.Dialogs
 
             GuildButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Shield,
                 Index = 2054,
                 HoverIndex = 2055,
                 PressedIndex = 2056,
@@ -1421,6 +1393,8 @@ namespace Client.MirScenes.Dialogs
 
             TradeButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Trade",
                 Index = 2004,
                 HoverIndex = 2005,
                 PressedIndex = 2006,
@@ -1434,6 +1408,8 @@ namespace Client.MirScenes.Dialogs
 
             ReportButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Report",
                 Index = 2063,
                 HoverIndex = 2064,
                 PressedIndex = 2065,
@@ -1512,7 +1488,7 @@ namespace Client.MirScenes.Dialogs
         }
     }
 
-    public sealed class SkillBarDialog : MirImageControl
+    public sealed class SkillBarDialog : MirPanel
     {
         private readonly MirButton _switchBindsButton;
 
@@ -1536,10 +1512,11 @@ namespace Client.MirScenes.Dialogs
             Location = new Point(0, BarIndex * 20);
             Visible = true;
 
-            BeforeDraw += MagicKeyDialog_BeforeDraw;
 
             _switchBindsButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Switch bindings",
                 Index = 2247,
                 Library = Libraries.Prguse,
                 Parent = this,
@@ -1653,11 +1630,6 @@ namespace Client.MirScenes.Dialogs
         }
 
 
-        void MagicKeyDialog_BeforeDraw(object sender, EventArgs e)
-        {
-            Libraries.Prguse.Draw(2193, new Point(DisplayLocation.X + 12, DisplayLocation.Y), Color.White, true, 0.5F);
-        }
-
         public void Update()
         {
             HasSkill = false;
@@ -1760,7 +1732,7 @@ namespace Client.MirScenes.Dialogs
         }
     }
 
-    public sealed class MiniMapDialog : MirImageControl
+    public sealed class MiniMapDialog : MirPanel
     {
         public MirImageControl LightSetting, NewMail;
         public MirButton ToggleButton, BigMapButton, MailButton;
@@ -1802,6 +1774,8 @@ namespace Client.MirScenes.Dialogs
 
             MailButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Mail,
                 Index = 2099,
                 HoverIndex = 2100,
                 PressedIndex = 2101,
@@ -1825,6 +1799,8 @@ namespace Client.MirScenes.Dialogs
 
             BigMapButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Map,
                 Index = 2096,
                 HoverIndex = 2097,
                 PressedIndex = 2098,
@@ -1838,6 +1814,8 @@ namespace Client.MirScenes.Dialogs
 
             ToggleButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Minus,
                 Index = 2102,
                 HoverIndex = 2103,
                 PressedIndex = 2104,
@@ -2109,7 +2087,7 @@ namespace Client.MirScenes.Dialogs
             }
         }
     }
-    public sealed class InspectDialog : MirImageControl
+    public sealed class InspectDialog : MirPanel
     {
         public static UserItem[] Items = new UserItem[14];
         public static uint InspectID;
@@ -2157,6 +2135,7 @@ namespace Client.MirScenes.Dialogs
 
             CharacterPage = new MirImageControl
             {
+                Skin = UiSurface.Inset,
                 Index = 340,
                 Parent = this,
                 Library = Libraries.Prguse,
@@ -2207,6 +2186,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(241, 3),
@@ -2221,6 +2203,8 @@ namespace Client.MirScenes.Dialogs
 
             GroupButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
                 HoverIndex = 432,
                 Index = 431,
                 Location = new Point(55, 357),
@@ -2250,6 +2234,8 @@ namespace Client.MirScenes.Dialogs
 
             FriendButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Group,
                 HoverIndex = 435,
                 Index = 434,
                 Location = new Point(85, 357),
@@ -2266,6 +2252,8 @@ namespace Client.MirScenes.Dialogs
 
             MailButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Mail,
                 HoverIndex = 438,
                 Index = 437,
                 Location = new Point(115, 357),
@@ -2279,6 +2267,8 @@ namespace Client.MirScenes.Dialogs
 
             TradeButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Trade",
                 HoverIndex = 524,
                 Index = 523,
                 Location = new Point(145, 357),
@@ -2292,6 +2282,8 @@ namespace Client.MirScenes.Dialogs
 
             ObserveButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Eye,
                 Index = 854,
                 HoverIndex = 855,
                 PressedIndex = 856,
@@ -2332,6 +2324,8 @@ namespace Client.MirScenes.Dialogs
             };
             LoverButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Lover",
                 Index = 604,
                 Location = new Point(17, 17),
                 Library = Libraries.Prguse,
@@ -2523,7 +2517,7 @@ namespace Client.MirScenes.Dialogs
 
 
     }
-    public sealed class OptionDialog : MirImageControl
+    public sealed class OptionDialog : MirPanel
     {
         public MirButton SkillModeOn, SkillModeOff;
         public MirButton SkillBarOn, SkillBarOff;
@@ -2541,8 +2535,8 @@ namespace Client.MirScenes.Dialogs
 
         public OptionDialog()
         {
-            Index = 411;
-            Library = Libraries.Title;
+            AutoSize = false;
+            Size = new Size(260, 328);
             Movable = true;
             Sort = true;
 
@@ -2552,6 +2546,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 Index = 360,
                 HoverIndex = 361,
                 Library = Libraries.Prguse2,
@@ -2565,6 +2562,8 @@ namespace Client.MirScenes.Dialogs
             //tilde option
             SkillModeOn = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Tilde",
                 Library = Libraries.Prguse2,
                 Location = new Point(159, 68),
                 Parent = this,
@@ -2580,6 +2579,8 @@ namespace Client.MirScenes.Dialogs
             //ctrl option
             SkillModeOff = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Ctrl",
                 Library = Libraries.Prguse2,
                 Location = new Point(201, 68),
                 Parent = this,
@@ -2594,6 +2595,8 @@ namespace Client.MirScenes.Dialogs
 
             SkillBarOn = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "On",
                 Library = Libraries.Prguse2,
                 Location = new Point(159, 93),
                 Parent = this,
@@ -2605,6 +2608,8 @@ namespace Client.MirScenes.Dialogs
 
             SkillBarOff = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Off",
                 Library = Libraries.Prguse2,
                 Location = new Point(201, 93),
                 Parent = this,
@@ -2616,6 +2621,8 @@ namespace Client.MirScenes.Dialogs
 
             EffectOn = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "On",
                 Library = Libraries.Prguse2,
                 Location = new Point(159, 118),
                 Parent = this,
@@ -2627,6 +2634,8 @@ namespace Client.MirScenes.Dialogs
 
             EffectOff = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Off",
                 Library = Libraries.Prguse2,
                 Location = new Point(201, 118),
                 Parent = this,
@@ -2638,6 +2647,8 @@ namespace Client.MirScenes.Dialogs
 
             DropViewOn = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "On",
                 Library = Libraries.Prguse2,
                 Location = new Point(159, 143),
                 Parent = this,
@@ -2649,6 +2660,8 @@ namespace Client.MirScenes.Dialogs
 
             DropViewOff = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Off",
                 Library = Libraries.Prguse2,
                 Location = new Point(201, 143),
                 Parent = this,
@@ -2660,6 +2673,8 @@ namespace Client.MirScenes.Dialogs
 
             NameViewOn = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "On",
                 Library = Libraries.Prguse2,
                 Location = new Point(159, 168),
                 Parent = this,
@@ -2671,6 +2686,8 @@ namespace Client.MirScenes.Dialogs
 
             NameViewOff = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Off",
                 Library = Libraries.Prguse2,
                 Location = new Point(201, 168),
                 Parent = this,
@@ -2682,6 +2699,8 @@ namespace Client.MirScenes.Dialogs
 
             HPViewOn = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "On",
                 Library = Libraries.Prguse2,
                 Location = new Point(159, 193),
                 Parent = this,
@@ -2697,6 +2716,8 @@ namespace Client.MirScenes.Dialogs
 
             HPViewOff = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Off",
                 Library = Libraries.Prguse2,
                 Location = new Point(201, 193),
                 Parent = this,
@@ -2712,8 +2733,9 @@ namespace Client.MirScenes.Dialogs
 
             SoundBar = new MirImageControl
             {
-                Index = 468,
-                Library = Libraries.Prguse2,
+                Skin = UiSurface.ScrollTrack,
+                AutoSize = false,
+                Size = new Size(78, 9),
                 Location = new Point(159, 225),
                 Parent = this,
                 DrawImage = false,
@@ -2724,8 +2746,9 @@ namespace Client.MirScenes.Dialogs
 
             VolumeBar = new MirImageControl
             {
-                Index = 20,
-                Library = Libraries.Prguse,
+                Skin = UiSurface.ScrollThumb,
+                AutoSize = false,
+                Size = new Size(8, 17),
                 Location = new Point(155, 218),
                 Parent = this,
                 NotControl = true,
@@ -2733,8 +2756,9 @@ namespace Client.MirScenes.Dialogs
 
             MusicSoundBar = new MirImageControl
             {
-                Index = 468,
-                Library = Libraries.Prguse2,
+                Skin = UiSurface.ScrollTrack,
+                AutoSize = false,
+                Size = new Size(78, 9),
                 Location = new Point(159, 251),
                 Parent = this,
                 DrawImage = false
@@ -2745,8 +2769,9 @@ namespace Client.MirScenes.Dialogs
 
             MusicVolumeBar = new MirImageControl
             {
-                Index = 20,
-                Library = Libraries.Prguse,
+                Skin = UiSurface.ScrollThumb,
+                AutoSize = false,
+                Size = new Size(8, 17),
                 Location = new Point(155, 244),
                 Parent = this,
                 NotControl = true,
@@ -2754,6 +2779,8 @@ namespace Client.MirScenes.Dialogs
 
             NewMoveOn = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "On",
                 Library = Libraries.Title,
                 Location = new Point(159, 296),
                 Parent = this,
@@ -2769,6 +2796,8 @@ namespace Client.MirScenes.Dialogs
 
             NewMoveOff = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Off",
                 Library = Libraries.Title,
                 Location = new Point(201, 296),
                 Parent = this,
@@ -2784,6 +2813,8 @@ namespace Client.MirScenes.Dialogs
 
             ObserveOn = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "On",
                 Library = Libraries.Prguse2,
                 Location = new Point(159, 271),
                 Parent = this,
@@ -2795,6 +2826,8 @@ namespace Client.MirScenes.Dialogs
 
             ObserveOff = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Off",
                 Library = Libraries.Prguse2,
                 Location = new Point(201, 271),
                 Parent = this,
@@ -2803,6 +2836,16 @@ namespace Client.MirScenes.Dialogs
                 PressedIndex = 460
             };
             ObserveOff.Click += (o, e) => ToggleObserve(false);
+
+            PanelTitle = "Settings";
+            foreach (var row in new[]
+            {
+                ("Skill modifier", SkillModeOn.Location.Y), ("Skill bar", SkillBarOn.Location.Y),
+                ("Spell effects", EffectOn.Location.Y), ("Item names", DropViewOn.Location.Y),
+                ("Character names", NameViewOn.Location.Y), ("Health and mana text", HPViewOn.Location.Y),
+                ("Sound effects", SoundBar.Location.Y - 4), ("Music", MusicSoundBar.Location.Y - 4),
+                ("Allow observing", ObserveOn.Location.Y), ("Modern movement", NewMoveOn.Location.Y)
+            }) AddCaption(this, row.Item1, new Rectangle(16, row.Item2, 135, 17));
         }
 
         private void ToggleObserve(bool allow)
@@ -2835,7 +2878,7 @@ namespace Client.MirScenes.Dialogs
 
             Point p = e.Location.Subtract(SoundBar.DisplayLocation);
 
-            byte volume = (byte)(p.X / (double)SoundBar.Size.Width * 100);
+            byte volume = (byte)Math.Clamp(p.X / (double)Math.Max(1, SoundBar.Size.Width) * 100, 0, 100);
             Settings.Volume = volume;
 
             double percent = Settings.Volume / 100D;
@@ -2849,48 +2892,20 @@ namespace Client.MirScenes.Dialogs
 
         private void SoundBar_BeforeDraw(object sender, EventArgs e)
         {
-            if (SoundBar.Library == null) return;
-
-            double percent = Settings.Volume / 100D;
-
-            SoundBar.Hint = $"{Settings.Volume}%";
-
-            if (percent > 1) percent = 1;
-            if (percent > 0)
-            {
-                Rectangle section = new Rectangle
-                {
-                    Size = new Size((int)((SoundBar.Size.Width - 2) * percent), SoundBar.Size.Height)
-                };
-
-                SoundBar.Library.Draw(SoundBar.Index, section, SoundBar.DisplayLocation, Color.White, false);
-                VolumeBar.Location = new Point(159 + section.Size.Width, 218);
-            }
-            else
-                VolumeBar.Location = new Point(159, 218);
+            DrawVolume(SoundBar, VolumeBar, Settings.Volume);
         }
 
         private void MusicSoundBar_BeforeDraw(object sender, EventArgs e)
         {
-            if (MusicSoundBar.Library == null) return;
+            DrawVolume(MusicSoundBar, MusicVolumeBar, Settings.MusicVolume);
+        }
 
-            double percent = Settings.MusicVolume / 100D;
-
-            MusicSoundBar.Hint = $"{Settings.MusicVolume}%";
-
-            if (percent > 1) percent = 1;
-            if (percent > 0)
-            {
-                Rectangle section = new Rectangle
-                {
-                    Size = new Size((int)((MusicSoundBar.Size.Width - 2) * percent), MusicSoundBar.Size.Height)
-                };
-
-                MusicSoundBar.Library.Draw(MusicSoundBar.Index, section, MusicSoundBar.DisplayLocation, Color.White, false);
-                MusicVolumeBar.Location = new Point(159 + section.Size.Width, 244);
-            }
-            else
-                MusicVolumeBar.Location = new Point(159, 244);
+        private static void DrawVolume(MirImageControl track, MirImageControl thumb, byte value)
+        {
+            double fraction = Math.Clamp(value / 100d, 0, 1);
+            track.Hint = $"{value}%";
+            DXManager.Device.Ui.Progress(track.DisplayRectangle, fraction, DarkFantasyPalette.Experience);
+            thumb.Location = new Point(track.Location.X + (int)((track.Size.Width - thumb.Size.Width) * fraction), thumb.Location.Y);
         }
 
         private void MusicSoundBar_MouseMove(object sender, MouseEventArgs e)
@@ -2899,7 +2914,7 @@ namespace Client.MirScenes.Dialogs
 
             Point p = e.Location.Subtract(MusicSoundBar.DisplayLocation);
 
-            byte volume = (byte)(p.X / (double)MusicSoundBar.Size.Width * 100);
+            byte volume = (byte)Math.Clamp(p.X / (double)Math.Max(1, MusicSoundBar.Size.Width) * 100, 0, 100);
             Settings.MusicVolume = volume;
 
             double percent = Settings.MusicVolume / 100D;
@@ -2913,97 +2928,26 @@ namespace Client.MirScenes.Dialogs
 
         private void OptionPanel_BeforeDraw(object sender, EventArgs e)
         {
-            if (Settings.SkillMode)
-            {
-                SkillModeOn.Index = 452;
-                SkillModeOff.Index = 453;
-            }
-            else
-            {
-                SkillModeOn.Index = 450;
-                SkillModeOff.Index = 455;
-            }
-
-            if (Settings.SkillBar)
-            {
-                SkillBarOn.Index = 458;
-                SkillBarOff.Index = 459;
-            }
-            else
-            {
-                SkillBarOn.Index = 456;
-                SkillBarOff.Index = 461;
-            }
-
-            if (Settings.Effect)
-            {
-                EffectOn.Index = 458;
-                EffectOff.Index = 459;
-            }
-            else
-            {
-                EffectOn.Index = 456;
-                EffectOff.Index = 461;
-            }
-
-            if (Settings.DropView)
-            {
-                DropViewOn.Index = 458;
-                DropViewOff.Index = 459;
-            }
-            else
-            {
-                DropViewOn.Index = 456;
-                DropViewOff.Index = 461;
-            }
-
-            if (Settings.NameView)
-            {
-                NameViewOn.Index = 458;
-                NameViewOff.Index = 459;
-            }
-            else
-            {
-                NameViewOn.Index = 456;
-                NameViewOff.Index = 461;
-            }
-
-            if (Settings.HPView)
-            {
-                HPViewOn.Index = 464;
-                HPViewOff.Index = 465;
-            }
-            else
-            {
-                HPViewOn.Index = 462;
-                HPViewOff.Index = 467;
-            }
-
-            if (Settings.NewMove)
-            {
-                NewMoveOn.Index = 853;
-                NewMoveOff.Index = 848;
-            }
-            else
-            {
-                NewMoveOn.Index = 851;
-                NewMoveOff.Index = 850;
-            }
-
-            if (GameScene.AllowObserve)
-            {
-                ObserveOn.Index = 458;
-                ObserveOff.Index = 459;
-            }
-            else
-            {
-                ObserveOn.Index = 456;
-                ObserveOff.Index = 461;
-            }
+            SkillModeOn.Selected = !Settings.SkillMode;
+            SkillModeOff.Selected = !SkillModeOn.Selected;
+            SkillBarOn.Selected = Settings.SkillBar;
+            SkillBarOff.Selected = !SkillBarOn.Selected;
+            EffectOn.Selected = Settings.Effect;
+            EffectOff.Selected = !EffectOn.Selected;
+            DropViewOn.Selected = Settings.DropView;
+            DropViewOff.Selected = !DropViewOn.Selected;
+            NameViewOn.Selected = Settings.NameView;
+            NameViewOff.Selected = !NameViewOn.Selected;
+            HPViewOn.Selected = Settings.HPView;
+            HPViewOff.Selected = !HPViewOn.Selected;
+            ObserveOn.Selected = GameScene.AllowObserve;
+            ObserveOff.Selected = !ObserveOn.Selected;
+            NewMoveOn.Selected = Settings.NewMove;
+            NewMoveOff.Selected = !NewMoveOn.Selected;
         }
 
     }
-    public sealed class MenuDialog : MirImageControl
+    public sealed class MenuDialog : MirPanel
     {
         public MirButton ExitButton,
                          LogOutButton,
@@ -3032,6 +2976,8 @@ namespace Client.MirScenes.Dialogs
 
             ExitButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Exit",
                 HoverIndex = 634,
                 Index = 633,
                 Parent = this,
@@ -3044,6 +2990,8 @@ namespace Client.MirScenes.Dialogs
 
             LogOutButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Log Out",
                 HoverIndex = 637,
                 Index = 636,
                 Parent = this,
@@ -3057,6 +3005,8 @@ namespace Client.MirScenes.Dialogs
 
             HelpButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Help,
                 Index = 1970,
                 HoverIndex = 1971,
                 PressedIndex = 1972,
@@ -3074,6 +3024,8 @@ namespace Client.MirScenes.Dialogs
 
             KeyboardLayoutButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Keyboard Layout",
                 Index = 1973,
                 HoverIndex = 1974,
                 PressedIndex = 1975,
@@ -3092,6 +3044,8 @@ namespace Client.MirScenes.Dialogs
 
             RankingButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Ranking",
                 Index = 2000,
                 HoverIndex = 2001,
                 PressedIndex = 2002,
@@ -3110,6 +3064,8 @@ namespace Client.MirScenes.Dialogs
 
             CraftingButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Crafting",
                 Index = 2000,
                 HoverIndex = 2001,
                 PressedIndex = 2002,
@@ -3125,6 +3081,8 @@ namespace Client.MirScenes.Dialogs
 
             IntelligentCreatureButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Intelligent Creature",
                 Index = 431,
                 HoverIndex = 432,
                 PressedIndex = 433,
@@ -3141,6 +3099,8 @@ namespace Client.MirScenes.Dialogs
             };
             RideButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Ride",
                 Index = 1976,
                 HoverIndex = 1977,
                 PressedIndex = 1978,
@@ -3158,6 +3118,8 @@ namespace Client.MirScenes.Dialogs
 
             FishingButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Fishing",
                 Index = 1979,
                 HoverIndex = 1980,
                 PressedIndex = 1981,
@@ -3175,6 +3137,8 @@ namespace Client.MirScenes.Dialogs
 
             FriendButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Group,
                 Index = 1982,
                 HoverIndex = 1983,
                 PressedIndex = 1984,
@@ -3193,6 +3157,8 @@ namespace Client.MirScenes.Dialogs
 
             MentorButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Mentor",
                 Index = 1985,
                 HoverIndex = 1986,
                 PressedIndex = 1987,
@@ -3212,6 +3178,8 @@ namespace Client.MirScenes.Dialogs
 
             RelationshipButton = new MirButton  /* lover button */
             {
+                Skin = UiSurface.Button,
+                Text = "Relationship",
                 Index = 1988,
                 HoverIndex = 1989,
                 PressedIndex = 1990,
@@ -3230,6 +3198,8 @@ namespace Client.MirScenes.Dialogs
 
             GroupButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
                 Index = 1991,
                 HoverIndex = 1992,
                 PressedIndex = 1993,
@@ -3247,6 +3217,8 @@ namespace Client.MirScenes.Dialogs
 
             GuildButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Shield,
                 Index = 1994,
                 HoverIndex = 1995,
                 PressedIndex = 1996,
@@ -3283,6 +3255,9 @@ namespace Client.MirScenes.Dialogs
 
             SkillButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Sword,
+                Hint = "Skills",
                 Index = 0,
                 PressedIndex = 1,
                 Library = Libraries.MagIcon2,
@@ -3780,7 +3755,7 @@ namespace Client.MirScenes.Dialogs
             }
         }
     }
-    public sealed class AssignKeyPanel : MirImageControl
+    public sealed class AssignKeyPanel : MirPanel
     {
         public MirButton SaveButton, NoneButton;
         public UserObject Actor;
@@ -3824,6 +3799,8 @@ namespace Client.MirScenes.Dialogs
 
             NoneButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "None",
                 Index = 287, //154
                 HoverIndex = 288,
                 PressedIndex = 289,
@@ -3835,6 +3812,8 @@ namespace Client.MirScenes.Dialogs
 
             SaveButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Save",
                 Library = Libraries.Title,
                 Parent = this,
                 Location = new Point(284, 101),
@@ -3864,6 +3843,7 @@ namespace Client.MirScenes.Dialogs
             {
                 FKeys[i] = new MirButton
                 {
+                    Skin = UiSurface.Button,
                     Index = 0,
                     PressedIndex = 1,
                     Library = Libraries.Prguse,
@@ -3900,7 +3880,7 @@ namespace Client.MirScenes.Dialogs
             FKeys[key].PressedIndex = 1658;
         }
     }
-    public sealed class DuraStatusDialog : MirImageControl
+    public sealed class DuraStatusDialog : MirPanel
     {
         public MirButton Character;
 
@@ -3959,6 +3939,7 @@ namespace Client.MirScenes.Dialogs
             };
             Background = new MirImageControl()
             {
+                Skin = UiSurface.Inset,
                 Index = 2162,
                 Library = Libraries.Prguse,
                 Parent = this,

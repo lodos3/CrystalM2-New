@@ -4,7 +4,7 @@ using Client.MirSounds;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class ReportDialog : MirImageControl
+    public sealed class ReportDialog : MirPanel
     {
         MirDropDownBox ReportType;
         MirButton SendButton, CloseButton;
@@ -20,6 +20,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(336, 3),
@@ -55,6 +58,8 @@ namespace Client.MirScenes.Dialogs
 
             SendButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Send",
                 Parent = this,
                 Library = Libraries.Title,
                 Index = 607,

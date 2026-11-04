@@ -273,6 +273,7 @@ namespace Client
         }
         public static void CMain_MouseDown(object sender, MouseEventArgs e)
         {
+            MirPanel.ClearKeyboardFocus();
             if (Program.Form.ActiveControl is TextBox)
             {
                 MirTextBox textBox = Program.Form.ActiveControl.Tag as MirTextBox;
@@ -734,6 +735,17 @@ namespace Client
                 SoundManager.Dispose();
                 Graphics?.Dispose();
             }
+        }
+
+        protected override bool ProcessDialogKey(Keys keyData)
+        {
+            if (DXManager.Device != null && (keyData & Keys.KeyCode) == Keys.Tab && ActiveControl is not TextBox)
+            {
+                var e = new KeyEventArgs(keyData);
+                MirScene.ActiveScene?.OnKeyDown(e);
+                if (e.Handled) return true;
+            }
+            return base.ProcessDialogKey(keyData);
         }
 
         protected override void WndProc(ref Message m)

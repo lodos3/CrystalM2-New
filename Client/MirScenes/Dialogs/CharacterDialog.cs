@@ -5,7 +5,7 @@ using Client.MirSounds;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class CharacterDialog : MirImageControl
+    public sealed class CharacterDialog : MirPanel
     {
         public MirButton CloseButton, CharacterButton, StatusButton, StateButton, SkillButton;
         public MirImageControl CharacterPage, StatusPage, StatePage, SkillPage, ClassImage;
@@ -29,8 +29,8 @@ namespace Client.MirScenes.Dialogs
             Actor = actor;
             GridType = gridType;
 
-            Index = 504;
-            Library = Libraries.Title;
+            AutoSize = false;
+            Size = new Size(264, 382);
             Location = new Point(Settings.ScreenWidth - 264, 0);
             Movable = true;
             Sort = true;            
@@ -85,9 +85,10 @@ namespace Client.MirScenes.Dialogs
 
             StatusPage = new MirImageControl
             {
-                Index = 506,
+                Skin = UiSurface.Inset,
+                AutoSize = false,
+                Size = new Size(248, 282),
                 Parent = this,
-                Library = Libraries.Title,
                 Location = new Point(8, 90),
                 Visible = false,
             };
@@ -110,9 +111,10 @@ namespace Client.MirScenes.Dialogs
 
             StatePage = new MirImageControl
             {
-                Index = 507,
+                Skin = UiSurface.Inset,
+                AutoSize = false,
+                Size = new Size(248, 282),
                 Parent = this,
-                Library = Libraries.Title,
                 Location = new Point(8, 90),
                 Visible = false
             };
@@ -135,9 +137,10 @@ namespace Client.MirScenes.Dialogs
 
             SkillPage = new MirImageControl
             {
-                Index = 508,
+                Skin = UiSurface.Inset,
+                AutoSize = false,
+                Size = new Size(248, 282),
                 Parent = this,
-                Library = Libraries.Title,
                 Location = new Point(8, 90),
                 Visible = false
             };
@@ -145,6 +148,8 @@ namespace Client.MirScenes.Dialogs
 
             CharacterButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Equipment",
                 Index = 500,
                 Library = Libraries.Title,
                 Location = new Point(8, 70),
@@ -156,6 +161,8 @@ namespace Client.MirScenes.Dialogs
             CharacterButton.Click += (o, e) => ShowCharacterPage();
             StatusButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Stats",
                 Library = Libraries.Title,
                 Location = new Point(70, 70),
                 Parent = this,
@@ -167,6 +174,8 @@ namespace Client.MirScenes.Dialogs
 
             StateButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Attributes",
                 Library = Libraries.Title,
                 Location = new Point(132, 70),
                 Parent = this,
@@ -178,6 +187,8 @@ namespace Client.MirScenes.Dialogs
 
             SkillButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Skills",
                 Library = Libraries.Title,
                 Location = new Point(194, 70),
                 Parent = this,
@@ -189,6 +200,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(241, 3),
@@ -560,6 +574,9 @@ namespace Client.MirScenes.Dialogs
 
             NextButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Right,
+                Hint = "Next",
                 Index = 396,
                 Location = new Point(140, 250),
                 Library = Libraries.Prguse,
@@ -577,6 +594,9 @@ namespace Client.MirScenes.Dialogs
 
             BackButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Left,
+                Hint = "Back",
                 Index = 398,
                 Location = new Point(90, 250),
                 Library = Libraries.Prguse,
@@ -591,6 +611,19 @@ namespace Client.MirScenes.Dialogs
                 StartIndex -= 7;
                 RefreshInterface();
             };
+
+            CharacterButton.Selected = true;
+            foreach (var row in new[]
+            {
+                (HealthLabel, "Health"), (ManaLabel, "Mana"), (ACLabel, "Armour"), (MACLabel, "Magic armour"),
+                (DCLabel, "Attack"), (MCLabel, "Magic"), (SCLabel, "Spirit"), (CritRLabel, "Critical chance"),
+                (CritDLabel, "Critical damage"), (AttkSpdLabel, "Attack speed"), (AccLabel, "Accuracy"),
+                (AgilLabel, "Agility"), (LuckLabel, "Luck"), (ExpPLabel, "Experience"), (BagWLabel, "Bag weight"),
+                (WearWLabel, "Wear weight"), (HandWLabel, "Hand weight"), (MagicRLabel, "Magic resistance"),
+                (PoisonResLabel, "Poison resistance"), (HealthRLabel, "Health recovery"), (ManaRLabel, "Mana recovery"),
+                (PoisonRecLabel, "Poison recovery"), (HolyTLabel, "Holy"), (FreezeLabel, "Freezing"),
+                (PoisonAtkLabel, "Poison attack")
+            }) AddCaption(row.Item1.Parent, row.Item2, new Rectangle(11, row.Item1.Location.Y, 112, 16));
         }
 
         public override void Show()
@@ -612,9 +645,13 @@ namespace Client.MirScenes.Dialogs
             StatePage.Visible = false;
             SkillPage.Visible = false;
             CharacterButton.Index = 500;
+            CharacterButton.Selected = true;
             StatusButton.Index = -1;
+            StatusButton.Selected = false;
             StateButton.Index = -1;
+            StateButton.Selected = false;
             SkillButton.Index = -1;
+            SkillButton.Selected = false;
         }
 
         private void ShowStatusPage()
@@ -624,9 +661,13 @@ namespace Client.MirScenes.Dialogs
             StatePage.Visible = false;
             SkillPage.Visible = false;
             CharacterButton.Index = -1;
+            CharacterButton.Selected = false;
             StatusButton.Index = 501;
+            StatusButton.Selected = true;
             StateButton.Index = -1;
+            StateButton.Selected = false;
             SkillButton.Index = -1;
+            SkillButton.Selected = false;
         }
 
         private void ShowStatePage()
@@ -636,9 +677,13 @@ namespace Client.MirScenes.Dialogs
             StatePage.Visible = true;
             SkillPage.Visible = false;
             CharacterButton.Index = -1;
+            CharacterButton.Selected = false;
             StatusButton.Index = -1;
+            StatusButton.Selected = false;
             StateButton.Index = 502;
+            StateButton.Selected = true;
             SkillButton.Index = -1;
+            SkillButton.Selected = false;
         }
 
         public void ShowSkillPage()
@@ -648,9 +693,13 @@ namespace Client.MirScenes.Dialogs
             StatePage.Visible = false;
             SkillPage.Visible = true;
             CharacterButton.Index = -1;
+            CharacterButton.Selected = false;
             StatusButton.Index = -1;
+            StatusButton.Selected = false;
             StateButton.Index = -1;
+            StateButton.Selected = false;
             SkillButton.Index = 503;
+            SkillButton.Selected = true;
             //StartIndex = 0;
         }
 
@@ -658,7 +707,6 @@ namespace Client.MirScenes.Dialogs
         {
             int offSet = Actor.Gender == MirGender.Male ? 0 : 1;
 
-            Index = 504;// +offSet;
             CharacterPage.Index = 340 + offSet;
 
             switch (Actor.Class)

@@ -6,7 +6,7 @@ using C = ClientPackets;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class HeroInventoryDialog : MirImageControl
+    public sealed class HeroInventoryDialog : MirPanel
     {
         public MirImageControl[] LockBar = new MirImageControl[4];
         public MirImageControl HPLockBar, MPLockBar;
@@ -31,6 +31,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(299, 2),
@@ -100,6 +103,8 @@ namespace Client.MirScenes.Dialogs
 
             HPButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "HP",
                 Index = 560,
                 HoverIndex = 561,
                 PressedIndex = 562,
@@ -119,6 +124,8 @@ namespace Client.MirScenes.Dialogs
 
             MPButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "MP",
                 Index = 563,
                 HoverIndex = 564,
                 PressedIndex = 565,
@@ -245,7 +252,7 @@ namespace Client.MirScenes.Dialogs
             }
         }
     }
-    public sealed class HeroBeltDialog : MirImageControl
+    public sealed class HeroBeltDialog : MirPanel
     {
         public MirLabel[] Key = new MirLabel[2];
         public MirButton CloseButton, RotateButton;
@@ -260,7 +267,6 @@ namespace Client.MirScenes.Dialogs
             Visible = true;
             Location = new Point(GameScene.Scene.MainDialog.Location.X + 475, Settings.ScreenHeight - 150);
 
-            BeforeDraw += BeltPanel_BeforeDraw;
 
             for (int i = 0; i < Key.Length; i++)
             {
@@ -288,6 +294,8 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
                 HoverIndex = 1924,
                 Index = 1923,
                 Location = new Point(82, 19),
@@ -314,14 +322,6 @@ namespace Client.MirScenes.Dialogs
                 };
             }
 
-        }
-
-        private void BeltPanel_BeforeDraw(object sender, EventArgs e)
-        {
-            //if Transparent return
-
-            if (Libraries.Prguse != null)
-                Libraries.Prguse.Draw(Index == 1921 ? 1934 : 1946, DisplayLocation, Color.White, false, 0.5F);
         }
 
         public void Flip()
@@ -382,7 +382,7 @@ namespace Client.MirScenes.Dialogs
             return null;
         }
     }
-    public sealed class HeroMenuPanel : MirImageControl
+    public sealed class HeroMenuPanel : MirPanel
     {
         public MirButton HeroMagicsButton, HeroInventoryButton, HeroEquipmentButton;
 
@@ -397,6 +397,8 @@ namespace Client.MirScenes.Dialogs
 
             HeroMagicsButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Sword,
                 Index = 2173,
                 HoverIndex = 2174,
                 PressedIndex = 2175,
@@ -419,6 +421,8 @@ namespace Client.MirScenes.Dialogs
 
             HeroInventoryButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Bag,
                 Index = 2170,
                 HoverIndex = 2171,
                 PressedIndex = 2172,
@@ -435,6 +439,8 @@ namespace Client.MirScenes.Dialogs
 
             HeroEquipmentButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Person,
                 Index = 2176,
                 HoverIndex = 2177,
                 PressedIndex = 2178,
@@ -461,7 +467,7 @@ namespace Client.MirScenes.Dialogs
             Visible = !Visible;
         }
     }
-    public sealed class HeroInfoPanel : MirImageControl
+    public sealed class HeroInfoPanel : MirPanel
     {
         private MirImageControl Avatar, NameContainer, HealthContainer, HealthBar, ManaBar, ExperienceBar, DangerAvatar, DeadAvatar;
         private MirLabel NameLabel, LevelLabel, Hplabel, Mplabel, ExLabel;
@@ -748,7 +754,7 @@ namespace Client.MirScenes.Dialogs
             return count;
         }
     }
-    public sealed class HeroBehaviourPanel : MirImageControl
+    public sealed class HeroBehaviourPanel : MirPanel
     {
         private MirButton[] BehaviourButtons;
         public HeroBehaviourPanel()
@@ -791,7 +797,7 @@ namespace Client.MirScenes.Dialogs
                 BehaviourButtons[i].Enabled = (byte)behaviour != i;
         }
     }
-    public sealed class HeroManageDialog : MirImageControl
+    public sealed class HeroManageDialog : MirPanel
     {
         public HeroManageAvatar CurrentAvatar;
         public HeroManageAvatar[] Avatars = new HeroManageAvatar[8];
@@ -807,6 +813,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(Size.Width - 24, 4),

@@ -95,6 +95,8 @@ namespace Client.MirControls
 
             BuyItem = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Buy",
                 Index = 778,
                 HoverIndex = 779,
                 PressedIndex = 780,
@@ -110,6 +112,8 @@ namespace Client.MirControls
 
             PreviewItem = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Preview",
                 Index = 781,
                 HoverIndex = 782,
                 PressedIndex = 783,
@@ -135,6 +139,9 @@ namespace Client.MirControls
 
             quantityUp = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Plus,
+                Hint = "Quantity Up",
                 Index = 243,
                 HoverIndex = 244,
                 PressedIndex = 245,
@@ -155,6 +162,9 @@ namespace Client.MirControls
 
             quantityDown = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Minus,
+                Hint = "Quantity Down",
                 Index = 240,
                 HoverIndex = 241,
                 PressedIndex = 242,
@@ -334,6 +344,9 @@ namespace Client.MirControls
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 362,
                 Index = 361,
                 Location = new Point(230, 8),
@@ -403,6 +416,9 @@ namespace Client.MirControls
 
             RightDirection = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Right,
+                Hint = "Right Direction",
                 Index = 243,
                 HoverIndex = 244,
                 PressedIndex = 245,
@@ -421,6 +437,9 @@ namespace Client.MirControls
 
             LeftDirection = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Left,
+                Hint = "Left Direction",
                 Index = 240,
                 HoverIndex = 241,
                 PressedIndex = 242,

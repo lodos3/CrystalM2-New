@@ -1,9 +1,30 @@
 ﻿using Client.MirSounds;
+using Client.MirGraphics;
 
 namespace Client.MirControls
 {
     public class MirButton : MirImageControl
     {
+        public UiGlyph Glyph { get; set; }
+        public bool Selected { get; set; }
+        private Color _themeText = DarkFantasyPalette.Text;
+        internal bool KeyboardFocused { get; set; }
+        protected override int LayoutIndex => base.Index;
+        public override Size Size
+        {
+            get
+            {
+                Size size = base.Size;
+                if (!size.IsEmpty || Skin == UiSurface.None) return size;
+                return Skin == UiSurface.ScrollThumb ? new Size(12, 16) :
+                    Glyph != UiGlyph.None ? new Size(22, 22) : new Size(72, 24);
+            }
+            set => base.Size = value;
+        }
+        protected override UiVisualState SkinState => !Enabled ? UiVisualState.Disabled :
+            ActiveControl == this && MouseControl == this ? UiVisualState.Pressed :
+            KeyboardFocused ? UiVisualState.Focused : Selected ? UiVisualState.Selected :
+            MouseControl == this ? UiVisualState.Hover : UiVisualState.Normal;
         #region Font Colour
         public virtual Color FontColour
         {
@@ -15,6 +36,7 @@ namespace Client.MirControls
             }
             set
             {
+                _themeText = value;
                 if (_label != null && !_label.IsDisposed)
                     _label.ForeColour = value;
             }
@@ -80,7 +102,8 @@ namespace Client.MirControls
                 if (_center)
                 {
                     _label.Size = Size;
-                    _label.DrawFormat = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter;
+                    _label.DrawFormat = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
+                        TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis;
                 }
                 else
                     _label.AutoSize = true;
@@ -145,6 +168,7 @@ namespace Client.MirControls
         #region Text
         public virtual string Text
         {
+            get => _label?.Text ?? string.Empty;
             set
             {
                 if (_label == null || _label.IsDisposed)
@@ -168,18 +192,30 @@ namespace Client.MirControls
                 {
                     NotControl = true,
                     Parent = this,
+                    ForeColour = DarkFantasyPalette.Text,
+                    OutLine = false,
                     //Font = new Font("Constantia", 8, FontStyle.Italic),
                     //OutLine = true,
                     //OutLineColour = Color.FromArgb(255, 70, 50, 30),
                 };
+            CenterText = true;
         }
 
         protected internal override void DrawControl()
         {
-            if (OnlyDrawWhenActive && ActiveControl != this && MouseControl != this)
+            if (Skin == UiSurface.None && OnlyDrawWhenActive && ActiveControl != this && MouseControl != this)
                 return;
 
+            if (_label != null && Skin != UiSurface.None)
+                _label.ForeColour = !Enabled ? DarkFantasyPalette.DisabledText : _themeText;
             base.DrawControl();
+            if (DrawImage && Skin != UiSurface.None && Glyph != UiGlyph.None)
+            {
+                int side = Math.Max(1, Math.Min(16, Math.Min(Size.Width, Size.Height) - 4));
+                DXManager.Device.Ui.Glyph(Glyph, new Rectangle(DisplayLocation.X + (Size.Width - side) / 2,
+                    DisplayLocation.Y + (Size.Height - side) / 2, side, side),
+                    !Enabled ? DarkFantasyPalette.DisabledText : DarkFantasyPalette.Text);
+            }
         }
 
         protected override void Highlight()

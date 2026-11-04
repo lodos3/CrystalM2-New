@@ -7,7 +7,7 @@ using C = ClientPackets;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class FishingDialog : MirImageControl
+    public sealed class FishingDialog : MirPanel
     {
         public MirLabel TitleLabel;
         public MirButton CloseButton;
@@ -43,6 +43,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(175, 3),
@@ -156,7 +159,7 @@ namespace Client.MirScenes.Dialogs
             return null;
         }
     }
-    public sealed class FishingStatusDialog : MirImageControl
+    public sealed class FishingStatusDialog : MirPanel
     {
         public MirImageControl TitleLabel, AutoCastBox, ESCTick, ESCExit, FishDisableButton;
         public MirControl ChanceBar, ProgressBar;
@@ -206,6 +209,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(216, 4),
@@ -230,6 +236,8 @@ namespace Client.MirScenes.Dialogs
 
             FishButton = new MirAnimatedButton()
             {
+                Skin = UiSurface.Button,
+                Text = "Fish",
                 Animated = true,
                 AnimationCount = 10,
                 Loop = true,
@@ -249,6 +257,8 @@ namespace Client.MirScenes.Dialogs
 
             AutoCastButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Auto Cast",
                 Index = 180,
                 HoverIndex = 181,
                 PressedIndex = 182,
@@ -280,6 +290,9 @@ namespace Client.MirScenes.Dialogs
 
             ESCExitButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Exit fishing",
                 Index = 1346,
                 HoverIndex = 1346,
                 PressedIndex = 1346,

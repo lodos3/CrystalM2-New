@@ -2508,6 +2508,14 @@ namespace Client.MirControls
             return true;
         }
 
+        internal void DrawSlotFrame()
+        {
+            if (GridType == MirGridType.DropPanel) return;
+            DXManager.Device.Ui.Draw(UiSurface.Slot, DisplayRectangle,
+                Locked || GameScene.SelectedCell == this ? UiVisualState.Selected :
+                MouseControl == this ? UiVisualState.Hover : UiVisualState.Normal);
+        }
+
         protected internal override void DrawControl()
         {
             if (Item != null && GameScene.SelectedCell != this && Locked != true)
@@ -2521,11 +2529,6 @@ namespace Client.MirControls
                     Size imgSize = Library.GetTrueSize(image);
 
                     Point offSet = new Point((Size.Width - imgSize.Width) / 2, (Size.Height - imgSize.Height) / 2);
-
-                    if (GridType == MirGridType.Craft)
-                    {
-                        Libraries.Prguse.Draw(1121, DisplayLocation.Add(new Point(-2, -1)), Color.White, UseOffSet, 0.8F);
-                    }
 
                     Library.Draw(image, DisplayLocation.Add(offSet), ForeColour, UseOffSet, 1F);
 
@@ -2561,11 +2564,6 @@ namespace Client.MirControls
                     Size imgSize = Library.GetTrueSize(image);
 
                     Point offSet = new Point((Size.Width - imgSize.Width) / 2, (Size.Height - imgSize.Height) / 2);
-
-                    if (GridType == MirGridType.Craft)
-                    {
-                        Libraries.Prguse.Draw(1121, DisplayLocation.Add(new Point(-2, -1)), Color.White, UseOffSet, 0.8F);
-                    }
 
                     Library.Draw(image, DisplayLocation.Add(offSet), Color.DimGray, UseOffSet, 0.8F);
                 }

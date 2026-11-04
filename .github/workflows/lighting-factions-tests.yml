@@ -7,6 +7,9 @@ on:
     paths:
       - "Client.Rendering.Core/**"
       - "Client/Rendering/**"
+      - "Client/MirControls/**"
+      - "Client/MirScenes/Dialogs/**"
+      - "Client/MirScenes/LoginScene.cs"
       - "Client/MirGraphics/MapLightEncoding.cs"
       - "Client/MirGraphics/MapMaterialMap.cs"
       - "Client/MirGraphics/MapMaterialMapLoader.cs"
@@ -47,6 +50,8 @@ jobs:
           dotnet-version: 8.0.x
       - name: Modern renderer asset-fidelity and batching tests
         run: dotnet run --project Tests/ModernRendererTests/ModernRendererTests.csproj
+      - name: Generated UI atlas and nine-slice geometry
+        run: dotnet run --project Tests/UiSkinTests/UiSkinTests.csproj
       - name: Map light decoder
         run: dotnet run --project Tests/RenderingLightTests/RenderingLightTests.csproj
       - name: Atmospheric lighting and bloom geometry

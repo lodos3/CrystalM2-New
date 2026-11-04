@@ -4,7 +4,7 @@ using Client.MirSounds;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class HelpDialog : MirImageControl
+    public sealed class HelpDialog : MirPanel
     {
         public List<HelpPage> Pages = new List<HelpPage>();
 
@@ -33,6 +33,9 @@ namespace Client.MirScenes.Dialogs
 
             PreviousButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Left,
+                Hint = "Previous",
                 Index = 240,
                 HoverIndex = 241,
                 PressedIndex = 242,
@@ -53,6 +56,9 @@ namespace Client.MirScenes.Dialogs
 
             NextButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Right,
+                Hint = "Next",
                 Index = 243,
                 HoverIndex = 244,
                 PressedIndex = 245,
@@ -84,6 +90,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(509, 3),

@@ -75,7 +75,7 @@ namespace Client.MirScenes.Dialogs
         }
     }
 
-    public sealed class GuildTerritoryDialog : MirImageControl
+    public sealed class GuildTerritoryDialog : MirPanel
     {
 
         public List<ClientGTMap> GTMapList = new List<ClientGTMap>();
@@ -95,6 +95,8 @@ namespace Client.MirScenes.Dialogs
 
             var closeButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
                 Parent = this,
                 Index = 361,
                 PressedIndex = 363,
@@ -107,6 +109,8 @@ namespace Client.MirScenes.Dialogs
 
             var prevButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Left,
                 HoverIndex = 241,
                 Index = 240,
                 Location = new Point(214, 213),
@@ -128,6 +132,8 @@ namespace Client.MirScenes.Dialogs
 
             var nextButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Right,
                 HoverIndex = 244,
                 Index = 243,
                 Location = new Point(317, 213),
@@ -150,6 +156,8 @@ namespace Client.MirScenes.Dialogs
 
             var mailButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Mail,
                 Index = 437,
                 HoverIndex = 438,
                 PressedIndex = 439,
@@ -170,6 +178,8 @@ namespace Client.MirScenes.Dialogs
 
             BuyButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Buy",
                 Index = 437,
                 HoverIndex = 438,
                 PressedIndex = 439,

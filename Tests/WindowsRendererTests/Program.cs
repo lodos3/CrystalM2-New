@@ -119,6 +119,20 @@ internal static class Program
         }
         Check(device.TextureBytes == bytes && device.TextureCount == textures,
             "Disposed uploads must leave no registered texture memory.");
+        device.BeginFrame();
+        device.Clear(Color.Black);
+        device.Ui.Draw(UiSurface.Window, new Rectangle(0, 0, 64, 56));
+        using (var image = device.Capture(backBuffer))
+            Near(CrystalM2.Rendering.Core.DarkFantasyPalette.Accent, image.GetPixel(9, 6),
+                "Nine-slice window ornaments must retain their original pixels.");
+        Check(device.DrawCalls == 1, "All nine compatible atlas patches should share one draw.");
+        bytes = device.TextureBytes;
+        textures = device.TextureCount;
+        for (int i = 0; i < 32; i++)
+            device.Ui.Draw(UiSurface.Button, new Rectangle(2, 2, 45, 24), UiVisualState.Hover);
+        device.Sprite.End();
+        Check(device.TextureCount == textures && device.TextureBytes == bytes,
+            "Resizing or hovering generated controls must not allocate per-control textures.");
         device.Resize(80, 60);
         using Surface resized = device.GetBackBuffer();
         device.Clear(Color.Black);

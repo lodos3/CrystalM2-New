@@ -4,7 +4,7 @@ using Client.MirSounds;
 
 namespace Client.MirScenes.Dialogs
 {
-    public class BuffDialog : MirImageControl
+    public class BuffDialog : MirPanel
     {
         public List<ClientBuff> Buffs = new List<ClientBuff>();
 
@@ -542,7 +542,7 @@ namespace Client.MirScenes.Dialogs
         public long ExpireTime;
     }
 
-    public sealed class PoisonBuffDialog : MirImageControl
+    public sealed class PoisonBuffDialog : MirPanel
     {
         public List<ClientPoisonBuff> Buffs = new List<ClientPoisonBuff>();
 

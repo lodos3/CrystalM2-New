@@ -6,7 +6,7 @@ using C = ClientPackets;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class ItemRentDialog : MirImageControl
+    public sealed class ItemRentDialog : MirPanel
     {
         private readonly MirLabel _nameLabel, _rentalPriceLabel;
         private readonly MirButton _lockButton, _rentalPriceButton;
@@ -22,6 +22,9 @@ namespace Client.MirScenes.Dialogs
 
             var closeButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(180, 3),
@@ -37,6 +40,9 @@ namespace Client.MirScenes.Dialogs
 
             _lockButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Lock,
+                Hint = "Lock",
                 Index = 250,
                 HoverIndex = 251,
                 Location = new Point(22, 76),
@@ -56,6 +62,8 @@ namespace Client.MirScenes.Dialogs
 
             _rentalPriceButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Price",
                 Index = 28,
                 Location = new Point(18, 46),
                 Size = new Size(32, 17),
@@ -187,7 +195,7 @@ namespace Client.MirScenes.Dialogs
         }
     }
 
-    public sealed class GuestItemRentDialog : MirImageControl
+    public sealed class GuestItemRentDialog : MirPanel
     {
         public string GuestName => _guestName;
 
@@ -208,6 +216,9 @@ namespace Client.MirScenes.Dialogs
 
             _lockButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Lock,
+                Hint = "Lock",
                 Index = 250,
                 Location = new Point(22, 76),
                 Size = new Size(28, 25),
@@ -218,6 +229,8 @@ namespace Client.MirScenes.Dialogs
 
             _rentalPriceButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Price",
                 Index = 28,
                 Location = new Point(18, 46),
                 Size = new Size(32, 17),

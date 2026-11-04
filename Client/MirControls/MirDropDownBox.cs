@@ -155,6 +155,9 @@ namespace Client.MirControls
             }
             _DropDownButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Down,
+                Hint = "Drop Down",
                 Index = 207,
                 Library = Libraries.Prguse2,
                 Location = new Point(Size.Width - 18, 1),
@@ -166,6 +169,9 @@ namespace Client.MirControls
             _DropDownButton.Click += (o, e) => DropDownClick();
             _ScrollUp = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
+                Hint = "Scroll Up",
                 HoverIndex = 2022,
                 Index = 2021,
                 Library = Libraries.Prguse,
@@ -177,6 +183,9 @@ namespace Client.MirControls
             _ScrollUp.Click += (o, e) => ScrollUp();
             _ScrollDown = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Down,
+                Hint = "Scroll Down",
                 HoverIndex = 2025,
                 Index = 2024,
                 Library = Libraries.Prguse,
@@ -189,6 +198,8 @@ namespace Client.MirControls
            
             _ScrollPosition = new MirButton
             {
+                Skin = UiSurface.ScrollThumb,
+                Glyph = UiGlyph.Grip,
                 HoverIndex = 2016,
                 Index = 2015,
                 Library = Libraries.Prguse,

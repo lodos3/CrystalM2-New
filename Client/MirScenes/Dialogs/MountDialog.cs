@@ -7,7 +7,7 @@ using C = ClientPackets;
 
 namespace Client.MirScenes.Dialogs
 {
-    public sealed class MountDialog : MirImageControl
+    public sealed class MountDialog : MirPanel
     {
         public MirLabel MountName, MountLoyalty;
         public MirButton CloseButton, MountButton, HelpButton;
@@ -42,6 +42,8 @@ namespace Client.MirScenes.Dialogs
 
             MountButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Mount",
                 Library = Libraries.Prguse,
                 Parent = this,
                 Sound = SoundList.ButtonA,
@@ -57,6 +59,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Library = Libraries.Prguse2,
@@ -68,6 +73,9 @@ namespace Client.MirScenes.Dialogs
 
             HelpButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Help,
+                Hint = "Help",
                 Index = 257,
                 HoverIndex = 258,
                 PressedIndex = 259,

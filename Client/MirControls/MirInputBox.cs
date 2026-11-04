@@ -2,7 +2,7 @@
 
 namespace Client.MirControls
 {
-    public sealed class MirInputBox : MirImageControl
+    public sealed class MirInputBox : MirPanel
     {
         public readonly MirLabel CaptionLabel;
         public readonly MirButton OKButton, CancelButton;
@@ -32,7 +32,7 @@ namespace Client.MirControls
             {
                 Parent = this,
                 Border = true,
-                BorderColour = Color.Lime,
+                BorderColour = DarkFantasyPalette.Border,
                 Location = new Point(23, 86),
                 Size = new Size(240, 19),
                 MaxLength = 50,
@@ -42,6 +42,8 @@ namespace Client.MirControls
 
             OKButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "OK",
                 HoverIndex = 201,
                 Index = 200,
                 Library = Libraries.Title,
@@ -52,6 +54,8 @@ namespace Client.MirControls
 
             CancelButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Cancel",
                 HoverIndex = 204,
                 Index = 203,
                 Library = Libraries.Title,

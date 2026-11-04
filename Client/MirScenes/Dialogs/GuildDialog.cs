@@ -9,7 +9,7 @@ using C = ClientPackets;
 namespace Client.MirScenes.Dialogs
 {
 
-    public sealed class GuildDialog : MirImageControl
+    public sealed class GuildDialog : MirPanel
     {
         #region NoticeBase
         public MirLabel GuildName;
@@ -137,6 +137,8 @@ namespace Client.MirScenes.Dialogs
 
             NoticeButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Notice",
                 Library = Libraries.Title,
                 Index = 93,
                 PressedIndex = 94,
@@ -147,6 +149,8 @@ namespace Client.MirScenes.Dialogs
             NoticeButton.Click += (o, e) => LeftDialog(0);
             MembersButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Members",
                 Library = Libraries.Title,
                 Index = 99,
                 PressedIndex = 100,
@@ -157,6 +161,8 @@ namespace Client.MirScenes.Dialogs
             MembersButton.Click += (o, e) => LeftDialog(1);
             StorageButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Storage",
                 Library = Libraries.Title,
                 Index = 105,
                 PressedIndex = 106,
@@ -168,6 +174,8 @@ namespace Client.MirScenes.Dialogs
             StorageButton.Click += (o, e) => LeftDialog(2);
             RankButton = new MirButton // Ranks
             {
+                Skin = UiSurface.Button,
+                Text = "Rank",
                 Library = Libraries.Title,
                 Index = 101,
                 Sound = SoundList.ButtonA,
@@ -179,6 +187,8 @@ namespace Client.MirScenes.Dialogs
 
             StatusButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Stats",
                 Library = Libraries.Title,
                 Parent = this,
                 Index = 103,
@@ -189,6 +199,8 @@ namespace Client.MirScenes.Dialogs
 
             BuffButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Buff",
                 Library = Libraries.Title,
                 Parent = this,
                 Index = 95,
@@ -200,6 +212,9 @@ namespace Client.MirScenes.Dialogs
 
             CloseButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Close,
+                Hint = "Close",
                 HoverIndex = 361,
                 Index = 360,
                 Location = new Point(565, 4),
@@ -214,6 +229,7 @@ namespace Client.MirScenes.Dialogs
             #region NoticePageUI
             NoticePage = new MirImageControl()
             {
+                Skin = UiSurface.Inset,
                 Parent = this,
                 Size = new Size(352, 372),
                 Location = new Point(0, 60),
@@ -221,7 +237,7 @@ namespace Client.MirScenes.Dialogs
             };
             Notice = new MirTextBox()
             {
-                ForeColour = Color.White,
+                ForeColour = DarkFantasyPalette.Text,
                 Font = new Font(Settings.FontName, 8F),
                 Enabled = false,
                 Visible = true,
@@ -233,6 +249,8 @@ namespace Client.MirScenes.Dialogs
 
             NoticeEditButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Notice Edit",
                 Visible = false,
                 Index = 560,
                 HoverIndex = 561,
@@ -246,6 +264,8 @@ namespace Client.MirScenes.Dialogs
 
             NoticeSaveButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Notice Save",
                 Visible = false,
                 Index = 554,
                 HoverIndex = 555,
@@ -259,6 +279,9 @@ namespace Client.MirScenes.Dialogs
 
             NoticeUpButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
+                Hint = "Notice Up",
                 HoverIndex = 198,
                 Index = 197,
                 Visible = true,
@@ -279,6 +302,9 @@ namespace Client.MirScenes.Dialogs
 
             NoticeDownButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Down,
+                Hint = "Notice Down",
                 HoverIndex = 208,
                 Index = 207,
                 Visible = true,
@@ -300,6 +326,8 @@ namespace Client.MirScenes.Dialogs
 
             NoticePositionBar = new MirButton
             {
+                Skin = UiSurface.ScrollThumb,
+                Glyph = UiGlyph.Grip,
                 Index = 206,
                 Library = Libraries.Prguse2,
                 Location = new Point(337, 16),
@@ -317,6 +345,7 @@ namespace Client.MirScenes.Dialogs
             #region MembersPageUI
             MembersPage = new MirImageControl()
             {
+                Skin = UiSurface.Inset,
                 Parent = this,
                 Size = new Size(352, 372),
                 Location = new Point(0, 60),
@@ -389,6 +418,8 @@ namespace Client.MirScenes.Dialogs
                 int index = i;
                 MembersDelete[i] = new MirButton()
                 {
+                    Skin = UiSurface.Button,
+                    Text = "Remove",
                     Enabled = true,
                     Visible = true,
                     Location = new Point(210, 30 + (i * 15)),
@@ -401,6 +432,9 @@ namespace Client.MirScenes.Dialogs
             }
             MembersUpButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
+                Hint = "Members Up",
                 HoverIndex = 198,
                 Index = 197,
                 Visible = true,
@@ -420,6 +454,9 @@ namespace Client.MirScenes.Dialogs
             };
             MembersDownButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Down,
+                Hint = "Members Down",
                 HoverIndex = 208,
                 Index = 207,
                 Visible = true,
@@ -440,6 +477,8 @@ namespace Client.MirScenes.Dialogs
 
             MembersPositionBar = new MirButton
             {
+                Skin = UiSurface.ScrollThumb,
+                Glyph = UiGlyph.Grip,
                 Index = 206,
                 Library = Libraries.Prguse2,
                 Location = new Point(337, 16),
@@ -451,6 +490,8 @@ namespace Client.MirScenes.Dialogs
 
             MembersShowOfflineButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Text = "Members Show Offline",
                 Visible = true,
                 Index = 1346,
                 Library = Libraries.Prguse,
@@ -488,6 +529,7 @@ namespace Client.MirScenes.Dialogs
             #region StatusDialogUI 
             StatusPage = new MirImageControl()
             {
+                Skin = UiSurface.Inset,
                 Parent = this,
                 Size = new Size(230, 372),
                 Location = new Point(355, 60),
@@ -590,6 +632,8 @@ namespace Client.MirScenes.Dialogs
             };
             RecruitMemberButton = new MirButton()
             {
+                Skin = UiSurface.Button,
+                Text = "Recruit Member",
                 Parent = StatusPage,
                 Enabled = true,
                 Visible = true,
@@ -616,6 +660,7 @@ namespace Client.MirScenes.Dialogs
             #region StorageDialogUI 
             StoragePage = new MirImageControl()
             {
+                Skin = UiSurface.Inset,
                 Parent = this,
                 Size = new Size(352, 372),
                 Location = new Point(0, 60),
@@ -649,6 +694,8 @@ namespace Client.MirScenes.Dialogs
             };
             StorageGoldAdd = new MirButton()
             {
+                Skin = UiSurface.Button,
+                Text = "Deposit",
                 Parent = StoragePage,
                 Library = Libraries.Prguse,
                 Index = 918,
@@ -660,6 +707,8 @@ namespace Client.MirScenes.Dialogs
 
             StorageGoldRemove = new MirButton()
             {
+                Skin = UiSurface.Button,
+                Text = "Withdraw",
                 Parent = StoragePage,
                 Library = Libraries.Prguse,
                 Index = 917,
@@ -693,6 +742,9 @@ namespace Client.MirScenes.Dialogs
 
             StorageUpButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
+                Hint = "Storage Up",
                 HoverIndex = 198,
                 Index = 197,
                 Visible = true,
@@ -713,6 +765,9 @@ namespace Client.MirScenes.Dialogs
 
             StorageDownButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Down,
+                Hint = "Storage Down",
                 HoverIndex = 208,
                 Index = 207,
                 Visible = true,
@@ -733,6 +788,8 @@ namespace Client.MirScenes.Dialogs
 
             StoragePositionBar = new MirButton
             {
+                Skin = UiSurface.ScrollThumb,
+                Glyph = UiGlyph.Grip,
                 Index = 206,
                 Library = Libraries.Prguse2,
                 Location = new Point(337, 16),
@@ -751,6 +808,7 @@ namespace Client.MirScenes.Dialogs
             #region RankDialogUI
             RankPage = new MirImageControl()
             {
+                Skin = UiSurface.Inset,
                 Parent = this,
                 Size = new Size(352, 372),
                 Location = new Point(0, 60),
@@ -807,6 +865,8 @@ namespace Client.MirScenes.Dialogs
             RanksName.TextBox.KeyPress += RanksName_KeyPress;
             RanksSaveName = new MirButton()
             {
+                Skin = UiSurface.Button,
+                Text = "Save",
                 Location = new Point(155, 290),
                 Enabled = false,
                 Visible = true,
@@ -873,6 +933,7 @@ namespace Client.MirScenes.Dialogs
 
             BuffPage = new MirImageControl()
             {
+                Skin = UiSurface.Inset,
                 Parent = this,
                 Size = new Size(352, 372),
                 Location = new Point(360, 61),
@@ -903,6 +964,9 @@ namespace Client.MirScenes.Dialogs
 
             UpButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Up,
+                Hint = "Up",
                 Index = 197,
                 HoverIndex = 198,
                 PressedIndex = 199,
@@ -920,6 +984,9 @@ namespace Client.MirScenes.Dialogs
             };
             DownButton = new MirButton
             {
+                Skin = UiSurface.Button,
+                Glyph = UiGlyph.Down,
+                Hint = "Down",
                 Index = 207,
                 HoverIndex = 208,
                 PressedIndex = 209,
@@ -939,6 +1006,8 @@ namespace Client.MirScenes.Dialogs
 
             PositionBar = new MirButton
             {
+                Skin = UiSurface.ScrollThumb,
+                Glyph = UiGlyph.Grip,
                 Index = 205,
                 HoverIndex = 206,
                 PressedIndex = 206,

@@ -40,6 +40,8 @@ public sealed unsafe class RendererDevice : IDisposable
     private ShaderEffect _effect;
     private float _blendRate = 1, _opacity = 1;
     public SpriteBatch Sprite { get; private set; }
+    private UiSkinRenderer _ui;
+    public UiSkinRenderer Ui => _ui ??= new UiSkinRenderer(this);
     public Surface CurrentSurface { get; private set; }
     public int TargetWidth => CurrentSurface?.Texture.Width ?? 0;
     public int TargetHeight => CurrentSurface?.Texture.Height ?? 0;
