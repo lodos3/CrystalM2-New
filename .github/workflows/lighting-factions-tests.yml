@@ -39,6 +39,14 @@ on:
       - "Client/Forms/CMain.cs"
       - "Server/MirEnvir/MonsterFactionRules.cs"
       - "Tests/**"
+      - "Shared/SpellCurriculum.cs"
+      - "Server/MirDatabase/CharacterInfo.cs"
+      - "Server/MirDatabase/HeroInfo.cs"
+      - "Server/MirEnvir/Envir.cs"
+      - "Server/MirObjects/HumanObject.cs"
+      - "Server/MirObjects/PlayerObject.cs"
+      - "Server/MirObjects/HeroObject.cs"
+      - "Server.MirForms/Database/MagicInfoForm.cs"
       - ".github/workflows/lighting-factions-tests.yml"
 jobs:
   pure-logic-tests:
@@ -48,6 +56,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+      - name: Bookless five-class spell and specialisation catalog tests
+        run: dotnet run --project Tests/SpellCurriculumTests/SpellCurriculumTests.csproj
       - name: Modern renderer asset-fidelity and batching tests
         run: dotnet run --project Tests/ModernRendererTests/ModernRendererTests.csproj
       - name: Generated UI atlas and nine-slice geometry
@@ -74,6 +84,10 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+      - name: Compile authoritative spell server and versioned database
+        run: dotnet build Server/Server.Library.csproj --configuration Release
+      - name: Compile server database magic editor and WinForms host
+        run: dotnet build Server.MirForms/Server.csproj --configuration Release
       - name: Restore Windows CrystalM2 client
         run: dotnet restore Client/Client.csproj
       - name: Compile the sole Vortice D3D11 game client
