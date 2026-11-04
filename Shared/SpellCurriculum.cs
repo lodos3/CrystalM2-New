@@ -171,6 +171,9 @@ public static class SpellCurriculum
     public static bool IsUnlocked(MirClass actorClass, Spell spell, ushort actorLevel, byte firstRankLevel) =>
         Owns(actorClass, spell) && actorLevel >= UnlockLevel(spell, firstRankLevel);
 
+    public static bool ShouldGrant(MirClass actorClass, Spell spell, ushort actorLevel, byte firstRankLevel, bool alreadyOwned) =>
+        !alreadyOwned && IsUnlocked(actorClass, spell, actorLevel, firstRankLevel);
+
     public static bool IsValid(CombatSpecialisation spec) =>
         spec == CombatSpecialisation.Unchosen ||
         spec == CombatSpecialisation.First ||

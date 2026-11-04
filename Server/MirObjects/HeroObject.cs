@@ -147,6 +147,7 @@ namespace Server.MirObjects
             Stats = new Stats();            
 
             if (Level == 0) NewCharacter();
+            ReconcileCurriculumSpells(false);
 
             RefreshStats();
             SendInfo();
@@ -494,18 +495,8 @@ namespace Server.MirObjects
                     }
                     break;
                 case ItemType.Book:
-                    UserMagic magic = new UserMagic((Spell)item.Info.Shape);
-
-                    if (magic.Info == null)
-                    {
-                        Owner.Enqueue(p);
-                        return;
-                    }
-
-                    Info.Magics.Add(magic);
-                    SendMagicInfo(magic);
-                    RefreshStats();
-                    break;
+                    Owner.Enqueue(p);
+                    return;
                 case ItemType.Food:
                     temp = Info.Equipment[(int)EquipmentSlot.Mount];
                     if (temp == null || temp.MaxDura == temp.CurrentDura)

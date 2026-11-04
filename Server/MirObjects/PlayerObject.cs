@@ -228,6 +228,7 @@ namespace Server.MirObjects
             }
 
             if (Level == 0) NewCharacter();
+            ReconcileCurriculumSpells(false);
 
             if (Info.GuildIndex != -1)
             {
@@ -6120,18 +6121,9 @@ namespace Server.MirObjects
                     }
                     break;
                 case ItemType.Book:
-                    UserMagic magic = new UserMagic((Spell)item.Info.Shape);
-
-                    if (magic.Info == null)
-                    {
-                        Enqueue(p);
-                        return;
-                    }
-
-                    Info.Magics.Add(magic);
-                    SendMagicInfo(magic);
-                    RefreshStats();
-                    break;
+                    // Preserve the item for a future book-to-resource conversion, but do not learn or consume it.
+                    Enqueue(p);
+                    return;
                 case ItemType.Script:
                     CallDefaultNPC(DefaultNPCType.UseItem, item.Info.Shape);
                     break;

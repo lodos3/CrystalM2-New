@@ -844,6 +844,7 @@ namespace Server.MirObjects
         }
         public virtual void LevelUp()
         {
+            ReconcileCurriculumSpells(true);
             RefreshStats();
             SetHP(Stats[Stat.HP]);
             SetMP(Stats[Stat.MP]);
@@ -2273,6 +2274,35 @@ namespace Server.MirObjects
                 SendMagicInfo(magic);                
             }
         }
+        // Idempotent across creation, relogging and skipped level thresholds.
+// Does not replace existing UserMagic records (rank, XP, key and cast timing).
+        protected void ReconcileCurriculumSpells(bool notifyClient)
+        {
+            foreach (Spell spell in SpellCurriculum.ForClass(Info.Class))
+            {
+                MagicInfo definition = Envir.MagicInfoList.FirstOrDefault(m => m.Spell == spell);
+                if (definition == null) continue;
+
+                UserMagic existing = Info.Magics.FirstOrDefault(m => m.Spell == spell);
+                if (existing != null &&
+                    SpellCurriculum.IsUnlocked(Info.Class, spell, Info.Level, definition.Level1))
+                {
+                    // Eligible native skills take precedence over temporary equipment grants.
+                    existing.IsTempSpell = false;
+                    continue;
+                }
+
+                if (!SpellCurriculum.ShouldGrant(Info.Class, spell, Info.Level, definition.Level1, existing != null))
+                    continue;
+
+                var learned = new UserMagic(spell);
+                if (learned.Info == null) continue;
+
+                Info.Magics.Add(learned);
+                if (notifyClient) SendMagicInfo(learned);
+            }
+        }
+
         public virtual void SendMagicInfo(UserMagic magic)
         {
             Enqueue(magic.GetInfo(false));

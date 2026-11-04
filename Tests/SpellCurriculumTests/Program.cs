@@ -22,6 +22,9 @@ Check(!SpellCurriculum.IsUnlocked(MirClass.Warrior, Spell.ShoulderDash, 29, 30),
 Check(SpellCurriculum.IsUnlocked(MirClass.Warrior, Spell.ShoulderDash, 30, 30), "Exact level gate");
 Check(SpellCurriculum.IsUnlocked(MirClass.Warrior, Spell.ShoulderDash, 90, 30), "Skipping levels");
 Check(!SpellCurriculum.IsUnlocked(MirClass.Warrior, Spell.FireBall, 90, 7), "Foreign spell");
+Check(SpellCurriculum.ShouldGrant(MirClass.Wizard, Spell.FireBall, 1, 7, false), "Fresh grant");
+Check(!SpellCurriculum.ShouldGrant(MirClass.Wizard, Spell.FireBall, 1, 7, true), "Repeated migration should not duplicate");
+Check(!SpellCurriculum.ShouldGrant(MirClass.Warrior, Spell.ShoulderDash, 29, 30, false), "Not yet entitled");
 Check(!SpellCurriculum.Owns(MirClass.Wizard, Spell.FastMove), "Unseeded FastMove");
 Check(!SpellCurriculum.Owns(MirClass.Wizard, Spell.Blink), "Equipment-only Blink");
 Check(!SpellCurriculum.Owns(MirClass.Warrior, Spell.BattleCry), "Custom BattleCry");
