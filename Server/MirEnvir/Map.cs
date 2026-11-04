@@ -1208,7 +1208,10 @@ namespace Server.MirEnvir
 
                             if (!target.IsAttackTarget(player)) continue;
                             if (target.Attacked(player, value, DefenceType.MAC, false) > 0)
+                            {
+                                player.RecordComboHit(Spell.Lightning, target);
                                 train = true;
+                            }
                             break;
                         }
                     }
@@ -1282,7 +1285,7 @@ namespace Server.MirEnvir
                                         if (target.IsFriendlyTarget(player))
                                         {
                                             if (target.Health >= target.MaxHealth) continue;
-                                            target.HealAmount = (ushort)Math.Min(ushort.MaxValue, target.HealAmount + value);
+                                            player.QueueSpellHealing(target, value);
                                             target.OperateTime = 0;
                                             train = true;
                                         }
@@ -1533,32 +1536,16 @@ namespace Server.MirEnvir
                                             if (target.IsAttackTarget(player))
                                             {
                                                 //Only targets
-                                                if (target.Attacked(player, j <= 1 ? nearDamage : farDamage, DefenceType.MAC, false) > 0)
+                                                int damage = j <= 1 ? nearDamage : farDamage;
+                                                bool shatter = player.HasRime(target);
+                                                if (shatter) damage = HumanObject.ComboDamage(damage, 125);
+                                                if (target.Attacked(player, damage, DefenceType.MAC, false) > 0)
                                                 {
-                                                    if (player.Level + (target.Race == ObjectType.Player ? 2 : 10) >= target.Level && Envir.Random.Next(target.Race == ObjectType.Player ? 100 : 20) <= magic.Level)
+                                                    if (shatter)
                                                     {
-                                                        target.ApplyPoison(new Poison
-                                                        {
-                                                            Owner = player,
-                                                            Duration = target.Race == ObjectType.Player ? 4 : 5 + Envir.Random.Next(5),
-                                                            PType = PoisonType.Slow,
-                                                            TickSpeed = 1000,
-                                                        }, player);
-                                                        target.OperateTime = 0;
+                                                        player.SpendRime(target);
+                                                        player.ApplyRimeSlow(target);
                                                     }
-
-                                                    if (player.Level + (target.Race == ObjectType.Player ? 2 : 10) >= target.Level && Envir.Random.Next(target.Race == ObjectType.Player ? 100 : 40) <= magic.Level)
-                                                    {
-                                                        target.ApplyPoison(new Poison
-                                                        {
-                                                            Owner = player,
-                                                            Duration = target.Race == ObjectType.Player ? 2 : 5 + Envir.Random.Next(player.Stats[Stat.Freezing]),
-                                                            PType = PoisonType.Frozen,
-                                                            TickSpeed = 1000,
-                                                        }, player);
-                                                        target.OperateTime = 0;
-                                                    }
-
                                                     train = true;
                                                 }
                                             }

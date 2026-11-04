@@ -131,7 +131,10 @@ namespace Server.MirObjects
                         if (ob.Dead) return;
 
                         if (!ob.IsAttackTarget(Caster)) return;
-                        ob.Attacked(((HumanObject)Caster), Value, DefenceType.MAC, false);
+                        var caster = (HumanObject)Caster;
+                        if (ob.Attacked(caster, Value, DefenceType.MAC, false) > 0 && !caster.Dead &&
+                            caster.CurrentMap == CurrentMap)
+                            caster.RecordComboHit(Spell.FireWall, ob);
                     }
                     break;
                 case Spell.Healing: //SafeZone
@@ -155,14 +158,14 @@ namespace Server.MirObjects
                         if (!ob.IsAttackTarget(Caster)) return;
                         ob.Attacked(((HumanObject)Caster), Value, DefenceType.MAC, false);
                         if (!ob.Dead)
-                            ob.ApplyPoison(new Poison
+                            ((HumanObject)Caster).ApplyInkPoison(ob, new Poison
                             {
                                 Duration = 12,
                                 Owner = Caster,
                                 PType = PoisonType.Green,
                                 TickSpeed = TickSpeed,
                                 Value = (Caster.Stats[Stat.MinSC] + Caster.Stats[Stat.MaxSC]) / 2 + BonusDmg
-                            }, Caster, false, false);
+                            }, ignoreDefence: false);
                     }
                     break;
                 case Spell.Blizzard:
@@ -383,7 +386,8 @@ namespace Server.MirObjects
                     {
                         if (ob.Dead || ob.HealAmount != 0 || ob.PercentHealth == 100) return;
 
-                        ob.HealAmount += 25;
+                        if (Caster is HumanObject healer) healer.QueueSpellHealing(ob, 25);
+                        else ob.HealAmount += 25;
                         Broadcast(new S.ObjectEffect { ObjectID = ob.ObjectID, Effect = SpellEffect.Healing });
                     }
                     else if (ob.IsAttackTarget(Caster))

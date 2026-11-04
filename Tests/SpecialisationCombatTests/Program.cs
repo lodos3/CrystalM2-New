@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using Server;
 using Server.MirDatabase;
 using Server.MirEnvir;
@@ -22,6 +23,7 @@ try
     tuned.PowerBase = 13;
     Envir.Edit.SaveDB();
     Check(Envir.Main.LoadDB(), "Read the editor's saved definitions on the server");
+    Envir.Main.BuffInfoList.AddRange(BuffInfo.Load());
     foreach (var ability in SpecialisationAbilities.All)
     {
         var rows = Envir.Main.MagicInfoList.Where(m => m.Spell == ability.Spell).ToArray();
@@ -34,6 +36,8 @@ try
 
     foreach (var ability in SpecialisationAbilities.All)
         ExerciseSpell(ability);
+    foreach (var ability in SpecialisationAbilities.All.Where(a => SpellCombos.For(a.Spell) != null))
+        ExerciseSpell(ability, exerciseCombo: true);
 }
 finally
 {
@@ -41,9 +45,9 @@ finally
     databaseDirectory.Delete(recursive: true);
 }
 
-Console.WriteLine("All 18 starter and signature spell dispatches and the Magic database round-trip passed.");
+Console.WriteLine("All 18 spell dispatches, nine original-spell combo rotations and the Magic database round-trip passed.");
 
-static void ExerciseSpell(SpecialisationAbility ability)
+static void ExerciseSpell(SpecialisationAbility ability, bool exerciseCombo = false)
 {
     const int size = 12;
     var map = new Map(new MapInfo()) { Width = size, Height = size, Cells = new Cell[size, size], DoorIndex = new Door[size, size] };
@@ -114,6 +118,16 @@ static void ExerciseSpell(SpecialisationAbility ability)
         Check(caster.MP == 150 && caster.ActionList.Count == 0, $"{ability.Name} cannot spend mana without a valid target");
     }
 
+    if (exerciseCombo)
+    {
+        PrimeCombo(ability.Spell, caster, enemy, map);
+        SpellComboProgress before = ReadCombo(caster);
+        uint key = SpellCombos.For(ability.Spell).TargetBound ? enemy.ObjectID : 0;
+        Check(before.Count(Envir.Main.Time, key) == 1, $"{ability.Name} must get one confirmed combo stack");
+        if (key != 0)
+            Check(before.Count(Envir.Main.Time, key + 1) == 0, $"{ability.Name} cannot spend another target's mark");
+    }
+
     int health = enemy.HP;
     caster.Magic(ability.Spell, MirDirection.Right, target, enemy.CurrentLocation);
     Check(caster.MP == 150 - magic.Info.BaseCost && caster.ActionList.Count == 1,
@@ -162,6 +176,76 @@ static void ExerciseSpell(SpecialisationAbility ability)
         Check(resolved == 4 && chain.Take(3).All(t => t.HP < t.MaxHealth) &&
             chain[3].HP == chain[3].MaxHealth && magic.Experience is > 0 and <= 3,
             "Storm Relay must hit at most four distinct targets and train once");
+    if (exerciseCombo)
+        Check(ReadCombo(caster).Count(Envir.Main.Time, enemy.ObjectID) == 0,
+            $"{ability.Name} must consume its eligible combo on resolution");
+}
+
+static SpellComboProgress ReadCombo(HumanObject caster) => (SpellComboProgress)typeof(HumanObject)
+    .GetField("_combo", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(caster)!;
+
+static void PrimeCombo(Spell spender, PlayerObject caster, MonsterObject enemy, Map map)
+{
+    long now = Envir.Main.Time;
+    switch (spender)
+    {
+        case Spell.Notchbreaker:
+        case Spell.RedWake:
+            Spell attack = spender == Spell.Notchbreaker ? Spell.FlamingSword : Spell.HalfMoon;
+            caster.Process(new DelayedAction(DelayedType.Damage, now, enemy, 20, DefenceType.AC, false,
+                new UserMagic(attack)));
+            if (spender == Spell.RedWake)
+            {
+                var secondary = MakeMonster("Cleave target", map, new Point(4, 5));
+                caster.Process(new DelayedAction(DelayedType.Damage, now, secondary, 20, DefenceType.AC, false,
+                    new UserMagic(attack)));
+            }
+            break;
+        case Spell.Interpose:
+            caster.Stats[Stat.MinAC] = caster.Stats[Stat.MaxAC] = 12;
+            caster.AddBuff(BuffType.ProtectionField, caster, 5000, new Stats(), refreshStats: false);
+            caster.Attacked(enemy, 10, DefenceType.AC);
+            break;
+        case Spell.LanternLink:
+            var heal = new DelayedAction(DelayedType.Magic, now, new UserMagic(Spell.Healing), 50, caster);
+            var regen = typeof(HumanObject).GetMethod("ProcessRegen", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            caster.Process(heal);
+            Check(ReadCombo(caster).Count(now) == 0, "Queueing a heal does not award Healing Reserve");
+            caster.HP = caster.MaxHealth;
+            caster.HealTime = now - 1;
+            regen.Invoke(caster, null);
+            Check(ReadCombo(caster).Count(now) == 0, "Overhealing does not award Healing Reserve");
+            caster.HP = 200;
+            caster.Process(heal);
+            caster.HealTime = now - 1;
+            regen.Invoke(caster, null);
+            break;
+        case Spell.Distil:
+            var cloud = new SpellObject { Spell = Spell.PoisonCloud, Caster = caster, CurrentMap = map, TickSpeed = 1000, Value = 10 };
+            cloud.ProcessSpell(enemy);
+            break;
+        default:
+            Spell builder = spender switch
+            {
+                Spell.AshSeal => Spell.GreatFireBall,
+                Spell.GlacialGate => Spell.FrostCrunch,
+                Spell.StormRelay => Spell.ThunderBolt,
+                Spell.SpiritCommand => Spell.SoulFireBall,
+                _ => throw new InvalidOperationException()
+            };
+            var build = new DelayedAction(DelayedType.Magic, now, new UserMagic(builder), 20, enemy, enemy.CurrentLocation);
+            caster.Process(build);
+            if (spender == Spell.GlacialGate)
+            {
+                int health = enemy.HP;
+                map.Process(new DelayedAction(DelayedType.Magic, now, caster, new UserMagic(Spell.IceThrust),
+                    caster.CurrentLocation, MirDirection.Right, 20, 20));
+                Check(health - enemy.HP == 25 && ReadCombo(caster).Count(now, enemy.ObjectID) == 0,
+                    "Ice Thrust must shatter Rime once for 25% extra damage");
+                caster.Process(build);
+            }
+            break;
+    }
 }
 
 static MonsterObject MakeMonster(string name, Map map, Point location)

@@ -8,6 +8,13 @@ namespace Client.MirObjects
     {
         public uint Id;
         public CombatSpecialisation Specialisation;
+        public Spell ComboSpender;
+        public byte ComboCount;
+        public uint ComboTarget;
+        public long ComboExpires;
+
+        public int ActiveComboCount(Spell spell) =>
+            spell == ComboSpender && CMain.Time < ComboExpires ? ComboCount : 0;
 
         public int HP, MP;
 

@@ -189,6 +189,13 @@ public static class SpellCurriculum
             case Spell.Healing:
             case Spell.FatalSword:
             case Spell.StraightShot: return 1;
+            case Spell.Thrusting:
+            case Spell.HalfMoon:
+            case Spell.ProtectionField:
+            case Spell.GreatFireBall:
+            case Spell.FrostCrunch:
+            case Spell.ThunderBolt:
+                return Math.Min((byte)SpecialisationUnlockLevel, rankOneLevel == 0 ? (byte)1 : rankOneLevel);
             case Spell.MoonLight:
             case Spell.SummonVampire: return (byte)SpecialisationUnlockLevel;
             default: return rankOneLevel == 0 ? (byte)1 : rankOneLevel;
@@ -227,10 +234,10 @@ public static class SpellCurriculum
         return spell switch
         {
             // Warrior: focused melee, aggressive cleave, or protection.
-            Spell.Slaying or Spell.Thrusting or Spell.FlamingSword or Spell.SlashingBurst
+            Spell.Slaying or Spell.Thrusting or Spell.FlamingSword or Spell.SlashingBurst or Spell.Rage
                 => CombatSpecialisation.First,
             Spell.HalfMoon or Spell.TwinDrakeBlade or Spell.CrossHalfMoon or Spell.BladeAvalanche
-                or Spell.Rage or Spell.Fury => CombatSpecialisation.Second,
+                or Spell.Fury => CombatSpecialisation.Second,
             Spell.Entrapment or Spell.LionRoar or Spell.ProtectionField or Spell.CounterAttack
                 or Spell.ImmortalSkin => CombatSpecialisation.Third,
 
@@ -239,7 +246,7 @@ public static class SpellCurriculum
                 or Spell.FlameDisruptor or Spell.FlameField or Spell.MeteorStrike
                 => CombatSpecialisation.First,
             Spell.FrostCrunch or Spell.IceStorm or Spell.Mirroring or Spell.Blizzard
-                or Spell.IceThrust => CombatSpecialisation.Second,
+                or Spell.IceThrust or Spell.Vampirism => CombatSpecialisation.Second,
             Spell.ElectricShock or Spell.ThunderBolt or Spell.Lightning or Spell.ThunderStorm
                 or Spell.MagicBooster or Spell.StormEscape => CombatSpecialisation.Third,
 
@@ -249,7 +256,7 @@ public static class SpellCurriculum
                 => CombatSpecialisation.First,
             Spell.Poisoning or Spell.Revelation or Spell.Hallucination or Spell.Curse
                 or Spell.Plague or Spell.PoisonCloud => CombatSpecialisation.Second,
-            Spell.SummonSkeleton or Spell.Hiding or Spell.MassHiding or Spell.TrapHexagon
+            Spell.SummonSkeleton or Spell.MassHiding or Spell.TrapHexagon
                 or Spell.UltimateEnhancer or Spell.SummonShinsu or Spell.SummonHolyDeva
                 or Spell.PetEnhancer => CombatSpecialisation.Third,
 

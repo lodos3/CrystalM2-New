@@ -1383,6 +1383,9 @@ namespace Client.MirScenes
                 case (short)ServerPacketIds.SpecialisationResult:
                     SpecialisationResult((S.SpecialisationResult)p);
                     break;
+                case (short)ServerPacketIds.SpellComboState:
+                    SpellComboState((S.SpellComboState)p);
+                    break;
                 case (short)ServerPacketIds.UserSlotsRefresh:
                     UserSlotsRefresh((S.UserSlotsRefresh)p);
                     break;
@@ -2260,6 +2263,17 @@ namespace Client.MirScenes
             AllowObserve = p.AllowObserve;
             Observing = p.Observer;
         }
+        private void SpellComboState(S.SpellComboState p)
+        {
+            UserObject actor = p.ObjectID == User?.ObjectID ? User : p.ObjectID == Hero?.ObjectID ? Hero : null;
+            if (actor == null) return;
+
+            actor.ComboSpender = p.Spender;
+            actor.ComboCount = p.Stacks;
+            actor.ComboTarget = p.TargetID;
+            actor.ComboExpires = CMain.Time + p.Remaining;
+        }
+
         private void SpecialisationResult(S.SpecialisationResult p)
         {
             UserObject actor = p.ForHero ? Hero : User;

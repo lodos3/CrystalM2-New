@@ -53,4 +53,11 @@ foreach (SpellEffect phase in new[] { SpellEffect.SignatureWindup, SpellEffect.S
         "Timed signature stages use the existing map-effect packet shape");
 }
 
-Console.WriteLine("Specialisation protocol round-trip tests passed.");
+var combo = RoundTrip<ServerPackets.SpellComboState>(new ServerPackets.SpellComboState
+{
+    ObjectID = 123, TargetID = 456, Spender = Spell.GlacialGate, Stacks = 1, Remaining = 6500
+}, false);
+Check(combo.ObjectID == 123 && combo.TargetID == 456 && combo.Spender == Spell.GlacialGate &&
+    combo.Stacks == 1 && combo.Remaining == 6500, "Combo proc updates preserve actor, target and expiry");
+
+Console.WriteLine("Specialisation and combo protocol round-trip tests passed.");

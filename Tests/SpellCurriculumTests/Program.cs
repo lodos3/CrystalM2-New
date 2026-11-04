@@ -90,4 +90,35 @@ Check(SpellCurriculum.RequiredSpecialisation(MirClass.Warrior, Spell.Slaying) ==
 Check(!SpellCurriculum.CanUse(MirClass.Warrior, CombatSpecialisation.Second, Spell.Slaying),
     "Red Tempest must not gain Iron Vow passive");
 
+foreach (MirClass actorClass in new[] { MirClass.Warrior, MirClass.Wizard, MirClass.Taoist })
+{
+    var activeCounts = new int[3];
+    for (int i = 0; i < activeCounts.Length; i++)
+    {
+        var spec = (CombatSpecialisation)(i + 1);
+        var ability = SpecialisationAbilities.Signature(actorClass, spec)!;
+        Check(SpellCombos.For(ability.Spell) != null && SpecialisationAbilities.TraitsFor(ability.Spell).Count == 3,
+            $"Each {actorClass} loadout needs a combo and three traits");
+        activeCounts[i] = SpellCurriculum.ForClass(actorClass).Count(spell =>
+            SpellCurriculum.RequiredSpecialisation(actorClass, spell) == spec && !SpellCurriculum.IsPassive(spell));
+    }
+    Check(activeCounts.Max() - activeCounts.Min() <= 1, $"{actorClass} role kits should differ by at most one active");
+}
+
+foreach (Spell builder in new[] { Spell.Thrusting, Spell.HalfMoon, Spell.ProtectionField, Spell.GreatFireBall,
+    Spell.FrostCrunch, Spell.ThunderBolt })
+    Check(SpellCurriculum.UnlockLevel(builder, 35) == 20, "Core setup spell available at specialisation unlock");
+
+var progress = new SpellComboProgress();
+var embers = SpellCombos.For(Spell.AshSeal);
+Check(progress.Build(embers, 100, 0) && !progress.Build(embers, 200, 0),
+    "A multi-hit builder cannot award an extra stack inside its internal interval");
+Check(progress.Build(embers, 1100, 0) && progress.Build(embers, 2100, 0) && progress.Count(2100) == 2,
+    "Stacks are capped");
+Check(progress.Count(10100) == 0 && !progress.Spend(10100, 0), "Expired stacks cannot be spent");
+var rime = SpellCombos.For(Spell.GlacialGate);
+Check(progress.Build(rime, 11000, 3) && !progress.Spend(11000, 4) && progress.Count(11000, 3) == 1,
+    "A mismatched target does not consume a mark");
+Check(progress.Spend(11000, 3) && progress.Count(11000, 3) == 0, "Matching targets consume their mark once");
+
 Console.WriteLine("Spell curriculum tests passed.");

@@ -9,7 +9,7 @@ public partial class HumanObject
 {
     private sealed record SignatureCast(Map Map, int Generation, Point Location, MapObject Target, MonsterObject Companion,
         MirDirection Direction, int Power, bool Concealed, int Stage = 0, bool Trained = false,
-        Point LastImpact = default, List<MapObject> RelayTargets = null);
+        Point LastImpact = default, List<MapObject> RelayTargets = null, byte RelayCharge = 0);
 
     private int _signatureWard, _signatureGeneration;
     private long _signatureWardUntil, _signatureFieldUntil;
@@ -181,6 +181,7 @@ public partial class HumanObject
                 break;
             case Spell.SpiritSpark:
                 landed = HitSignatureTarget(target, spell, power, DefenceType.MAC);
+                if (landed) RecordComboHit(spell, target);
                 break;
             case Spell.Notchbreaker:
             case Spell.Pinpoint:
@@ -188,15 +189,21 @@ public partial class HumanObject
                 int distance = Functions.MaxDistance(CurrentLocation, target.CurrentLocation);
                 bool far = distance >= (spell == Spell.Notchbreaker ? 2 : 5);
                 if (far) power = ScaleSignature(power, advanced ? 125 : 115);
+                bool opening = spell == Spell.Notchbreaker && ComboStacks(spell, target) > 0;
+                if (opening) power = ScaleSignature(power, 118);
                 landed = HitSignatureTarget(target, spell, power, DefenceType.ACAgility);
+                if (landed && opening) SpendCombo(spell, target);
                 if (landed && far && master) ChangeMP(4);
                 break;
             }
             case Spell.RedWake:
             {
                 BroadcastSignatureEffect(spell, CurrentLocation, SpellEffect.SignatureImpact);
-                int hits = HitSignatureArea(spell, CurrentLocation, 1, advanced ? 5 : 4, power, DefenceType.AC, 55);
+                byte momentum = ComboStacks(spell);
+                int hits = HitSignatureArea(spell, CurrentLocation, 1, advanced ? 5 : 4, power, DefenceType.AC,
+                    55 + momentum * 12);
                 landed = hits > 0;
+                if (hits >= 2 && momentum > 0) SpendCombo(spell);
                 if (master && hits >= 3) ChangeMP(4);
                 break;
             }
@@ -204,14 +211,20 @@ public partial class HumanObject
             {
                 var ally = (HumanObject)target;
                 int capacity = advanced ? ScaleSignature(power, 125) : power;
+                byte guard = ComboStacks(spell);
+                capacity = ScaleSignature(capacity, 100 + guard * 15);
                 landed = GrantSignatureWard(ally, spell, capacity, 4000);
+                if (landed && guard > 0) SpendCombo(spell);
                 if (landed && master && ally != this) GrantSignatureWard(this, spell, capacity / 3, 3000);
                 break;
             }
             case Spell.AshSeal:
             {
                 int percent = advanced && cast.Stage == 2 ? 53 : 39;
-                landed = HitSignatureArea(spell, cast.Location, 1, 5, ScaleSignature(power, percent), DefenceType.MAC, 80) > 0;
+                byte embers = cast.Trained ? (byte)0 : ComboStacks(spell);
+                int pulse = ScaleSignature(ScaleSignature(power, percent), 100 + embers * 12);
+                landed = HitSignatureArea(spell, cast.Location, 1, 5, pulse, DefenceType.MAC, 80) > 0;
+                if (landed && embers > 0) SpendCombo(spell);
                 BroadcastSignatureEffect(spell, cast.Location, SpellEffect.SignatureImpact);
                 if (cast.Stage < 2) QueueSignatureStage(magic, cast with { Trained = cast.Trained || landed }, 800);
                 else if (landed && master) ChangeMP(4);
@@ -225,7 +238,10 @@ public partial class HumanObject
                 foreach (var enemy in enemies)
                 {
                     int damage = advanced && enemy.CurrentPoison.HasFlag(PoisonType.Slow) ? ScaleSignature(power, 120) : power;
+                    bool shatter = HasRime(enemy);
+                    if (shatter) damage = ScaleSignature(damage, 125);
                     if (!HitSignatureTarget(enemy, spell, damage, DefenceType.MAC)) continue;
+                    if (shatter) SpendRime(enemy);
                     SlowSignatureTarget(enemy, 2);
                     landed = true;
                 }
@@ -238,7 +254,8 @@ public partial class HumanObject
                     !Functions.InRange(cast.LastImpact, target.CurrentLocation, 3))) break;
 
                 Point impact = target.CurrentLocation;
-                landed = HitSignatureTarget(target, spell, ScaleSignature(power, cast.Stage == 0 ? 100 : 55), DefenceType.MAC);
+                landed = HitSignatureTarget(target, spell,
+                    ScaleSignature(power, cast.Stage == 0 ? 100 : 55 + cast.RelayCharge * 12), DefenceType.MAC);
                 if (!landed) break;
                 if (cast.Stage == 2 && master) ChangeMP(4);
                 int max = advanced ? 4 : 3;
@@ -247,10 +264,15 @@ public partial class HumanObject
                     var visited = cast.RelayTargets ?? new List<MapObject>(max);
                     visited.Add(target);
                     var next = GetSignatureTargets(impact, 3, 1, visited).FirstOrDefault();
-                    if (next != null) QueueSignatureStage(magic, cast with
+                    if (next != null)
                     {
-                        Target = next, LastImpact = impact, RelayTargets = visited, Trained = true
-                    }, 95);
+                        byte charge = cast.Stage == 0 ? ComboStacks(spell) : cast.RelayCharge;
+                        if (cast.Stage == 0 && charge > 0) SpendCombo(spell);
+                        QueueSignatureStage(magic, cast with
+                        {
+                            Target = next, LastImpact = impact, RelayTargets = visited, Trained = true, RelayCharge = charge
+                        }, 95);
+                    }
                 }
                 break;
             }
@@ -260,7 +282,11 @@ public partial class HumanObject
                 int before = ally.HP;
                 ally.ChangeHP(Math.Min(Math.Max(0, ally.MaxHealth - before), power));
                 int effective = Math.Max(0, ally.HP - before);
-                landed = GrantSignatureWard(ally, spell, power / 2 + (advanced ? effective / 3 : 0), 3500) || effective > 0;
+                byte reserve = ComboStacks(spell);
+                int ward = power / 2 + (advanced ? effective / 3 : 0) + ScaleSignature(power, reserve * 15);
+                bool protectedAlly = GrantSignatureWard(ally, spell, ward, 3500);
+                if (protectedAlly && reserve > 0) SpendCombo(spell);
+                landed = protectedAlly || effective > 0;
                 if (master)
                 {
                     int index = ally.PoisonList.FindIndex(p => p.PType is PoisonType.Green or PoisonType.Red);
@@ -276,10 +302,12 @@ public partial class HumanObject
             {
                 Poison dose = FindDistilPoison(target);
                 if (dose == null) break;
-                int bonus = (int)Math.Min(dose.Duration - dose.Time, 4) * (advanced ? 8 : 5);
+                bool ink = ComboStacks(spell, target) > 0;
+                int bonus = (int)Math.Min(dose.Duration - dose.Time, 4) * (advanced ? 8 : 5) + (ink ? 18 : 0);
                 Point impact = target.CurrentLocation;
                 landed = HitSignatureTarget(target, spell, ScaleSignature(power, 100 + bonus), DefenceType.MAC);
                 if (!landed) break;
+                if (ink) SpendCombo(spell, target);
                 target.PoisonList.Remove(dose);
                 if (master && GetSignatureTargets(impact, 2, 1, new[] { target }).FirstOrDefault() is { } next)
                 {
@@ -312,7 +340,12 @@ public partial class HumanObject
                         break;
                     }
                 }
-                pet.ChangeHP(Math.Min(Math.Max(0, pet.MaxHealth - pet.Health), advanced ? ScaleSignature(power, 125) : power));
+                int missing = Math.Max(0, pet.MaxHealth - pet.Health);
+                int baseMend = advanced ? ScaleSignature(power, 125) : power;
+                byte bond = spell == Spell.SpiritCommand ? ComboStacks(spell) : (byte)0;
+                int mend = Math.Min(missing, ScaleSignature(baseMend, 100 + bond * 20));
+                pet.ChangeHP(mend);
+                if (bond > 0 && mend > baseMend) SpendCombo(spell);
                 BroadcastSignatureEffect(spell, pet.CurrentLocation, SpellEffect.SignatureImpact);
                 landed = true;
                 break;
@@ -385,6 +418,7 @@ public partial class HumanObject
     protected void ResetSignatureState()
     {
         _signatureGeneration++;
+        ResetCombo();
         _signatureFieldUntil = 0;
         lock (_signatureWardLock)
         {
@@ -439,7 +473,7 @@ public partial class HumanObject
     {
         if (!target.Dead)
             target.ApplyPoison(new Poison { Owner = this, PType = PoisonType.Slow, TickSpeed = 1000,
-                Duration = target is HumanObject ? 1 : pveSeconds }, this);
+                TickTime = Envir.Time + 1000, Duration = target is HumanObject ? 1 : pveSeconds }, this);
     }
 
     private bool HitSignatureTarget(MapObject target, Spell spell, int power, DefenceType defence)

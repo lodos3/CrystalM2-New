@@ -1737,6 +1737,7 @@ public enum ServerPacketIds : short
     StorageUnlockResult,
     StoragePasswordResult,
     SpecialisationResult,
+    SpellComboState,
 }
 
 public enum ClientPacketIds : short

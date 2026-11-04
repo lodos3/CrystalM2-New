@@ -827,6 +827,34 @@ namespace ServerPackets
         }
     }
 
+    public sealed class SpellComboState : Packet
+    {
+        public override short Index => (short)ServerPacketIds.SpellComboState;
+
+        public uint ObjectID, TargetID;
+        public Spell Spender;
+        public byte Stacks;
+        public ushort Remaining;
+
+        protected override void ReadPacket(BinaryReader reader)
+        {
+            ObjectID = reader.ReadUInt32();
+            TargetID = reader.ReadUInt32();
+            Spender = (Spell)reader.ReadByte();
+            Stacks = reader.ReadByte();
+            Remaining = reader.ReadUInt16();
+        }
+
+        protected override void WritePacket(BinaryWriter writer)
+        {
+            writer.Write(ObjectID);
+            writer.Write(TargetID);
+            writer.Write((byte)Spender);
+            writer.Write(Stacks);
+            writer.Write(Remaining);
+        }
+    }
+
     public sealed class UserSlotsRefresh : Packet
     {
         public override short Index

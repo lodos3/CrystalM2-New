@@ -2101,7 +2101,8 @@ namespace Client.MirScenes.Dialogs
                 int mana = magic.BaseCost + magic.Level * magic.LevelCost;
                 SkillButton.Hint = $"{ability.Description}\n{mana} MP · {magic.Delay / 1000f:0.#} s cooldown" +
                     (magic.Range > 0 ? $" · {magic.Range} tiles" : "") +
-                    (usable ? "" : $"\nRequires {SpellCurriculum.Name(ability.Class, ability.Spec)}");
+                    (usable ? "" : $"\nRequires {SpellCurriculum.Name(ability.Class, ability.Spec)}") +
+                    (SpellCombos.For(magic.Spell) is { } combo ? $"\n{combo.Rotation}" : "");
                 SetDelay();
                 return;
             }
@@ -2208,6 +2209,7 @@ namespace Client.MirScenes.Dialogs
                     break;
                 case Spell.FrostCrunch:
                     SkillButton.Hint = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.FrostCrunchSkillDescription), Magic.Level, Magic.Level == 0 ? Magic.Level1 : Magic.Level == 1 ? Magic.Level2 : Magic.Level == 2 ? Magic.Level3 : 0, Magic.BaseCost);
+                    SkillButton.Hint += "\nA landed hit applies Rime. Ice Thrust or Glacial Gate can shatter it.";
                     break;
                 case Spell.Mirroring:
                     SkillButton.Hint = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.MirroringSkillDescription), Magic.Level, Magic.Level == 0 ? Magic.Level1 : Magic.Level == 1 ? Magic.Level2 : Magic.Level == 2 ? Magic.Level3 : 0, Magic.BaseCost);
@@ -2226,6 +2228,7 @@ namespace Client.MirScenes.Dialogs
                     break;
                 case Spell.IceThrust:
                     SkillButton.Hint = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.IceThrustSkillDescription), Magic.Level, Magic.Level == 0 ? Magic.Level1 : Magic.Level == 1 ? Magic.Level2 : Magic.Level == 2 ? Magic.Level3 : 0, Magic.BaseCost);
+                    SkillButton.Hint += "\nShatter Rime on your marked enemy for 25% extra damage and a slow.";
                     break;
                 case Spell.MagicBooster:
                     SkillButton.Hint = GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.MagicBoosterSkillDescription), Magic.Level, Magic.Level == 0 ? Magic.Level1 : Magic.Level == 1 ? Magic.Level2 : Magic.Level == 2 ? Magic.Level3 : 0, Magic.BaseCost);

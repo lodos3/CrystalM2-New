@@ -67,8 +67,9 @@ public sealed class SkillBarDialog : MirPanel
 
 internal sealed class ActionSlot : MirControl
 {
-    private readonly MirLabel _key, _cooldown;
+    private readonly MirLabel _key, _cooldown, _comboBadge;
     private long _lastSeconds;
+    private int _lastComboStacks;
     public readonly int Number;
     public readonly SkillBarDialog Bar;
     public ClientMagic Magic { get; private set; }
@@ -84,6 +85,9 @@ internal sealed class ActionSlot : MirControl
         _cooldown = MirPanel.AddCaption(this, "", new Rectangle(0, 3, 38, 19), false);
         _cooldown.DrawFormat |= TextFormatFlags.HorizontalCenter;
         _cooldown.OutLine = true;
+        _comboBadge = MirPanel.AddCaption(this, "", new Rectangle(3, 1, 13, 16), false);
+        _comboBadge.ForeColour = Color.Gold;
+        _comboBadge.OutLine = true;
     }
 
     public void Update(ClientMagic magic)
@@ -95,11 +99,19 @@ internal sealed class ActionSlot : MirControl
         Hint = (magic == null ? slot + " · Drag a spell here." :
             $"{magic.Name} · {slot}\n{magic.BaseCost + magic.LevelCost * magic.Level} MP · {Functions.PrintTimeSpanFromMilliSeconds(magic.Delay)} cooldown") +
             (key.Length == 0 ? "\nUnbound" : $"\n{key}");
+        if (magic != null && SpellCombos.For(magic.Spell) is { } combo)
+            Hint += $"\n{combo.Rotation}";
         UpdateCooldown();
     }
 
     public void UpdateCooldown()
     {
+        int stacks = Magic == null ? 0 : Bar.Actor?.ActiveComboCount(Magic.Spell) ?? 0;
+        if (stacks != _lastComboStacks)
+        {
+            _lastComboStacks = stacks;
+            _comboBadge.Text = stacks == 0 ? "" : stacks.ToString();
+        }
         long seconds = Magic == null || Magic.CastTime <= 0 ? 0 :
             Math.Max(0, (Magic.CastTime + Magic.Delay - CMain.Time + 999) / 1000);
         if (seconds == _lastSeconds) return;
@@ -111,7 +123,11 @@ internal sealed class ActionSlot : MirControl
     {
         Rectangle bounds = DisplayRectangle;
         var scene = GameScene.Scene;
-        UiVisualState state = scene.IsActionDropTarget(this) || (scene.BindingActionKeys && MouseControl == this)
+        var actor = Bar.Actor;
+        bool comboReady = Magic != null && _lastSeconds == 0 && actor?.ActiveComboCount(Magic.Spell) > 0 &&
+            (actor.ComboTarget == 0 || actor.ComboTarget == MapObject.TargetObjectID ||
+                actor.ComboTarget == MapObject.MouseObjectID);
+        UiVisualState state = comboReady || scene.IsActionDropTarget(this) || (scene.BindingActionKeys && MouseControl == this)
             ? UiVisualState.Selected : SkinState;
         DXManager.Device.Ui.Draw(UiSurface.Slot, bounds, state);
         bounds.Inflate(-3, -3);

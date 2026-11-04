@@ -35,3 +35,21 @@ The server validates mana, cooldown, entitlement, range, target and map before a
 Combat particles use separate caster, target and impact layers with staggered start times. The client clears pending effects on a map reset. Ash Seal and Storm Relay resolve in timed stages. The same client renders terrain, weather and combat effects using the Vortice renderer.
 
 Run `dotnet run --project Tests/SpecialisationCombatTests/SpecialisationCombatTests.csproj` to exercise the server's spell dispatch and Magic database. The defaults are initial PvE and PvP tuning. The encounter and duel comparisons in the design audit require live gear, map and monster data.
+
+## Warrior, Taoist and Wizard rotations
+
+Counts below cover specialisation-only active abilities, including the signature. Each class also has a shared kit. Each spec has three traits and one combo proc. Rage belongs to Iron Vow, Vampirism belongs to Rimecaller, and Hiding is shared Taoist utility. The setup spells needed at spec selection unlock by level 20. Their original proficiency gates still govern ranks.
+
+| Specialisation | Spec actives | Setup and payoff |
+| --- | ---: | --- |
+| Iron Vow | 5 | Two-tile Thrusting or Flaming Sword opens the enemy for Notchbreaker. |
+| Red Tempest | 6 | Half Moon or Cross Half Moon builds up to two Momentum. Red Wake spends it on stronger secondary hits. |
+| Stoneguard | 6 | Mitigate an attack during Protection Field or Immortal Skin to build Guard for Interpose. |
+| Ashweaver | 8 | Great Fire Ball and Fire Wall build Embers for the first Ash Seal pulse that lands. |
+| Rimecaller | 7 | Frost Crunch marks and slows an enemy. Ice Thrust or Glacial Gate shatters that enemy's Rime. |
+| Stormwright | 7 | Thunder Bolt or Lightning builds Charge for stronger Storm Relay bounces. |
+| Lanternkeeper | 8 | Effective healing from Healing, Mass Healing or Healing Circle builds reserve for Lantern Link. |
+| Venom Scribe | 7 | Poisoning or Poison Cloud adds Fresh Ink when the poison applies. Distil consumes the caster's poison and gets a bonus from the mark. |
+| Spirit Binder | 8 | Soul Fire Ball, Spirit Spark or Pet Enhancer builds Bond with an owned spirit. Spirit Command spends Bond on a stronger mend. |
+
+The action bar shows active stacks and highlights a ready spender when its target matches. Frost Crunch applies a short, resistible slow. Ice Thrust trades its independent freeze roll for the Rime payoff. Marks expire, belong to their caster and target, and clear on a map change or death. Client and server should be deployed together for the new proc-state packet. The database layout is still version 118.

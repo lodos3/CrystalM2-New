@@ -603,17 +603,7 @@ namespace Server.MirObjects
             {
                 HealTime = Envir.Time + HealDelay;
 
-                int incHeal = (Level / 10) + (HealAmount / 10);
-                if (HealAmount > (5 + incHeal))
-                {
-                    healthRegen += (5 + incHeal);
-                    HealAmount -= (ushort)Math.Min(HealAmount, 5 + incHeal);
-                }
-                else
-                {
-                    healthRegen += HealAmount;
-                    HealAmount = 0;
-                }
+                healthRegen += DrainSpellHealing(healthRegen);
             }
 
             if (Envir.Time > VampTime)
@@ -641,7 +631,7 @@ namespace Server.MirObjects
             if (HP == Stats[Stat.HP])
             {
                 PotHealthAmount = 0;
-                HealAmount = 0;
+                ClearSpellHealing();
             }
 
             if (manaRegen > 0) ChangeMP(manaRegen);
@@ -3267,7 +3257,7 @@ namespace Server.MirObjects
                     if (ob.Attacked(this, damageFinal,
                         ob is MonsterObject monster && monster.Info.AI == 49 ? DefenceType.Repulsion : DefenceType.Agility,
                         false) > 0)
-                        BroadcastWeaponSpellImpact(ob.CurrentLocation, spell);
+                        BroadcastWeaponSpellImpact(ob, spell);
                     break;
                 }
 
@@ -3299,7 +3289,7 @@ namespace Server.MirObjects
                         if (!ob.IsAttackTarget(this)) continue;
 
                         if (ob.Attacked(this, damageFinal, DefenceType.Agility, false) > 0)
-                            BroadcastWeaponSpellImpact(ob.CurrentLocation, spell);
+                            BroadcastWeaponSpellImpact(ob, spell);
                         break;
                     }
                 }
@@ -3329,7 +3319,7 @@ namespace Server.MirObjects
                         if (!ob.IsAttackTarget(this)) continue;
 
                         if (ob.Attacked(this, damageFinal, DefenceType.Agility, false) > 0)
-                            BroadcastWeaponSpellImpact(ob.CurrentLocation, spell);
+                            BroadcastWeaponSpellImpact(ob, spell);
                         break;
                     }
                 }
@@ -5983,7 +5973,11 @@ namespace Server.MirObjects
                     targetLocation = (Point)data[3];
 
                     if (target == null || !target.IsAttackTarget(this) || target.CurrentMap != CurrentMap || target.Node == null || !Functions.InRange(target.CurrentLocation, targetLocation, 2)) return;
-                    if (target.Attacked(this, value, DefenceType.MAC, false) > 0) LevelMagic(magic);
+                    if (target.Attacked(this, value, DefenceType.MAC, false) > 0)
+                    {
+                        RecordComboHit(magic.Spell, target);
+                        LevelMagic(magic);
+                    }
                     break;
 
                 #endregion
@@ -6024,30 +6018,8 @@ namespace Server.MirObjects
                     if (target == null || !target.IsAttackTarget(this) || target.CurrentMap != CurrentMap || target.Node == null || !Functions.InRange(target.CurrentLocation, targetLocation, 2)) return;
                     if (target.Attacked(this, value, DefenceType.MAC, false) > 0)
                     {
-                        if (Level + (target.Race == ObjectType.Player ? 2 : 10) >= target.Level && Envir.Random.Next(target.Race == ObjectType.Player ? 100 : 20) <= magic.Level)
-                        {
-                            target.ApplyPoison(new Poison
-                            {
-                                Owner = this,
-                                Duration = target.Race == ObjectType.Player ? 4 : 5 + Envir.Random.Next(5),
-                                PType = PoisonType.Slow,
-                                TickSpeed = 1000,
-                            }, this);
-                            target.OperateTime = 0;
-                        }
-
-                        if (Level + (target.Race == ObjectType.Player ? 2 : 10) >= target.Level && Envir.Random.Next(target.Race == ObjectType.Player ? 100 : 40) <= magic.Level)
-                        {
-                            target.ApplyPoison(new Poison
-                            {
-                                Owner = this,
-                                Duration = target.Race == ObjectType.Player ? 2 : 5 + Envir.Random.Next(Stats[Stat.Freezing]),
-                                PType = PoisonType.Frozen,
-                                TickSpeed = 1000,
-                            }, this);
-                            target.OperateTime = 0;
-                        }
-
+                        RecordComboHit(Spell.FrostCrunch, target);
+                        SlowSignatureTarget(target, 2);
                         LevelMagic(magic);
                     }
                     break;
@@ -6078,7 +6050,7 @@ namespace Server.MirObjects
 
                     if (target == null || !target.IsFriendlyTarget(this) || target.CurrentMap != CurrentMap || target.Node == null) return;
                     if (target.Health >= target.MaxHealth) return;
-                    target.HealAmount = (ushort)Math.Min(ushort.MaxValue, target.HealAmount + value);
+                    QueueSpellHealing(target, value);
                     target.OperateTime = 0;
                     LevelMagic(magic);
                     break;
@@ -6107,23 +6079,23 @@ namespace Server.MirObjects
                     switch (item.Info.Shape)
                     {
                         case 1:
-                            target.ApplyPoison(new Poison
+                            ApplyInkPoison(target, new Poison
                             {
                                 Duration = (value * 2) + ((magic.Level + 1) * 7),
                                 Owner = this,
                                 PType = PoisonType.Green,
                                 TickSpeed = 2000,
                                 Value = value / 15 + magic.Level + 1 + Envir.Random.Next(Stats[Stat.PoisonAttack])
-                            }, this);
+                            });
                             break;
                         case 2:
-                            target.ApplyPoison(new Poison
+                            ApplyInkPoison(target, new Poison
                             {
                                 Duration = (value * 2) + (magic.Level + 1) * 7,
                                 Owner = this,
                                 PType = PoisonType.Red,
                                 TickSpeed = 2000,
-                            }, this);
+                            });
                             break;
                     }
                     target.OperateTime = 0;
@@ -6422,7 +6394,8 @@ namespace Server.MirObjects
                         value = (int)data[1];
                         target = (MonsterObject)data[2];
 
-                        if (target.Node == null) return;
+                        if (target == null || target.Dead || target.Node == null || target.CurrentMap != CurrentMap ||
+                            !target.IsFriendlyTarget(this)) return;
 
                         int dcInc = 2 + target.Level * 2;
                         int acInc = 4 + target.Level;
@@ -6436,6 +6409,7 @@ namespace Server.MirObjects
                         };
 
                         target.AddBuff(BuffType.PetEnhancer, this, (Settings.Second * value), stats);
+                        if (IsSignatureCompanion((MonsterObject)target, Spell.SpiritCommand)) BuildCombo(Spell.SpiritCommand);
                         LevelMagic(magic);
                     }
                     break;
@@ -6847,7 +6821,7 @@ namespace Server.MirObjects
                 defence = DefenceType.Agility;
 
             if (target.Attacked(this, damage, defence, damageWeapon) <= 0) return;
-            if (userMagic != null) BroadcastWeaponSpellImpact(target.CurrentLocation, userMagic.Spell);
+            if (userMagic != null) BroadcastWeaponSpellImpact(target, userMagic.Spell);
 
             if (FatalSword)
             {
@@ -6883,8 +6857,10 @@ namespace Server.MirObjects
                 }
             }
         }
-        private void BroadcastWeaponSpellImpact(Point location, Spell spell)
+        private void BroadcastWeaponSpellImpact(MapObject target, Spell spell)
         {
+            RecordComboHit(spell, target);
+            Point location = target.CurrentLocation;
             CurrentMap.Broadcast(new S.MapEffect
             {
                 Location = location,
@@ -7203,6 +7179,7 @@ namespace Server.MirObjects
                 damage -= (damage * Stats[Stat.DamageReductionPercent]) / 100;
             }
 
+            RecordGuard(armour, damage);
             if (armour >= damage)
             {
                 BroadcastDamageIndicator(DamageType.Miss);
@@ -7324,6 +7301,7 @@ namespace Server.MirObjects
                 damage -= (damage * Stats[Stat.DamageReductionPercent]) / 100;
             }
 
+            RecordGuard(armour, damage);
             if (armour >= damage)
             {
                 BroadcastDamageIndicator(DamageType.Miss);

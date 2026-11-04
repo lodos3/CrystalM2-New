@@ -460,6 +460,8 @@ public abstract class Packet
                 return new S.UserInformation();
             case (short)ServerPacketIds.SpecialisationResult:
                 return new S.SpecialisationResult();
+            case (short)ServerPacketIds.SpellComboState:
+                return new S.SpellComboState();
             case (short)ServerPacketIds.UserSlotsRefresh:
                 return new S.UserSlotsRefresh();
             case (short)ServerPacketIds.UserLocation:
