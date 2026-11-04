@@ -10368,6 +10368,7 @@ namespace Client.MirScenes
         private AtmosphericWeatherFrame _weatherFrame;
         internal AtmosphericWeatherFrame WeatherFrame => _weatherFrame;
         private Color _atmosphereTint = Color.White;
+        private Color _atmosphereHazeTint = Color.FromArgb(255, 198, 214, 240);
         private float _atmosphereFog;
         private const int DynamicLightLimit = 48;
 
@@ -10748,12 +10749,14 @@ namespace Client.MirScenes
             {
                 Color desiredTint = AtmosphereColourGrade.Target(setting, Weather, MapDarkLight);
                 _atmosphereTint = _atmosphereFade.Sample(desiredTint, CMain.Time);
+                _atmosphereHazeTint = AtmosphereColourGrade.FogTint(Weather);
                 _atmosphereFog = _fogFade.Sample(AtmosphereColourGrade.FogStrength(Weather),
                                                  CMain.Time);
             }
             else
             {
                 _atmosphereTint = Color.White;
+                _atmosphereHazeTint = Color.FromArgb(255, 198, 214, 240);
                 _atmosphereFog = 0;
                 _atmosphereFade.Reset();
                 _fogFade.Reset();
@@ -10825,7 +10828,7 @@ namespace Client.MirScenes
             bool postProcessing = !dead && Settings.PostProcessing &&
                 DXManager.BeginPostProcessing(_atmosphereTint,
                     AtmosphereColourGrade.GradeStrength(_atmosphereTint), _atmosphereFog,
-                    _weatherFrame);
+                    _weatherFrame, _atmosphereHazeTint);
 
             DXManager.DrawOpaque(ControlTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White, Opacity);
 
