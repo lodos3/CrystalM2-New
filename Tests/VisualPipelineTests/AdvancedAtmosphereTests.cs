@@ -40,6 +40,11 @@ internal static class AdvancedAtmosphereTests
               "Ash storms must produce warm drifting particulate haze.");
         Check(AtmosphereColourGrade.FogStrength(WeatherSetting.RedEmber) > 0,
               "Active ember weather must influence distant atmospheric haze.");
+        Color ashHaze = AtmosphereColourGrade.FogTint(WeatherSetting.RedEmber);
+        Color snowHaze = AtmosphereColourGrade.FogTint(WeatherSetting.Snow);
+        Check(ashHaze.R > ashHaze.B && snowHaze.B > snowHaze.R,
+              "Haze tint must follow smoky ash and cold snow rather than stay uniformly blue.");
+
         Color emberTint = AtmosphereColourGrade.Target(LightSetting.Day, WeatherSetting.RedEmber, 0);
         Check(emberTint.R > emberTint.B, "Ember skies must grade warm without changing map data.");
         Color violet = AtmosphereColourGrade.Target(LightSetting.Day, WeatherSetting.PurpleLeaves, 0);
