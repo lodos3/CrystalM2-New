@@ -71,7 +71,10 @@ namespace Client.MirGraphics
                 {
                     bool snow = (weather & WeatherSetting.Snow) != 0;
                     bool rain = (weather & WeatherSetting.Rain) != 0;
-                    Color mist = snow ? Color.FromArgb(220, 233, 246) :
+                    bool ash = (weather & (WeatherSetting.RedEmber |
+                                           WeatherSetting.FireParticle)) != 0;
+                    Color mist = ash ? Color.FromArgb(219, 158, 116) :
+                                 snow ? Color.FromArgb(220, 233, 246) :
                                  rain ? Color.FromArgb(176, 196, 220) :
                                         Color.FromArgb(201, 213, 226);
                     int alpha = Math.Min(66, Math.Max(0, (int)(frame.FogCover * 74f)));
@@ -85,7 +88,10 @@ namespace Client.MirGraphics
                     int alpha = Math.Min(32, Math.Max(0, (int)(frame.CloudCover * 34f)));
                     RenderLayer(768, frame.DriftX * 0.42f + 100f,
                                 frame.DriftY * 0.35f + 210f,
-                                Color.FromArgb(alpha, 32, 42, 57));
+                                (weather & (WeatherSetting.RedEmber |
+                                            WeatherSetting.FireParticle)) != 0
+                                    ? Color.FromArgb(alpha, 70, 47, 43)
+                                    : Color.FromArgb(alpha, 32, 42, 57));
                 }
             }
             catch (Exception ex)
