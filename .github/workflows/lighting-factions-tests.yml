@@ -5,6 +5,8 @@ on:
       - master
   pull_request:
     paths:
+      - "Client.Rendering.Core/**"
+      - "Client.Rendering.D3D11Preview/**"
       - "Client/MirGraphics/MapLightEncoding.cs"
       - "Client/MirGraphics/MapMaterialMap.cs"
       - "Client/MirGraphics/MapMaterialMapLoader.cs"
@@ -43,6 +45,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+      - name: Modern renderer asset-fidelity and batching tests
+        run: dotnet run --project Tests/ModernRendererTests/ModernRendererTests.csproj
       - name: Map light decoder
         run: dotnet run --project Tests/RenderingLightTests/RenderingLightTests.csproj
       - name: Atmospheric lighting and bloom geometry
@@ -69,3 +73,5 @@ jobs:
         run: dotnet restore Client/Client.csproj
       - name: Compile native SlimDX client integration
         run: dotnet build Client/Client.csproj --configuration Release --no-restore
+      - name: Compile independent hardware Direct3D11 LIB preview
+        run: dotnet build Client.Rendering.D3D11Preview/Client.Rendering.D3D11Preview.csproj --configuration Release
