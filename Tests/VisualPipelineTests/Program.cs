@@ -59,4 +59,5 @@ Check(BloomBufferLayout.ClampDivisor(1) == 2 && BloomBufferLayout.ClampDivisor(2
       "Bloom quality must clamp to safe bounds.");
 Check(BloomBufferLayout.Resolve(12000, 12000, 2) == Size.Empty,
       "Oversized bloom allocations must disable the pass.");
+AdvancedAtmosphereTests.Run();
 Console.WriteLine("Atmosphere, occlusion and bounded bloom geometry checks passed.");
