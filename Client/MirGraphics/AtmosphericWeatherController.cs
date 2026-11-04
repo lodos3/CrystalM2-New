@@ -28,6 +28,19 @@ namespace Client.MirGraphics
         }
     }
 
+    internal static class AtmosphereIntensity
+    {
+        internal static int ClampPercent(int requested)
+        {
+            return Math.Max(0, Math.Min(100, requested));
+        }
+
+        internal static float Scale(int requested)
+        {
+            return ClampPercent(requested) / 100f;
+        }
+    }
+
     internal static class WeatherParticleBudget
     {
         internal static int Clamp(int requested)
