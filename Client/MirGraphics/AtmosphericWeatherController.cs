@@ -11,9 +11,11 @@ namespace Client.MirGraphics
         internal readonly float WindPixelsPerSecondX;
         internal readonly float WindPixelsPerSecondY;
         internal readonly float LightningFlash;
+        internal readonly float DriftX, DriftY;
 
         internal AtmosphericWeatherFrame(float wetness, float cloudCover, float fogCover,
-                                         float windX, float windY, float lightning)
+                                         float windX, float windY, float lightning,
+                                         float driftX, float driftY)
         {
             Wetness = wetness;
             CloudCover = cloudCover;
@@ -21,6 +23,8 @@ namespace Client.MirGraphics
             WindPixelsPerSecondX = windX;
             WindPixelsPerSecondY = windY;
             LightningFlash = lightning;
+            DriftX = driftX;
+            DriftY = driftY;
         }
     }
 
@@ -31,12 +35,17 @@ namespace Client.MirGraphics
         private readonly SmoothScalarTransition _wetness = new SmoothScalarTransition(30000);
         private readonly SmoothScalarTransition _clouds = new SmoothScalarTransition(16000);
         private readonly SmoothScalarTransition _fog = new SmoothScalarTransition(14000);
+        private long _lastTime;
+        private bool _hasTime;
+        private float _driftX, _driftY;
 
         internal void Reset()
         {
             _wetness.Reset();
             _clouds.Reset();
             _fog.Reset();
+            _hasTime = false;
+            _driftX = _driftY = 0f;
         }
 
         internal AtmosphericWeatherFrame Sample(WeatherSetting weather, long now,
@@ -65,8 +74,19 @@ namespace Client.MirGraphics
             float windY = baseWind * (0.25f + 0.12f * (float)Math.Sin(seconds / 27.0 - phase));
             float flash = rain ? LightningFlashAt(now, lightningEnabled, true, mapSeed) : 0;
 
+            if (_hasTime)
+            {
+                // Cap one update to 250ms after a pause to prevent the fog
+                // pattern from abruptly jumping across the whole screen.
+                float dt = Math.Min(250L, Math.Max(0L, now - _lastTime)) / 1000f;
+                _driftX = (_driftX + windX * dt) % 8192f;
+                _driftY = (_driftY + windY * dt) % 8192f;
+            }
+            _lastTime = now;
+            _hasTime = true;
+
             return new AtmosphericWeatherFrame(wetness, cloudCover, fogCover,
-                                               windX, windY, flash);
+                                               windX, windY, flash, _driftX, _driftY);
         }
 
         // A rare, optional and deliberately restrained lightning exposure bump.
