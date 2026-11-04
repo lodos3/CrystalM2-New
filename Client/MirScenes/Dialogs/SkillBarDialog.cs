@@ -51,7 +51,9 @@ public sealed class SkillBarDialog : MirPanel
     {
         UserObject actor = Actor;
         foreach (ActionSlot slot in _slots)
-            slot.Update(actor?.Magics.Find(magic => magic.Key == slot.Number));
+            slot.Update(actor?.Magics.Find(magic =>
+                magic.Key == slot.Number &&
+                SpellCurriculum.CanUse(actor.Class, actor.Specialisation, magic.Spell)));
     }
 
     public void Process()

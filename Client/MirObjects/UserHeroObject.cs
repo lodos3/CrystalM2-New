@@ -27,6 +27,7 @@ namespace Client.MirObjects
             Class = info.Class;
             Gender = info.Gender;
             Level = info.Level;
+            Specialisation = info.Specialisation;
             Hair = info.Hair;
 
             HP = info.HP;

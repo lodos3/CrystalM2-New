@@ -1031,6 +1031,11 @@ namespace Client.MirScenes
             }
 
             if (magic == null) return;
+            if (!SpellCurriculum.CanUse(actor.Class, actor.Specialisation, magic.Spell))
+            {
+                OutputMessage("This ability is unavailable in your specialisation.");
+                return;
+            }
 
             switch (magic.Spell)
             {
@@ -1383,6 +1388,9 @@ namespace Client.MirScenes
                     break;
                 case (short)ServerPacketIds.UserInformation:
                     UserInformation((S.UserInformation)p);
+                    break;
+                case (short)ServerPacketIds.SpecialisationResult:
+                    SpecialisationResult((S.SpecialisationResult)p);
                     break;
                 case (short)ServerPacketIds.UserSlotsRefresh:
                     UserSlotsRefresh((S.UserSlotsRefresh)p);
@@ -2261,6 +2269,34 @@ namespace Client.MirScenes
             AllowObserve = p.AllowObserve;
             Observing = p.Observer;
         }
+        private void SpecialisationResult(S.SpecialisationResult p)
+        {
+            UserObject actor = p.ForHero ? Hero : User;
+            if (actor == null) return;
+
+            // Do not change local loadout until the server has accepted the choice.
+            actor.Specialisation = p.Specialisation;
+            if (!p.Accepted)
+            {
+                OutputMessage("Specialisation selection rejected by the server.");
+                return;
+            }
+
+            actor.Thrusting = false;
+            actor.HalfMoon = false;
+            actor.CrossHalfMoon = false;
+            actor.DoubleSlash = false;
+            actor.Slaying = false;
+            actor.TwinDrakeBlade = false;
+            actor.FlamingSword = false;
+            actor.ClearMagic();
+
+            foreach (SkillBarDialog bar in SkillBarDialogs)
+                bar.Update();
+
+            OutputMessage("Specialisation chosen: " + SpellCurriculum.Name(actor.Class, actor.Specialisation));
+        }
+
         private void UserSlotsRefresh(S.UserSlotsRefresh p)
         {
             User.SetSlots(p);
@@ -11962,6 +11998,13 @@ namespace Client.MirScenes
 
         public void UseMagic(ClientMagic magic, UserObject actor)
         {
+            if (magic == null || actor == null ||
+                !SpellCurriculum.CanUse(actor.Class, actor.Specialisation, magic.Spell))
+            {
+                actor?.ClearMagic();
+                return;
+            }
+
             if (CMain.Time < GameScene.SpellTime || actor.Poison.HasFlag(PoisonType.Stun))
             {
                 actor.ClearMagic();

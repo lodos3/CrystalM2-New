@@ -1970,6 +1970,7 @@ namespace Client.MirScenes.Dialogs
         public ClientMagic Magic;
         public MirImageControl CoolDown;
         public bool HeroMagic;
+        public bool Usable = true;
 
         public MagicButton()
         {
@@ -1988,17 +1989,18 @@ namespace Client.MirScenes.Dialogs
             SkillButton.AfterDraw += (_, _) =>
             {
                 if (Magic == null) return;
-                Libraries.MagIcon2.Draw(Magic.Icon * 2, SkillButton.DisplayLocation.Add(2, 2), new Size(27, 27), Color.White);
+                Libraries.MagIcon2.Draw(Magic.Icon * 2, SkillButton.DisplayLocation.Add(2, 2), new Size(27, 27),
+                    Usable ? Color.White : Color.Gray);
             };
             SkillButton.MouseDown += (_, e) =>
             {
-                if (e.Button == MouseButtons.Left && Magic != null)
+                if (e.Button == MouseButtons.Left && Magic != null && Usable)
                     GameScene.Scene.PressSpellbookSpell(HeroMagic ? GameScene.Hero : GameScene.User, Magic);
             };
             SkillButton.Click += (_, _) =>
             {
                 UserObject actor = HeroMagic ? GameScene.Hero : GameScene.User;
-                if (GameScene.Observing || Magic == null || actor == null ||
+                if (GameScene.Observing || Magic == null || !Usable || actor == null ||
                     (HeroMagic && GameScene.Scene.HeroSpawnState != HeroSpawnState.Summoned)) return;
                 new AssignKeyPanel(actor, Magic, HeroMagic);
             };
@@ -2064,11 +2066,14 @@ namespace Client.MirScenes.Dialogs
             };
         }
 
-        public void Update(ClientMagic magic)
+        public void Update(ClientMagic magic, bool usable = true)
         {
             Magic = magic;
+            Usable = usable;
+            SkillButton.Hint = usable ? "Drag this spell onto an action bar." :
+                "Inactive: this spell belongs to another specialisation.";
 
-            NameLabel.Text = Magic.Name;
+            NameLabel.Text = usable ? Magic.Name : Magic.Name + " [Locked]";
 
             LevelLabel.Text = Magic.Level.ToString();
             switch (Magic.Level)

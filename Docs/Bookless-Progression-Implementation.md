@@ -17,3 +17,13 @@ Server `Envir.Version` is now 118. Player and hero save records each append a se
 PlayerObject and HeroObject now call `ReconcileCurriculumSpells(false)` immediately after loading or creating the actor, before stats and initial skill snapshots. `HumanObject.LevelUp` reconciles with client notifications after threshold changes. Existing saved spells are retained without resetting rank, XP, keys or cast time; an eligible temporary grant becomes permanent. New spells receive server-generated `UserMagic` records. The old player and hero ItemType.Book handlers now return a failed use response without consuming the book or granting any ability.
 
 This currently unlocks the legacy catalog at each spell's original `Level1` value, not spec-exclusive ownership. Spec UI, slot migration, signature spells, passives and spec-aware server cast enforcement remain incomplete.
+
+## Specialisation selection and enforcement (protocol update)
+
+The shared catalogue now assigns class-specific spells to one of three loadouts per class (15 total), while leaving an explicit basic kit. The player or summoned hero can choose a single specialisation from **Character → Skills** at level 20 or above. Selections are confirmed in the client, validated by the server, and acknowledged before local UI state updates. This is deliberately a one-time decision; a future respecialisation service will need its own rules and persisted state before it can be enabled.
+
+Server magic lookup, melee spell parameters, passive stat refresh, and normal hero AI checks respect the selected loadout. Inactive spell records remain saved, including rank, experience, and keys; inactive spells cannot be dragged from the character panel or shown as usable action bar skills. The player and hero login packets carry specialisation independently. Packet IDs were **appended** to preserve the numeric values of existing messages; **client and server must be deployed together** because the login packet layouts changed.
+
+The five-class catalogue and protocol round-trip tests are at `Tests/SpellCurriculumTests` and `Tests/SpecialisationProtocolTests`. Run `dotnet run --project Tests/SpellCurriculumTests/SpellCurriculumTests.csproj`, `dotnet run --project Tests/SpecialisationProtocolTests/SpecialisationProtocolTests.csproj`, and the complete Windows client/server builds in CI. These have not yet been verified to pass in this authoring environment.
+
+**Not yet implemented:** new unique signature spells, conditional passive mechanics beyond restricting old passive ownership, particle VFX authoring, respecs, and expanded server-editor loadout control. Do not treat this milestone as balance certification.

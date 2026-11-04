@@ -7,6 +7,7 @@ namespace Client.MirObjects
     public class UserObject : PlayerObject
     {
         public uint Id;
+        public CombatSpecialisation Specialisation;
 
         public int HP, MP;
 
@@ -79,6 +80,7 @@ namespace Client.MirObjects
             Class = info.Class;
             Gender = info.Gender;
             Level = info.Level;
+            Specialisation = info.Specialisation;
 
             CurrentLocation = info.Location;
             MapLocation = info.Location;

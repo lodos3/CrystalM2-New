@@ -1,6 +1,8 @@
 ﻿using Client.MirControls;
 using Client.MirGraphics;
+using Client.MirNetwork;
 using Client.MirObjects;
+using C = ClientPackets;
 using Client.MirSounds;
 
 namespace Client.MirScenes.Dialogs
@@ -18,6 +20,8 @@ namespace Client.MirScenes.Dialogs
         private readonly MirLabel _nameLabel, _identityLabel;
         private readonly CharacterStatsPane _combat, _attributes;
         private readonly MagicButton[] _magics;
+        private readonly MirButton[] _specialisationButtons;
+        private readonly MirLabel _specialisationLabel;
         private readonly UserObject _actor;
         private int _spellOffset;
 
@@ -272,18 +276,68 @@ namespace Client.MirScenes.Dialogs
                 Location = new Point(203, 62),
             };
 
-            _magics = new MagicButton[7];
+            // The save stores exactly one selection for each actor. Spell rows remain
+            // available for review, but inactive spells cannot be dragged or cast.
+            _specialisationButtons = new MirButton[3];
+            for (int i = 0; i < _specialisationButtons.Length; i++)
+            {
+                CombatSpecialisation choice = (CombatSpecialisation)(i + 1);
+                string name = SpellCurriculum.Name(actor.Class, choice);
+                var button = new MirButton
+                {
+                    Parent = SkillPage,
+                    Skin = UiSurface.Button,
+                    Text = name,
+                    Hint = name + " - choose this permanent specialisation.",
+                    AutoSize = false,
+                    Size = new Size(74, 24),
+                    Location = new Point(8 + i * 76, 8),
+                    Sound = SoundList.ButtonA
+                };
+                button.Click += (_, _) => ChooseSpecialisation(choice);
+                _specialisationButtons[i] = button;
+            }
+            _specialisationLabel = AddCaption(SkillPage, "", new Rectangle(8, 38, 231, 20), false);
+
+            _magics = new MagicButton[5];
             for (int i = 0; i < _magics.Length; i++)
                 _magics[i] = new MagicButton
                 {
                     Parent = SkillPage,
                     Visible = false,
-                    Location = new Point(8, 8 + i * 33),
+                    Location = new Point(8, 64 + i * 33),
                     HeroMagic = gridType == MirGridType.HeroEquipment
                 };
 
             AddSpellPageButton(UiGlyph.Left, "Previous spells", 90, -_magics.Length);
             AddSpellPageButton(UiGlyph.Right, "Next spells", 140, _magics.Length);
+        }
+
+        private void ChooseSpecialisation(CombatSpecialisation requested)
+        {
+            if (GameScene.Observing || _actor.Specialisation != CombatSpecialisation.Unchosen) return;
+            if (!SpellCurriculum.CanSelect(_actor.Class, _actor.Level, _actor.Specialisation, requested))
+            {
+                GameScene.Scene.OutputMessage("Specialisations unlock at level " +
+                    SpellCurriculum.SpecialisationUnlockLevel + ".");
+                return;
+            }
+
+            string name = SpellCurriculum.Name(_actor.Class, requested);
+            var confirm = new MirMessageBox(
+                "Choose " + name + "? This choice cannot currently be changed.",
+                MirMessageBoxButtons.YesNo);
+            confirm.YesButton.Click += (_, _) =>
+            {
+                Network.Enqueue(new C.SelectSpecialisation
+                {
+                    ForHero = _actor is UserHeroObject,
+                    Specialisation = requested
+                });
+                confirm.Dispose();
+            };
+            confirm.NoButton.Click += (_, _) => confirm.Dispose();
+            confirm.Show();
         }
 
         private MirButton CreateTab(string text, int left, int width) => new()
@@ -359,7 +413,21 @@ namespace Client.MirScenes.Dialogs
                 identity += $" · {_actor.GuildName} {_actor.GuildRankName}";
             _identityLabel.Text = identity;
 
-            if (SkillPage.Visible) RefreshSpells();
+            if (SkillPage.Visible)
+            {
+                if (_actor.Specialisation == CombatSpecialisation.Unchosen)
+                    _specialisationLabel.Text = _actor.Level < SpellCurriculum.SpecialisationUnlockLevel
+                        ? "Specialisation unlocks at level " + SpellCurriculum.SpecialisationUnlockLevel
+                        : "Choose a specialisation";
+                else
+                    _specialisationLabel.Text = "Specialisation: " +
+                        SpellCurriculum.Name(_actor.Class, _actor.Specialisation);
+
+                for (int i = 0; i < _specialisationButtons.Length; i++)
+                    _specialisationButtons[i].Selected = _actor.Specialisation == (CombatSpecialisation)(i + 1);
+
+                RefreshSpells();
+            }
         }
 
         private void RefreshSpells()
@@ -368,7 +436,12 @@ namespace Client.MirScenes.Dialogs
             {
                 int index = i + _spellOffset;
                 _magics[i].Visible = index < _actor.Magics.Count;
-                if (_magics[i].Visible) _magics[i].Update(_actor.Magics[index]);
+                if (_magics[i].Visible)
+                {
+                    ClientMagic magic = _actor.Magics[index];
+                    _magics[i].Update(magic,
+                        SpellCurriculum.CanUse(_actor.Class, _actor.Specialisation, magic.Spell));
+                }
             }
         }
 
