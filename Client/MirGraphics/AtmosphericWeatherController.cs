@@ -28,6 +28,18 @@ namespace Client.MirGraphics
         }
     }
 
+    internal static class AtmosphereExposure
+    {
+        // Smooth overcast response on the existing world shader. Does not
+        // require another ambient render target or modify light map metadata.
+        internal static float Brightness(float cloudCover, float intensity)
+        {
+            float clouds = Math.Max(0f, Math.Min(1f, cloudCover));
+            float strength = Math.Max(0f, Math.Min(1f, intensity));
+            return 1.035f - 0.12f * clouds * strength;
+        }
+    }
+
     internal static class AtmosphereIntensity
     {
         internal static int ClampPercent(int requested)
