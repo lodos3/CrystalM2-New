@@ -22,6 +22,8 @@ internal static class AdvancedAtmosphereTests
         var halfway = climate.Sample(WeatherSetting.Rain, 16000, false, 0);
         Check(halfway.Wetness > 0.2f && halfway.Wetness < 0.8f &&
               halfway.CloudCover > 0, "Clouds and wetness should accumulate smoothly.");
+        Check(halfway.DriftX > rainStart.DriftX && halfway.DriftY >= rainStart.DriftY,
+              "Cloud drift must accumulate continuously during rain.");
         var soaked = climate.Sample(WeatherSetting.Rain, 41000, false, 0);
         Check(soaked.Wetness > 0.8f && soaked.CloudCover > 0.3f,
               "Sustained rain must increase wetness and overcast.");
