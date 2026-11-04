@@ -10359,6 +10359,7 @@ namespace Client.MirScenes
         public byte MapDarkLight;
         private readonly AmbientLightTransition _ambientLighting = new AmbientLightTransition();
         private readonly MapLightViewportCache _staticLightCache = new MapLightViewportCache();
+        private MapMaterialMap _mapMaterials = MapMaterialMap.Empty;
         private readonly Func<int, int, byte> _staticLightReader;
         private readonly Func<int, int, bool> _staticOccluder;
         private readonly List<Point> _movingLights = new List<Point>(48);
@@ -10388,9 +10389,13 @@ namespace Client.MirScenes
             if (M2CellInfo == null || x < 0 || y < 0 || x >= Width || y >= Height)
                 return true;
 
+            // An explicitly authored wall override takes precedence for visual
+            // occlusion ONLY. It does not alter gameplay collision/pathfinding.
+            if (_mapMaterials.TrySample(x, y, out MaterialRegion material) &&
+                material.BlocksLight.HasValue)
+                return material.BlocksLight.Value;
+
             CellInfo cell = M2CellInfo[x, y];
-            // These are the same map-side impassability flags used by EmptyCell.
-            // They are only an approximation for visual wall height.
             return cell == null ||
                    LightVisibility.BlocksByMapFlags(cell.BackImage, cell.FrontImage);
         }
@@ -10546,6 +10551,7 @@ namespace Client.MirScenes
             _atmosphereFog = 0;
             _movingLights.Clear();
             _staticLightCache.Reset();
+            _mapMaterials = MapMaterialMap.Empty;
 
             MapObject.MouseObjectID = 0;
             MapObject.TargetObjectID = 0;
@@ -10555,6 +10561,10 @@ namespace Client.MirScenes
             M2CellInfo = Map.MapCells;
             Width = Map.Width;
             Height = Map.Height;
+            // Explicit map sidecars are optional and never required for legacy
+            // Mir 2/Mir 3 rendering or gameplay.
+            _mapMaterials = MapMaterialMapLoader.Load(FileName, Settings.MapPath,
+                                                       Width, Height);
 
             PathFinder = new PathFinder(this);
 
@@ -10727,6 +10737,13 @@ namespace Client.MirScenes
                 IndexMovingLights();
             }
             DXManager.ProjectedShadowsDrawn = 0;
+
+            // Apply authored terrain wetness before foreground sprites, preserving
+            // the original map/actor layering and avoiding any new render target.
+            if (Settings.AtmosphereWetSurfaces)
+                WetSurfacePass.Draw(_mapMaterials, _weatherFrame, User.Movement,
+                                    User.OffSetMove, OffSetX, OffSetY,
+                                    ViewRangeX, ViewRangeY, Width, Height);
             DrawObjects();
 
             //render weather
@@ -12389,6 +12406,7 @@ namespace Client.MirScenes
                 NextAction = 0;
 
                 _staticLightCache.Reset();
+                _mapMaterials = MapMaterialMap.Empty;
                 _movingLights.Clear();
                 _weatherController.Reset();
                 _weatherFrame = default;
