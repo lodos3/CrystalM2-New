@@ -47,7 +47,9 @@ namespace Client.MirGraphics
             new Vector4(1.035f, 0.22f, 1.0f, 0.80f),
             new Vector4(0.5f, 0.5f, 0.0f, 0.0f),
             new Vector4(1f, 1f, 1f, 0f),
-            new Vector4(0f, 0.78f, 0.84f, 0.94f)
+            new Vector4(0f, 0.78f, 0.84f, 0.94f),
+            new Vector4(0f, 0.78f, 1.38f, 0.095f),
+            new Vector4(0f, 0.80f, 0.90f, 1.0f)
         };
 
         public static bool GrayScale;
@@ -274,7 +276,8 @@ namespace Client.MirGraphics
 
         // One-sample map colour grading/vignette on the existing map texture.
         // It does not shade UI or create another full-screen render target.
-        public static bool BeginPostProcessing(Color atmosphere, float gradeStrength, float fogStrength)
+        public static bool BeginPostProcessing(Color atmosphere, float gradeStrength, float fogStrength,
+                                               AtmosphericWeatherFrame weatherFrame)
         {
             if (PostProcessingPixelShader == null || PostProcessingPixelShader.Disposed)
                 return false;
@@ -284,6 +287,12 @@ namespace Client.MirGraphics
                                                    Math.Clamp(gradeStrength, 0f, 0.4f));
             PostProcessConstants[3] = new Vector4(Math.Clamp(fogStrength, 0f, 0.2f),
                                                    0.78f, 0.84f, 0.94f);
+            PostProcessConstants[4] = new Vector4(
+                Settings.AtmosphereWetSurfaces ? Math.Clamp(weatherFrame.Wetness, 0f, 1f) : 0f,
+                0.78f, 1.38f, 0.095f);
+            PostProcessConstants[5] = new Vector4(
+                Settings.AtmosphereLightning ? Math.Clamp(weatherFrame.LightningFlash, 0f, 0.12f) : 0f,
+                0.80f, 0.90f, 1f);
             Sprite.Flush();
             Device.PixelShader = PostProcessingPixelShader;
             Device.SetPixelShaderConstant(0, PostProcessConstants);
@@ -552,6 +561,7 @@ namespace Client.MirGraphics
             // The bloom pass owns a DEFAULT-pool target and DX9 shader objects.
             // Release these before Device.Reset or disposing the old sprite.
             LightBloomPass.DisposeAll();
+            AtmosphereFogOverlay.DisposeAll();
             if (Sprite != null)
             {
                 if (!Sprite.Disposed)
