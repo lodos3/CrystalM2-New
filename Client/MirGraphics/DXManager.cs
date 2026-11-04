@@ -282,16 +282,17 @@ namespace Client.MirGraphics
             if (PostProcessingPixelShader == null || PostProcessingPixelShader.Disposed)
                 return false;
 
+            float intensity = AtmosphereIntensity.Scale(Settings.AtmosphereIntensityPercent);
             PostProcessConstants[2] = new Vector4(atmosphere.R / 255f, atmosphere.G / 255f,
                                                    atmosphere.B / 255f,
-                                                   Math.Clamp(gradeStrength, 0f, 0.4f));
-            PostProcessConstants[3] = new Vector4(Math.Clamp(fogStrength, 0f, 0.2f),
+                                                   Math.Clamp(gradeStrength * intensity, 0f, 0.4f));
+            PostProcessConstants[3] = new Vector4(Math.Clamp(fogStrength * intensity, 0f, 0.2f),
                                                    0.78f, 0.84f, 0.94f);
             PostProcessConstants[4] = new Vector4(
-                Settings.AtmosphereWetSurfaces ? Math.Clamp(weatherFrame.Wetness, 0f, 1f) : 0f,
+                Settings.AtmosphereWetSurfaces ? Math.Clamp(weatherFrame.Wetness * intensity, 0f, 1f) : 0f,
                 0.78f, 1.38f, 0.095f);
             PostProcessConstants[5] = new Vector4(
-                Settings.AtmosphereLightning ? Math.Clamp(weatherFrame.LightningFlash, 0f, 0.12f) : 0f,
+                Settings.AtmosphereLightning ? Math.Clamp(weatherFrame.LightningFlash * intensity, 0f, 0.12f) : 0f,
                 0.80f, 0.90f, 1f);
             Sprite.Flush();
             Device.PixelShader = PostProcessingPixelShader;
