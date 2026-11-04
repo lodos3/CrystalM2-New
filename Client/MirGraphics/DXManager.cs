@@ -277,7 +277,7 @@ namespace Client.MirGraphics
         // One-sample map colour grading/vignette on the existing map texture.
         // It does not shade UI or create another full-screen render target.
         public static bool BeginPostProcessing(Color atmosphere, float gradeStrength, float fogStrength,
-                                               AtmosphericWeatherFrame weatherFrame)
+                                               AtmosphericWeatherFrame weatherFrame, Color hazeTint)
         {
             if (PostProcessingPixelShader == null || PostProcessingPixelShader.Disposed)
                 return false;
@@ -290,7 +290,8 @@ namespace Client.MirGraphics
                                                    atmosphere.B / 255f,
                                                    Math.Clamp(gradeStrength * intensity, 0f, 0.4f));
             PostProcessConstants[3] = new Vector4(Math.Clamp(fogStrength * intensity, 0f, 0.2f),
-                                                   0.78f, 0.84f, 0.94f);
+                                                   hazeTint.R / 255f, hazeTint.G / 255f,
+                                                   hazeTint.B / 255f);
             PostProcessConstants[4] = new Vector4(
                 Settings.AtmosphereWetSurfaces ? Math.Clamp(weatherFrame.Wetness * intensity, 0f, 1f) : 0f,
                 0.78f, 1.38f, 0.095f);
