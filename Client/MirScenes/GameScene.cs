@@ -10363,6 +10363,7 @@ namespace Client.MirScenes
         private readonly Func<int, int, bool> _staticOccluder;
         private readonly List<Point> _movingLights = new List<Point>(48);
         private readonly AmbientLightTransition _atmosphereFade = new AmbientLightTransition();
+        private readonly SmoothScalarTransition _fogFade = new SmoothScalarTransition(10000);
         private Color _atmosphereTint = Color.White;
         private float _atmosphereFog;
         private const int DynamicLightLimit = 48;
@@ -10387,8 +10388,7 @@ namespace Client.MirScenes
             // These are the same map-side impassability flags used by EmptyCell.
             // They are only an approximation for visual wall height.
             return cell == null ||
-                   (cell.BackImage & 0x20000000) != 0 ||
-                   (cell.FrontImage & 0x8000) != 0;
+                   LightVisibility.BlocksByMapFlags(cell.BackImage, cell.FrontImage);
         }
 
         private void IndexMovingLights()
@@ -10535,6 +10535,7 @@ namespace Client.MirScenes
             ResetMap();
             _ambientLighting.Reset();
             _atmosphereFade.Reset();
+            _fogFade.Reset();
             _atmosphereTint = Color.White;
             _atmosphereFog = 0;
             _movingLights.Clear();
@@ -10728,12 +10729,15 @@ namespace Client.MirScenes
             {
                 Color desiredTint = AtmosphereColourGrade.Target(setting, Weather, MapDarkLight);
                 _atmosphereTint = _atmosphereFade.Sample(desiredTint, CMain.Time);
-                _atmosphereFog = AtmosphereColourGrade.FogStrength(Weather);
+                _atmosphereFog = _fogFade.Sample(AtmosphereColourGrade.FogStrength(Weather),
+                                                 CMain.Time);
             }
             else
             {
                 _atmosphereTint = Color.White;
                 _atmosphereFog = 0;
+                _atmosphereFade.Reset();
+                _fogFade.Reset();
             }
 
             // Continue the light pass when transitioning into day, then avoid
