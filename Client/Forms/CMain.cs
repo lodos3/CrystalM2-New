@@ -472,6 +472,13 @@ namespace Client
                                   DXManager.ShadowMasks.LimitBytes / 1048576.0);
             text += string.Format(", ManagedHeap: {0:F1} MiB",
                                   GC.GetTotalMemory(false) / 1048576.0);
+            if (Settings.EnvironmentAtmosphere && GameScene.Scene?.MapControl != null &&
+                MirScene.ActiveScene == GameScene.Scene)
+            {
+                var climate = GameScene.Scene.MapControl.WeatherFrame;
+                text += string.Format(", WX clouds:{0:P0} fog:{1:P0} wet:{2:P0}",
+                                      climate.CloudCover, climate.FogCover, climate.Wetness);
+            }
 
             if (Settings.FullScreen)
             {
