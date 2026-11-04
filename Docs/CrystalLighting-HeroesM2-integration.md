@@ -200,6 +200,8 @@ The existing weather flags drive the presentation:
 
 The old weather particle textures and particle motion remain intact.
 
+In addition to the weather flags, the night palette distinguishes the map's original slate, sky-blue and golden ambience. The new `AtmosphereColourGrade.FogTint(weather, mapDarkLight)` keeps golden environments warm under fog and ash rather than imposing the same blue haze everywhere. Runtime intensity scales the fog overlay, shader colour grade, overcast exposure, wet highlights and optional lightning from 0–100%.
+
 ### Low-memory atmospheric layers
 
 `AtmosphereFogOverlay` creates a single, *lazily allocated* **128×128 A8R8G8B8** managed texture (64 KiB nominal raw pixels) from `AtmosphereTileNoise`. The tile repeats seamlessly and is reused for **two independent wind-driven layers**: translucent fog and broad cloud shadow. The fog is blended **inside the world render target**, before the existing ambient darkness pass and before UI/nameplates. It does not introduce an additional full-screen framebuffer or a GPU readback.
