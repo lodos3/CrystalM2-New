@@ -178,3 +178,83 @@ Bloom and static-map occlusion remain **opt-in** until a Windows Direct3D9 game 
 Run `dotnet run --project Tests/VisualPipelineTests/VisualPipelineTests.csproj` for tone targets, haze transitions, static-occluder checks and bloom target sizes. In Windows x64, build `Client/Client.csproj` and inspect shader compilation diagnostics in the client's logs. Check dawn, evening, blue/warm night maps, fog/rain/snow maps, animated fire and stationary blue/green lights, screen resizing/reset, moving spells and walls. Repeat with bloom/occlusion independently toggled to detect performance or map-compatibility regressions.
 
 **Not verified:** client build, Direct3D9 shader assembly on target hardware, exact in-game appearances, and FPS/VRAM improvements. Existing GitHub Actions jobs have failed before reporting test steps. These changes are source-level and should not be described as measured visual or performance improvements until tested.
+
+
+## 2026-11-04 — advanced environment and atmosphere (master)
+
+This extension retains the existing top-down Mir2 tile renderer, original world artwork, legacy particle systems, time-of-day ambient transition, night map tint, and UI. No new server packets or database fields were introduced.
+
+### Environment response
+
+`AtmosphericWeatherController` tracks rainfall-driven wetness, cloud opacity and airborne mist as **separate, smoothly transitioning** values. Abrupt weather changes do not instantly saturate the screen: clouds rise over roughly 16 seconds, mist over 14 seconds, and wetness over 30 seconds. Wetness gradually recedes after rain stops rather than disappearing at the next weather packet. All calculations reuse value types and three existing easing instances, avoiding per-frame heap allocations.
+
+Wind displacement is integrated continuously each draw, with a 250 ms delta limit after pauses so the overlay cannot jump several screens. The field varies slowly using deterministic time functions. Weather transitions reset when a new map is loaded.
+
+The existing weather flags drive the presentation:
+- **Rain:** cooler cloud cover, optional persistent wet highlights, drifting mist
+- **Snow:** cool pale atmosphere with slow-moving wind and distinct mist palette
+- **Fog:** thicker white/blue-gray parallax mist
+- **Red embers/fire particles:** ochre ash haze and warm moving cloud shadows
+- **Yellow embers, purple foliage and autumn leaves:** subtle matching palette corrections
+- **Clear weather:** no procedural cloud overlay and no wet sheen
+
+The old weather particle textures and particle motion remain intact.
+
+### Low-memory atmospheric layers
+
+`AtmosphereFogOverlay` creates a single, *lazily allocated* **128×128 A8R8G8B8** managed texture (64 KiB nominal raw pixels) from `AtmosphereTileNoise`. The tile repeats seamlessly and is reused for **two independent wind-driven layers**: translucent fog and broad cloud shadow. The fog is blended **inside the world render target**, before the existing ambient darkness pass and before UI/nameplates. It does not introduce an additional full-screen framebuffer or a GPU readback.
+
+`AtmosphereOverlayLayout` limits each layer to **48 sprite tile draws**. On exceptionally large resolutions a layer exceeding this bound is skipped. If the optional texture allocation fails, the renderer logs the error, disables that layer, and continues with the existing scene. Device reset/cleanup releases its texture.
+
+### Enhanced screen-space atmosphere shader
+
+The existing post-processing pixel shader remains a single world-texture fetch with constant-register input and now accepts:
+
+- A vertical **distance-haze approximation** (stronger near the upper part of the top-down screen)
+- Weather and time dependent tinting
+- Smooth overcast **exposure dimming**, bounded to a maximum reduction of 0.12 brightness units
+- **Optional** rain-wet highlight enhancement, persisting after showers
+- **Optional** low-intensity lightning tint on rain-enabled maps that explicitly allow lightning
+
+The deterministic lightning flash peaks at **0.12 intensity**, lasts at most **150 ms**, and repeats no faster than **35 seconds** per map seed. It is **disabled by default**, including for photosensitivity considerations.
+
+These are *screen-space approximations*. They do **not** create geometric sky/cloud volumes, surface normals, puddle meshes, true specular reflections, light shafts through 3D fog, or physically correct shadows on buildings.
+
+### Weather memory and FPS hygiene
+
+`MapControl.UpdateWeather()` now disposes **every** previous weather particle engine (including index zero, which the legacy loop skipped) before clearing the list. `ParticleEngine.Process()` enforces a configurable **per-engine particle cap** (default 256, allowed 64–1024) for continuously emitted weather effects; pre-existing initial weather grids remain intact. This addresses potential weather-transition retention and uncontrolled emitter growth without suppressing the original weather artwork.
+
+The existing debug FPS display also reports current cloud, mist and wetness state for side-by-side checks.
+
+### Configuration
+
+The following example enables high-detail atmospheric effects. They remain **opt-in** by default until the Windows DX9 client has been tested.
+
+```ini
+[Graphics]
+PostProcessing=True
+EnvironmentAtmosphere=True
+EnvironmentFogLayers=True
+AtmosphereWetSurfaces=True
+AtmosphereLightning=False
+AtmosphereIntensityPercent=75
+WeatherParticleCap=256
+LightingBloom=True
+BloomDivisor=4
+```
+
+Set `EnvironmentFogLayers=False` to eliminate the extra 1–2 procedural overlays. Set `AtmosphereWetSurfaces=False` to eliminate wet highlight response. Set `AtmosphereIntensityPercent=0` to remove all newly introduced shader/overlay grading without changing existing precipitation particles. `LightingBloom` is an independently controlled older feature.
+
+### Validation path / limitations
+
+Run the pure regression project:
+
+```sh
+dotnet run --project Tests/VisualPipelineTests/VisualPipelineTests.csproj
+```
+
+It now covers weather persistence, interruption, wind drift, ash/foliage colour, tileable procedural noise and padded buffer safety, tile budgets, particle caps, lightning opt-in and overcast exposure. Also run the existing texture, map lighting, day-night and faction test projects.
+
+Then build and run `Client/Client.csproj` on a Windows x64 machine with the repository's SlimDX dependencies. Confirm `Data/Shaders/postprocess.ps` loads, compare clear/rain/snow/fog/ash maps at dawn/day/evening/night, move the camera and resize window, inspect actual shadows and sprite alpha edges, test weather transitions at different frame rates, and check repeated map transitions for leaked particle resources. Measure frame times, draw calls, working-set, and GPU memory with each effect enabled/disabled independently.
+
+**Status:** source changes are committed, but not compiled or visually executed on Windows here. GitHub Actions is currently reporting jobs that terminate without runner steps; do not treat those results as passing CI or measured FPS/VRAM changes.
