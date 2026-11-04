@@ -12415,7 +12415,7 @@ namespace Client.MirScenes
 
         public void UpdateWeather()
         {
-            for (int i = GameScene.Scene.ParticleEngines.Count - 1; i > 0; i--)
+            for (int i = GameScene.Scene.ParticleEngines.Count - 1; i >= 0; i--)
                 GameScene.Scene.ParticleEngines[i].Dispose();
 
             GameScene.Scene.ParticleEngines.Clear();
