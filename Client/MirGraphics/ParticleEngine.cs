@@ -401,7 +401,8 @@ namespace Client.MirGraphics
                 particle.ProcessImage();
             }
 
-            if (GenerateParticles && CMain.Now > NextParticleTime)
+            if (GenerateParticles && WeatherParticleBudget.CanSpawn(particles.Count, Settings.WeatherParticleCap) &&
+                CMain.Now > NextParticleTime)
             {
                 NextParticleTime = CMain.Now + UpdateDelay;
                 GenerateNewParticle(type);
