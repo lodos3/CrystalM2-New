@@ -107,11 +107,15 @@ namespace Client.MirGraphics
 
             // Smooth wind field: variation occurs on 12s+ cycles. Rates are
             // deliberately modest; only the 64 KiB procedural cloud tile moves.
-            double seconds = (now >= 0 ? now : 0) / 1000.0;
-            double phase = mapSeed * 0.013;
             float baseWind = rain ? 13f : snow ? 7f : foggy ? 4f : embers ? 10f : 0f;
-            float windX = baseWind * (0.85f + 0.15f * (float)Math.Sin(seconds / 19.0 + phase));
-            float windY = baseWind * (0.25f + 0.12f * (float)Math.Sin(seconds / 27.0 - phase));
+            float windX = 0f, windY = 0f;
+            if (baseWind > 0f)
+            {
+                double seconds = (now >= 0 ? now : 0) / 1000.0;
+                double phase = mapSeed * 0.013;
+                windX = baseWind * (0.85f + 0.15f * (float)Math.Sin(seconds / 19.0 + phase));
+                windY = baseWind * (0.25f + 0.12f * (float)Math.Sin(seconds / 27.0 - phase));
+            }
             float flash = rain ? LightningFlashAt(now, lightningEnabled, true, mapSeed) : 0;
 
             if (_hasTime)
