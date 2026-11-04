@@ -55,7 +55,8 @@ namespace Client.MirGraphics
 
         internal static void Draw(AtmosphericWeatherFrame frame, WeatherSetting weather)
         {
-            if (!Settings.EnvironmentFogLayers || DXManager.DeviceLost ||
+            float intensity = AtmosphereIntensity.Scale(Settings.AtmosphereIntensityPercent);
+            if (intensity <= 0f || !Settings.EnvironmentFogLayers || DXManager.DeviceLost ||
                 DXManager.Sprite == null || DXManager.Sprite.Disposed ||
                 DXManager.CurrentSurface == null ||
                 (frame.FogCover < 0.01f && frame.CloudCover < 0.01f) ||
@@ -77,7 +78,7 @@ namespace Client.MirGraphics
                                  snow ? Color.FromArgb(220, 233, 246) :
                                  rain ? Color.FromArgb(176, 196, 220) :
                                         Color.FromArgb(201, 213, 226);
-                    int alpha = Math.Min(66, Math.Max(0, (int)(frame.FogCover * 74f)));
+                    int alpha = Math.Min(66, Math.Max(0, (int)(frame.FogCover * 74f * intensity)));
                     RenderLayer(512, frame.DriftX, frame.DriftY, Color.FromArgb(alpha, mist));
                 }
 
@@ -85,7 +86,7 @@ namespace Client.MirGraphics
                 {
                     // A broad, lower-frequency dark overcast layer introduces
                     // soft moving canopy shadows without scene depth geometry.
-                    int alpha = Math.Min(32, Math.Max(0, (int)(frame.CloudCover * 34f)));
+                    int alpha = Math.Min(32, Math.Max(0, (int)(frame.CloudCover * 34f * intensity)));
                     RenderLayer(768, frame.DriftX * 0.42f + 100f,
                                 frame.DriftY * 0.35f + 210f,
                                 (weather & (WeatherSetting.RedEmber |
