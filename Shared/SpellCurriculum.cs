@@ -180,6 +180,92 @@ public static class SpellCurriculum
         spec == CombatSpecialisation.Second ||
         spec == CombatSpecialisation.Third;
 
+    // Class curricula keep all learned records; only the selected combat loadout is usable.
+    // Non-curriculum spells are still delegated to their existing equipment/event rules.
+    public const ushort SpecialisationUnlockLevel = 20;
+
+    public static bool CanSelect(MirClass actorClass, ushort level, CombatSpecialisation current,
+        CombatSpecialisation requested) =>
+        ForClass(actorClass).Count != 0 &&
+        level >= SpecialisationUnlockLevel &&
+        current == CombatSpecialisation.Unchosen &&
+        requested != CombatSpecialisation.Unchosen &&
+        IsValid(requested);
+
+    public static CombatSpecialisation RequiredSpecialisation(MirClass actorClass, Spell spell)
+    {
+        if (!Owns(actorClass, spell)) return CombatSpecialisation.Unchosen;
+
+        return spell switch
+        {
+            // Warrior: focused melee, aggressive cleave, or protection.
+            Spell.Slaying or Spell.Thrusting or Spell.FlamingSword or Spell.SlashingBurst
+                => CombatSpecialisation.First,
+            Spell.HalfMoon or Spell.TwinDrakeBlade or Spell.CrossHalfMoon or Spell.BladeAvalanche
+                or Spell.Rage or Spell.Fury => CombatSpecialisation.Second,
+            Spell.Entrapment or Spell.LionRoar or Spell.ProtectionField or Spell.CounterAttack
+                or Spell.ImmortalSkin => CombatSpecialisation.Third,
+
+            // Wizard: fire, frost, or storm.
+            Spell.GreatFireBall or Spell.HellFire or Spell.FireBang or Spell.FireWall
+                or Spell.FlameDisruptor or Spell.FlameField or Spell.MeteorStrike
+                => CombatSpecialisation.First,
+            Spell.FrostCrunch or Spell.IceStorm or Spell.Mirroring or Spell.Blizzard
+                or Spell.IceThrust => CombatSpecialisation.Second,
+            Spell.ElectricShock or Spell.ThunderBolt or Spell.Lightning or Spell.ThunderStorm
+                or Spell.MagicBooster or Spell.StormEscape => CombatSpecialisation.Third,
+
+            // Taoist: healing, curses, or companions.
+            Spell.SoulShield or Spell.BlessedArmour or Spell.Purification or Spell.MassHealing
+                or Spell.Reincarnation or Spell.EnergyShield or Spell.HealingCircle
+                => CombatSpecialisation.First,
+            Spell.Poisoning or Spell.Revelation or Spell.Hallucination or Spell.Curse
+                or Spell.Plague or Spell.PoisonCloud => CombatSpecialisation.Second,
+            Spell.SummonSkeleton or Spell.Hiding or Spell.MassHiding or Spell.TrapHexagon
+                or Spell.UltimateEnhancer or Spell.SummonShinsu or Spell.SummonHolyDeva
+                or Spell.PetEnhancer => CombatSpecialisation.Third,
+
+            // Assassin: stealth, weapon technique, or disruption.
+            Spell.MoonLight or Spell.DarkBody or Spell.PoisonSword or Spell.Hemorrhage
+                or Spell.MoonMist => CombatSpecialisation.First,
+            Spell.DoubleSlash or Spell.Haste or Spell.HeavenlySword or Spell.FireBurst
+                or Spell.CrescentSlash => CombatSpecialisation.Second,
+            Spell.Trap or Spell.MPEater or Spell.CatTongue or Spell.FlashDash
+                => CombatSpecialisation.Third,
+
+            // Archer: precision, traps, or animal companions.
+            Spell.DoubleShot or Spell.ElementalShot or Spell.Concentration or Spell.CrippleShot
+                or Spell.BindingShot => CombatSpecialisation.First,
+            Spell.ExplosiveTrap or Spell.DelayedExplosion or Spell.Stonetrap
+                or Spell.ElementalBarrier or Spell.NapalmShot or Spell.PoisonShot
+                => CombatSpecialisation.Second,
+            Spell.SummonVampire or Spell.VampireShot or Spell.SummonToad
+                or Spell.SummonSnakes or Spell.OneWithNature or Spell.MentalState
+                => CombatSpecialisation.Third,
+
+            // Every remaining native spell is part of the class-independent basic kit.
+            _ => CombatSpecialisation.Unchosen
+        };
+    }
+
+    public static bool CanUse(MirClass actorClass, CombatSpecialisation selected, Spell spell)
+    {
+        if (spell == Spell.None) return true;
+
+        if (Owns(actorClass, spell))
+        {
+            CombatSpecialisation required = RequiredSpecialisation(actorClass, spell);
+            return required == CombatSpecialisation.Unchosen || required == selected;
+        }
+
+        // Never let equipment grants of another class's native spell bypass ownership.
+        foreach (MirClass other in new[] { MirClass.Warrior, MirClass.Wizard, MirClass.Taoist,
+                     MirClass.Assassin, MirClass.Archer })
+            if (Owns(other, spell)) return false;
+
+        return true; // Equipment/event/custom spells retain their own authorisation paths.
+    }
+
     public static string Name(MirClass actorClass, CombatSpecialisation spec) =>
         (actorClass, spec) switch
         {
