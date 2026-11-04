@@ -138,3 +138,43 @@ Windows x64 client build: `dotnet build Client/Client.csproj -c Release` with th
 Compare identical in-game camera routes with `DynamicShadows=False` and then `True`; leave post-processing unchanged for that comparison. Then toggle `PostProcessing` separately. Collect FPS and DPS with debug mode, plus actual process working set in Windows Task Manager. Test at night with several coloured map lights, large/dithered characters, sprite death, map transitions, resize/device reset, and 48+ simultaneous actors. Observe masked/tinted artwork for layer-alignment regressions.
 
 **Verification blocker:** no `dotnet` compiler or Windows D3D9 runtime is present in the assistant execution environment. Current GitHub Actions runs fail before providing executable steps or test logs. All runtime, build, and FPS assertions remain unverified. Do not treat this source commit series as evidence of an actual FPS uplift or pixel-perfect shadows.
+
+
+## Visual upgrade 1, 2 and 4 — light bloom, shadow occlusion and atmosphere
+
+### Lighting (1)
+
+`LightBloomPass` supplies an *optional*, shader-driven two-stage bloom path. On dark maps the already composed light texture is sampled to extract bright areas into a single default-pool render target scaled by `BloomDivisor` (default 4). A five-tap cross blur is sampled during upscaling and additively composited on the world, **before the interface**. This is deliberately LDR, not HDR/tonemapping. It runs only when the normal map light pass runs (daylight does not trigger this light pass).
+
+The additional GPU surface is capped at 1,048,576 pixels (~4 MiB nominal BGRA). Shaders are loaded lazily when enabled. Missing shader files, assembly failure or rendering errors disable the optional pass for the current renderer lifetime while leaving standard light rendering intact. The `DXManager.CleanUp` device-reset path disposes the surface and shaders. Both shader assets are copied into `Data/Shaders/` by `Client.csproj`.
+
+### Shadows and occlusion (2)
+
+Player/monster projected shadows already track the active animation frame. Their cast direction now searches nearby static map-light cells **and** up to 48 dynamic moving object/spell lights indexed once per redraw. An optional bounded Bresenham line-of-sight test rejects sources behind tiles carrying the map's own pathfinding-blocking bits (`BackImage & 0x20000000`, `FrontImage & 0x8000`). Rays are capped at 24 cells. An unobstructed nearby light can steer the projected-shadow direction.
+
+**Important limits:** walk-block flags are *not* wall geometry or object heights. These are directional 2D ground silhouettes, not full physical ray-traced occlusion or wall-projected shadows. The occlusion approximation is disabled by default for compatibility until representative maps have been reviewed.
+
+### Atmosphere (4)
+
+`AtmosphereColourGrade` supplies distinct warm dawn, amber evening and blue night tints, preserving the original per-map night ambient colour. `WeatherSetting.Fog`, `Rain`, `Snow` and ember flags influence the tint and add a small screen-space haze. Both day/night tint changes and haze intensity transition over ten seconds with interruption-safe interpolation. The world post-process shader applies colour without colouring text or HUD controls. The existing gameplay weather particles and server lighting rules remain unchanged.
+
+### Graphics settings
+
+The following settings belong under `[Graphics]` in `Mir2Config.ini`:
+
+```ini
+PostProcessing=True
+EnvironmentAtmosphere=True
+LightingBloom=False
+BloomDivisor=4
+DynamicShadows=True
+MapLightOcclusion=False
+```
+
+Bloom and static-map occlusion remain **opt-in** until a Windows Direct3D9 game build can be tested; to evaluate them, set `LightingBloom=True` and `MapLightOcclusion=True` separately. `BloomDivisor` is clamped to 2..8; larger divisors allocate smaller buffers. Neither option requires protocol/database changes.
+
+### Validation
+
+Run `dotnet run --project Tests/VisualPipelineTests/VisualPipelineTests.csproj` for tone targets, haze transitions, static-occluder checks and bloom target sizes. In Windows x64, build `Client/Client.csproj` and inspect shader compilation diagnostics in the client's logs. Check dawn, evening, blue/warm night maps, fog/rain/snow maps, animated fire and stationary blue/green lights, screen resizing/reset, moving spells and walls. Repeat with bloom/occlusion independently toggled to detect performance or map-compatibility regressions.
+
+**Not verified:** client build, Direct3D9 shader assembly on target hardware, exact in-game appearances, and FPS/VRAM improvements. Existing GitHub Actions jobs have failed before reporting test steps. These changes are source-level and should not be described as measured visual or performance improvements until tested.
