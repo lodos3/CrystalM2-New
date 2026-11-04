@@ -10749,7 +10749,7 @@ namespace Client.MirScenes
             {
                 Color desiredTint = AtmosphereColourGrade.Target(setting, Weather, MapDarkLight);
                 _atmosphereTint = _atmosphereFade.Sample(desiredTint, CMain.Time);
-                _atmosphereHazeTint = AtmosphereColourGrade.FogTint(Weather);
+                _atmosphereHazeTint = AtmosphereColourGrade.FogTint(Weather, MapDarkLight);
                 _atmosphereFog = _fogFade.Sample(AtmosphereColourGrade.FogStrength(Weather),
                                                  CMain.Time);
             }
