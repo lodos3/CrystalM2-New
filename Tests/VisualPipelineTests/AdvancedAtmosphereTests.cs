@@ -59,6 +59,14 @@ internal static class AdvancedAtmosphereTests
         }
         catch (ArgumentException) { }
 
+        Check(WeatherParticleBudget.Clamp(10) == 64 &&
+              WeatherParticleBudget.Clamp(5000) == 1024,
+              "Environmental particle settings must have safe hardware bounds.");
+        Check(WeatherParticleBudget.CanSpawn(255, 256) &&
+              !WeatherParticleBudget.CanSpawn(256, 256) &&
+              !WeatherParticleBudget.CanSpawn(5000, 256),
+              "Weather emitters must not allocate unbounded particles.");
+
         Check(AtmosphereOverlayLayout.TryCountTiles(1920, 1080, 512, out int count) &&
               count > 0 && count <= AtmosphereOverlayLayout.MaxTilesPerLayer,
               "Common resolutions must fit inside fog draw budget.");
