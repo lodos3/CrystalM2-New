@@ -13,5 +13,6 @@
     <Compile Include="../../Client/MirGraphics/SmoothScalarTransition.cs" Link="SmoothScalarTransition.cs" />
     <Compile Include="../../Client/MirGraphics/AtmosphericWeatherController.cs" Link="AtmosphericWeatherController.cs" />
     <Compile Include="../../Client/MirGraphics/AtmosphereTileNoise.cs" Link="AtmosphereTileNoise.cs" />
+    <Compile Include="../../Client/MirGraphics/MapMaterialMap.cs" Link="MapMaterialMap.cs" />
   </ItemGroup>
 </Project>
