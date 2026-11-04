@@ -28,6 +28,19 @@ namespace Client.MirGraphics
         }
     }
 
+    internal static class WeatherParticleBudget
+    {
+        internal static int Clamp(int requested)
+        {
+            return Math.Max(64, Math.Min(1024, requested));
+        }
+
+        internal static bool CanSpawn(int current, int requestedLimit)
+        {
+            return current >= 0 && current < Clamp(requestedLimit);
+        }
+    }
+
     // Deterministic, interruption-safe environmental accumulation. Wetness
     // persists after rain stops; clouds and fog dissolve more quickly.
     internal sealed class AtmosphericWeatherController
