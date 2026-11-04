@@ -10364,6 +10364,9 @@ namespace Client.MirScenes
         private readonly List<Point> _movingLights = new List<Point>(48);
         private readonly AmbientLightTransition _atmosphereFade = new AmbientLightTransition();
         private readonly SmoothScalarTransition _fogFade = new SmoothScalarTransition(10000);
+        private readonly AtmosphericWeatherController _weatherController = new AtmosphericWeatherController();
+        private AtmosphericWeatherFrame _weatherFrame;
+        internal AtmosphericWeatherFrame WeatherFrame => _weatherFrame;
         private Color _atmosphereTint = Color.White;
         private float _atmosphereFog;
         private const int DynamicLightLimit = 48;
@@ -10536,6 +10539,8 @@ namespace Client.MirScenes
             _ambientLighting.Reset();
             _atmosphereFade.Reset();
             _fogFade.Reset();
+            _weatherController.Reset();
+            _weatherFrame = default;
             _atmosphereTint = Color.White;
             _atmosphereFog = 0;
             _movingLights.Clear();
@@ -10706,6 +10711,15 @@ namespace Client.MirScenes
                 DXManager.Draw(DXManager.FloorTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White);
             }
 
+            if (Settings.EnvironmentAtmosphere)
+                _weatherFrame = _weatherController.Sample(
+                    Weather, CMain.Time, Settings.AtmosphereLightning && Lightning, Index);
+            else
+            {
+                _weatherController.Reset();
+                _weatherFrame = default;
+            }
+
             if (Settings.DynamicShadows)
             {
                 UpdateStaticLights();
@@ -10719,6 +10733,11 @@ namespace Client.MirScenes
             {
                 engine.Draw();
             }
+
+            // Wind-driven mist/overcast belongs to the world render target.
+            // The ambient darkness pass shades it; floating HUD stays sharp.
+            if (Settings.EnvironmentAtmosphere && Settings.EnvironmentFogLayers)
+                AtmosphereFogOverlay.Draw(_weatherFrame, Weather);
 
             //Render Death, 
 
@@ -10805,7 +10824,8 @@ namespace Client.MirScenes
             if (dead) DXManager.SetGrayscale(true);
             bool postProcessing = !dead && Settings.PostProcessing &&
                 DXManager.BeginPostProcessing(_atmosphereTint,
-                    AtmosphereColourGrade.GradeStrength(_atmosphereTint), _atmosphereFog);
+                    AtmosphereColourGrade.GradeStrength(_atmosphereTint), _atmosphereFog,
+                    _weatherFrame);
 
             DXManager.DrawOpaque(ControlTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White, Opacity);
 
@@ -12367,6 +12387,8 @@ namespace Client.MirScenes
 
                 _staticLightCache.Reset();
                 _movingLights.Clear();
+                _weatherController.Reset();
+                _weatherFrame = default;
                 M2CellInfo = null;
                 Width = 0;
                 Height = 0;
