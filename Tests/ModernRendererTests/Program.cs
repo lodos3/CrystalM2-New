@@ -75,7 +75,7 @@ static class Program
 
         byte[] malformed = (byte[])fixture.Clone();
         // Corrupt compressed payload; decoder must not silently return garbage.
-        malformed[37] = 0;
+        malformed[33] = 0; // GZip magic, after the 17-byte frame header.
         using var badStream = new MemoryStream(malformed);
         using var bad = new LegacyMirLibReader(badStream);
         bool rejected = false;
