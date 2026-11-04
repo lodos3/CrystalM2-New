@@ -64,6 +64,23 @@ namespace Client.MirGraphics
             return Math.Min(0.36f, spread / 200f);
         }
 
+        // Fog colour follows weather, rather than applying blue distance haze
+        // to every environment, including fire/ash maps.
+        internal static Color FogTint(WeatherSetting weather)
+        {
+            if ((weather & (WeatherSetting.RedEmber | WeatherSetting.FireParticle)) != 0)
+                return Color.FromArgb(255, 224, 177, 144);
+            if ((weather & WeatherSetting.YellowEmber) != 0)
+                return Color.FromArgb(255, 246, 225, 174);
+            if ((weather & WeatherSetting.PurpleLeaves) != 0)
+                return Color.FromArgb(255, 210, 189, 237);
+            if ((weather & WeatherSetting.Snow) != 0)
+                return Color.FromArgb(255, 205, 222, 249);
+            if ((weather & WeatherSetting.Rain) != 0)
+                return Color.FromArgb(255, 182, 201, 226);
+            return Color.FromArgb(255, 198, 214, 240);
+        }
+
         internal static float FogStrength(WeatherSetting weather)
         {
             if ((weather & WeatherSetting.Fog) != 0) return 0.13f;
