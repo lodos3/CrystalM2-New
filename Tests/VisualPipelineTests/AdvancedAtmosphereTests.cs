@@ -32,6 +32,19 @@ internal static class AdvancedAtmosphereTests
         var drying = climate.Sample(WeatherSetting.None, 70000, false, 0);
         Check(drying.Wetness < dryStart.Wetness, "Ground wetness must fade after rain.");
 
+        var ashClimate = new AtmosphericWeatherController();
+        ashClimate.Sample(WeatherSetting.None, 0, false, 0);
+        var ash = ashClimate.Sample(WeatherSetting.RedEmber | WeatherSetting.FireParticle, 20000, false, 0);
+        ash = ashClimate.Sample(WeatherSetting.RedEmber | WeatherSetting.FireParticle, 40000, false, 0);
+        Check(ash.FogCover > 0 && ash.WindPixelsPerSecondX > 0,
+              "Ash storms must produce warm drifting particulate haze.");
+        Check(AtmosphereColourGrade.FogStrength(WeatherSetting.RedEmber) > 0,
+              "Active ember weather must influence distant atmospheric haze.");
+        Color emberTint = AtmosphereColourGrade.Target(LightSetting.Day, WeatherSetting.RedEmber, 0);
+        Check(emberTint.R > emberTint.B, "Ember skies must grade warm without changing map data.");
+        Color violet = AtmosphereColourGrade.Target(LightSetting.Day, WeatherSetting.PurpleLeaves, 0);
+        Check(violet.B > violet.G, "Purple foliage weather needs a subtle violet atmosphere.");
+
         var snow = new AtmosphericWeatherController().Sample(WeatherSetting.Snow, 0, false, 0);
         Check(snow.Wetness == 0, "Snow must not automatically be treated as liquid rain.");
         Check(AtmosphericWeatherController.LightningFlashAt(35000, false, true, 0) == 0,
