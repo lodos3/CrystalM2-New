@@ -102,8 +102,21 @@ namespace Client.MirGraphics
             }
             finally
             {
-                DXManager.Sprite.Flush();
-                DXManager.Sprite.Transform = original;
+                // A device-reset can invalidate the sprite between entering
+                // this optional pass and restoring state. Do not crash gameplay.
+                try
+                {
+                    if (DXManager.Sprite != null && !DXManager.Sprite.Disposed)
+                    {
+                        DXManager.Sprite.Flush();
+                        DXManager.Sprite.Transform = original;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _failed = true;
+                    CMain.SaveError("Atmosphere fog state restore failed: " + ex);
+                }
             }
         }
 
