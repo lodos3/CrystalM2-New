@@ -72,6 +72,13 @@ internal static class AdvancedAtmosphereTests
         }
         catch (ArgumentException) { }
 
+        Check(Math.Abs(AtmosphereExposure.Brightness(0f, 1f) - 1.035f) < 0.0001f,
+              "Clear skies must preserve the original brightness.");
+        Check(AtmosphereExposure.Brightness(1f, 1f) < 0.95f,
+              "Fully overcast weather should subtly darken the world.");
+        Check(Math.Abs(AtmosphereExposure.Brightness(1f, 0f) - 1.035f) < 0.0001f,
+              "Zero atmosphere intensity must not darken the map.");
+
         Check(AtmosphereIntensity.ClampPercent(-100) == 0 &&
               AtmosphereIntensity.ClampPercent(300) == 100 &&
               AtmosphereIntensity.Scale(0) == 0f &&
