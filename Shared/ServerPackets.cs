@@ -626,8 +626,7 @@ namespace ServerPackets
         public bool CreatureSummoned;
         public bool AllowObserve;
         public bool Observer;
-
-
+        public CombatSpecialisation Specialisation;
 
         protected override void ReadPacket(BinaryReader reader)
         {
@@ -708,6 +707,7 @@ namespace ServerPackets
             CreatureSummoned = reader.ReadBoolean();
             AllowObserve = reader.ReadBoolean();
             Observer = reader.ReadBoolean();
+            Specialisation = (CombatSpecialisation)reader.ReadByte();
         }
 
         protected override void WritePacket(BinaryWriter writer)
@@ -800,6 +800,30 @@ namespace ServerPackets
             writer.Write(CreatureSummoned);
             writer.Write(AllowObserve);
             writer.Write(Observer);
+            writer.Write((byte)Specialisation);
+        }
+    }
+
+    public sealed class SpecialisationResult : Packet
+    {
+        public override short Index => (short)ServerPacketIds.SpecialisationResult;
+
+        public bool ForHero;
+        public bool Accepted;
+        public CombatSpecialisation Specialisation;
+
+        protected override void ReadPacket(BinaryReader reader)
+        {
+            ForHero = reader.ReadBoolean();
+            Accepted = reader.ReadBoolean();
+            Specialisation = (CombatSpecialisation)reader.ReadByte();
+        }
+
+        protected override void WritePacket(BinaryWriter writer)
+        {
+            writer.Write(ForHero);
+            writer.Write(Accepted);
+            writer.Write((byte)Specialisation);
         }
     }
 
@@ -4824,6 +4848,7 @@ namespace ServerPackets
             AutoMPPercent = reader.ReadByte();
             HPItemIndex = reader.ReadInt32();
             MPItemIndex = reader.ReadInt32();
+            Specialisation = (CombatSpecialisation)reader.ReadByte();
         }
 
         protected override void WritePacket(BinaryWriter writer)
@@ -4879,6 +4904,7 @@ namespace ServerPackets
             writer.Write(AutoMPPercent);
             writer.Write(HPItemIndex);
             writer.Write(MPItemIndex);
+            writer.Write((byte)Specialisation);
         }
     }
 

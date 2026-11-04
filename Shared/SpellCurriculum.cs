@@ -13,6 +13,11 @@ public enum CombatSpecialisation : byte
 // It excludes custom/equipment/event spells and unseeded FastMove.
 public static class SpellCurriculum
 {
+    private static readonly MirClass[] PlayableClasses =
+    {
+        MirClass.Warrior, MirClass.Wizard, MirClass.Taoist, MirClass.Assassin, MirClass.Archer
+    };
+
     private static readonly Spell[] WarriorSpells =
     {
         Spell.Fencing,
@@ -259,8 +264,7 @@ public static class SpellCurriculum
         }
 
         // Never let equipment grants of another class's native spell bypass ownership.
-        foreach (MirClass other in new[] { MirClass.Warrior, MirClass.Wizard, MirClass.Taoist,
-                     MirClass.Assassin, MirClass.Archer })
+        foreach (MirClass other in PlayableClasses)
             if (Owns(other, spell)) return false;
 
         return true; // Equipment/event/custom spells retain their own authorisation paths.

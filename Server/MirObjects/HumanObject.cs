@@ -2329,6 +2329,9 @@ namespace Server.MirObjects
             for (int i = 0; i < Info.Magics.Count; i++)
             {
                 UserMagic magic = Info.Magics[i];
+                if (!SpellCurriculum.CanUse(Info.Class, Info.Specialisation, magic.Spell))
+                    continue;
+
                 switch (magic.Spell)
                 {
                     case Spell.Fencing:
@@ -2878,6 +2881,10 @@ namespace Server.MirObjects
         }
         public void Attack(MirDirection dir, Spell spell)
         {
+            // The network client may supply an arbitrary legacy or forged spell ID.
+            if (!SpellCurriculum.CanUse(Info.Class, Info.Specialisation, spell))
+                spell = Spell.None;
+
             LogTime = Envir.Time + Globals.LogDelay;
 
             bool Mined = false;
@@ -6922,6 +6929,9 @@ namespace Server.MirObjects
         }
         public UserMagic GetMagic(Spell spell)
         {
+            if (!SpellCurriculum.CanUse(Info.Class, Info.Specialisation, spell))
+                return null;
+
             for (int i = 0; i < Info.Magics.Count; i++)
             {
                 UserMagic magic = Info.Magics[i];

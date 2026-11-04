@@ -475,6 +475,9 @@ namespace Server.MirNetwork
                 case (short)ClientPacketIds.Magic:
                     Magic((C.Magic)p);
                     break;
+                case (short)ClientPacketIds.SelectSpecialisation:
+                    SelectSpecialisation((C.SelectSpecialisation)p);
+                    break;
                 case (short)ClientPacketIds.SwitchGroup:
                     SwitchGroup((C.SwitchGroup)p);
                     return;
@@ -1578,6 +1581,12 @@ namespace Server.MirNetwork
                 _retryList.Enqueue(p);
             else
                 actor.BeginMagic(p.Spell, p.Direction, p.TargetID, p.Location, p.SpellTargetLock);
+        }
+
+        private void SelectSpecialisation(C.SelectSpecialisation p)
+        {
+            if (Stage != GameStage.Game || Player == null) return;
+            Player.SelectSpecialisation(p);
         }
 
         private void SwitchGroup(C.SwitchGroup p)

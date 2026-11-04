@@ -219,6 +219,8 @@ public abstract class Packet
                 return new C.MagicKey();
             case (short)ClientPacketIds.Magic:
                 return new C.Magic();
+            case (short)ClientPacketIds.SelectSpecialisation:
+                return new C.SelectSpecialisation();
             case (short)ClientPacketIds.SwitchGroup:
                 return new C.SwitchGroup();
             case (short)ClientPacketIds.AddMember:
@@ -456,6 +458,8 @@ public abstract class Packet
                 return new S.SearchMapResult();
             case (short)ServerPacketIds.UserInformation:
                 return new S.UserInformation();
+            case (short)ServerPacketIds.SpecialisationResult:
+                return new S.SpecialisationResult();
             case (short)ServerPacketIds.UserSlotsRefresh:
                 return new S.UserSlotsRefresh();
             case (short)ServerPacketIds.UserLocation:

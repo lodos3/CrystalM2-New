@@ -58,6 +58,8 @@ jobs:
           dotnet-version: 8.0.x
       - name: Bookless five-class spell and specialisation catalog tests
         run: dotnet run --project Tests/SpellCurriculumTests/SpellCurriculumTests.csproj
+      - name: Specialisation protocol round-trip tests
+        run: dotnet run --project Tests/SpecialisationProtocolTests/SpecialisationProtocolTests.csproj
       - name: Modern renderer asset-fidelity and batching tests
         run: dotnet run --project Tests/ModernRendererTests/ModernRendererTests.csproj
       - name: Generated UI atlas and nine-slice geometry

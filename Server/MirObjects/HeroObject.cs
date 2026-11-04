@@ -301,13 +301,15 @@ namespace Server.MirObjects
         }
         protected bool CanUseMagic(UserMagic magic)
         {
-            if (magic == null) return false;
+            if (magic == null || !SpellCurriculum.CanUse(Info.Class, Info.Specialisation, magic.Spell)) return false;
             if (MagicCost(magic) > MP) return false;
             if (magic.Key <= 0) return false;
 
             return true;
         }
-        protected bool HasMagic(Spell spell) => Info.Magics.Any(x => x.Spell == spell);
+        protected bool HasMagic(Spell spell) =>
+            SpellCurriculum.CanUse(Info.Class, Info.Specialisation, spell) &&
+            Info.Magics.Any(x => x.Spell == spell);
         public override bool TryMagic()
         {
             return true;
@@ -1196,6 +1198,7 @@ namespace Server.MirObjects
                 Gender = Gender,
                 Level = Level,
                 Hair = Hair,
+                Specialisation = Info.Specialisation,
 
                 HP = HP,
                 MP = MP,

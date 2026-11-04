@@ -1111,6 +1111,26 @@ namespace ClientPackets
             writer.Write(OldKey);
         }
     }
+    public sealed class SelectSpecialisation : Packet
+    {
+        public override short Index => (short)ClientPacketIds.SelectSpecialisation;
+
+        public bool ForHero;
+        public CombatSpecialisation Specialisation;
+
+        protected override void ReadPacket(BinaryReader reader)
+        {
+            ForHero = reader.ReadBoolean();
+            Specialisation = (CombatSpecialisation)reader.ReadByte();
+        }
+
+        protected override void WritePacket(BinaryWriter writer)
+        {
+            writer.Write(ForHero);
+            writer.Write((byte)Specialisation);
+        }
+    }
+
     public sealed class Magic : Packet
     {
         public override short Index { get { return (short)ClientPacketIds.Magic; } }

@@ -1675,6 +1675,7 @@ namespace Server.MirObjects
 
                 HasHero = HasHero,
                 HeroBehaviour = Info.HeroBehaviour,
+                Specialisation = Info.Specialisation,
 
                 Inventory = new UserItem[Info.Inventory.Length],
                 Equipment = new UserItem[Info.Equipment.Length],
@@ -9686,6 +9687,31 @@ namespace Server.MirObjects
         #endregion
 
         #region Heroes
+        public void SelectSpecialisation(C.SelectSpecialisation request)
+        {
+            HumanObject actor = request.ForHero ? (HeroSpawned ? Hero : null) : this;
+            bool accepted = actor != null && SpellCurriculum.CanSelect(
+                actor.Info.Class, actor.Info.Level, actor.Info.Specialisation, request.Specialisation);
+
+            if (accepted)
+            {
+                actor.Info.Specialisation = request.Specialisation;
+                // Do not leave old saved attack toggles armed after a loadout is chosen.
+                actor.Info.Thrusting = false;
+                actor.Info.HalfMoon = false;
+                actor.Info.CrossHalfMoon = false;
+                actor.Info.DoubleSlash = false;
+                actor.RefreshStats();
+            }
+
+            Enqueue(new S.SpecialisationResult
+            {
+                ForHero = request.ForHero,
+                Accepted = accepted,
+                Specialisation = actor?.Info.Specialisation ?? CombatSpecialisation.Unchosen
+            });
+        }
+
         public void NewHero(C.NewHero p)
         {
             if (!Envir.CanCreateHero(p, Connection, IsGM))
