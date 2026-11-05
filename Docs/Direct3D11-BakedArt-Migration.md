@@ -36,6 +36,11 @@ positions. This runs when a sprite is uploaded, including its mask layer. Dark
 patterns inside opaque artwork require source art or an authored shadow mask to
 identify the shadow pixels reliably.
 
+Map strips reflect checker samples at the frame boundary so joined sections
+retain shadow coverage. For maps previously converted by the library editor,
+the client can read an original frame from `Data/.shadow-backup` when its
+dimensions, offsets and artwork match. It uses that frame in memory only.
+
 Projected shadows are disabled by default. Enabling `DynamicShadows=True`
 alone does not authorise another shadow on already shaded artwork. List the
 exact libraries that an artist has verified contain no baked ground shadow:

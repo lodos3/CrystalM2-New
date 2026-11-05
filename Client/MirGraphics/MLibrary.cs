@@ -480,6 +480,7 @@ namespace Client.MirGraphics
 
         private readonly string _fileName;
         private readonly bool _worldArtwork;
+        private readonly Lazy<LegacyMirLibReader> _mapShadowBackup;
 
         private MImage[] _images;
         private FrameSet _frames;
@@ -503,6 +504,32 @@ namespace Client.MirGraphics
                 parts[1].ToUpperInvariant() is "MAP" or "MONSTER" or "CARMOUR" or "AARMOUR" or "ARARMOUR" or
                     "CHAIR" or "AHAIR" or "ARHAIR" or "CHELMET" or "CWEAPON" or "AWEAPON" or "ARWEAPON" or
                     "MOUNT" or "PET" or "NPC" or "GATE" or "SIEGE" or "FLAG" or "TRANSFORM" or "TRANSFORMRIDE2";
+            if (_worldArtwork && parts[1].Equals("Map", StringComparison.OrdinalIgnoreCase))
+            {
+                string relativePath = Path.GetRelativePath(Settings.DataPath, _fileName);
+                _mapShadowBackup = new Lazy<LegacyMirLibReader>(() => OpenMapShadowBackup(relativePath));
+            }
+        }
+
+        private static LegacyMirLibReader OpenMapShadowBackup(string relativePath)
+        {
+            string root = Path.Combine(Settings.DataPath, ".shadow-backup");
+            if (!Directory.Exists(root)) return null;
+            try
+            {
+                foreach (string snapshot in Directory.GetDirectories(root).OrderByDescending(path => path, StringComparer.Ordinal))
+                {
+                    string path = Path.Combine(snapshot, relativePath);
+                    if (!File.Exists(path)) continue;
+                    try
+                    {
+                        return new LegacyMirLibReader(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete));
+                    }
+                    catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { }
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            return null;
         }
 
         public void Initialize()
@@ -589,7 +616,7 @@ namespace Client.MirGraphics
             if (!mi.TextureValid)
             {
                 _fStream.Seek(_indexList[index] + 17, SeekOrigin.Begin);
-                mi.CreateTexture(_reader, _worldArtwork);
+                mi.CreateTexture(_reader, _worldArtwork, _mapShadowBackup, index);
             }
             return true;
         }
@@ -645,7 +672,7 @@ namespace Client.MirGraphics
                         return Size.Empty;
 
                     _fStream.Seek(_indexList[index] + 17, SeekOrigin.Begin);
-                    mi.CreateTexture(_reader, _worldArtwork);
+                    mi.CreateTexture(_reader, _worldArtwork, _mapShadowBackup, index);
                 }
                 return mi.GetTrueSize();
             }
@@ -987,7 +1014,7 @@ namespace Client.MirGraphics
             }
         }
 
-        public unsafe void CreateTexture(BinaryReader reader, bool worldArtwork)
+        public unsafe void CreateTexture(BinaryReader reader, bool worldArtwork, Lazy<LegacyMirLibReader> mapShadowBackup, int index)
         {
             int width = Width;
             int height = Height;
@@ -1003,7 +1030,7 @@ namespace Client.MirGraphics
                     var pixels = new Span<byte>((void*)locked.Data.DataPointer, checked(locked.Pitch * height));
                     _alphaCoverage = AlphaCoverage.Capture(pixels, width, height, locked.Pitch);
                     TrueSize = _alphaCoverage.VisibleSize;
-                    HasBakedShadow = worldArtwork && BakedShadowRepair.Smooth(pixels, width, height, locked.Pitch);
+                    HasBakedShadow = worldArtwork && SmoothShadowLayer(pixels, locked.Pitch, mapShadowBackup, index, mask: false);
                 }
                 finally
                 {
@@ -1027,7 +1054,7 @@ namespace Client.MirGraphics
                             if (worldArtwork)
                             {
                                 var pixels = new Span<byte>((void*)maskLocked.Data.DataPointer, checked(maskLocked.Pitch * MaskHeight));
-                                HasBakedShadow |= BakedShadowRepair.Smooth(pixels, MaskWidth, MaskHeight, maskLocked.Pitch);
+                                HasBakedShadow |= SmoothShadowLayer(pixels, maskLocked.Pitch, mapShadowBackup, index, mask: true);
                             }
                         }
                         finally
@@ -1055,6 +1082,27 @@ namespace Client.MirGraphics
                 TextureValid = false;
                 throw;
             }
+        }
+
+        private bool SmoothShadowLayer(Span<byte> pixels, int pitch, Lazy<LegacyMirLibReader> backup, int index, bool mask)
+        {
+            int width = mask ? MaskWidth : Width, height = mask ? MaskHeight : Height;
+            int x = mask ? MaskX : X, y = mask ? MaskY : Y;
+            if (backup != null && BakedShadowRepair.HasOfflineRepair(pixels, width, height, pitch) && backup.Value is { } library)
+            {
+                try
+                {
+                    if (library.TryReadFrame(index, out var original, includeMask: mask))
+                    {
+                        var layer = mask ? original.Mask : original;
+                        if (layer != null && layer.Width == width && layer.Height == height && layer.OffsetX == x && layer.OffsetY == y &&
+                            BakedShadowRepair.TryUseOriginal(pixels, width, height, pitch, layer.Bgra)) return true;
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or InvalidDataException) { }
+            }
+
+            return BakedShadowRepair.Smooth(pixels, width, height, pitch, joinTileEdges: backup != null);
         }
 
         // Generate a compact repair texture once per checked sprite frame. Original

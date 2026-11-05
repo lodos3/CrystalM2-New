@@ -96,6 +96,7 @@ static class Program
             .SelectMany(pair => pair).ToArray();
         Assertions.True(!BakedShadowRepair.Smooth(darkTiles, 8, 8, 32),
             "Opaque dark tile patterns are not transparent checker shadows.");
+        CheckShadowTileEdges();
 
         BakedSpriteCommand command = BakedArtPolicy.ForArtwork(7, 10, 20, 2, 2);
         Assertions.True(command.TintR == 255 && command.TintG == 255 &&
@@ -218,6 +219,60 @@ static class Program
                 hasAlpha |= atlas[(y * SpellParticleAtlas.Width + x) * 4 + 3] > 0;
             Assertions.True(hasAlpha, "Each facing must have a visible slash mask.");
         }
+    }
+
+    private static void CheckShadowTileEdges()
+    {
+        const int width = 7, height = 8, pitch = width * 4;
+        byte[] left = CheckerTile(width, height, 0);
+        byte[] right = CheckerTile(width, height, 1);
+        byte[] previousRepair = left.ToArray();
+        Assertions.True(BakedShadowRepair.Smooth(previousRepair, width, height, pitch), "Reproduce the old per-frame fade.");
+        int edge = 3 * pitch + (width - 1) * 4 + 3;
+        Assertions.True(previousRepair[edge] < 110, "Missing samples used to fade the edge of a cut tile.");
+        Assertions.True(BakedShadowRepair.Smooth(left, width, height, pitch, joinTileEdges: true) &&
+                        BakedShadowRepair.Smooth(right, width, height, pitch, joinTileEdges: true), "Repair both sides of the tile join.");
+        for (int row = 0; row < height; row++)
+        {
+            byte leftAlpha = left[row * pitch + (width - 1) * 4 + 3];
+            byte rightAlpha = right[row * pitch + 3];
+            Assertions.True(leftAlpha >= 126 && Math.Abs(leftAlpha - rightAlpha) <= 2,
+                "Connected map shadows must retain coverage across opposite phases at the cut.");
+        }
+
+        byte[] thinTile = CheckerTile(2, 6, 0, alpha: 144, red: 16);
+        Assertions.True(BakedShadowRepair.Smooth(thinTile, 2, 6, 8, joinTileEdges: true) && thinTile[3] is >= 70 and <= 74,
+            "Recognise narrow, darker-tinted shadow strips and preserve their lower opacity.");
+
+        byte[] raw = CheckerTile(width, height, 0);
+        byte[] converted = raw.ToArray();
+        for (int i = 0; i < converted.Length; i += 4)
+        {
+            converted[i + 2] = 0;
+            converted[i + 3] = 112;
+        }
+        byte[] edited = converted.ToArray();
+        edited[2] = 127;
+        byte[] editedBefore = edited.ToArray();
+        Assertions.True(!BakedShadowRepair.TryUseOriginal(edited, width, height, pitch, raw.ToArray()) && edited.SequenceEqual(editedBefore),
+            "Reject the older source if the current artwork differs.");
+        Assertions.True(BakedShadowRepair.HasOfflineRepair(converted, width, height, pitch) &&
+                        BakedShadowRepair.TryUseOriginal(converted, width, height, pitch, raw) && converted.SequenceEqual(left),
+            "Rebuild an offline-converted tile from a matching backup using the same edge rules as its neighbour.");
+    }
+
+    private static byte[] CheckerTile(int width, int height, int phase, byte alpha = 255, byte red = 8)
+    {
+        byte[] pixels = new byte[width * height * 4];
+        for (int y = 0; y < height; y++)
+        for (int x = 0; x < width; x++)
+        {
+            if (((x + y) & 1) != phase) continue;
+            int p = (y * width + x) * 4;
+            pixels[p + 2] = red;
+            pixels[p + 3] = alpha;
+        }
+        return pixels;
     }
 
     private static byte[] MakeTestLib(byte[] bgra, bool includeMask = false)
