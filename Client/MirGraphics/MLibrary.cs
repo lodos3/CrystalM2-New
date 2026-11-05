@@ -499,14 +499,17 @@ namespace Client.MirGraphics
         public MLibrary(string filename)
         {
             _fileName = Path.ChangeExtension(filename, Extention);
-            string[] parts = filename.TrimStart('.', '/', '\\').Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries);
-            _worldArtwork = parts.Length > 2 && parts[0].Equals("Data", StringComparison.OrdinalIgnoreCase) &&
-                parts[1].ToUpperInvariant() is "MAP" or "MONSTER" or "CARMOUR" or "AARMOUR" or "ARARMOUR" or
+            if (string.IsNullOrEmpty(filename)) return;
+            string relativePath = Path.GetRelativePath(Settings.DataPath, _fileName);
+            string[] parts = relativePath.Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries);
+            string family = parts[0].ToUpperInvariant();
+            _worldArtwork = parts.Length == 1
+                ? family is "DECO.LIB" or "DNITEMS.LIB" or "DRAGON.LIB"
+                : family is "MAP" or "MONSTER" or "CARMOUR" or "AARMOUR" or "ARARMOUR" or
                     "CHAIR" or "AHAIR" or "ARHAIR" or "CHELMET" or "CWEAPON" or "AWEAPON" or "ARWEAPON" or
-                    "MOUNT" or "PET" or "NPC" or "GATE" or "SIEGE" or "FLAG" or "TRANSFORM" or "TRANSFORMRIDE2";
-            if (_worldArtwork && parts[1].Equals("Map", StringComparison.OrdinalIgnoreCase))
+                    "MOUNT" or "PET" or "NPC" or "GATE" or "SIEGE" or "FLAG" or "FISHING" or "TRANSFORM" or "TRANSFORMRIDE2";
+            if (_worldArtwork && family == "MAP")
             {
-                string relativePath = Path.GetRelativePath(Settings.DataPath, _fileName);
                 _mapShadowBackup = new Lazy<LegacyMirLibReader>(() => OpenMapShadowBackup(relativePath));
             }
         }
@@ -613,6 +616,9 @@ namespace Client.MirGraphics
             if (mi == null || mi.Width <= 0 || mi.Height <= 0)
                 return false;
 
+            if (_worldArtwork && mi.TextureValid && mi.ShadowRevision != GraphicsTuning.ShadowRevision)
+                mi.DisposeTexture();
+
             if (!mi.TextureValid)
             {
                 _fStream.Seek(_indexList[index] + 17, SeekOrigin.Begin);
@@ -693,12 +699,13 @@ namespace Client.MirGraphics
                 mi.Width > 320 || mi.Height > 320)
                 return; // Reject oversized frames before their texture is uploaded.
 
-            Point imagePoint = location;
+            Point imagePoint = GraphicsTuning.ProjectedOffset.Apply(location);
             imagePoint.Offset(mi.X, mi.Y);
             ShadowProjection direction = GameScene.Scene?.MapControl?.GetShadowProjection(worldCell)
                                         ?? ShadowProjection.Sunlight;
             float length = Settings.ShadowLengthPercent / 100f;
-            direction = new ShadowProjection(direction.Horizontal * length, direction.Vertical * length);
+            direction = new ShadowProjection(direction.Horizontal * length + GraphicsTuning.ProjectedSlope.Current / 100f,
+                direction.Vertical * length);
             if (!direction.IsProjectedVisible(imagePoint, mi.Width, mi.Height,
                                               Settings.ScreenWidth, Settings.ScreenHeight))
                 return;
@@ -796,13 +803,14 @@ namespace Client.MirGraphics
             DrawBlend(index, point, Color.FromArgb((int)MathF.Round(colour.A * strength), colour), true);
         }
 
-        public bool DrawLightShape(int index, Point point, Color colour, bool offset, float intensity, ref int pixelBudget)
+        public bool DrawLightShape(int index, Point point, Color colour, bool offset, float intensity,
+                                   ref int pixelBudget, int spreadPercent = 100)
         {
             MImage image = GetImageMetadata(index);
             if (image == null || image.Width <= 0 || image.Height <= 0) return false;
             if (offset) point.Offset(image.X, image.Y);
 
-            int radius = Math.Clamp(Math.Min(image.Width, image.Height) / 8, 2, 6);
+            int radius = Math.Max(1, (int)MathF.Round(Math.Clamp(Math.Min(image.Width, image.Height) / 8, 2, 6) * spreadPercent / 100f));
             var bounds = new Rectangle(point, new Size(image.Width, image.Height));
             bounds.Inflate(radius, radius);
             Rectangle visible = Rectangle.Intersect(bounds, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight));
@@ -979,6 +987,7 @@ namespace Client.MirGraphics
         public Texture MaskImage;
         public Boolean HasMask;
         public bool HasBakedShadow { get; private set; }
+        internal int ShadowRevision { get; private set; }
 
         public long CleanTime;
         public Size TrueSize;
@@ -1030,7 +1039,8 @@ namespace Client.MirGraphics
                     var pixels = new Span<byte>((void*)locked.Data.DataPointer, checked(locked.Pitch * height));
                     _alphaCoverage = AlphaCoverage.Capture(pixels, width, height, locked.Pitch);
                     TrueSize = _alphaCoverage.VisibleSize;
-                    HasBakedShadow = worldArtwork && SmoothShadowLayer(pixels, locked.Pitch, mapShadowBackup, index, mask: false);
+                    HasBakedShadow = worldArtwork && GraphicsTuning.RepairBakedShadows &&
+                        SmoothShadowLayer(pixels, locked.Pitch, mapShadowBackup, index, mask: false);
                 }
                 finally
                 {
@@ -1051,7 +1061,7 @@ namespace Client.MirGraphics
                         {
                             DecompressBgraRows(reader.ReadBytes(MaskLength), maskLocked.Data,
                                                MaskWidth, MaskHeight, maskLocked.Pitch);
-                            if (worldArtwork)
+                            if (worldArtwork && GraphicsTuning.RepairBakedShadows)
                             {
                                 var pixels = new Span<byte>((void*)maskLocked.Data.DataPointer, checked(maskLocked.Pitch * MaskHeight));
                                 HasBakedShadow |= SmoothShadowLayer(pixels, maskLocked.Pitch, mapShadowBackup, index, mask: true);
@@ -1066,6 +1076,7 @@ namespace Client.MirGraphics
                 }
 
                 _shadowAllocationFailed = false;
+                ShadowRevision = GraphicsTuning.ShadowRevision;
                 DXManager.TextureList.Add(this);
                 TextureValid = true;
                 CleanTime = CMain.Time + Settings.CleanDelay;
@@ -1088,6 +1099,8 @@ namespace Client.MirGraphics
         {
             int width = mask ? MaskWidth : Width, height = mask ? MaskHeight : Height;
             int x = mask ? MaskX : X, y = mask ? MaskY : Y;
+            bool join = backup != null && GraphicsTuning.JoinBakedEdges;
+            var settings = GraphicsTuning.BakedSettings;
             if (backup != null && BakedShadowRepair.HasOfflineRepair(pixels, width, height, pitch) && backup.Value is { } library)
             {
                 try
@@ -1096,13 +1109,13 @@ namespace Client.MirGraphics
                     {
                         var layer = mask ? original.Mask : original;
                         if (layer != null && layer.Width == width && layer.Height == height && layer.OffsetX == x && layer.OffsetY == y &&
-                            BakedShadowRepair.TryUseOriginal(pixels, width, height, pitch, layer.Bgra)) return true;
+                            BakedShadowRepair.TryUseOriginal(pixels, width, height, pitch, layer.Bgra, join, settings)) return true;
                     }
                 }
                 catch (Exception ex) when (ex is IOException or InvalidDataException) { }
             }
 
-            return BakedShadowRepair.Smooth(pixels, width, height, pitch, joinTileEdges: backup != null);
+            return BakedShadowRepair.Smooth(pixels, width, height, pitch, join, settings);
         }
 
         // Generate a compact repair texture once per checked sprite frame. Original

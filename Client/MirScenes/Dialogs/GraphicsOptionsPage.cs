@@ -6,57 +6,203 @@ namespace Client.MirScenes.Dialogs;
 
 internal sealed class GraphicsOptionsPage : MirControl
 {
-    private readonly MirTextBox _libraries;
-    private readonly MirLabel _libraryStatus;
+    private const int Right = 253;
+    private static readonly string[] BlendModes = ["Authored", "Alpha", "Additive", "Screen", "Multiply", "Subtract"];
+    private enum Preview { World, Floor, Ambient, Baked, Textures }
+
+    private MirControl _content;
+    private MirControl _selectedPage;
+    private MirButton _selectedTab;
+    private MirTextBox _libraries;
+    private MirLabel _libraryStatus;
 
     internal GraphicsOptionsPage()
     {
         Size = new Size(488, 391);
         Visible = false;
 
-        AddHeading("Post processing", 0);
-        AddToggle("Post processing", 0, 25, Settings.PostProcessing, value => Settings.PostProcessing = value);
-        AddToggle("Environment atmosphere", 0, 49, Settings.EnvironmentAtmosphere, value => Settings.EnvironmentAtmosphere = value);
-        AddSlider("Atmosphere", 0, 73, 0, 100, "%", () => Settings.AtmosphereIntensityPercent,
-            value => Settings.AtmosphereIntensityPercent = value);
-        AddSlider("Vignette", 0, 97, 0, 100, "%", () => Settings.VignetteIntensityPercent,
-            value => Settings.VignetteIntensityPercent = value);
-        AddToggle("Fog layers", 0, 121, Settings.EnvironmentFogLayers, value => Settings.EnvironmentFogLayers = value);
-        AddToggle("Wet surfaces", 0, 145, Settings.AtmosphereWetSurfaces, value => Settings.AtmosphereWetSurfaces = value);
-        AddToggle("Lightning", 0, 169, Settings.AtmosphereLightning, value => Settings.AtmosphereLightning = value);
-        AddToggle("Light bloom", 0, 193, Settings.LightingBloom, value => Settings.LightingBloom = value);
-        AddSlider("Bloom strength", 0, 217, 0, 200, "%", () => Settings.BloomIntensityPercent,
-            value => Settings.BloomIntensityPercent = value);
-        AddSlider("Bloom divisor", 0, 241, 2, 8, "", () => Settings.BloomDivisor, value => Settings.BloomDivisor = value,
-            "Lower values use a larger blur buffer.");
-        MirPanel.AddCaption(this, "Lighting and effects", new Rectangle(0, 269, 235, 22), muted: false);
-        AddSlider("Ambient shade", 0, 295, 0, 100, "%", () => Settings.AmbientDarknessPercent,
-            value => Settings.AmbientDarknessPercent = value);
-        AddSlider("Spell light", 0, 319, 0, 200, "%", () => Settings.SpellLightIntensityPercent,
-            value => Settings.SpellLightIntensityPercent = value);
-        AddSlider("Map light", 0, 343, 0, 200, "%", () => Settings.MapLightIntensityPercent,
-            value => Settings.MapLightIntensityPercent = value);
-        AddSlider("Spell blend", 0, 367, 0, 200, "%", () => Settings.SpellBlendIntensityPercent,
-            value => Settings.SpellBlendIntensityPercent = value, "Opacity of additive spell sprites.");
+        AddPage("Offsets", 0, BuildOffsets);
+        AddPage("Lighting", 1, BuildLighting);
+        AddPage("Post", 2, BuildPost);
+        AddPage("Blending", 3, BuildBlending);
+        AddPage("Shadows", 4, BuildShadows);
+        AddPage("Textures", 5, BuildTextures);
 
-        const int right = 253;
-        AddHeading("Projected shadows", right);
-        AddToggle("Projected shadows", right, 25, Settings.DynamicShadows, value => Settings.DynamicShadows = value);
-        AddToggle("Follow nearby lights", right, 49, Settings.ShadowsFollowLights, value => Settings.ShadowsFollowLights = value);
-        AddSlider("Opacity", right, 73, 0, 100, "%", () => Settings.ShadowOpacityPercent,
-            value => Settings.ShadowOpacityPercent = value);
-        AddSlider("Length", right, 97, 50, 175, "%", () => Settings.ShadowLengthPercent,
-            value => Settings.ShadowLengthPercent = value);
-        AddSlider("Softness", right, 121, 0, 8, "", () => Settings.ShadowSoftness,
-            value => Settings.ShadowSoftness = value, "Blur radius in source sprite pixels.");
-        AddToggle("Block shadow lights through walls", right, 145, Settings.MapLightOcclusion,
-            value => Settings.MapLightOcclusion = value);
+        MirPanel.AddCaption(this, "Drag, scroll, or use +/−. Click a value to reset it.", new Rectangle(0, 366, 488, 20));
+    }
 
-        MirPanel.AddCaption(this, "Shadow-free sprite libraries", new Rectangle(right, 171, 230, 18), muted: false);
+    private void AddPage(string title, int index, Action build)
+    {
+        var page = new MirControl { Parent = this, Location = new Point(0, 32), Size = new Size(488, 328), Visible = false };
+        var tab = AddButton(this, title, new Rectangle(index * 81, 0, 77, 24), () => { });
+        tab.Click += (_, _) => SelectPage();
+        _content = page;
+        build();
+        if (index == 0) SelectPage();
+
+        void SelectPage()
+        {
+            if (_selectedPage != null) _selectedPage.Visible = false;
+            if (_selectedTab != null) _selectedTab.Selected = false;
+            _selectedPage = page;
+            _selectedTab = tab;
+            page.Visible = true;
+            tab.Selected = true;
+        }
+    }
+
+    private void BuildOffsets()
+    {
+        Caption("Horizontal offset", 0, 0);
+        Caption("Vertical offset", Right, 0);
+        for (int i = 0; i < GraphicsTuning.Layers.Length; i++)
+        {
+            GraphicsLayer layer = GraphicsTuning.Layers[i];
+            var offset = GraphicsTuning.Offset(layer);
+            Preview preview = layer is GraphicsLayer.Ground or GraphicsLayer.Middle or GraphicsLayer.Front ? Preview.Floor : Preview.World;
+            AddValue(LayerName(layer), 0, 20 + i * 23, offset.X, "px", preview);
+            AddValue(LayerName(layer), Right, 20 + i * 23, offset.Y, "px", preview);
+        }
+    }
+
+    private void BuildLighting()
+    {
+        Caption("Ambient and global lighting", 0, 0);
+        AddSlider("Ambient shade", 0, 22, 0, 100, "%", () => Settings.AmbientDarknessPercent,
+            value => Settings.AmbientDarknessPercent = value, 100, Preview.Ambient);
+        AddValue("Day brightness", 0, 46, GraphicsTuning.DayBrightness, "%", Preview.Ambient);
+        AddValue("Dawn shade", 0, 70, GraphicsTuning.Dawn, "%", Preview.Ambient);
+        AddValue("Evening shade", 0, 94, GraphicsTuning.Evening, "%", Preview.Ambient);
+        AddValue("Night shade", 0, 118, GraphicsTuning.Night, "%", Preview.Ambient);
+        AddValue("Warmth", 0, 142, GraphicsTuning.LightWarmth, "%", Preview.Ambient);
+        AddValue("Daytime glow", 0, 166, GraphicsTuning.DayGlow);
+        AddValue("All lights X", 0, 190, GraphicsTuning.AllLights.X, "px");
+        AddValue("All lights Y", 0, 214, GraphicsTuning.AllLights.Y, "px");
+        AddSlider("All spell light", 0, 238, 0, 200, "%", () => Settings.SpellLightIntensityPercent,
+            value => Settings.SpellLightIntensityPercent = value, 100);
+        AddSlider("All map light", 0, 262, 0, 200, "%", () => Settings.MapLightIntensityPercent,
+            value => Settings.MapLightIntensityPercent = value, 100);
+
+        Caption("Light sources", Right, 0);
+        MirControl page = _content, selected = null;
+        MirButton selectedButton = null;
+        for (int i = 0; i < GraphicsTuning.LightSources.Length; i++)
+        {
+            LightSource source = GraphicsTuning.LightSources[i];
+            string name = source == LightSource.Npc ? "NPC" : source == LightSource.MapAnimation ? "Animated" : source.ToString();
+            var emitterPanel = new MirControl { Parent = page, Location = new Point(Right, 77), Size = new Size(235, 205), Visible = false };
+            var button = AddButton(page, name, new Rectangle(Right + (i % 4) * 59, 22 + (i / 4) * 25, 55, 22), () => { });
+            button.Click += (_, _) => SelectEmitter();
+            _content = emitterPanel;
+            Caption(name + " light", 0, 0);
+            var light = GraphicsTuning.Light(source);
+            AddValue("Strength", 0, 22, light.Strength);
+            AddValue("Radius", 0, 46, light.Radius);
+            AddValue("Warmth", 0, 70, light.Warmth);
+            AddValue("Offset X", 0, 94, light.Offset.X, "px");
+            AddValue("Offset Y", 0, 118, light.Offset.Y, "px");
+            if (i == 0) SelectEmitter();
+
+            void SelectEmitter()
+            {
+                if (selected != null) selected.Visible = false;
+                if (selectedButton != null) selectedButton.Selected = false;
+                selected = emitterPanel;
+                selectedButton = button;
+                selected.Visible = true;
+                button.Selected = true;
+            }
+        }
+        _content = page;
+        Caption("Animated lights follow the sprite shape.", Right, 235);
+        Caption("Torch controls equipped player lights.", Right, 257);
+    }
+
+    private void BuildPost()
+    {
+        Caption("World colour and tone", 0, 0);
+        AddToggle("Post processing", 0, 23, () => Settings.PostProcessing, value => Settings.PostProcessing = value);
+        AddValue("Exposure", 0, 47, GraphicsTuning.Exposure);
+        AddValue("Contrast", 0, 71, GraphicsTuning.Contrast);
+        AddValue("Saturation", 0, 95, GraphicsTuning.Saturation);
+        AddValue("Gamma", 0, 119, GraphicsTuning.Gamma);
+        AddChoice("Colour grade", 0, 143, GraphicsTuning.Grade, ["Neutral", "Warm", "Cool", "Sepia", "Jade"]);
+        AddChoice("Tone curve", 0, 167, GraphicsTuning.Tone, ["Linear", "Soft highlight", "S-curve"]);
+        AddSlider("Vignette", 0, 191, 0, 100, "%", () => Settings.VignetteIntensityPercent,
+            value => Settings.VignetteIntensityPercent = value, 100);
+        AddChoice("World shader", 0, 215, GraphicsTuning.PostShader, ["Standard", "Monochrome", "Posterize", "Sharpen"]);
+        AddChoice("Death effect", 0, 239, GraphicsTuning.DeathLook, ["Grayscale", "Post settings", "Original"]);
+
+        Caption("Atmosphere and effects", Right, 0);
+        AddToggle("Environment atmosphere", Right, 23, () => Settings.EnvironmentAtmosphere, value => Settings.EnvironmentAtmosphere = value);
+        AddSlider("Atmosphere", Right, 47, 0, 100, "%", () => Settings.AtmosphereIntensityPercent,
+            value => Settings.AtmosphereIntensityPercent = value, 100);
+        AddToggle("Fog layers", Right, 71, () => Settings.EnvironmentFogLayers, value => Settings.EnvironmentFogLayers = value);
+        AddValue("Fog density", Right, 95, GraphicsTuning.FogDensity);
+        AddToggle("Wet surfaces", Right, 119, () => Settings.AtmosphereWetSurfaces, value => Settings.AtmosphereWetSurfaces = value);
+        AddToggle("Lightning", Right, 143, () => Settings.AtmosphereLightning, value => Settings.AtmosphereLightning = value);
+        AddToggle("Light bloom", Right, 167, () => Settings.LightingBloom, value => Settings.LightingBloom = value);
+        AddSlider("Bloom strength", Right, 191, 0, 200, "%", () => Settings.BloomIntensityPercent,
+            value => Settings.BloomIntensityPercent = value, 100);
+        AddValue("Bloom cutoff", Right, 215, GraphicsTuning.BloomThreshold);
+        AddSlider("Bloom divisor", Right, 239, 2, 8, "", () => Settings.BloomDivisor,
+            value => Settings.BloomDivisor = value, 4, hint: "Lower values use a larger blur buffer.");
+    }
+
+    private void BuildBlending()
+    {
+        Caption("Actors and effects", 0, 0);
+        Caption("Terrain and render states", Right, 0);
+        GraphicsLayer[] left = [GraphicsLayer.Player, GraphicsLayer.Monster, GraphicsLayer.Npc,
+            GraphicsLayer.Item, GraphicsLayer.Decoration, GraphicsLayer.Spell, GraphicsLayer.Particles, GraphicsLayer.Weather];
+        GraphicsLayer[] right = [GraphicsLayer.Ground, GraphicsLayer.Middle, GraphicsLayer.Front,
+            GraphicsLayer.MapAnimation, GraphicsLayer.Background];
+        for (int i = 0; i < left.Length; i++)
+            AddChoice(LayerName(left[i]), 0, 22 + i * 24, GraphicsTuning.Blend(left[i]), BlendModes);
+        for (int i = 0; i < right.Length; i++)
+            AddChoice(LayerName(right[i]), Right, 22 + i * 24, GraphicsTuning.Blend(right[i]), BlendModes, Preview.Floor);
+
+        AddChoice("Corpses", Right, 142, GraphicsTuning.CorpseBlend, BlendModes);
+        AddChoice("Target highlight", Right, 166, GraphicsTuning.HighlightBlend, BlendModes);
+        AddChoice("Ground particles", Right, 190, GraphicsTuning.GroundParticleBlend, BlendModes);
+        AddSlider("Spell opacity", 0, 224, 0, 200, "%", () => Settings.SpellBlendIntensityPercent,
+            value => Settings.SpellBlendIntensityPercent = value, 100);
+        Caption("Click a mode to cycle through blend options.", 0, 274, 488);
+    }
+
+    private void BuildShadows()
+    {
+        Caption("Baked checker shadows", 0, 0);
+        AddToggle("Repair checker shadows", 0, 22, () => GraphicsTuning.BakedEnabled.Current != 0,
+            value => GraphicsTuning.BakedEnabled.Current = value ? 1 : 0, Preview.Baked);
+        AddToggle("Preserve map tile joins", 0, 46, () => GraphicsTuning.BakedJoin.Current != 0,
+            value => GraphicsTuning.BakedJoin.Current = value ? 1 : 0, Preview.Baked);
+        AddValue("Dark threshold", 0, 70, GraphicsTuning.BakedDarkness, "", Preview.Baked, "Higher values detect lighter checker dots.");
+        AddValue("Min dot alpha", 0, 94, GraphicsTuning.BakedMinAlpha, "", Preview.Baked);
+        AddValue("Colour match", 0, 118, GraphicsTuning.BakedTolerance, "", Preview.Baked,
+            "Higher values allow more colour variation between checker dots.");
+        AddValue("Blur radius", 0, 142, GraphicsTuning.BakedRadius, "px", Preview.Baked);
+        AddValue("Opacity", 0, 166, GraphicsTuning.BakedOpacity, "%", Preview.Baked);
+        Caption("Baked settings apply when you release.", 0, 196);
+        Caption("The client processes the loaded frames.", 0, 218);
+
+        Caption("Projected shadows", Right, 0);
+        AddToggle("Projected shadows", Right, 22, () => Settings.DynamicShadows, value => Settings.DynamicShadows = value);
+        AddToggle("Follow nearby lights", Right, 46, () => Settings.ShadowsFollowLights, value => Settings.ShadowsFollowLights = value);
+        AddToggle("Walls block shadow lights", Right, 70, () => Settings.MapLightOcclusion, value => Settings.MapLightOcclusion = value);
+        AddSlider("Opacity", Right, 94, 0, 100, "%", () => Settings.ShadowOpacityPercent, value => Settings.ShadowOpacityPercent = value, 36);
+        AddSlider("Length", Right, 118, 50, 175, "%", () => Settings.ShadowLengthPercent, value => Settings.ShadowLengthPercent = value, 100);
+        AddSlider("Blur radius", Right, 142, 0, 8, "px", () => Settings.ShadowSoftness, value => Settings.ShadowSoftness = value, 0);
+        AddValue("Width", Right, 166, GraphicsTuning.ProjectedWidth);
+        AddValue("Direction", Right, 190, GraphicsTuning.ProjectedSlope);
+        AddValue("Offset X", Right, 214, GraphicsTuning.ProjectedOffset.X, "px");
+        AddValue("Offset Y", Right, 238, GraphicsTuning.ProjectedOffset.Y, "px");
+
+        Caption("Approved shadow-free sprite libraries", 0, 253, 248);
         _libraries = new MirTextBox
         {
-            Parent = this, Location = new Point(right, 195), Size = new Size(228, 20), Border = true,
-            Text = Settings.ProjectedShadowLibraries, Hint = "Exact relative .Lib paths separated by semicolons."
+            Parent = _content, Location = new Point(0, 277), Size = new Size(366, 21), Border = true,
+            Text = Settings.ProjectedShadowLibraries, Hint = "Relative .Lib paths separated by semicolons."
         };
         _libraries.TextBox.KeyDown += (_, e) =>
         {
@@ -64,54 +210,76 @@ internal sealed class GraphicsOptionsPage : MirControl
             ApplyLibraries();
             e.Handled = e.SuppressKeyPress = true;
         };
-        AddButton("Apply libraries", new Rectangle(right, 223, 94, 22), ApplyLibraries);
-        _libraryStatus = MirPanel.AddCaption(this, "", new Rectangle(right, 250, 230, 16));
+        AddButton(_content, "Apply libraries", new Rectangle(374, 277, 114, 21), ApplyLibraries);
+        _libraryStatus = Caption("", 0, 302, 488);
         UpdateLibraryStatus();
-        MirPanel.AddCaption(this, "Use relative paths separated by semicolons.", new Rectangle(right, 266, 235, 16));
-        MirPanel.AddCaption(this, "Baked checker shadows are softened on load.", new Rectangle(right, 296, 235, 20));
     }
 
-    private void AddHeading(string text, int x) =>
-        MirPanel.AddCaption(this, text, new Rectangle(x, 0, 235, 22), muted: false);
-
-    private void AddToggle(string label, int x, int y, bool initial, Action<bool> write)
+    private void BuildTextures()
     {
-        var checkBox = new MirCheckBox
+        Caption("Live GPU texture scaling", 0, 0, 488);
+        AddChoice("Texture filter", 0, 27, GraphicsTuning.TextureFilter, ["Pixel", "Smooth", "Edge-aware 2x", "HD"], Preview.Textures);
+        Caption("Pixel keeps the original hard edges.", 0, 63, 488);
+        Caption("Smooth interpolates between texture pixels when scaled.", 0, 86, 488);
+        Caption("Edge-aware 2x reconstructs diagonal edges when enlarged.", 0, 109, 488);
+        Caption("HD also smooths diagonal edges at native size.", 0, 132, 488);
+        Caption("Applies to world art, effects, icons and UI textures.", 0, 165, 488);
+        Caption("Changes are rendered live on the GPU.", 0, 188, 488);
+    }
+
+    private static string LayerName(GraphicsLayer layer) => layer switch
+    {
+        GraphicsLayer.Npc => "NPC",
+        GraphicsLayer.MapAnimation => "Map animation",
+        _ => layer.ToString()
+    };
+
+    private MirLabel Caption(string text, int x, int y, int width = 235) =>
+        MirPanel.AddCaption(_content, text, new Rectangle(x, y, width, 20), muted: false);
+
+    private void AddToggle(string label, int x, int y, Func<bool> read, Action<bool> write, Preview preview = Preview.World)
+    {
+        var box = new MirCheckBox { Parent = _content, Location = new Point(x, y + 2), LabelText = label, Checked = read() };
+        box.Click += (_, _) =>
         {
-            Parent = this, Location = new Point(x, y + 2), LabelText = label, Checked = initial
-        };
-        checkBox.Click += (_, _) =>
-        {
-            write(checkBox.Checked);
-            ApplyPreview();
+            write(box.Checked);
+            ApplyPreview(preview);
             Settings.SaveGraphicsEffects();
         };
     }
+
+    private void AddChoice(string label, int x, int y, GraphicsTuning.Value value, string[] names, Preview preview = Preview.World)
+    {
+        Caption(label, x, y, 105);
+        MirButton button = null;
+        button = AddButton(_content, names[value.Current], new Rectangle(x + 111, y, 118, 20), () =>
+        {
+            value.Current = (value.Current + 1) % names.Length;
+            button.Text = names[value.Current];
+            ApplyPreview(preview);
+            Settings.SaveGraphicsEffects();
+        });
+    }
+
+    private void AddValue(string label, int x, int y, GraphicsTuning.Value value, string unit = "%",
+                          Preview preview = Preview.World, string hint = null) =>
+        AddSlider(label, x, y, value.Minimum, value.Maximum, unit, () => value.Current,
+            next => value.Current = next, value.Default, preview, hint);
 
     private void AddSlider(string label, int x, int y, int minimum, int maximum, string unit,
-                           Func<int> read, Action<int> write, string hint = null)
+                           Func<int> read, Action<int> write, int reset, Preview preview = Preview.World, string hint = null)
     {
-        MirPanel.AddCaption(this, label, new Rectangle(x, y, 85, 20));
-        var value = MirPanel.AddCaption(this, $"{read()}{unit}", new Rectangle(x + 191, y, 44, 20), muted: false);
-        void SetValue(int next)
-        {
-            next = Math.Clamp(next, minimum, maximum);
-            if (next == read()) return;
-            write(next);
-            value.Text = $"{next}{unit}";
-            ApplyPreview();
-        }
-        void Step(int delta)
-        {
-            SetValue(read() + delta);
-            Settings.SaveGraphicsEffects();
-        }
+        MirPanel.AddCaption(_content, label, new Rectangle(x, y, 85, 20));
+        bool changed = false;
+        var value = AddButton(_content, Format(), new Rectangle(x + 191, y, 44, 20), () => { });
+        value.Hint = "Reset " + label;
+        value.Click += (_, _) => SetAndSave(reset);
+        AddButton(_content, "−", new Rectangle(x + 87, y, 19, 20), () => SetAndSave(read() - 1)).Hint = "Decrease " + label;
+        AddButton(_content, "+", new Rectangle(x + 169, y, 19, 20), () => SetAndSave(read() + 1)).Hint = "Increase " + label;
 
-        AddButton("−", new Rectangle(x + 87, y, 19, 20), () => Step(-1)).Hint = $"Decrease {label}";
-        AddButton("+", new Rectangle(x + 169, y, 19, 20), () => Step(1)).Hint = $"Increase {label}";
-        var slider = new GraphicsSlider(fraction => SetValue(minimum + (int)Math.Round(fraction * (maximum - minimum))))
+        var slider = new GraphicsSlider(fraction => SetValue(minimum + (int)Math.Round(fraction * (maximum - minimum))), Commit)
         {
-            Parent = this, Location = new Point(x + 108, y), Size = new Size(59, 20), Hint = hint ?? label
+            Parent = _content, Location = new Point(x + 108, y), Size = new Size(59, 20), Hint = hint ?? label
         };
         slider.BeforeDraw += (_, _) =>
         {
@@ -122,14 +290,41 @@ internal sealed class GraphicsOptionsPage : MirControl
             DXManager.Device.Ui.Draw(UiSurface.ScrollThumb,
                 new Rectangle(bounds.X + (int)((bounds.Width - 8) * fraction), bounds.Y + 2, 8, 16));
         };
-        slider.MouseWheel += (_, e) => Step(Math.Sign(e.Delta));
+        slider.MouseWheel += (_, e) => SetAndSave(read() + Math.Sign(e.Delta));
+
+        string Format() => $"{read()}{unit}";
+
+        void SetValue(int next)
+        {
+            next = Math.Clamp(next, minimum, maximum);
+            if (next == read()) return;
+            write(next);
+            changed = true;
+            value.Text = Format();
+            if (preview == Preview.Baked) Redraw();
+            else ApplyPreview(preview);
+        }
+
+        void SetAndSave(int next)
+        {
+            SetValue(next);
+            Commit();
+        }
+
+        void Commit()
+        {
+            if (!changed) return;
+            changed = false;
+            if (preview == Preview.Baked) ApplyPreview(preview);
+            Settings.SaveGraphicsEffects();
+        }
     }
 
-    private MirButton AddButton(string text, Rectangle bounds, Action action)
+    private static MirButton AddButton(MirControl parent, string text, Rectangle bounds, Action action)
     {
         var button = new MirButton
         {
-            Parent = this, Location = bounds.Location, Size = bounds.Size, AutoSize = false,
+            Parent = parent, Location = bounds.Location, Size = bounds.Size, AutoSize = false,
             Skin = UiSurface.Button, Text = text, Sound = SoundList.ButtonA
         };
         button.Click += (_, _) => action();
@@ -145,7 +340,7 @@ internal sealed class GraphicsOptionsPage : MirControl
             return;
         }
         Settings.SetProjectedShadowLibraries(paths);
-        ApplyPreview();
+        ApplyPreview(Preview.World);
         Settings.SaveGraphicsEffects();
         UpdateLibraryStatus();
     }
@@ -153,16 +348,24 @@ internal sealed class GraphicsOptionsPage : MirControl
     private void UpdateLibraryStatus()
     {
         int count = Settings.ProjectedShadowLibraries.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Length;
-        _libraryStatus.Text = count == 0 ? "No libraries approved for shadows." : $"{count} library paths configured.";
+        _libraryStatus.Text = count == 0 ? "No libraries approved for projected shadows." : $"{count} library paths configured.";
     }
 
-    private void ApplyPreview()
+    private void ApplyPreview(Preview preview)
     {
-        if (GameScene.Scene?.MapControl is { } map) map.TextureValid = false;
+        if (preview == Preview.Baked) GraphicsTuning.ApplyBakedSettings();
+        if (preview == Preview.Textures && DXManager.Device != null)
+            DXManager.Device.TextureFilter = (TextureFilterMode)GraphicsTuning.TextureFilter.Current;
+        if (GameScene.Scene?.MapControl is { } map)
+        {
+            if (preview is Preview.Floor or Preview.Baked or Preview.Textures) map.FloorValid = false;
+            if (preview == Preview.Ambient) map.PreviewAmbient();
+            map.TextureValid = false;
+        }
         Redraw();
     }
 
-    private sealed class GraphicsSlider(Action<double> change) : MirControl
+    private sealed class GraphicsSlider(Action<double> change, Action commit) : MirControl
     {
         public override void OnMouseDown(MouseEventArgs e)
         {
@@ -180,13 +383,13 @@ internal sealed class GraphicsOptionsPage : MirControl
 
         public override void OnMouseUp(MouseEventArgs e)
         {
-            if (Moving) Settings.SaveGraphicsEffects();
+            if (Moving) commit();
             base.OnMouseUp(e);
         }
 
         protected override void OnVisibleChanged()
         {
-            if (!Visible && Moving) Settings.SaveGraphicsEffects();
+            if (!Visible && Moving) commit();
             base.OnVisibleChanged();
         }
 

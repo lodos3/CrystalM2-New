@@ -436,11 +436,24 @@ namespace Client.MirObjects
             NameLabel.Location = new Point(DisplayRectangle.X + (50 - NameLabel.Size.Width) / 2, DisplayRectangle.Y - (32 - NameLabel.Size.Height / 2) + (Dead ? 35 : 8)); //was 48 -
             NameLabel.Draw();
         }
+        private bool _drawingHighlight;
+
+        private protected DXManager.ArtworkBlendScope BlendArtwork()
+        {
+            if (_drawingHighlight) return new DXManager.ArtworkBlendScope(GraphicsTuning.HighlightBlend.Current);
+            return DXManager.BlendArtwork(GraphicsTuning.Layer(Race), Dead ? GraphicsTuning.CorpseBlend : null);
+        }
+
         public virtual void DrawBlend()
         {
-            DXManager.SetBlend(true, 0.3F); //0.8
-            Draw();
-            DXManager.SetBlend(false);
+            DXManager.SetBlend(true, 0.3F);
+            _drawingHighlight = true;
+            try { Draw(); }
+            finally
+            {
+                _drawingHighlight = false;
+                DXManager.SetBlend(false);
+            }
         }
         public void DrawDamages()
         {

@@ -436,6 +436,7 @@ namespace Client.MirObjects
             DrawLocation.Offset(User.OffSetMove);
             DrawLocation = DrawLocation.Add(ManualLocationOffset);
             DrawLocation.Offset(GlobalDisplayLocationOffset);
+            DrawLocation.Offset(GraphicsTuning.Offset(GraphicsLayer.Monster).Pixels);
 
             if (BodyLibrary != null && update)
             {
@@ -4293,6 +4294,7 @@ namespace Client.MirObjects
         public override void Draw()
         {
             DrawBehindEffects(Settings.Effect);
+            using var artwork = BlendArtwork();
 
             float oldOpacity = DXManager.Opacity;
             if (Hidden && !DXManager.Blending) DXManager.SetOpacity(0.5F);

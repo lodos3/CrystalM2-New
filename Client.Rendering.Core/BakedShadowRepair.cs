@@ -3,14 +3,20 @@ using System.Buffers;
 
 namespace CrystalM2.Rendering.Core;
 
+public readonly record struct BakedShadowSettings(int DarkestChannel, int MinimumDotAlpha,
+    int ColourTolerance, int Radius, int OpacityPercent)
+{
+    public static BakedShadowSettings Default => new(24, 96, 4, 2, 100);
+}
+
 public static class BakedShadowRepair
 {
-    private const int Radius = 2;
-
     // Repair transparent checker shadows at their authored position. Dense
     // colour-matched seeds distinguish shadows from dark outlines and isolated pixels.
-    public static bool Smooth(Span<byte> bgra, int width, int height, int pitch, bool joinTileEdges = false)
+    public static bool Smooth(Span<byte> bgra, int width, int height, int pitch, bool joinTileEdges = false,
+                              BakedShadowSettings? tuning = null)
     {
+        BakedShadowSettings settings = tuning ?? BakedShadowSettings.Default;
         if (width < 2 || height < 2) return false;
         int seedWidth = Math.Min(width, height == 2 ? 4 : 3);
         int seedHeight = Math.Min(height, width == 2 ? 4 : 3);
@@ -32,7 +38,8 @@ public static class BakedShadowRepair
                 if (selected != null && selected[index] != 0) continue;
                 int pixel = y * pitch + x * 4;
                 int key = pixel + phase * 4;
-                if (!IsDark(bgra, key) || !IsSeed(bgra, pixel, key, phase, pitch, seedWidth, seedHeight)) continue;
+                if (!IsDark(bgra, key, settings) ||
+                    !IsSeed(bgra, pixel, key, phase, pitch, seedWidth, seedHeight, settings)) continue;
 
                 if (selected == null)
                 {
@@ -56,7 +63,7 @@ public static class BakedShadowRepair
                         if ((uint)nx >= (uint)width || (uint)ny >= (uint)height) continue;
                         int neighbour = ny * width + nx;
                         int offset = ny * pitch + nx * 4;
-                        if (selected[neighbour] != 0 || !SameColour(bgra, key, offset) ||
+                        if (selected[neighbour] != 0 || !SameColour(bgra, key, offset, settings) ||
                             !HasClearNeighbours(bgra, nx, ny, width, height, pitch)) continue;
                         selected[neighbour] = bgra[offset + 3];
                         queue[end++] = neighbour;
@@ -65,7 +72,7 @@ public static class BakedShadowRepair
             }
 
             if (selected == null) return false;
-            PaintShadow(bgra, selected, width, height, pitch, left, top, right, bottom, joinTileEdges);
+            PaintShadow(bgra, selected, width, height, pitch, left, top, right, bottom, joinTileEdges, settings);
             return true;
         }
         finally
@@ -91,7 +98,8 @@ public static class BakedShadowRepair
 
     // The backup is usable only when every changed pixel can be explained by
     // the old shadow conversion. In particular, keep newer edits to the artwork.
-    public static bool TryUseOriginal(Span<byte> pixels, int width, int height, int pitch, Span<byte> original)
+    public static bool TryUseOriginal(Span<byte> pixels, int width, int height, int pitch, Span<byte> original,
+                                      bool joinTileEdges = true, BakedShadowSettings? tuning = null)
     {
         int originalPitch = checked(width * 4);
         if (original.Length != (long)originalPitch * height) return false;
@@ -103,26 +111,30 @@ public static class BakedShadowRepair
             if (pixels.Slice(p, 4).SequenceEqual(original.Slice(source, 4))) continue;
             if (pixels[p + 3] > 128 || (pixels[p] | pixels[p + 1] | pixels[p + 2]) != 0) return false;
             if (original[source + 3] == 0) continue;
-            if (!IsDark(original, source)) return false;
+            if (!IsDark(original, source, BakedShadowSettings.Default)) return false;
             removedDots++;
         }
 
-        if (removedDots < 4 || !Smooth(original, width, height, originalPitch, joinTileEdges: true)) return false;
+        if (removedDots < 4 || !Smooth(original, width, height, originalPitch, joinTileEdges, tuning)) return false;
         for (int y = 0; y < height; y++)
             original.Slice(y * originalPitch, originalPitch).CopyTo(pixels.Slice(y * pitch, originalPitch));
         return true;
     }
 
-    private static bool IsDark(ReadOnlySpan<byte> pixels, int p) => pixels[p + 3] >= 96 &&
-        pixels[p] <= 24 && pixels[p + 1] <= 24 && pixels[p + 2] <= 24 &&
-        pixels[p] + pixels[p + 1] + pixels[p + 2] <= 36;
+    private static bool IsDark(ReadOnlySpan<byte> pixels, int p, BakedShadowSettings settings) =>
+        pixels[p + 3] >= settings.MinimumDotAlpha &&
+        pixels[p] <= settings.DarkestChannel && pixels[p + 1] <= settings.DarkestChannel &&
+        pixels[p + 2] <= settings.DarkestChannel &&
+        pixels[p] + pixels[p + 1] + pixels[p + 2] <= settings.DarkestChannel * 3 / 2;
 
-    private static bool SameColour(ReadOnlySpan<byte> pixels, int a, int b) => IsDark(pixels, b) &&
-        Math.Abs(pixels[a] - pixels[b]) <= 4 && Math.Abs(pixels[a + 1] - pixels[b + 1]) <= 4 &&
-        Math.Abs(pixels[a + 2] - pixels[b + 2]) <= 4 && Math.Abs(pixels[a + 3] - pixels[b + 3]) <= 32;
+    private static bool SameColour(ReadOnlySpan<byte> pixels, int a, int b, BakedShadowSettings settings) =>
+        IsDark(pixels, b, settings) && Math.Abs(pixels[a] - pixels[b]) <= settings.ColourTolerance &&
+        Math.Abs(pixels[a + 1] - pixels[b + 1]) <= settings.ColourTolerance &&
+        Math.Abs(pixels[a + 2] - pixels[b + 2]) <= settings.ColourTolerance &&
+        Math.Abs(pixels[a + 3] - pixels[b + 3]) <= 32;
 
     private static bool IsSeed(ReadOnlySpan<byte> pixels, int pixel, int key, int phase, int pitch,
-                               int seedWidth, int seedHeight)
+                               int seedWidth, int seedHeight, BakedShadowSettings settings)
     {
         int matches = 0;
         for (int y = 0; y < seedHeight; y++)
@@ -130,7 +142,7 @@ public static class BakedShadowRepair
         {
             int p = pixel + y * pitch + x * 4;
             if (pixels[p + 3] == 0) continue;
-            if (((x + y) & 1) != phase || !SameColour(pixels, key, p)) return false;
+            if (((x + y) & 1) != phase || !SameColour(pixels, key, p, settings)) return false;
             matches++;
         }
         return matches >= 4;
@@ -148,17 +160,22 @@ public static class BakedShadowRepair
     }
 
     private static void PaintShadow(Span<byte> pixels, ReadOnlySpan<byte> selected, int width, int height, int pitch,
-                                    int left, int top, int right, int bottom, bool joinTileEdges)
+                                    int left, int top, int right, int bottom, bool joinTileEdges, BakedShadowSettings settings)
     {
-        for (int y = Math.Max(0, top - Radius); y <= Math.Min(height - 1, bottom + Radius); y++)
-        for (int x = Math.Max(0, left - Radius); x <= Math.Min(width - 1, right + Radius); x++)
+        int radius = Math.Clamp(settings.Radius, 1, 5);
+        int kernel = radius + 1;
+        int normalization = kernel * kernel * kernel * kernel * 100;
+        int opacity = Math.Clamp(settings.OpacityPercent, 0, 200);
+        int maxAlpha = Math.Min(255, (128 * opacity + 50) / 100);
+        for (int y = Math.Max(0, top - radius); y <= Math.Min(height - 1, bottom + radius); y++)
+        for (int x = Math.Max(0, left - radius); x <= Math.Min(width - 1, right + radius); x++)
         {
             int p = y * pitch + x * 4;
             if (pixels[p + 3] != 0 && selected[y * width + x] == 0) continue;
 
             int coverage = 0;
-            for (int dy = -Radius; dy <= Radius; dy++)
-            for (int dx = -Radius; dx <= Radius; dx++)
+            for (int dy = -radius; dy <= radius; dy++)
+            for (int dx = -radius; dx <= radius; dx++)
             {
                 int nx = x + dx, ny = y + dy;
                 if (joinTileEdges)
@@ -168,14 +185,19 @@ public static class BakedShadowRepair
                     ny = Reflect(ny, height);
                 }
                 if ((uint)nx < (uint)width && (uint)ny < (uint)height)
-                    coverage += (3 - Math.Abs(dx)) * (3 - Math.Abs(dy)) * selected[ny * width + nx];
+                    coverage += (kernel - Math.Abs(dx)) * (kernel - Math.Abs(dy)) * selected[ny * width + nx];
             }
             if (coverage == 0) continue;
             pixels[p] = pixels[p + 1] = pixels[p + 2] = 0;
-            pixels[p + 3] = (byte)Math.Min(128, (coverage + 40) / 81);
+            pixels[p + 3] = (byte)Math.Min(maxAlpha, (coverage * opacity + normalization / 2) / normalization);
         }
     }
 
-    private static int Reflect(int position, int size) => size == 2 ? position & 1 :
-        position < 0 ? -position : position >= size ? 2 * (size - 1) - position : position;
+    private static int Reflect(int position, int size)
+    {
+        if ((uint)position < (uint)size) return position;
+        int period = 2 * (size - 1);
+        int folded = Math.Abs(position) % period;
+        return Math.Min(folded, period - folded);
+    }
 }

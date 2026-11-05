@@ -52,7 +52,7 @@ namespace Client.MirGraphics
 
         internal static void Draw(AtmosphericWeatherFrame frame, WeatherSetting weather)
         {
-            float intensity = AtmosphereIntensity.Scale(Settings.AtmosphereIntensityPercent);
+            float intensity = AtmosphereIntensity.Scale(Settings.AtmosphereIntensityPercent) * GraphicsTuning.FogDensity.Current / 100f;
             if (intensity <= 0f || !Settings.EnvironmentFogLayers || DXManager.DeviceLost ||
                 DXManager.Sprite == null || DXManager.Sprite.Disposed ||
                 DXManager.CurrentSurface == null ||
@@ -63,6 +63,7 @@ namespace Client.MirGraphics
             Matrix original = DXManager.Sprite.Transform;
             try
             {
+                Point offset = GraphicsTuning.Offset(GraphicsLayer.Weather).Pixels;
                 // World-space haze: draw before nameplates and HUD; existing
                 // precipitation particles remain an independent effect.
                 if (frame.FogCover > 0.01f)
@@ -76,7 +77,7 @@ namespace Client.MirGraphics
                                  rain ? Color.FromArgb(176, 196, 220) :
                                         Color.FromArgb(201, 213, 226);
                     int alpha = Math.Min(66, Math.Max(0, (int)(frame.FogCover * 74f * intensity)));
-                    RenderLayer(512, frame.DriftX, frame.DriftY, Color.FromArgb(alpha, mist));
+                    RenderLayer(512, frame.DriftX + offset.X, frame.DriftY + offset.Y, Color.FromArgb(alpha, mist));
                 }
 
                 if (frame.CloudCover > 0.02f)
@@ -84,8 +85,8 @@ namespace Client.MirGraphics
                     // A broad, lower-frequency dark overcast layer introduces
                     // soft moving canopy shadows without scene depth geometry.
                     int alpha = Math.Min(32, Math.Max(0, (int)(frame.CloudCover * 34f * intensity)));
-                    RenderLayer(768, frame.DriftX * 0.42f + 100f,
-                                frame.DriftY * 0.35f + 210f,
+                    RenderLayer(768, frame.DriftX * 0.42f + 100f + offset.X,
+                                frame.DriftY * 0.35f + 210f + offset.Y,
                                 (weather & (WeatherSetting.RedEmber |
                                             WeatherSetting.FireParticle)) != 0
                                     ? Color.FromArgb(alpha, 70, 47, 43)

@@ -333,11 +333,13 @@ namespace Client.MirObjects
 
             DrawLocation = new Point((CurrentLocation.X - User.Movement.X + MapControl.OffSetX) * MapControl.CellWidth, (CurrentLocation.Y - User.Movement.Y + MapControl.OffSetY) * MapControl.CellHeight);
             DrawLocation.Offset(GlobalDisplayLocationOffset);
+            DrawLocation.Offset(GraphicsTuning.Offset(GraphicsLayer.Spell).Pixels);
             DrawLocation.Offset(User.OffSetMove);
         }
 
         public override void Draw()
         {
+            using var artwork = BlendArtwork();
             if (FrameIndex >= FrameCount && !Repeat) return;
             if (BodyLibrary == null) return;
 
@@ -361,6 +363,9 @@ namespace Client.MirObjects
         // The spell's actual animated frame contributes its own alpha silhouette
         // to the light map, rather than being represented solely by a round glow.
         // This is called only while the light render target is active.
+        internal Point LightPosition => GraphicsTuning.LightPosition(LightSource.Spell,
+            AnimationOffset == default ? DrawLocation : GetDrawWithOffset());
+
         public bool DrawLightMask(Color tint, float intensity, ref int pixelBudget)
         {
             if (BodyLibrary == null || (FrameIndex >= FrameCount && !Repeat))
@@ -368,8 +373,7 @@ namespace Client.MirObjects
 
             return BodyLibrary.DrawLightShape(
                 DrawFrame + FrameIndex,
-                AnimationOffset == default ? DrawLocation : GetDrawWithOffset(),
-                tint, true, intensity, ref pixelBudget);
+                LightPosition, tint, true, intensity, ref pixelBudget, GraphicsTuning.Light(LightSource.Spell).Radius.Current);
         }
 
         public override bool MouseOver(Point p)
@@ -392,6 +396,7 @@ namespace Client.MirObjects
                 (CurrentLocation.Y + AnimationOffset.Y - User.Movement.Y + MapControl.OffSetY) * MapControl.CellHeight);
 
             newDrawLocation.Offset(GlobalDisplayLocationOffset);
+            newDrawLocation.Offset(GraphicsTuning.Offset(GraphicsLayer.Spell).Pixels);
             newDrawLocation.Offset(User.OffSetMove);
 
             return newDrawLocation;

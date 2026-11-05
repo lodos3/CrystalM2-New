@@ -238,6 +238,7 @@ namespace Client
             TopMost = Reader.ReadBoolean("Graphics", "AlwaysOnTop", TopMost);
             FPSCap = Reader.ReadBoolean("Graphics", "FPSCap", FPSCap);
             PostProcessing = Reader.ReadBoolean("Graphics", "PostProcessing", PostProcessing);
+            GraphicsTuning.Load(ReadGraphicsRange);
             DynamicShadows = Reader.ReadBoolean("Graphics", "DynamicShadows", DynamicShadows);
             SetProjectedShadowLibraries(Reader.ReadString("Graphics", "ProjectedShadowLibraries", ProjectedShadowLibraries));
             ShadowsFollowLights = Reader.ReadBoolean("Graphics", "ShadowsFollowLights", ShadowsFollowLights);
@@ -426,6 +427,7 @@ namespace Client
             Write(nameof(SpellLightIntensityPercent), SpellLightIntensityPercent);
             Write(nameof(MapLightIntensityPercent), MapLightIntensityPercent);
             Write(nameof(SpellBlendIntensityPercent), SpellBlendIntensityPercent);
+            GraphicsTuning.Save(Write);
             Reader.Save();
 
             void Write(string key, object value) => Reader.Write("Graphics", key, value.ToString(), save: false);

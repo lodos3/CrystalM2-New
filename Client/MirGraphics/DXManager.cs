@@ -44,7 +44,8 @@ namespace Client.MirGraphics
             new Vector4(1f, 1f, 1f, 0f),
             new Vector4(0f, 0.78f, 0.84f, 0.94f),
             new Vector4(0f, 0.78f, 1.38f, 0.095f),
-            new Vector4(0f, 0.80f, 0.90f, 1.0f)
+            new Vector4(0f, 0.80f, 0.90f, 1.0f),
+            Vector4.One
         };
 
         public static bool GrayScale;
@@ -69,6 +70,7 @@ namespace Client.MirGraphics
         public static void Create()
         {
             Device = new RendererDevice(Program.Form.Handle, Settings.ScreenWidth, Settings.ScreenHeight);
+            Device.TextureFilter = (TextureFilterMode)GraphicsTuning.TextureFilter.Current;
             Sprite = Device.Sprite;
             Opacity = BlendingRate = 1f;
             Blending = GrayScale = false;
@@ -207,12 +209,14 @@ namespace Client.MirGraphics
             float intensity = AtmosphereIntensity.Scale(Settings.AtmosphereIntensityPercent);
             float vignette = Settings.VignetteIntensityPercent / 100f;
             PostProcessConstants[0] = new Vector4(
-                AtmosphereExposure.Brightness(weatherFrame.CloudCover, intensity),
-                0.22f * vignette, 1f, 1f - 0.20f * vignette);
+                AtmosphereExposure.Brightness(weatherFrame.CloudCover, intensity) * GraphicsTuning.Exposure.Current / 100f,
+                0.22f * vignette, 100f / GraphicsTuning.Gamma.Current, 1f - 0.20f * vignette);
+            PostProcessConstants[1].Z = GraphicsTuning.Contrast.Current / 100f - 1;
+            PostProcessConstants[1].W = GraphicsTuning.Saturation.Current / 100f - 1;
             PostProcessConstants[2] = new Vector4(atmosphere.R / 255f, atmosphere.G / 255f,
                                                    atmosphere.B / 255f,
                                                    Math.Clamp(gradeStrength * intensity, 0f, 0.4f));
-            PostProcessConstants[3] = new Vector4(Math.Clamp(fogStrength * intensity, 0f, 0.2f),
+            PostProcessConstants[3] = new Vector4(Math.Clamp(fogStrength * intensity * GraphicsTuning.FogDensity.Current / 100f, 0f, 0.4f),
                                                    hazeTint.R / 255f, hazeTint.G / 255f,
                                                    hazeTint.B / 255f);
             PostProcessConstants[4] = new Vector4(
@@ -221,6 +225,15 @@ namespace Client.MirGraphics
             PostProcessConstants[5] = new Vector4(
                 Settings.AtmosphereLightning ? Math.Clamp(weatherFrame.LightningFlash * intensity, 0f, 0.12f) : 0f,
                 0.80f, 0.90f, 1f);
+            Vector3 grade = GraphicsTuning.Grade.Current switch
+            {
+                1 => new(1.09f, 1.01f, 0.87f),
+                2 => new(0.88f, 1.02f, 1.12f),
+                3 => new(1.06f, 0.99f, 0.79f),
+                4 => new(0.94f, 1.09f, 1.02f),
+                _ => Vector3.One
+            };
+            PostProcessConstants[6] = new Vector4(grade, GraphicsTuning.Tone.Current + 4 * GraphicsTuning.PostShader.Current);
             Sprite.Flush();
             Device.PixelShader = PostProcessingPixelShader;
             Device.SetPixelShaderConstant(0, PostProcessConstants);
@@ -247,16 +260,17 @@ namespace Client.MirGraphics
             ShaderEffect originalShader = Device.PixelShader;
             float scale = halfResolution ? 2f : 1f;
             float blurRadius = Settings.ShadowSoftness / scale;
-            Span<Vector4> originalConstants = stackalloc Vector4[6];
+            Span<Vector4> originalConstants = stackalloc Vector4[RendererDevice.EffectConstantCount];
             if (blurRadius > 0) Device.CopyPixelShaderConstants(originalConstants);
             Sprite.Flush();
             try
             {
                 Matrix projection = Matrix.Identity;
-                projection.M11 = scale;
+                float width = GraphicsTuning.ProjectedWidth.Current / 100f;
+                projection.M11 = scale * width;
                 projection.M21 = -horizontal * scale;
                 projection.M22 = -vertical * scale;
-                projection.M41 = topLeft.X + horizontal * sourceHeight;
+                projection.M41 = topLeft.X + horizontal * sourceHeight + sourceRect.Width * scale * (1 - width) * 0.5f;
                 projection.M42 = topLeft.Y + (1f + vertical) * sourceHeight;
                 Sprite.Transform = projection;
 
@@ -295,7 +309,7 @@ namespace Client.MirGraphics
         internal static void DrawShapedLight(Texture texture, Point location, int radius, Color tint, float intensity)
         {
             ShaderEffect previous = Device.PixelShader;
-            Span<Vector4> constants = stackalloc Vector4[6];
+            Span<Vector4> constants = stackalloc Vector4[RendererDevice.EffectConstantCount];
             Device.CopyPixelShaderConstants(constants);
             Device.PixelShader = ShaderEffect.ShapedLight;
             try
@@ -317,6 +331,37 @@ namespace Client.MirGraphics
         {
             Sprite.Draw(texture, sourceRect, position, RendererDevice.ToVector(color));
             CMain.DPSCounter++;
+        }
+
+        internal static ArtworkBlendScope BlendArtwork(GraphicsLayer layer) => new(GraphicsTuning.Blend(layer).Current);
+        internal static ArtworkBlendScope BlendArtwork(GraphicsLayer layer, GraphicsLayer fallback)
+        {
+            int mode = GraphicsTuning.Blend(layer).Current;
+            return new ArtworkBlendScope(mode == 0 ? GraphicsTuning.Blend(fallback).Current : mode);
+        }
+
+        internal static ArtworkBlendScope BlendArtwork(GraphicsLayer layer, GraphicsTuning.Value state) =>
+            new(state is { Current: > 0 } ? state.Current : GraphicsTuning.Blend(layer).Current);
+
+        internal readonly struct ArtworkBlendScope : IDisposable
+        {
+            private readonly SpriteBlendMode? _previous;
+
+            public ArtworkBlendScope(int mode)
+            {
+                _previous = Device.ArtworkBlend;
+                Device.ArtworkBlend = mode switch
+                {
+                    1 => SpriteBlendMode.Alpha,
+                    2 => SpriteBlendMode.Additive,
+                    3 => SpriteBlendMode.Screen,
+                    4 => SpriteBlendMode.ArtworkMultiply,
+                    5 => SpriteBlendMode.Subtractive,
+                    _ => null
+                };
+            }
+
+            public void Dispose() => Device.ArtworkBlend = _previous;
         }
 
         public static void AttemptReset()

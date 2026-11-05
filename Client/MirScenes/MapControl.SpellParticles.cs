@@ -273,7 +273,10 @@ public sealed partial class MapControl
     {
         if (!Settings.Effect || _spellParticles.Active.IsEmpty) return;
 
-        Point camera = ToMouseLocation(Point.Empty);
+        Point camera = SpellParticleOrigin();
+        using var artwork = ground && GraphicsTuning.GroundParticleBlend.Current != 0
+            ? DXManager.BlendArtwork(GraphicsLayer.Particles, GraphicsTuning.GroundParticleBlend)
+            : DXManager.BlendArtwork(GraphicsLayer.Particles, GraphicsLayer.Spell);
         DXManager.Device.SpellParticles.Draw(_spellParticles.Active, new Vector2(camera.X, camera.Y), CMain.Time, ground,
             ground ? 1f : Settings.SpellBlendIntensityPercent / 100f);
     }
@@ -281,9 +284,16 @@ public sealed partial class MapControl
     private void DrawSpellParticleLights(float intensity)
     {
         if (_spellParticles.Active.IsEmpty) return;
-        Point position = ToMouseLocation(Point.Empty);
+        Point position = GraphicsTuning.LightPosition(LightSource.Spell, SpellParticleOrigin());
         Vector2 camera = new(position.X, position.Y);
-        DXManager.Device.SpellParticles.Draw(_spellParticles.Active, camera, CMain.Time, ground: true, intensity, emission: true);
-        DXManager.Device.SpellParticles.Draw(_spellParticles.Active, camera, CMain.Time, ground: false, intensity, emission: true);
+        var light = GraphicsTuning.Light(LightSource.Spell);
+        float radius = light.Radius.Current / 100f, warmth = light.Warmth.Current * 0.003f;
+        DXManager.Device.SpellParticles.Draw(_spellParticles.Active, camera, CMain.Time, ground: true,
+            intensity, emission: true, radius, warmth);
+        DXManager.Device.SpellParticles.Draw(_spellParticles.Active, camera, CMain.Time, ground: false,
+            intensity, emission: true, radius, warmth);
     }
+
+    private Point SpellParticleOrigin() => GraphicsTuning.Offset(GraphicsLayer.Particles).Apply(
+        GraphicsTuning.Offset(GraphicsLayer.Spell).Apply(ToMouseLocation(Point.Empty)));
 }

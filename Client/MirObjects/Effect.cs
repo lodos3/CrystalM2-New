@@ -127,6 +127,8 @@ namespace Client.MirObjects
             }
 
 
+            DrawLocation.Offset(GraphicsTuning.Offset(GraphicsLayer.Spell).Pixels);
+            using var artwork = DXManager.BlendArtwork(GraphicsLayer.Spell);
             if (Blend)
                 Library.DrawEffectBlend(DrawnFrame, DrawLocation, Color.White, Rate);
             else
@@ -134,7 +136,8 @@ namespace Client.MirObjects
         }
 
         internal bool DrawLightMask(Color tint, float intensity, ref int pixelBudget) => Library != null && CurrentFrame >= 0 &&
-            CurrentFrame < Count && Library.DrawLightShape(DrawnFrame, DrawLocation, tint, true, intensity, ref pixelBudget);
+            CurrentFrame < Count && Library.DrawLightShape(DrawnFrame, GraphicsTuning.LightPosition(LightSource.Spell, DrawLocation),
+                tint, true, intensity, ref pixelBudget, GraphicsTuning.Light(LightSource.Spell).Radius.Current);
 
         public void Clear()
         {
@@ -237,7 +240,9 @@ namespace Client.MirObjects
 
 
             DrawLocation.Offset(x * CurrentFrame / Count, y * CurrentFrame / Count);
+            DrawLocation.Offset(GraphicsTuning.Offset(GraphicsLayer.Spell).Pixels);
 
+            using var artwork = DXManager.BlendArtwork(GraphicsLayer.Spell);
             if (!Blend)
                 Library.Draw(index, DrawLocation, Color.White, true);
             else

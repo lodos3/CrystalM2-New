@@ -143,6 +143,7 @@ internal static class Program
         }
         device.Blend = SpriteBlendMode.Alpha;
         device.PixelShader = ShaderEffect.Artwork;
+        TestArtworkStyles(device, backBuffer, translucent);
 
         long bytes = device.TextureBytes;
         int textures = device.TextureCount;
@@ -197,6 +198,77 @@ internal static class Program
             Near(Color.Red, image.GetPixel(0, 0), "Existing textures must survive swapchain resize.");
         }
         Console.WriteLine("D3D11 shader, alpha, layer order, batching, flip, upload disposal and resize checks passed (WARP).");
+    }
+
+    private static void TestArtworkStyles(RendererDevice device, Surface target, Texture translucent)
+    {
+        var background = Color.FromArgb(100, 100, 100);
+        (SpriteBlendMode Mode, Color Expected)[] modes =
+        [
+            (SpriteBlendMode.Alpha, Color.FromArgb(140, 90, 60)),
+            (SpriteBlendMode.Additive, Color.FromArgb(190, 140, 110)),
+            (SpriteBlendMode.Screen, Color.FromArgb(155, 124, 106)),
+            (SpriteBlendMode.ArtworkMultiply, Color.FromArgb(85, 66, 54)),
+            (SpriteBlendMode.Subtractive, Color.FromArgb(10, 60, 90))
+        ];
+        foreach (var (mode, expected) in modes)
+        {
+            device.Clear(background);
+            device.ArtworkBlend = mode;
+            device.Sprite.Draw(translucent, null, Vector3.Zero, Vector4.One);
+            device.ArtworkBlend = null;
+            device.Sprite.Draw(translucent, null, new Vector3(4, 0, 0), Vector4.One);
+            using var image = device.Capture(target);
+            Near(expected, image.GetPixel(0, 0), $"Incorrect artwork blend for {mode}.");
+            Near(modes[0].Expected, image.GetPixel(4, 0), "Resetting the artwork override must restore the authored blend.");
+        }
+
+        using var atlas = new Texture(device, 4, 3);
+        var upload = atlas.BeginUpload();
+        byte[] opaqueWhite = [255, 255, 255, 255];
+        byte[] clear = [0, 0, 0, 0];
+        byte[] opaqueRed = [0, 0, 255, 255];
+        for (int y = 0; y < 3; y++)
+        for (int x = 0; x < 4; x++)
+            upload.Data.Write(x == 3 ? opaqueRed : x + y < 2 ? opaqueWhite : clear);
+        atlas.EndUpload();
+        Rectangle source = new(0, 0, 3, 3);
+        var destination = new Rectangle(0, 0, 6, 6);
+
+        device.TextureFilter = TextureFilterMode.Smooth;
+        device.Clear(Color.Black);
+        device.Sprite.Draw(atlas, source, destination, Vector4.One);
+        using (var image = device.Capture(target))
+        {
+            Color edge = image.GetPixel(2, 2);
+            Check(edge.R > 20 && edge.R < 255 && edge.R == edge.G, "Smooth interpolation must handle transparent edges.");
+            Near(Color.Black, image.GetPixel(5, 1), "Smooth filtering must clamp to the selected atlas rectangle.");
+        }
+
+        device.TextureFilter = TextureFilterMode.EdgeAware;
+        device.Clear(Color.Black);
+        device.Sprite.Draw(atlas, source, destination, Vector4.One);
+        using (var image = device.Capture(target))
+        {
+            Near(Color.White, image.GetPixel(2, 2), "Edge-aware magnification must reconstruct the diagonal corner.");
+            Near(Color.Black, image.GetPixel(5, 1), "Edge-aware filtering must clamp to the selected atlas rectangle.");
+        }
+
+        device.TextureFilter = TextureFilterMode.Hd;
+        device.Clear(Color.Black);
+        device.Sprite.Draw(atlas, source, new Rectangle(0, 0, 3, 3), Vector4.One);
+        using (var image = device.Capture(target))
+            Near(Color.FromArgb(64, 64, 64), image.GetPixel(1, 1), "HD must resolve diagonal coverage at native size.");
+
+        device.TextureFilter = TextureFilterMode.Pixel;
+        device.PixelShader = ShaderEffect.Atmosphere;
+        device.SetPixelShaderConstant(0, [new(1, 0, 1, 1), new(0.5f, 0.5f, 0, -1), Vector4.Zero,
+            Vector4.Zero, Vector4.Zero, Vector4.Zero, new(1, 1, 1, 0)]);
+        device.Clear(Color.Black);
+        device.Sprite.Draw(translucent, null, Vector3.Zero, Vector4.One);
+        using (var image = device.Capture(target))
+            Near(Color.FromArgb(52, 52, 52), image.GetPixel(0, 0), "Zero saturation must produce a monochrome image.");
+        device.PixelShader = ShaderEffect.Artwork;
     }
 
     private static Texture Upload(RendererDevice device, Color colour)

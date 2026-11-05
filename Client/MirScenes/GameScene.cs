@@ -10495,6 +10495,10 @@ namespace Client.MirScenes
                 if (ob.Race != ObjectType.Spell && ob.Race != ObjectType.Merchant &&
                     ob.Light < 15)
                     continue;
+                if (ob.Race == ObjectType.Spell
+                    ? !Settings.Effect || Settings.SpellLightIntensityPercent == 0 || GraphicsTuning.Light(LightSource.Spell).Intensity == 0
+                    : GraphicsTuning.Light(ActorLightSource(ob)).Intensity == 0)
+                    continue;
                 _movingLights.Add(ob.CurrentLocation);
             }
         }
@@ -10528,6 +10532,8 @@ namespace Client.MirScenes
 
             foreach (CachedMapLight light in _staticLightCache.Items)
             {
+                if (Settings.MapLightIntensityPercent == 0 || GraphicsTuning.Light(LightSource.Map).Intensity == 0)
+                    break;
                 long dx = (long)light.X - worldCell.X, dy = (long)light.Y - worldCell.Y;
                 long distance = dx * dx + dy * dy;
                 if (distance > bestDistance ||
@@ -10784,7 +10790,10 @@ namespace Client.MirScenes
         {
             if (User == null) return;
 
-            if (!FloorValid || DXManager.FloorTexture == null || DXManager.FloorTexture.Disposed)
+            bool drawFloorDirectly = GraphicsTuning.Blend(GraphicsLayer.Ground).Current != 0 ||
+                GraphicsTuning.Blend(GraphicsLayer.Middle).Current != 0 ||
+                GraphicsTuning.Blend(GraphicsLayer.Front).Current != 0;
+            if (!drawFloorDirectly && (!FloorValid || DXManager.FloorTexture == null || DXManager.FloorTexture.Disposed))
                 DrawFloor();
 
 
@@ -10805,7 +10814,9 @@ namespace Client.MirScenes
 
             DrawBackground();
 
-            if (FloorValid)
+            if (drawFloorDirectly)
+                DrawFloorTiles();
+            else if (FloorValid)
             {
                 DXManager.Draw(DXManager.FloorTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White);
             }
@@ -10830,7 +10841,7 @@ namespace Client.MirScenes
             // the original map/actor layering and avoiding any new render target.
             if (Settings.AtmosphereWetSurfaces)
                 WetSurfacePass.Draw(_mapMaterials, _weatherFrame, User.Movement,
-                                    User.OffSetMove, OffSetX, OffSetY,
+                                    GraphicsTuning.Offset(GraphicsLayer.Ground).Apply(User.OffSetMove), OffSetX, OffSetY,
                                     ViewRangeX, ViewRangeY, Width, Height);
             _animatedMapLights.Clear();
             DrawSpellParticles(ground: true);
@@ -10838,21 +10849,19 @@ namespace Client.MirScenes
             DrawSpellParticles(ground: false);
 
             //render weather
-            foreach (ParticleEngine engine in GameScene.Scene.ParticleEngines)
+            using (DXManager.BlendArtwork(GraphicsLayer.Weather))
             {
-                engine.Draw();
+                foreach (ParticleEngine engine in GameScene.Scene.ParticleEngines)
+                    engine.Draw();
+                if (Settings.EnvironmentAtmosphere && Settings.EnvironmentFogLayers)
+                    AtmosphereFogOverlay.Draw(_weatherFrame, Weather);
             }
-
-            // Wind-driven mist/overcast belongs to the world render target.
-            // The ambient darkness pass shades it; floating HUD stays sharp.
-            if (Settings.EnvironmentAtmosphere && Settings.EnvironmentFogLayers)
-                AtmosphereFogOverlay.Draw(_weatherFrame, Weather);
 
             //Render Death, 
 
             LightSetting setting = Lights == LightSetting.Normal ? GameScene.Scene.Lights : Lights;
-            Color targetAmbient = AmbientLightTransition.Target(setting, MapDarkLight);
-            Color ambient = ApplyAmbientDarkness(_ambientLighting.Sample(targetAmbient, CMain.Time));
+            Color targetAmbient = ApplyAmbientDarkness(AmbientLightTransition.Target(setting, MapDarkLight), setting);
+            Color ambient = _ambientLighting.Sample(targetAmbient, CMain.Time);
             if (Settings.EnvironmentAtmosphere)
             {
                 Color desiredTint = AtmosphereColourGrade.Target(setting, Weather, MapDarkLight);
@@ -10872,7 +10881,7 @@ namespace Client.MirScenes
 
             if (ambient.ToArgb() != Color.White.ToArgb() ||
                 (Settings.LightingBloom && Settings.BloomIntensityPercent > 0) ||
-                _animatedMapLights.Count != 0 || HasSpellLights() ||
+                _animatedMapLights.Count != 0 || HasSpellLights() || HasDaylightEmitters() ||
                 GameScene.User.Poison.HasFlag(PoisonType.Blindness))
             {
                 DrawLights(ambient);
@@ -10933,9 +10942,9 @@ namespace Client.MirScenes
 
             float oldOpacity = DXManager.Opacity;
 
-            bool dead = MapObject.User.Dead;
-            if (dead) DXManager.SetGrayscale(true);
-            bool postProcessing = !dead && Settings.PostProcessing &&
+            bool grayscale = MapObject.User.Dead && GraphicsTuning.DeathLook.Current == 0;
+            if (grayscale) DXManager.SetGrayscale(true);
+            bool postProcessing = (!MapObject.User.Dead || GraphicsTuning.DeathLook.Current == 1) && Settings.PostProcessing &&
                 DXManager.BeginPostProcessing(_atmosphereTint,
                     AtmosphereColourGrade.GradeStrength(_atmosphereTint), _atmosphereFog,
                     _weatherFrame, _atmosphereHazeTint);
@@ -10943,7 +10952,7 @@ namespace Client.MirScenes
             DXManager.DrawOpaque(ControlTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White, Opacity);
 
             if (postProcessing) DXManager.EndPostProcessing();
-            if (dead) DXManager.SetGrayscale(false);
+            if (grayscale) DXManager.SetGrayscale(false);
 
             CleanTime = CMain.Time + Settings.CleanDelay;
         }
@@ -10958,9 +10967,23 @@ namespace Client.MirScenes
 
             Surface oldSurface = DXManager.CurrentSurface;
             DXManager.SetSurface(DXManager.FloorSurface);
-            DXManager.Device.Clear(Color.Empty);
+            try
+            {
+                DXManager.Device.Clear(Color.Empty);
+                DrawFloorTiles();
+                FloorValid = true;
+            }
+            finally
+            {
+                DXManager.SetSurface(oldSurface);
+            }
+        }
 
-
+        private void DrawFloorTiles()
+        {
+            Point ground = GraphicsTuning.Offset(GraphicsLayer.Ground).Pixels;
+            Point middle = GraphicsTuning.Offset(GraphicsLayer.Middle).Pixels;
+            Point front = GraphicsTuning.Offset(GraphicsLayer.Front).Pixels;
             int startX = User.Movement.X - ViewRangeX;
             int endX = User.Movement.X + ViewRangeX;
             int startY = User.Movement.Y - ViewRangeY;
@@ -10999,7 +11022,8 @@ namespace Client.MirScenes
                         {
                             int index = (cell.BackImage & 0x1FFFFFFF) - 1;
                             var lib = Libraries.MapLibs[cell.BackIndex];
-                            lib.Draw(index, drawX, drawY);
+                            using var artwork = DXManager.BlendArtwork(GraphicsLayer.Ground);
+                            lib.Draw(index, drawX + ground.X, drawY + ground.Y);
                         }
                     }
 
@@ -11012,7 +11036,8 @@ namespace Client.MirScenes
                         if ((s.Width == CellWidth && s.Height == CellHeight) ||
                             (s.Width == CellWidth * 2 && s.Height == CellHeight * 2))
                         {
-                            lib.Draw(midIndex, drawX, drawY);
+                            using var artwork = DXManager.BlendArtwork(GraphicsLayer.Middle);
+                            lib.Draw(midIndex, drawX + middle.X, drawY + middle.Y);
                         }
                     }
 
@@ -11045,40 +11070,44 @@ namespace Client.MirScenes
                                 ((s.Width == CellWidth && s.Height == CellHeight) ||
                                  (s.Width == CellWidth * 2 && s.Height == CellHeight * 2)))
                             {
-                                lib.Draw(frontIndex, drawX, drawY);
+                                using var artwork = DXManager.BlendArtwork(GraphicsLayer.Front);
+                                lib.Draw(frontIndex, drawX + front.X, drawY + front.Y);
                             }
                         }
                     }
                 }
             }
 
-            DXManager.SetSurface(oldSurface);
-            FloorValid = true;
         }
         private void DrawBackground()
         {
             string cleanFilename = FileName.Replace(Settings.MapPath, "");
+            Point offset = GraphicsTuning.Offset(GraphicsLayer.Background).Pixels;
+            using var artwork = DXManager.BlendArtwork(GraphicsLayer.Background);
 
             if (cleanFilename.StartsWith("ID1") || cleanFilename.StartsWith("ID2"))
             {
-                Libraries.Background.Draw(10, 0, 0); //mountains
+                Libraries.Background.Draw(10, offset.X, offset.Y); //mountains
             }
             else if (cleanFilename.StartsWith("ID3_013"))
             {
-                Libraries.Background.Draw(22, 0, 0); //desert
+                Libraries.Background.Draw(22, offset.X, offset.Y); //desert
             }
             else if (cleanFilename.StartsWith("ID3_015"))
             {
-                Libraries.Background.Draw(23, 0, 0); //greatwall
+                Libraries.Background.Draw(23, offset.X, offset.Y); //greatwall
             }
             else if (cleanFilename.StartsWith("ID3_023") || cleanFilename.StartsWith("ID3_025"))
             {
-                Libraries.Background.Draw(21, 0, 0); //village entrance
+                Libraries.Background.Draw(21, offset.X, offset.Y); //village entrance
             }
         }
 
         private void DrawObjects()
         {
+            Point animationOffset = GraphicsTuning.Offset(GraphicsLayer.MapAnimation).Pixels;
+            Point middleOffset = GraphicsTuning.Offset(GraphicsLayer.Middle).Pixels;
+            Point frontOffset = GraphicsTuning.Offset(GraphicsLayer.Front).Pixels;
             if (Settings.Effect)
             {
                 for (int i = Effects.Count - 1; i >= 0; i--)
@@ -11123,9 +11152,11 @@ namespace Client.MirScenes
                         index--;
                         int animationoffset = M2CellInfo[x, y].TileAnimationOffset ^ 0x2000;
                         index += animationoffset * (AnimationCount % animation);
-                        Libraries.MapLibs[190].DrawUp(index, drawX, drawY);
+                        using var artwork = DXManager.BlendArtwork(GraphicsLayer.MapAnimation);
+                        Point position = new(drawX + animationOffset.X, drawY + animationOffset.Y);
+                        Libraries.MapLibs[190].DrawUp(index, position.X, position.Y);
                         CaptureAnimatedMapLight(Libraries.MapLibs[190], index,
-                            new Point(drawX, drawY - Libraries.MapLibs[190].GetSize(index).Height), false, x, y, false);
+                            new Point(position.X, position.Y - Libraries.MapLibs[190].GetSize(index).Height), false, x, y, false);
                     }
 
                     #endregion
@@ -11136,6 +11167,7 @@ namespace Client.MirScenes
                         index = M2CellInfo[x, y].MiddleImage - 1;
                         if (index > 0)
                         {
+                            Point position = new(drawX + middleOffset.X, drawY + middleOffset.Y);
                             animation = M2CellInfo[x, y].MiddleAnimationFrame;
                             blend = false;
                             if ((animation > 0) && (animation < 255))
@@ -11152,22 +11184,25 @@ namespace Client.MirScenes
 
                                     MLibrary library = Libraries.MapLibs[M2CellInfo[x, y].MiddleIndex];
                                     bool additive = blend && (animation == 10 || animation == 8); // diamond mines, abyss
+                                    using var artwork = DXManager.BlendArtwork(GraphicsLayer.MapAnimation, GraphicsLayer.Middle);
+                                    position.Offset(animationOffset);
                                     if (additive)
                                     {
-                                        library.DrawUpBlend(index, new Point(drawX, drawY));
+                                        library.DrawUpBlend(index, position);
                                     }
                                     else
                                     {
-                                        library.DrawUp(index, drawX, drawY);
+                                        library.DrawUp(index, position.X, position.Y);
                                     }
                                     CaptureAnimatedMapLight(library, index,
-                                        new Point(drawX, drawY - library.GetSize(index).Height), false, x, y, additive);
+                                        new Point(position.X, position.Y - library.GetSize(index).Height), false, x, y, additive);
                                 }
                             }
                             s = Libraries.MapLibs[M2CellInfo[x, y].MiddleIndex].GetSize(index);
                             if ((s.Width != CellWidth || s.Height != CellHeight) && (s.Width != (CellWidth * 2) || s.Height != (CellHeight * 2)) && !blend)
                             {
-                                Libraries.MapLibs[M2CellInfo[x, y].MiddleIndex].DrawUp(index, drawX, drawY);
+                                using var artwork = DXManager.BlendArtwork(animation > 0 ? GraphicsLayer.MapAnimation : GraphicsLayer.Middle, GraphicsLayer.Middle);
+                                Libraries.MapLibs[M2CellInfo[x, y].MiddleIndex].DrawUp(index, position.X, position.Y);
                             }
                         }
                     }
@@ -11224,6 +11259,9 @@ namespace Client.MirScenes
                     bool offsetFront = !blend && fileIndex == 28 && front.GetOffSet(index) != Point.Empty;
                     bool useOffset = highBlend || offsetFront || (blend && index is >= 2723 and <= 2732);
                     Point frontPosition = new(drawX, drawY - (highBlend ? 3 * CellHeight : offsetFront ? CellHeight : s.Height));
+                    frontPosition.Offset(frontOffset);
+                    if (animation > 0) frontPosition.Offset(animationOffset);
+                    using var frontArtwork = DXManager.BlendArtwork(animation > 0 ? GraphicsLayer.MapAnimation : GraphicsLayer.Front, GraphicsLayer.Front);
                     if (blend) front.DrawBlend(index, frontPosition, Color.White, useOffset);
                     else front.Draw(index, frontPosition, Color.White, useOffset);
                     if (animation > 0) CaptureAnimatedMapLight(front, index, frontPosition, useOffset, x, y, blend);
@@ -11242,23 +11280,19 @@ namespace Client.MirScenes
             float oldOpacity = DXManager.Opacity;
             DXManager.SetOpacity(0.4F);
 
-            //MapObject.User.DrawMount();
-
-            MapObject.User.DrawBody();
-
-            if ((MapObject.User.Direction == MirDirection.Up) ||
-                (MapObject.User.Direction == MirDirection.UpLeft) ||
-                (MapObject.User.Direction == MirDirection.UpRight) ||
-                (MapObject.User.Direction == MirDirection.Right) ||
-                (MapObject.User.Direction == MirDirection.Left))
+            using (DXManager.BlendArtwork(GraphicsLayer.Player, User.Dead ? GraphicsTuning.CorpseBlend : null))
             {
-                MapObject.User.DrawHead();
-                MapObject.User.DrawWings();
-            }
-            else
-            {
-                MapObject.User.DrawWings();
-                MapObject.User.DrawHead();
+                MapObject.User.DrawBody();
+                if (MapObject.User.Direction is MirDirection.Up or MirDirection.UpLeft or MirDirection.UpRight or MirDirection.Right or MirDirection.Left)
+                {
+                    MapObject.User.DrawHead();
+                    MapObject.User.DrawWings();
+                }
+                else
+                {
+                    MapObject.User.DrawWings();
+                    MapObject.User.DrawHead();
+                }
             }
 
             DXManager.SetOpacity(oldOpacity);

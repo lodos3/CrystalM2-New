@@ -846,6 +846,7 @@ namespace Client.MirObjects
 
             DrawLocation = new Point((Movement.X - User.Movement.X + MapControl.OffSetX) * MapControl.CellWidth, (Movement.Y - User.Movement.Y + MapControl.OffSetY) * MapControl.CellHeight);
             DrawLocation.Offset(GlobalDisplayLocationOffset);
+            DrawLocation.Offset(GraphicsTuning.Offset(GraphicsLayer.Player).Pixels);
 
             if (this != User)
             {
@@ -4881,6 +4882,7 @@ namespace Client.MirObjects
         public override void Draw()
         {
             DrawBehindEffects(Settings.Effect);
+            using var artwork = BlendArtwork();
 
             float oldOpacity = DXManager.Opacity;
             if (Hidden && !DXManager.Blending) DXManager.SetOpacity(0.5F);
@@ -5034,12 +5036,6 @@ namespace Client.MirObjects
             }
         }
 
-        public override void DrawBlend()
-        {
-            DXManager.SetBlend(true, 0.3F);
-            Draw();
-            DXManager.SetBlend(false);
-        }
         public void DrawBody()
         {
             bool oldGrayScale = DXManager.GrayScale;

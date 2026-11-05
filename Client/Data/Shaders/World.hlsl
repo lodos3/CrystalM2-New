@@ -1,10 +1,16 @@
 // Baked BGRA art is sampled without sRGB conversion or inferred relighting.
-cbuffer Frame : register(b0) { float2 Viewport; float SourcePremultiplied; float FramePad; };
-cbuffer Effect : register(b1) { float4 C[6]; };
+cbuffer Frame : register(b0) { float2 Viewport; float SourcePremultiplied; float RenderStyle; };
+cbuffer Effect : register(b1) { float4 C[7]; };
 Texture2D SpriteTexture : register(t0);
 SamplerState SpriteSampler : register(s0);
-struct Input { float2 Position : POSITION; float2 Uv : TEXCOORD0; float4 Tint : COLOR0; };
-struct Output { float4 Position : SV_POSITION; float2 Uv : TEXCOORD0; float4 Tint : COLOR0; };
+struct Input { float2 Position : POSITION; float2 Uv : TEXCOORD0; float4 Tint : COLOR0; float4 Bounds : TEXCOORD1; };
+struct Output
+{
+    float4 Position : SV_POSITION;
+    float2 Uv : TEXCOORD0;
+    float4 Tint : COLOR0;
+    nointerpolation float4 Bounds : TEXCOORD1;
+};
 Output VSMain(Input input)
 {
     Output output;
@@ -12,6 +18,7 @@ Output VSMain(Input input)
                              1 - input.Position.y * 2 / Viewport.y, 0, 1);
     output.Uv = input.Uv;
     output.Tint = input.Tint;
+    output.Bounds = input.Bounds;
     return output;
 }
 float4 SampleStraight(float2 uv)
@@ -21,25 +28,104 @@ float4 SampleStraight(float2 uv)
         pixel.rgb = pixel.a > 0.00001 ? pixel.rgb / pixel.a : 0;
     return pixel;
 }
-float4 PSArtwork(Output input) : SV_TARGET { return SampleStraight(input.Uv) * input.Tint; }
+float4 LoadPremultiplied(int2 texel, int2 first, int2 last)
+{
+    float4 pixel = SpriteTexture.Load(int3(clamp(texel, first, last), 0));
+    if (SourcePremultiplied < 0.5) pixel.rgb *= pixel.a;
+    return pixel;
+}
+
+bool Similar(float4 a, float4 b)
+{
+    float4 delta = abs(a - b);
+    return max(max(delta.r, delta.g), max(delta.b, delta.a)) < 0.08;
+}
+
+float4 SampleArtwork(Output input)
+{
+    int filter = (int)RenderStyle / 8;
+    if (filter == 0) return SampleStraight(input.Uv);
+
+    uint width, height;
+    SpriteTexture.GetDimensions(width, height);
+    float2 size = float2(width, height);
+    float2 position = input.Uv * size;
+    float2 footprint = fwidth(position);
+    // Clamp every tap to the source rectangle to keep atlas entries isolated.
+    int2 extent = int2(width, height) - 1;
+    int2 first = clamp(int2(round(input.Bounds.xy * size)), 0, extent);
+    int2 last = clamp(int2(round(input.Bounds.zw * size)) - 1, first, extent);
+    float4 pixel;
+    if (filter >= 2 && max(footprint.x, footprint.y) < 1.01 &&
+        (filter == 3 || min(footprint.x, footprint.y) < 0.99))
+    {
+        int2 texel = int2(floor(position));
+        float2 quadrant = frac(position);
+        float4 left = LoadPremultiplied(texel + int2(-1, 0), first, last);
+        float4 right = LoadPremultiplied(texel + int2(1, 0), first, last);
+        float4 top = LoadPremultiplied(texel + int2(0, -1), first, last);
+        float4 bottom = LoadPremultiplied(texel + int2(0, 1), first, last);
+        pixel = LoadPremultiplied(texel, first, last);
+        if (!Similar(left, right) && !Similar(top, bottom))
+        {
+            float4 h = quadrant.x < 0.5 ? left : right;
+            float4 v = quadrant.y < 0.5 ? top : bottom;
+            if (filter == 3 && min(footprint.x, footprint.y) > 0.99)
+            {
+                if (SourcePremultiplied > 0.5) return SampleStraight(input.Uv);
+                // Resolve the four virtual 2x samples at native size.
+                float4 a = Similar(left, top) ? (left + top) * 0.5 : pixel;
+                float4 b = Similar(right, top) ? (right + top) * 0.5 : pixel;
+                float4 c = Similar(left, bottom) ? (left + bottom) * 0.5 : pixel;
+                float4 d = Similar(right, bottom) ? (right + bottom) * 0.5 : pixel;
+                pixel = (a + b + c + d) * 0.25;
+            }
+            else if (Similar(h, v)) pixel = (h + v) * 0.5;
+        }
+    }
+    else
+    {
+        float2 fromCentre = position - 0.5;
+        int2 texel = int2(floor(fromCentre));
+        float2 fraction = frac(fromCentre);
+        if (max(fraction.x, fraction.y) < 0.001) return SampleStraight(input.Uv);
+        float4 top = lerp(LoadPremultiplied(texel, first, last),
+                          LoadPremultiplied(texel + int2(1, 0), first, last), fraction.x);
+        float4 bottom = lerp(LoadPremultiplied(texel + int2(0, 1), first, last),
+                             LoadPremultiplied(texel + int2(1, 1), first, last), fraction.x);
+        pixel = lerp(top, bottom, fraction.y);
+    }
+    pixel.rgb = pixel.a > 0.00001 ? pixel.rgb / pixel.a : 0;
+    return pixel;
+}
+
+float4 PrepareBlend(float4 pixel)
+{
+    int blend = (int)RenderStyle % 8;
+    if (blend == 4) pixel.rgb *= pixel.a; // Screen.
+    if (blend == 5) pixel.rgb = lerp(1, pixel.rgb, pixel.a); // Artwork multiply.
+    return pixel;
+}
+
+float4 PSArtwork(Output input) : SV_TARGET { return PrepareBlend(SampleArtwork(input) * input.Tint); }
 float4 PSNormal(Output input) : SV_TARGET
 {
-    float4 pixel = PSArtwork(input);
+    float4 pixel = SampleArtwork(input) * input.Tint;
     pixel.rgb = lerp(pixel.rgb, pixel.rgb * C[1].rgb, C[0].a);
-    return pixel;
+    return PrepareBlend(pixel);
 }
 float4 PSGrayscale(Output input) : SV_TARGET
 {
-    float4 pixel = PSArtwork(input);
+    float4 pixel = SampleArtwork(input) * input.Tint;
     pixel.rgb = dot(pixel.rgb, float3(0.299, 0.587, 0.114));
-    return pixel;
+    return PrepareBlend(pixel);
 }
 float4 PSMagic(Output input) : SV_TARGET
 {
-    float4 pixel = PSArtwork(input);
+    float4 pixel = SampleArtwork(input) * input.Tint;
     pixel.rgb *= C[1].rgb;
     pixel.a *= C[0].a;
-    return pixel;
+    return PrepareBlend(pixel);
 }
 // The emission texture contains no ambient colour. Add ambient exactly once
 // during multiplicative world composition; bloom sees only emitted light.
@@ -88,7 +174,17 @@ float4 PSShapedLight(Output input) : SV_TARGET
 // Atmosphere runs only when compositing the world texture, before the HUD.
 float4 PSAtmosphere(Output input) : SV_TARGET
 {
-    float4 pixel = PSArtwork(input);
+    float4 pixel = SampleStraight(input.Uv) * input.Tint;
+    int style = (int)C[6].w;
+    int shader = style / 4;
+    int tone = style % 4;
+    if (shader == 3)
+    {
+        float2 dx = float2(1 / Viewport.x, 0), dy = float2(0, 1 / Viewport.y);
+        float3 neighbours = SampleStraight(input.Uv - dx).rgb + SampleStraight(input.Uv + dx).rgb
+                          + SampleStraight(input.Uv - dy).rgb + SampleStraight(input.Uv + dy).rgb;
+        pixel.rgb = saturate(pixel.rgb + 0.18 * (4 * pixel.rgb - neighbours * input.Tint.rgb));
+    }
     float fog = saturate((C[4].y - input.Uv.y) * C[4].z) * C[3].x;
     pixel.rgb = lerp(pixel.rgb, C[3].yzw, fog);
     pixel.rgb = saturate(pixel.rgb + max(max(pixel.r, pixel.g), pixel.b) * C[4].x * C[4].w);
@@ -97,6 +193,15 @@ float4 PSAtmosphere(Output input) : SV_TARGET
     pixel.rgb *= C[0].x * vignette;
     pixel.rgb = lerp(pixel.rgb, pixel.rgb * C[2].rgb, C[2].a);
     pixel.rgb = lerp(pixel.rgb, C[5].yzw, C[5].x);
+    pixel.rgb *= C[6].rgb;
+    float luminance = dot(pixel.rgb, float3(0.299, 0.587, 0.114));
+    pixel.rgb = luminance + (pixel.rgb - luminance) * (1 + C[1].w);
+    pixel.rgb = (pixel.rgb - 0.5) * (1 + C[1].z) + 0.5;
+    if (tone == 1) pixel.rgb = max(pixel.rgb, 0) / (1 + max(pixel.rgb, 0) * 0.3);
+    if (tone == 2) pixel.rgb = smoothstep(0, 1, pixel.rgb);
+    if (C[0].z != 1) pixel.rgb = pow(max(pixel.rgb, 0), C[0].z);
+    if (shader == 1) pixel.rgb = dot(pixel.rgb, float3(0.299, 0.587, 0.114));
+    if (shader == 2) pixel.rgb = round(saturate(pixel.rgb) * 7) / 7;
     return pixel;
 }
 // Bloom receives the light mask, never the baked world artwork.

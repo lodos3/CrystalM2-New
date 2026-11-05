@@ -11,12 +11,14 @@ public struct SpriteVertex
     public Vector2 Position;
     public Vector2 Uv;
     public Vector4 Tint;
+    public Vector4 UvBounds;
 
-    public SpriteVertex(Vector2 position, Vector2 uv, Vector4 tint)
+    public SpriteVertex(Vector2 position, Vector2 uv, Vector4 tint, Vector4 uvBounds)
     {
         Position = position;
         Uv = uv;
         Tint = tint;
+        UvBounds = uvBounds;
     }
 }
 
@@ -44,11 +46,12 @@ public static class SpriteGeometry
 
         float left = (float)source.Left / textureWidth, right = (float)source.Right / textureWidth;
         float top = (float)source.Top / textureHeight, bottom = (float)source.Bottom / textureHeight;
-        output[0] = new SpriteVertex(a, new Vector2(left, top), tint);
-        output[1] = new SpriteVertex(b, new Vector2(right, top), tint);
-        output[2] = new SpriteVertex(c, new Vector2(left, bottom), tint);
+        Vector4 uvBounds = new(left, top, right, bottom);
+        output[0] = new SpriteVertex(a, new Vector2(left, top), tint, uvBounds);
+        output[1] = new SpriteVertex(b, new Vector2(right, top), tint, uvBounds);
+        output[2] = new SpriteVertex(c, new Vector2(left, bottom), tint, uvBounds);
         output[3] = output[1];
-        output[4] = new SpriteVertex(d, new Vector2(right, bottom), tint);
+        output[4] = new SpriteVertex(d, new Vector2(right, bottom), tint, uvBounds);
         output[5] = output[2];
         return true;
     }

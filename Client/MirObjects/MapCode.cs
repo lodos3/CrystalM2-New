@@ -67,6 +67,8 @@
                             player.BodyLibrary.DrawProjectedShadow(player.DrawFrame + player.ArmourOffSet, player.DrawLocation, player.CurrentLocation);
                         else if (actor is MonsterObject monster && monster.BodyLibrary != null && monster.Frame != null)
                             monster.BodyLibrary.DrawProjectedShadow(monster.DrawFrame, monster.DrawLocation, monster.CurrentLocation);
+                        else if (actor is NPCObject npc && npc.BodyLibrary != null)
+                            npc.BodyLibrary.DrawProjectedShadow(npc.DrawFrame, npc.DrawLocation, npc.CurrentLocation);
                     }
                     actor.Draw();
                     continue;
