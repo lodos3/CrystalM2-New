@@ -2172,7 +2172,7 @@ namespace Client.MirScenes
                 MapDarkLight = p.MapDarkLight,
                 Music = p.Music
             };
-            MapControl.Weather = p.WeatherParticles;
+            MapControl.ServerWeather = p.WeatherParticles;
             MapControl.LoadMap();
             InsertControl(0, MapControl);
         }
@@ -4050,7 +4050,7 @@ namespace Client.MirScenes
                 MapControl.Lights = p.Lights;
                 MapControl.MapDarkLight = p.MapDarkLight;
                 MapControl.Music = p.Music;
-                MapControl.Weather = p.Weather;
+                MapControl.ServerWeather = p.Weather;
                 MapControl.LoadMap();
             }
 
@@ -10549,7 +10549,8 @@ namespace Client.MirScenes
                          : ShadowProjection.Sunlight;
         }
         public long LightningTime, FireTime;
-        public WeatherSetting Weather = WeatherSetting.None;
+        public WeatherSetting ServerWeather = WeatherSetting.None;
+        private WeatherSetting Weather => GraphicsTuning.WeatherSource.Current == 0 ? GraphicsTuning.LocalWeather : ServerWeather;
         public bool FloorValid, LightsValid;
 
         public long OutputDelay;
@@ -10640,6 +10641,7 @@ namespace Client.MirScenes
             _fogFade.Reset();
             _weatherController.Reset();
             _weatherFrame = default;
+            ResetLocalWeather();
             _atmosphereTint = Color.White;
             _atmosphereFog = 0;
             _movingLights.Clear();
@@ -10684,6 +10686,8 @@ namespace Client.MirScenes
         public void Process()
         {
             Processdoors();
+            if (Weather != WeatherSetting.None || _surfaceWetness > 0.001f || _surfaceSnow > 0.001f ||
+                _groundFog > 0.001f) TextureValid = false;
             if (_spellParticles.Advance(CMain.Time)) TextureValid = false;
             User.Process();
             for (int i = ObjectsList.Count - 1; i >= 0; i--)
@@ -10821,9 +10825,11 @@ namespace Client.MirScenes
                 DXManager.Draw(DXManager.FloorTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White);
             }
 
+            bool legacyWeather = GraphicsTuning.WeatherSource.Current != 0;
             if (Settings.EnvironmentAtmosphere)
                 _weatherFrame = _weatherController.Sample(
-                    Weather, CMain.Time, Settings.AtmosphereLightning && Lightning, Index);
+                    Weather, CMain.Time, legacyWeather ? Settings.AtmosphereLightning && Lightning
+                        : GraphicsTuning.WeatherStorm.Current != 0, Index);
             else
             {
                 _weatherController.Reset();
@@ -10839,18 +10845,20 @@ namespace Client.MirScenes
 
             // Apply authored terrain wetness before foreground sprites, preserving
             // the original map/actor layering and avoiding any new render target.
-            if (Settings.AtmosphereWetSurfaces)
+            if (legacyWeather && Settings.AtmosphereWetSurfaces)
                 WetSurfacePass.Draw(_mapMaterials, _weatherFrame, User.Movement,
                                     GraphicsTuning.Offset(GraphicsLayer.Ground).Apply(User.OffSetMove), OffSetX, OffSetY,
                                     ViewRangeX, ViewRangeY, Width, Height);
+            if (!legacyWeather) DrawLocalWeather();
             _animatedMapLights.Clear();
             DrawSpellParticles(ground: true);
             DrawObjects();
             DrawSpellParticles(ground: false);
 
             //render weather
-            using (DXManager.BlendArtwork(GraphicsLayer.Weather))
+            if (legacyWeather)
             {
+                using var artwork = DXManager.BlendArtwork(GraphicsLayer.Weather);
                 foreach (ParticleEngine engine in GameScene.Scene.ParticleEngines)
                     engine.Draw();
                 if (Settings.EnvironmentAtmosphere && Settings.EnvironmentFogLayers)
@@ -10867,8 +10875,7 @@ namespace Client.MirScenes
                 Color desiredTint = AtmosphereColourGrade.Target(setting, Weather, MapDarkLight);
                 _atmosphereTint = _atmosphereFade.Sample(desiredTint, CMain.Time);
                 _atmosphereHazeTint = AtmosphereColourGrade.FogTint(Weather, MapDarkLight);
-                _atmosphereFog = _fogFade.Sample(AtmosphereColourGrade.FogStrength(Weather),
-                                                 CMain.Time);
+                _atmosphereFog = legacyWeather ? _fogFade.Sample(AtmosphereColourGrade.FogStrength(Weather), CMain.Time) : 0;
             }
             else
             {
@@ -12397,6 +12404,7 @@ namespace Client.MirScenes
                 GameScene.Scene.ParticleEngines[i].Dispose();
 
             GameScene.Scene.ParticleEngines.Clear();
+            if (GraphicsTuning.WeatherSource.Current == 0) return;
             List<ParticleImageInfo> textures = new List<ParticleImageInfo>();
             foreach (WeatherSetting itemWeather in Enum.GetValues(typeof(WeatherSetting)).Cast<object>().ToArray())
             {

@@ -90,6 +90,20 @@ internal static class GraphicsTuning
     internal static readonly Value PostShader = new("PostShader", 0, 0, 3);
     internal static readonly Value DeathLook = new("DeathLook", 0, 0, 2);
     internal static readonly Value FogDensity = new("PostFogDensity", 100, 0, 200);
+    internal static readonly Value WeatherSource = new("WeatherSource", 0, 0, 1);
+    internal static readonly Value WeatherRain = new("WeatherRain", 0, 0, 1);
+    internal static readonly Value WeatherSnow = new("WeatherSnow", 0, 0, 1);
+    internal static readonly Value WeatherFog = new("WeatherFog", 0, 0, 1);
+    internal static readonly Value WeatherStorm = new("WeatherStorm", 0, 0, 1);
+    internal static readonly Value Precipitation = new("WeatherPrecipitation", 100, 0, 200);
+    internal static readonly Value SurfaceWater = new("WeatherSurfaceWater", 100, 0, 200);
+    internal static readonly Value SurfaceSnow = new("WeatherSurfaceSnow", 100, 0, 200);
+    internal static readonly Value WeatherWind = new("WeatherWind", 100, 0, 200);
+
+    internal static WeatherSetting LocalWeather =>
+        (WeatherRain.Current != 0 || WeatherStorm.Current != 0 ? WeatherSetting.Rain : WeatherSetting.None) |
+        (WeatherSnow.Current != 0 ? WeatherSetting.Snow : WeatherSetting.None) |
+        (WeatherFog.Current != 0 ? WeatherSetting.Fog : WeatherSetting.None);
     internal static readonly Value BloomThreshold = new("BloomThreshold", 58, 0, 100);
     internal static readonly Value TextureFilter = new("TextureFilter", 0, 0, 3);
     internal static readonly Value CorpseBlend = new("CorpseBlendMode", 0, 0, 5);

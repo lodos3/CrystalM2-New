@@ -144,6 +144,7 @@ internal static class Program
         device.Blend = SpriteBlendMode.Alpha;
         device.PixelShader = ShaderEffect.Artwork;
         TestArtworkStyles(device, backBuffer, translucent);
+        TestGroundWeather(device, backBuffer);
 
         long bytes = device.TextureBytes;
         int textures = device.TextureCount;
@@ -198,6 +199,23 @@ internal static class Program
             Near(Color.Red, image.GetPixel(0, 0), "Existing textures must survive swapchain resize.");
         }
         Console.WriteLine("D3D11 shader, alpha, layer order, batching, flip, upload disposal and resize checks passed (WARP).");
+    }
+
+    private static void TestGroundWeather(RendererDevice device, Surface target)
+    {
+        device.PixelShader = ShaderEffect.WeatherGround;
+        device.Clear(Color.Black);
+        device.SetPixelShaderConstant(0, [new(0, 0, 0, 1), new(0, 0, 1, 0), Vector4.Zero]);
+        device.Ui.Fill(new Rectangle(0, 0, 48, 32), Color.FromArgb(3, 255, 255, 255));
+        using var first = device.Capture(target);
+        device.Clear(Color.Black);
+        device.SetPixelShaderConstant(0, [new(10, 6, 0, 1), new(10, 6, 1, 0), Vector4.Zero]);
+        device.Ui.Fill(new Rectangle(10, 6, 48, 32), Color.FromArgb(3, 255, 255, 255));
+        using var shifted = device.Capture(target);
+        Near(first.GetPixel(20, 16), shifted.GetPixel(30, 22), "Accumulation and fog must remain anchored through camera motion.");
+        Check(shifted.GetPixel(30, 22).B > 16, "Snow and fog should visibly affect the floor.");
+        Near(Color.Black, shifted.GetPixel(58, 22), "A skipped obstacle tile must receive no weather coverage.");
+        device.PixelShader = ShaderEffect.Artwork;
     }
 
     private static void TestArtworkStyles(RendererDevice device, Surface target, Texture translucent)

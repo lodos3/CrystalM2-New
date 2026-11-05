@@ -220,10 +220,11 @@ namespace Client.MirGraphics
                                                    hazeTint.R / 255f, hazeTint.G / 255f,
                                                    hazeTint.B / 255f);
             PostProcessConstants[4] = new Vector4(
-                Settings.AtmosphereWetSurfaces ? Math.Clamp(weatherFrame.Wetness * intensity, 0f, 1f) : 0f,
+                GraphicsTuning.WeatherSource.Current != 0 && Settings.AtmosphereWetSurfaces
+                    ? Math.Clamp(weatherFrame.Wetness * intensity, 0f, 1f) : 0f,
                 0.78f, 1.38f, 0.095f);
             PostProcessConstants[5] = new Vector4(
-                Settings.AtmosphereLightning ? Math.Clamp(weatherFrame.LightningFlash * intensity, 0f, 0.12f) : 0f,
+                Math.Clamp(weatherFrame.LightningFlash * intensity, 0f, 0.12f),
                 0.80f, 0.90f, 1f);
             Vector3 grade = GraphicsTuning.Grade.Current switch
             {

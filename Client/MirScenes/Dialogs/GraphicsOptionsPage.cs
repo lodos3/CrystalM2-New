@@ -8,7 +8,7 @@ internal sealed class GraphicsOptionsPage : MirControl
 {
     private const int Right = 253;
     private static readonly string[] BlendModes = ["Authored", "Alpha", "Additive", "Screen", "Multiply", "Subtract"];
-    private enum Preview { World, Floor, Ambient, Baked, Textures }
+    private enum Preview { World, Floor, Ambient, Baked, Textures, WeatherSource }
 
     private MirControl _content;
     private MirControl _selectedPage;
@@ -27,6 +27,7 @@ internal sealed class GraphicsOptionsPage : MirControl
         AddPage("Blending", 3, BuildBlending);
         AddPage("Shadows", 4, BuildShadows);
         AddPage("Textures", 5, BuildTextures);
+        AddPage("Weather", 6, BuildWeather);
 
         MirPanel.AddCaption(this, "Drag, scroll, or use +/−. Click a value to reset it.", new Rectangle(0, 366, 488, 20));
     }
@@ -34,7 +35,7 @@ internal sealed class GraphicsOptionsPage : MirControl
     private void AddPage(string title, int index, Action build)
     {
         var page = new MirControl { Parent = this, Location = new Point(0, 32), Size = new Size(488, 328), Visible = false };
-        var tab = AddButton(this, title, new Rectangle(index * 81, 0, 77, 24), () => { });
+        var tab = AddButton(this, title, new Rectangle(index * 70, 0, 66, 24), () => { });
         tab.Click += (_, _) => SelectPage();
         _content = page;
         build();
@@ -137,16 +138,39 @@ internal sealed class GraphicsOptionsPage : MirControl
         AddToggle("Environment atmosphere", Right, 23, () => Settings.EnvironmentAtmosphere, value => Settings.EnvironmentAtmosphere = value);
         AddSlider("Atmosphere", Right, 47, 0, 100, "%", () => Settings.AtmosphereIntensityPercent,
             value => Settings.AtmosphereIntensityPercent = value, 100);
-        AddToggle("Fog layers", Right, 71, () => Settings.EnvironmentFogLayers, value => Settings.EnvironmentFogLayers = value);
-        AddValue("Fog density", Right, 95, GraphicsTuning.FogDensity);
-        AddToggle("Wet surfaces", Right, 119, () => Settings.AtmosphereWetSurfaces, value => Settings.AtmosphereWetSurfaces = value);
-        AddToggle("Lightning", Right, 143, () => Settings.AtmosphereLightning, value => Settings.AtmosphereLightning = value);
         AddToggle("Light bloom", Right, 167, () => Settings.LightingBloom, value => Settings.LightingBloom = value);
         AddSlider("Bloom strength", Right, 191, 0, 200, "%", () => Settings.BloomIntensityPercent,
             value => Settings.BloomIntensityPercent = value, 100);
         AddValue("Bloom cutoff", Right, 215, GraphicsTuning.BloomThreshold);
         AddSlider("Bloom divisor", Right, 239, 2, 8, "", () => Settings.BloomDivisor,
             value => Settings.BloomDivisor = value, 4, hint: "Lower values use a larger blur buffer.");
+    }
+
+    private void BuildWeather()
+    {
+        Caption("Weather source and client preview", 0, 0);
+        AddChoice("Weather source", 0, 22, GraphicsTuning.WeatherSource, ["Client", "Server legacy"], Preview.WeatherSource);
+        AddWeatherToggle("Rain", 50, GraphicsTuning.WeatherRain);
+        AddWeatherToggle("Snow", 74, GraphicsTuning.WeatherSnow);
+        AddWeatherToggle("Ground fog", 98, GraphicsTuning.WeatherFog);
+        AddWeatherToggle("Thunderstorm", 122, GraphicsTuning.WeatherStorm);
+        Caption("Rain and snow build up, then fade.", 0, 158);
+        Caption("Client weather can combine effects.", 0, 180);
+        Caption("Server legacy uses the map's settings.", 0, 202);
+
+        Caption("Weather intensity", Right, 0);
+        AddValue("Precipitation", Right, 24, GraphicsTuning.Precipitation);
+        AddValue("Ground water", Right, 48, GraphicsTuning.SurfaceWater);
+        AddValue("Snow cover", Right, 72, GraphicsTuning.SurfaceSnow);
+        AddValue("Fog density", Right, 96, GraphicsTuning.FogDensity);
+        AddValue("Wind", Right, 120, GraphicsTuning.WeatherWind);
+        Caption("Server legacy effects", Right, 163);
+        AddToggle("Legacy fog layers", Right, 186, () => Settings.EnvironmentFogLayers, value => Settings.EnvironmentFogLayers = value);
+        AddToggle("Legacy wet surfaces", Right, 210, () => Settings.AtmosphereWetSurfaces, value => Settings.AtmosphereWetSurfaces = value);
+        AddToggle("Legacy lightning", Right, 234, () => Settings.AtmosphereLightning, value => Settings.AtmosphereLightning = value);
+
+        void AddWeatherToggle(string label, int y, GraphicsTuning.Value value) =>
+            AddToggle(label, 0, y, () => value.Current != 0, enabled => value.Current = enabled ? 1 : 0);
     }
 
     private void BuildBlending()
@@ -360,6 +384,7 @@ internal sealed class GraphicsOptionsPage : MirControl
         {
             if (preview is Preview.Floor or Preview.Baked or Preview.Textures) map.FloorValid = false;
             if (preview == Preview.Ambient) map.PreviewAmbient();
+            if (preview == Preview.WeatherSource) map.RefreshWeatherSource();
             map.TextureValid = false;
         }
         Redraw();

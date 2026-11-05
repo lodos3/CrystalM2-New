@@ -171,6 +171,59 @@ float4 PSShapedLight(Output input) : SV_TARGET
              LightSource(uv - dx + dy) + LightSource(uv + dx + dy);
     return float4(light * input.Tint.rgb * (input.Tint.a * C[0].z / 16), 1);
 }
+float WeatherNoise(float2 p)
+{
+    float2 i = floor(p), f = frac(p);
+    f = f * f * (3 - 2 * f);
+    float4 h = frac(sin(dot(i, float2(127.1, 311.7)) + float4(0, 127.1, 311.7, 438.8)) * 43758.5453);
+    return lerp(lerp(h.x, h.y, f.x), lerp(h.z, h.w, f.x), f.y);
+}
+
+float4 PSWeatherGround(Output input) : SV_TARGET
+{
+    float2 world = input.Position.xy - C[0].xy + C[2].xx;
+    float snow = 0, wet = 0, sheen = 0, fog = 0;
+    if (C[0].z > 0.001 && input.Tint.r > 0)
+    {
+        float basins = WeatherNoise(world / float2(41, 24)) * 0.72 + WeatherNoise(world / 11) * 0.28;
+        float pool = smoothstep(0.18, 0.5, basins + saturate(C[0].z) * 0.38 - 0.28);
+        wet = saturate(C[0].z * input.Tint.r * (0.22 + pool * 0.43));
+        float2 drops = world / float2(28, 18);
+        float phase = frac(C[1].w * 1.8 + WeatherNoise(floor(drops) + 0.27));
+        float ring = 1 - smoothstep(0.024, 0.075, abs(length(frac(drops) - 0.5) - phase * 0.47));
+        sheen = pool * saturate(C[0].z * input.Tint.r) * (0.15 + C[2].y * ring * (1 - phase) * 0.38);
+    }
+    if (C[0].w > 0.001 && input.Tint.g > 0)
+    {
+        float grain = WeatherNoise(world / 2.5);
+        float pattern = WeatherNoise(world / 33) * 0.7 + grain * 0.3;
+        float cover = saturate(C[0].w * input.Tint.g);
+        snow = smoothstep(0.27, 0.7, pattern + cover * 0.67 - 0.46) * cover * (0.58 + grain * 0.38);
+    }
+    if (C[1].z > 0.001)
+    {
+        float2 p = input.Position.xy - C[1].xy + C[2].xx;
+        float mist = WeatherNoise(p / float2(135, 38)) * 0.73 + WeatherNoise(p / float2(46, 17)) * 0.27;
+        float2 local = saturate((input.Uv - input.Bounds.xy) / (input.Bounds.zw - input.Bounds.xy));
+        int edge = (int)round(input.Tint.a * 255) - 1;
+        float fade = 1;
+        if ((edge & 1) != 0) fade *= smoothstep(0, 0.43, local.x);
+        if ((edge & 2) != 0) fade *= smoothstep(0, 0.43, 1 - local.x);
+        if ((edge & 4) != 0) fade *= smoothstep(0, 0.48, local.y);
+        if ((edge & 8) != 0) fade *= smoothstep(0, 0.48, 1 - local.y);
+        fog = fade * saturate(smoothstep(0.19, 0.89, mist) * C[1].z * 0.68);
+    }
+    // Compose the weather contributions in premultiplied space before returning straight alpha.
+    float3 colour = float3(0.13, 0.22, 0.32) * wet;
+    colour = lerp(colour, float3(0.62, 0.78, 0.96), sheen);
+    float alpha = lerp(wet, 1, sheen);
+    colour = lerp(colour, float3(0.81, 0.89, 0.99), snow);
+    alpha = lerp(alpha, 1, snow);
+    colour = lerp(colour, float3(0.73, 0.82, 0.88), fog);
+    alpha = lerp(alpha, 1, fog);
+    return float4(colour / max(alpha, 0.0001), alpha);
+}
+
 // Atmosphere runs only when compositing the world texture, before the HUD.
 float4 PSAtmosphere(Output input) : SV_TARGET
 {
