@@ -284,7 +284,8 @@ public sealed partial class MapControl
     private void DrawSpellParticleLights(float intensity)
     {
         if (_spellParticles.Active.IsEmpty) return;
-        Point position = GraphicsTuning.LightPosition(LightSource.Spell, SpellParticleOrigin());
+        Point position = GraphicsTuning.LightPosition(LightSource.Spell, SpellParticleOrigin(),
+            GraphicsTuning.Offset(GraphicsLayer.Spell).Linked || GraphicsTuning.Offset(GraphicsLayer.Particles).Linked);
         Vector2 camera = new(position.X, position.Y);
         var light = GraphicsTuning.Light(LightSource.Spell);
         float radius = light.Radius.Current / 100f, warmth = light.Warmth.Current * 0.003f;
@@ -295,5 +296,5 @@ public sealed partial class MapControl
     }
 
     private Point SpellParticleOrigin() => GraphicsTuning.Offset(GraphicsLayer.Particles).Apply(
-        GraphicsTuning.Offset(GraphicsLayer.Spell).Apply(ToMouseLocation(Point.Empty)));
+        GraphicsTuning.Offset(GraphicsLayer.Spell).Apply(ToMouseLocation(Point.Empty)), GraphicsTuning.Offset(GraphicsLayer.Spell).Linked);
 }

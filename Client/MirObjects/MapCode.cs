@@ -61,14 +61,16 @@
                 if (!CellObjects[i].Dead)
                 {
                     MapObject actor = CellObjects[i];
-                    if (Settings.DynamicShadows && !actor.Hidden)
+                    bool preview = actor == MapObject.User && MirScenes.GameScene.Scene?.MapControl?.ProjectionPreviewActive == true;
+                    if ((Settings.DynamicShadows || preview) && !actor.Hidden)
                     {
+                        bool linked = GraphicsTuning.Offset(GraphicsTuning.Layer(actor.Race)).Linked;
                         if (actor is PlayerObject player && player.BodyLibrary != null)
-                            player.BodyLibrary.DrawProjectedShadow(player.DrawFrame + player.ArmourOffSet, player.DrawLocation, player.CurrentLocation);
+                            player.BodyLibrary.DrawProjectedShadow(player.DrawFrame + player.ArmourOffSet, player.DrawLocation, player.CurrentLocation, linked, preview);
                         else if (actor is MonsterObject monster && monster.BodyLibrary != null && monster.Frame != null)
-                            monster.BodyLibrary.DrawProjectedShadow(monster.DrawFrame, monster.DrawLocation, monster.CurrentLocation);
+                            monster.BodyLibrary.DrawProjectedShadow(monster.DrawFrame, monster.DrawLocation, monster.CurrentLocation, linked, preview);
                         else if (actor is NPCObject npc && npc.BodyLibrary != null)
-                            npc.BodyLibrary.DrawProjectedShadow(npc.DrawFrame, npc.DrawLocation, npc.CurrentLocation);
+                            npc.BodyLibrary.DrawProjectedShadow(npc.DrawFrame, npc.DrawLocation, npc.CurrentLocation, linked, preview);
                     }
                     actor.Draw();
                     continue;

@@ -351,7 +351,7 @@ namespace Client.MirObjects
         // to the light map, rather than being represented solely by a round glow.
         // This is called only while the light render target is active.
         internal Point LightPosition => GraphicsTuning.LightPosition(LightSource.Spell,
-            AnimationOffset == default ? DrawLocation : GetDrawWithOffset());
+            AnimationOffset == default ? DrawLocation : GetDrawWithOffset(), GraphicsTuning.Offset(GraphicsLayer.Spell).Linked);
 
         public bool DrawLightMask(Color tint, float intensity, ref int pixelBudget)
         {

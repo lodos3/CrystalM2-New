@@ -232,7 +232,7 @@ public sealed unsafe class RendererDevice : IDisposable
         Context.PSSetShader(_shaders[(int)_effect]);
         Context.PSSetShaderResource(0, source.View);
         bool smooth = _effect is ShaderEffect.BloomBlur or ShaderEffect.BloomExtract or ShaderEffect.ShadowMask or
-            ShaderEffect.ProjectedShadow or ShaderEffect.ShapedLight;
+            ShaderEffect.ProjectedShadow or ShaderEffect.ShapedLight or ShaderEffect.ConeLight;
         Context.PSSetSampler(0, smooth ? _linearSampler : _pointSampler);
         var frame = Context.Map(_frameBuffer, MapMode.WriteDiscard);
         int style = (int)blend + (artwork ? 8 * (int)_textureFilter : 0);

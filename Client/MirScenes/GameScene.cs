@@ -10686,6 +10686,7 @@ namespace Client.MirScenes
         public void Process()
         {
             Processdoors();
+            if (LightPreviewActive || ProjectionPreviewActive) TextureValid = false;
             if (Weather != WeatherSetting.None || _surfaceWetness > 0.001f || _surfaceSnow > 0.001f ||
                 _groundFog > 0.001f) TextureValid = false;
             if (_spellParticles.Advance(CMain.Time)) TextureValid = false;
@@ -10836,7 +10837,7 @@ namespace Client.MirScenes
                 _weatherFrame = default;
             }
 
-            if (Settings.DynamicShadows && Settings.ShadowsFollowLights && Settings.ShadowOpacityPercent > 0)
+            if ((Settings.DynamicShadows || ProjectionPreviewActive) && Settings.ShadowsFollowLights && Settings.ShadowOpacityPercent > 0)
             {
                 UpdateStaticLights();
                 IndexMovingLights();
@@ -10888,7 +10889,7 @@ namespace Client.MirScenes
 
             if (ambient.ToArgb() != Color.White.ToArgb() ||
                 (Settings.LightingBloom && Settings.BloomIntensityPercent > 0) ||
-                _animatedMapLights.Count != 0 || HasSpellLights() || HasDaylightEmitters() ||
+                _animatedMapLights.Count != 0 || HasSpellLights() || HasDaylightEmitters() || LightPreviewActive ||
                 GameScene.User.Poison.HasFlag(PoisonType.Blindness))
             {
                 DrawLights(ambient);
@@ -10960,6 +10961,7 @@ namespace Client.MirScenes
 
             if (postProcessing) DXManager.EndPostProcessing();
             if (grayscale) DXManager.SetGrayscale(false);
+            DrawOffsetGuides();
 
             CleanTime = CMain.Time + Settings.CleanDelay;
         }
@@ -11112,9 +11114,9 @@ namespace Client.MirScenes
 
         private void DrawObjects()
         {
-            Point animationOffset = GraphicsTuning.Offset(GraphicsLayer.MapAnimation).Pixels;
-            Point middleOffset = GraphicsTuning.Offset(GraphicsLayer.Middle).Pixels;
-            Point frontOffset = GraphicsTuning.Offset(GraphicsLayer.Front).Pixels;
+            var animationOffset = GraphicsTuning.Offset(GraphicsLayer.MapAnimation);
+            var middleOffset = GraphicsTuning.Offset(GraphicsLayer.Middle);
+            var frontOffset = GraphicsTuning.Offset(GraphicsLayer.Front);
             if (Settings.Effect)
             {
                 for (int i = Effects.Count - 1; i >= 0; i--)
@@ -11160,10 +11162,11 @@ namespace Client.MirScenes
                         int animationoffset = M2CellInfo[x, y].TileAnimationOffset ^ 0x2000;
                         index += animationoffset * (AnimationCount % animation);
                         using var artwork = DXManager.BlendArtwork(GraphicsLayer.MapAnimation);
-                        Point position = new(drawX + animationOffset.X, drawY + animationOffset.Y);
+                        Point position = animationOffset.Apply(new Point(drawX, drawY));
                         Libraries.MapLibs[190].DrawUp(index, position.X, position.Y);
                         CaptureAnimatedMapLight(Libraries.MapLibs[190], index,
-                            new Point(position.X, position.Y - Libraries.MapLibs[190].GetSize(index).Height), false, x, y, false);
+                            new Point(position.X, position.Y - Libraries.MapLibs[190].GetSize(index).Height), false, x, y, false,
+                            animationOffset.Linked);
                     }
 
                     #endregion
@@ -11174,7 +11177,7 @@ namespace Client.MirScenes
                         index = M2CellInfo[x, y].MiddleImage - 1;
                         if (index > 0)
                         {
-                            Point position = new(drawX + middleOffset.X, drawY + middleOffset.Y);
+                            Point position = middleOffset.Apply(new Point(drawX, drawY));
                             animation = M2CellInfo[x, y].MiddleAnimationFrame;
                             blend = false;
                             if ((animation > 0) && (animation < 255))
@@ -11192,7 +11195,7 @@ namespace Client.MirScenes
                                     MLibrary library = Libraries.MapLibs[M2CellInfo[x, y].MiddleIndex];
                                     bool additive = blend && (animation == 10 || animation == 8); // diamond mines, abyss
                                     using var artwork = DXManager.BlendArtwork(GraphicsLayer.MapAnimation, GraphicsLayer.Middle);
-                                    position.Offset(animationOffset);
+                                    position = animationOffset.Apply(position, middleOffset.Linked);
                                     if (additive)
                                     {
                                         library.DrawUpBlend(index, position);
@@ -11202,7 +11205,8 @@ namespace Client.MirScenes
                                         library.DrawUp(index, position.X, position.Y);
                                     }
                                     CaptureAnimatedMapLight(library, index,
-                                        new Point(position.X, position.Y - library.GetSize(index).Height), false, x, y, additive);
+                                        new Point(position.X, position.Y - library.GetSize(index).Height), false, x, y, additive,
+                                        middleOffset.Linked || animationOffset.Linked);
                                 }
                             }
                             s = Libraries.MapLibs[M2CellInfo[x, y].MiddleIndex].GetSize(index);
@@ -11266,12 +11270,13 @@ namespace Client.MirScenes
                     bool offsetFront = !blend && fileIndex == 28 && front.GetOffSet(index) != Point.Empty;
                     bool useOffset = highBlend || offsetFront || (blend && index is >= 2723 and <= 2732);
                     Point frontPosition = new(drawX, drawY - (highBlend ? 3 * CellHeight : offsetFront ? CellHeight : s.Height));
-                    frontPosition.Offset(frontOffset);
-                    if (animation > 0) frontPosition.Offset(animationOffset);
+                    frontPosition = frontOffset.Apply(frontPosition);
+                    if (animation > 0) frontPosition = animationOffset.Apply(frontPosition, frontOffset.Linked);
                     using var frontArtwork = DXManager.BlendArtwork(animation > 0 ? GraphicsLayer.MapAnimation : GraphicsLayer.Front, GraphicsLayer.Front);
                     if (blend) front.DrawBlend(index, frontPosition, Color.White, useOffset);
                     else front.Draw(index, frontPosition, Color.White, useOffset);
-                    if (animation > 0) CaptureAnimatedMapLight(front, index, frontPosition, useOffset, x, y, blend);
+                    if (animation > 0) CaptureAnimatedMapLight(front, index, frontPosition, useOffset, x, y, blend,
+                        frontOffset.Linked || animationOffset.Linked);
                     #endregion
                 }
 

@@ -187,6 +187,17 @@ float4 PSShapedLight(Output input) : SV_TARGET
              LightSource(uv - dx + dy) + LightSource(uv + dx + dy);
     return float4(light * input.Tint.rgb * (input.Tint.a * C[0].z / 16), 1);
 }
+
+float4 PSConeLight(Output input) : SV_TARGET
+{
+    float2 ray = input.Uv * 2 - 1;
+    float distance = length(ray);
+    float direction = dot(ray, C[0].xy) / max(distance, 0.001);
+    float beam = lerp(1, smoothstep(C[0].z, C[0].w, direction), smoothstep(0, 0.1, distance));
+    float4 pixel = SampleStraight(input.Uv) * input.Tint;
+    pixel.a *= beam;
+    return pixel;
+}
 float WeatherNoise(float2 p)
 {
     float2 i = floor(p), f = frac(p);

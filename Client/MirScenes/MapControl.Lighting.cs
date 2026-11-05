@@ -10,29 +10,46 @@ public sealed partial class MapControl
     private static int ShapedLightPixelBudget => (int)Math.Clamp((long)Settings.ScreenWidth * Settings.ScreenHeight / 2, 120_000, 900_000);
     private readonly List<AnimatedMapLight> _animatedMapLights = new(MaxAnimatedMapLights);
     private readonly HashSet<Point> _shapedMapLightCells = new();
+    private long _lightPreviewUntil, _projectionPreviewUntil;
+    private LightSource _lightPreviewSource;
+    private bool LightPreviewActive => CMain.Time < _lightPreviewUntil;
+    internal bool ProjectionPreviewActive => CMain.Time < _projectionPreviewUntil;
 
     private readonly record struct AnimatedMapLight(MLibrary Library, int Frame, Point Position,
-        Point Cell, Color Tint, float Strength);
+        Point Cell, Color Tint, float Strength, int RadialIndex);
+
+    internal void PreviewLight(LightSource source)
+    {
+        _lightPreviewSource = source;
+        _lightPreviewUntil = CMain.Time + 4500;
+        TextureValid = false;
+    }
+
+    internal void PreviewProjection()
+    {
+        _projectionPreviewUntil = CMain.Time + 4500;
+        TextureValid = false;
+    }
 
     private void CaptureAnimatedMapLight(MLibrary library, int frame, Point position, bool offset,
-                                        int x, int y, bool additive)
+                                        int x, int y, bool additive, bool originLinked)
     {
         var emitter = GraphicsTuning.Light(LightSource.MapAnimation);
         if (Settings.MapLightIntensityPercent == 0 || emitter.Intensity == 0 ||
             _animatedMapLights.Count >= MaxAnimatedMapLights) return;
         bool authored = MapLightEncoding.TryDecode(M2CellInfo[x, y].Light, DXManager.LightSizes.Length - 1,
-            out _, out Color tint);
+            out int lightIndex, out Color tint);
         if (!authored && !additive) return;
 
         Size size = library.GetSize(frame);
         if (offset) position.Offset(library.GetOffSet(frame));
-        position = GraphicsTuning.LightPosition(LightSource.MapAnimation, position);
+        position = GraphicsTuning.LightPosition(LightSource.MapAnimation, position, originLinked);
         var bounds = new Rectangle(position, size);
         bounds.Inflate(15, 15);
         if (size.IsEmpty || !bounds.IntersectsWith(new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight))) return;
 
         _animatedMapLights.Add(new AnimatedMapLight(library, frame, position, new Point(x, y),
-            tint, authored ? 1f : 0.55f));
+            tint, authored ? 1f : 0.55f, authored ? lightIndex : 3));
     }
 
     private void DrawAnimatedMapLights(float intensity, bool blind)
@@ -42,9 +59,15 @@ public sealed partial class MapControl
         foreach (var light in _animatedMapLights)
         {
             Color tint = TintLight(light.Tint, LightSource.MapAnimation, blind);
-            if (light.Library.DrawLightShape(light.Frame, light.Position, tint, false, intensity * light.Strength,
-                    ref pixelBudget, GraphicsTuning.Light(LightSource.MapAnimation).Radius.Current))
-                _shapedMapLightCells.Add(light.Cell);
+            var emitter = GraphicsTuning.Light(LightSource.MapAnimation);
+            if (emitter.Shape.Current != 0 || !light.Library.DrawLightShape(light.Frame, light.Position, tint, false,
+                intensity * light.Strength, ref pixelBudget, emitter.Radius.Current))
+            {
+                Size size = light.Library.GetSize(light.Frame);
+                Point center = new(light.Position.X + size.Width / 2, light.Position.Y + size.Height / 2);
+                DrawRadialLight(light.RadialIndex, center, ScaleLight(tint, intensity * light.Strength), LightSource.MapAnimation);
+            }
+            _shapedMapLightCells.Add(light.Cell);
         }
     }
 
@@ -102,6 +125,12 @@ public sealed partial class MapControl
                 GraphicsTuning.Light(LightSource.Spell).Intensity : 0, blind);
             if (Settings.MapLightIntensityPercent > 0)
                 DrawMapLights(Settings.MapLightIntensityPercent / 100f, blind);
+            if (LightPreviewActive)
+            {
+                var preview = GraphicsTuning.Light(_lightPreviewSource);
+                Color tint = TintLight(Color.FromArgb(200, 225, 255), _lightPreviewSource, blind);
+                DrawRadialLight(3, ActorLightPosition(User, _lightPreviewSource), ScaleLight(tint, preview.Intensity), _lightPreviewSource);
+            }
         }
         finally
         {
@@ -119,7 +148,7 @@ public sealed partial class MapControl
         }
         // Multiplication cannot illuminate white ambient. Add a restrained contribution in daylight.
         int daylight = blind ? 0 : (int)MathF.Round(Math.Min(ambient.R, Math.Min(ambient.G, ambient.B)) *
-            GraphicsTuning.DayGlow.Current / 100f);
+            Math.Max(GraphicsTuning.DayGlow.Current, LightPreviewActive ? 42 : 0) / 100f);
         if (daylight > 0)
         {
             DXManager.Device.PixelShader = ShaderEffect.Artwork;
@@ -144,7 +173,8 @@ public sealed partial class MapControl
                     if (spellIntensity > 0)
                     {
                         Color tint = TintLight(actor.LightColour, LightSource.Spell, blind);
-                        if (shaped < MaxShapedSpellLights && spell.DrawLightMask(tint, spellIntensity, ref pixelBudget)) shaped++;
+                        if (GraphicsTuning.Light(LightSource.Spell).Shape.Current == 0 &&
+                            shaped < MaxShapedSpellLights && spell.DrawLightMask(tint, spellIntensity, ref pixelBudget)) shaped++;
                         else DrawRadialLight(actor.Light % 15, spell.LightPosition, ScaleLight(tint, spellIntensity), LightSource.Spell);
                     }
                 }
@@ -159,7 +189,7 @@ public sealed partial class MapControl
                         tint = Color.FromArgb(brightness, brightness, brightness);
                     }
                     if (intensity > 0)
-                        DrawRadialLight(actor.Light % 15, GraphicsTuning.LightPosition(source, actor.DrawLocation),
+                        DrawRadialLight(actor.Light % 15, ActorLightPosition(actor, source),
                             ScaleLight(TintLight(tint, source, blind), intensity), source);
                 }
             }
@@ -177,8 +207,9 @@ public sealed partial class MapControl
             if (!effect.Blend || effect.Light <= 0 || CMain.Time < effect.Start ||
                 effect.CurrentFrame < 0 || effect.CurrentFrame >= effect.Count) return;
             Color tint = TintLight(effect.LightColour, LightSource.Spell, blind);
-            if (shaped < MaxShapedSpellLights && effect.DrawLightMask(tint, spellIntensity, ref pixelBudget)) shaped++;
-            else DrawRadialLight(effect.Light, GraphicsTuning.LightPosition(LightSource.Spell, effect.DrawLocation),
+            if (GraphicsTuning.Light(LightSource.Spell).Shape.Current == 0 &&
+                shaped < MaxShapedSpellLights && effect.DrawLightMask(tint, spellIntensity, ref pixelBudget)) shaped++;
+            else DrawRadialLight(effect.Light, effect.LightPosition,
                 ScaleLight(tint, spellIntensity), LightSource.Spell);
         }
     }
@@ -219,6 +250,9 @@ public sealed partial class MapControl
         _ => LightSource.Monster
     };
 
+    private static Point ActorLightPosition(MapObject actor, LightSource source) =>
+        GraphicsTuning.LightPosition(source, actor.DrawLocation, GraphicsTuning.Offset(GraphicsTuning.Layer(actor.Race)).Linked);
+
     private static bool HasTorch(MapObject actor) => actor is UserObject user
         ? user.Equipment[(int)EquipmentSlot.Torch]?.Info is { Light: > 0 } torch && torch.Light == actor.Light
         : actor.Light >= 15;
@@ -238,7 +272,8 @@ public sealed partial class MapControl
         index = Math.Min(index, DXManager.Lights.Count - 1);
         Texture texture = DXManager.Lights[index];
         if (texture == null || texture.Disposed) return;
-        int radius = GraphicsTuning.Light(source).Radius.Current;
+        var tuning = GraphicsTuning.Light(source);
+        int radius = tuning.Radius.Current;
         int width = Math.Max(1, (int)MathF.Round(texture.Width * radius / 100f));
         int height = Math.Max(1, (int)MathF.Round(texture.Height * radius / 100f));
         Point authored = DXManager.LightSizes[index];
@@ -246,6 +281,30 @@ public sealed partial class MapControl
             point.X - authored.X / 2 - CellWidth / 2 + (texture.Width - width) / 2,
             point.Y - authored.Y / 2 - CellHeight / 2 - 5 + (texture.Height - height) / 2,
             width, height);
-        DXManager.Sprite.Draw(texture, new Rectangle(0, 0, texture.Width, texture.Height), bounds, RendererDevice.ToVector(tint));
+        var sourceRect = new Rectangle(0, 0, texture.Width, texture.Height);
+        if (tuning.Shape.Current != 2)
+        {
+            DXManager.Sprite.Draw(texture, sourceRect, bounds, RendererDevice.ToVector(tint));
+            return;
+        }
+
+        var device = DXManager.Device;
+        ShaderEffect shader = device.PixelShader;
+        Span<Vector4> constants = stackalloc Vector4[RendererDevice.EffectConstantCount];
+        device.CopyPixelShaderConstants(constants);
+        float direction = tuning.Direction.Current * MathF.PI / 180f;
+        float beam = tuning.Beam.Current * MathF.PI / 360f;
+        device.PixelShader = ShaderEffect.ConeLight;
+        try
+        {
+            device.SetPixelShaderConstant(0, [new(MathF.Cos(direction), MathF.Sin(direction),
+                MathF.Cos(beam), MathF.Cos(beam * 0.7f))]);
+            DXManager.Sprite.Draw(texture, sourceRect, bounds, RendererDevice.ToVector(tint));
+        }
+        finally
+        {
+            device.PixelShader = shader;
+            device.SetPixelShaderConstant(0, constants);
+        }
     }
 }

@@ -127,13 +127,18 @@ namespace Client.MirObjects
             }
 
 
-            DrawLocation.Offset(GraphicsTuning.Offset(GraphicsLayer.Spell).Pixels);
+            DrawLocation = GraphicsTuning.Offset(GraphicsLayer.Spell).Apply(DrawLocation, OwnerOffsetLinked);
             using var artwork = DXManager.BlendArtwork(GraphicsLayer.Spell);
             Library.DrawSpellFrame(DrawnFrame, DrawLocation, Color.White, Blend, Rate);
         }
 
+        private bool OwnerOffsetLinked => Owner != null && this is not Missile &&
+            GraphicsTuning.Offset(GraphicsTuning.Layer(Owner.Race)).Linked;
+        internal Point LightPosition => GraphicsTuning.LightPosition(LightSource.Spell, DrawLocation,
+            OwnerOffsetLinked || GraphicsTuning.Offset(GraphicsLayer.Spell).Linked);
+
         internal bool DrawLightMask(Color tint, float intensity, ref int pixelBudget) => Library != null && CurrentFrame >= 0 &&
-            CurrentFrame < Count && Library.DrawLightShape(DrawnFrame, GraphicsTuning.LightPosition(LightSource.Spell, DrawLocation),
+            CurrentFrame < Count && Library.DrawLightShape(DrawnFrame, LightPosition,
                 tint, true, intensity, ref pixelBudget, GraphicsTuning.Light(LightSource.Spell).Radius.Current);
 
         public void Clear()

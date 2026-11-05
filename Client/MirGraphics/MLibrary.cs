@@ -687,10 +687,11 @@ namespace Client.MirGraphics
 
         // Redraw the current animation frame's alpha silhouette at ground level.
         // Only checked/dithered sprites need an additional repaired GPU texture.
-        public void DrawProjectedShadow(int index, Point location, Point worldCell)
+        public void DrawProjectedShadow(int index, Point location, Point worldCell, bool originLinked = false, bool preview = false)
         {
-            if (!Settings.DynamicShadows || Settings.ShadowOpacityPercent == 0 ||
-                !Settings.ShadowSources.Allows(_fileName) || DXManager.Blending ||
+            bool automatic = GraphicsTuning.ProjectedPolicy.Current == 1 && _worldArtwork && GraphicsTuning.RepairBakedShadows;
+            if ((!Settings.DynamicShadows && !preview) || Settings.ShadowOpacityPercent == 0 ||
+                (!preview && !automatic && !Settings.ShadowSources.Allows(_fileName)) || DXManager.Blending ||
                 DXManager.ProjectedShadowsDrawn >= DXManager.MaxProjectedShadowsPerMapDraw)
                 return;
 
@@ -699,7 +700,7 @@ namespace Client.MirGraphics
                 mi.Width > 320 || mi.Height > 320)
                 return; // Reject oversized frames before their texture is uploaded.
 
-            Point imagePoint = GraphicsTuning.ProjectedOffset.Apply(location);
+            Point imagePoint = GraphicsTuning.ProjectedOffset.Apply(location, originLinked);
             imagePoint.Offset(mi.X, mi.Y);
             ShadowProjection direction = GameScene.Scene?.MapControl?.GetShadowProjection(worldCell)
                                         ?? ShadowProjection.Sunlight;
@@ -713,7 +714,7 @@ namespace Client.MirGraphics
             if (!CheckImage(index))
                 return;
 
-            if (mi.HasBakedShadow) return;
+            if (mi.HasBakedShadow && !preview) return;
             Texture repaired = mi.GetRepairedShadowTexture();
             bool halfSize = repaired != null;
             DXManager.DrawProjectedShadow(repaired ?? mi.Image,

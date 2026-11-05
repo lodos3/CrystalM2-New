@@ -146,6 +146,7 @@ internal static class Program
         TestArtworkStyles(device, backBuffer, translucent);
         TestGroundWeather(device, backBuffer);
         TestSpellArtwork(device, backBuffer);
+        TestConeProjection(device, backBuffer, red);
 
         long bytes = device.TextureBytes;
         int textures = device.TextureCount;
@@ -241,6 +242,20 @@ internal static class Program
         Near(terrain, withGlow.GetPixel(0, 0), "The second pass must not restore the black backing.");
         Check(withGlow.GetPixel(1, 0).R > beforeGlow.GetPixel(1, 0).R + 15, "The glow pass must boost the spell independently.");
         device.ArtworkBlend = null;
+        device.PixelShader = ShaderEffect.Artwork;
+    }
+
+    private static void TestConeProjection(RendererDevice device, Surface target, Texture red)
+    {
+        device.Clear(Color.Black);
+        device.PixelShader = ShaderEffect.ConeLight;
+        device.Blend = SpriteBlendMode.Additive;
+        device.SetPixelShaderConstant(0, [new(1, 0, 0.8f, 0.92f)]);
+        device.Sprite.Draw(red, new Rectangle(0, 0, 2, 2), new Rectangle(0, 0, 32, 32), Vector4.One);
+        using var image = device.Capture(target);
+        Near(Color.Red, image.GetPixel(25, 16), "An east-facing cone must illuminate its forward ray.");
+        Near(Color.Black, image.GetPixel(7, 16), "A cone must mask its rear hemisphere.");
+        device.Blend = SpriteBlendMode.Alpha;
         device.PixelShader = ShaderEffect.Artwork;
     }
 

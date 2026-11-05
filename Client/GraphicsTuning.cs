@@ -33,12 +33,20 @@ internal static class GraphicsTuning
         }
     }
 
-    internal sealed class Position(string key)
+    internal sealed class Position(string key, bool canLink = true)
     {
         public readonly Value X = new(key + "X", 0, -128, 128);
         public readonly Value Y = new(key + "Y", 0, -128, 128);
-        public Point Pixels => new(X.Current, Y.Current);
-        public Point Apply(Point point) => new(point.X + X.Current, point.Y + Y.Current);
+        public readonly Value Link = canLink ? new(key + "Linked", 0, 0, 1) : null;
+        public bool Linked => Link is { Current: 1 };
+        public Point Pixels => Apply(Point.Empty);
+
+        public Point Apply(Point point, bool originLinked = false)
+        {
+            point.Offset(X.Current, Y.Current);
+            if (Linked && !originLinked) point.Offset(GroupOffset.X.Current, GroupOffset.Y.Current);
+            return point;
+        }
     }
 
     internal sealed class Emitter(LightSource source)
@@ -47,6 +55,9 @@ internal static class GraphicsTuning
         public readonly Value Strength = new(source + "LightStrength", 100, 0, 300);
         public readonly Value Radius = new(source + "LightRadius", 100, 25, 250);
         public readonly Value Warmth = new(source + "LightWarmth", 0, -100, 100);
+        public readonly Value Shape = new(source + "LightShape", 0, 0, 2);
+        public readonly Value Direction = new(source + "LightDirection", 0, 0, 360);
+        public readonly Value Beam = new(source + "LightBeam", 65, 12, 175);
         public float Intensity => Strength.Current / 100f;
     }
 
@@ -77,9 +88,11 @@ internal static class GraphicsTuning
     internal static readonly Value DayBrightness = new("DayBrightness", 100, 0, 100);
     internal static readonly Value LightWarmth = new("AmbientWarmth", 0, -100, 100);
     internal static readonly Position AllLights = new("AllLightOffset");
+    internal static readonly Position GroupOffset = new("LinkedOffset", canLink: false);
+    internal static readonly Value OffsetGuides = new("OffsetGuides", 0, 0, 1);
 
-    internal static Point LightPosition(LightSource source, Point point) =>
-        AllLights.Apply(Light(source).Offset.Apply(point));
+    internal static Point LightPosition(LightSource source, Point point, bool originLinked = false) =>
+        Light(source).Offset.Apply(AllLights.Apply(point, originLinked), originLinked || AllLights.Linked);
 
     internal static readonly Value Exposure = new("PostExposure", 100, 25, 200);
     internal static readonly Value Contrast = new("PostContrast", 100, 25, 200);
@@ -131,6 +144,7 @@ internal static class GraphicsTuning
     internal static readonly Value BakedOpacity = new("BakedShadowOpacity", 100, 0, 200);
     internal static readonly Value ProjectedWidth = new("ProjectedShadowWidth", 100, 50, 160);
     internal static readonly Value ProjectedSlope = new("ProjectedShadowDirection", 0, -100, 100);
+    internal static readonly Value ProjectedPolicy = new("ProjectedShadowSource", 0, 0, 1);
     internal static readonly Position ProjectedOffset = new("ProjectedShadowOffset");
 
     internal static BakedShadowSettings BakedSettings { get; private set; } = BakedShadowSettings.Default;

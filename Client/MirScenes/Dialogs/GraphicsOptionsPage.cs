@@ -54,8 +54,13 @@ internal sealed class GraphicsOptionsPage : MirControl
 
     private void BuildOffsets()
     {
+        MirControl page = _content;
+        var individual = new MirControl { Parent = page, Size = page.Size };
+        var links = new MirControl { Parent = page, Size = page.Size, Visible = false };
+        _content = individual;
         Caption("Horizontal offset", 0, 0);
-        Caption("Vertical offset", Right, 0);
+        Caption("Vertical offset", Right, 0, 109);
+        AddButton(individual, "Link offsets", new Rectangle(374, 0, 114, 20), () => Select(true));
         for (int i = 0; i < GraphicsTuning.Layers.Length; i++)
         {
             GraphicsLayer layer = GraphicsTuning.Layers[i];
@@ -63,6 +68,33 @@ internal sealed class GraphicsOptionsPage : MirControl
             Preview preview = layer is GraphicsLayer.Ground or GraphicsLayer.Middle or GraphicsLayer.Front ? Preview.Floor : Preview.World;
             AddValue(LayerName(layer), 0, 20 + i * 23, offset.X, "px", preview);
             AddValue(LayerName(layer), Right, 20 + i * 23, offset.Y, "px", preview);
+        }
+        _content = links;
+        Caption("Select offsets to move together", 0, 0);
+        AddButton(links, "Individual offsets", new Rectangle(374, 0, 114, 20), () => Select(false));
+        AddValue("Group X", 0, 25, GraphicsTuning.GroupOffset.X, "px", Preview.Floor);
+        AddValue("Group Y", Right, 25, GraphicsTuning.GroupOffset.Y, "px", Preview.Floor);
+
+        var members = GraphicsTuning.Layers.Select(layer => (LayerName(layer), GraphicsTuning.Offset(layer)))
+            .Concat(GraphicsTuning.LightSources.Select(source => (LightName(source) + " light", GraphicsTuning.Light(source).Offset)))
+            .Append(("All lights", GraphicsTuning.AllLights))
+            .Append(("Projected shadows", GraphicsTuning.ProjectedOffset))
+            .ToArray();
+        for (int i = 0; i < members.Length; i++)
+        {
+            var (name, position) = members[i];
+            AddToggle(name, i < 11 ? 0 : Right, 54 + (i % 11) * 21,
+                () => position.Linked, linked => position.Link.Current = linked ? 1 : 0, Preview.Floor);
+        }
+        AddToggle("Show offset guides", 0, 292, () => GraphicsTuning.OffsetGuides.Current != 0,
+            visible => GraphicsTuning.OffsetGuides.Current = visible ? 1 : 0);
+        Caption("Cyan sprites · Gold lights · Violet map", Right, 292);
+        _content = page;
+
+        void Select(bool group)
+        {
+            individual.Visible = !group;
+            links.Visible = group;
         }
     }
 
@@ -90,8 +122,8 @@ internal sealed class GraphicsOptionsPage : MirControl
         for (int i = 0; i < GraphicsTuning.LightSources.Length; i++)
         {
             LightSource source = GraphicsTuning.LightSources[i];
-            string name = source == LightSource.Npc ? "NPC" : source == LightSource.MapAnimation ? "Animated" : source.ToString();
-            var emitterPanel = new MirControl { Parent = page, Location = new Point(Right, 77), Size = new Size(235, 205), Visible = false };
+            string name = LightName(source);
+            var emitterPanel = new MirControl { Parent = page, Location = new Point(Right, 77), Size = new Size(235, 242), Visible = false };
             var button = AddButton(page, name, new Rectangle(Right + (i % 4) * 59, 22 + (i / 4) * 25, 55, 22), () => { });
             button.Click += (_, _) => SelectEmitter();
             _content = emitterPanel;
@@ -102,6 +134,11 @@ internal sealed class GraphicsOptionsPage : MirControl
             AddValue("Warmth", 0, 70, light.Warmth);
             AddValue("Offset X", 0, 94, light.Offset.X, "px");
             AddValue("Offset Y", 0, 118, light.Offset.Y, "px");
+            AddChoice("Projection", 0, 142, light.Shape, ["Authored", "Radial", "Cone"]);
+            AddValue("Direction", 0, 166, light.Direction, "°", hint: "Cone direction. Zero points right.");
+            AddValue("Beam width", 0, 190, light.Beam, "°");
+            AddButton(emitterPanel, "Test light", new Rectangle(0, 216, 96, 21),
+                () => GameScene.Scene?.MapControl?.PreviewLight(source));
             if (i == 0) SelectEmitter();
 
             void SelectEmitter()
@@ -115,8 +152,7 @@ internal sealed class GraphicsOptionsPage : MirControl
             }
         }
         _content = page;
-        Caption("Animated lights follow the sprite shape.", Right, 235);
-        Caption("Torch controls equipped player lights.", Right, 257);
+        Caption("Authored keeps sprite-shaped emitters.", 0, 289);
     }
 
     private void BuildPost()
@@ -221,8 +257,10 @@ internal sealed class GraphicsOptionsPage : MirControl
             "Higher values allow more colour variation between checker dots.");
         AddValue("Blur radius", 0, 142, GraphicsTuning.BakedRadius, "px", Preview.Baked);
         AddValue("Opacity", 0, 166, GraphicsTuning.BakedOpacity, "%", Preview.Baked);
-        Caption("Baked settings apply when you release.", 0, 196);
-        Caption("The client processes the loaded frames.", 0, 218);
+        Caption("Baked settings apply when you release.", 0, 192);
+        AddChoice("Cast from", 0, 213, GraphicsTuning.ProjectedPolicy, ["Approved libraries", "Auto detect"]);
+        AddButton(_content, "Test shadow", new Rectangle(0, 235, 96, 18),
+            () => GameScene.Scene?.MapControl?.PreviewProjection());
 
         Caption("Projected shadows", Right, 0);
         AddToggle("Projected shadows", Right, 22, () => Settings.DynamicShadows, value => Settings.DynamicShadows = value);
@@ -270,6 +308,13 @@ internal sealed class GraphicsOptionsPage : MirControl
         GraphicsLayer.Npc => "NPC",
         GraphicsLayer.MapAnimation => "Map animation",
         _ => layer.ToString()
+    };
+
+    private static string LightName(LightSource source) => source switch
+    {
+        LightSource.Npc => "NPC",
+        LightSource.MapAnimation => "Animated",
+        _ => source.ToString()
     };
 
     private MirLabel Caption(string text, int x, int y, int width = 235) =>

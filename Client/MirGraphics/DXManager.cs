@@ -337,6 +337,17 @@ namespace Client.MirGraphics
             CMain.DPSCounter++;
         }
 
+        internal static void DrawLine(Point from, Point to, Color colour)
+        {
+            int dx = to.X - from.X, dy = to.Y - from.Y;
+            if (dx == 0 && dy == 0) return;
+            Matrix transform = Sprite.Transform;
+            Sprite.Transform = Matrix.CreateRotationZ(MathF.Atan2(dy, dx)) *
+                Matrix.CreateTranslation(from.X, from.Y, 0) * transform;
+            try { Device.Ui.Fill(new Rectangle(0, 0, (int)MathF.Ceiling(MathF.Sqrt(dx * dx + dy * dy)), 1), colour); }
+            finally { Sprite.Transform = transform; }
+        }
+
         internal static void DrawSpellArtwork(Texture texture, Point position, Color colour, bool additive)
         {
             ShaderEffect shader = Device.PixelShader;

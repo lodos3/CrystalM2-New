@@ -35,7 +35,7 @@ public sealed partial class MapControl
 
         Point floor = GraphicsTuning.Offset(GraphicsLayer.Ground).Apply(ToMouseLocation(Point.Empty));
         floor.X -= OffSetX; // Match DrawFloorTiles, including its legacy horizontal adjustment.
-        Point weatherOrigin = GraphicsTuning.Offset(GraphicsLayer.Weather).Apply(floor);
+        Point weatherOrigin = GraphicsTuning.Offset(GraphicsLayer.Weather).Apply(floor, GraphicsTuning.Offset(GraphicsLayer.Ground).Linked);
         var viewport = new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight);
         Point start = new(Math.Max(0, User.Movement.X - ViewRangeX), Math.Max(1, User.Movement.Y - ViewRangeY));
         Point end = new(Math.Min(Width - 1, User.Movement.X + ViewRangeX), Math.Min(Height - 1, User.Movement.Y + ViewRangeY));
