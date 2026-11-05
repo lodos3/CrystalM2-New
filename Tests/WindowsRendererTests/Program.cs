@@ -109,6 +109,25 @@ internal static class Program
                 "Repaired masks must use smooth alpha edges, without tinting source artwork.");
             device.Sprite.Transform = Matrix4x4.Identity;
         }
+        device.PixelShader = ShaderEffect.ProjectedShadow;
+        device.SetPixelShaderConstant(0, [new Vector4(0.5f, 0.5f, 0, 0)]);
+        var paddedShadow = new Rectangle(-1, -1, 4, 4);
+        device.Clear(Color.White);
+        device.Sprite.Draw(red, paddedShadow, new Vector3(7, 7, 0), new Vector4(0, 0, 0, 0.5f));
+        byte coreRed;
+        using (var image = device.Capture(backBuffer))
+        {
+            Color core = image.GetPixel(8, 8), edge = image.GetPixel(7, 8);
+            coreRed = core.R;
+            Check(core.R < edge.R && edge.R < 255 && edge.R == edge.G && edge.R == edge.B,
+                "A softened shadow must feather beyond the original sprite silhouette.");
+            Near(Color.White, image.GetPixel(6, 8), "The blur must stay within the padded shadow quad.");
+        }
+        device.Clear(Color.White);
+        device.Sprite.Draw(red, paddedShadow, new Vector3(7, 7, 0), new Vector4(0, 0, 0, 0.25f));
+        using (var image = device.Capture(backBuffer))
+            Check(image.GetPixel(8, 8).R > coreRed && image.GetPixel(8, 8).R < 255,
+                "Lower shadow opacity must darken the scene less.");
         device.PixelShader = ShaderEffect.Artwork;
 
         long bytes = device.TextureBytes;

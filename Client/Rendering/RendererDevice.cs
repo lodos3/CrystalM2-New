@@ -209,7 +209,7 @@ public sealed unsafe class RendererDevice : IDisposable
         Context.VSSetShader(_vertexShader);
         Context.PSSetShader(_shaders[(int)_effect]);
         Context.PSSetShaderResource(0, source.View);
-        bool smooth = _effect is ShaderEffect.BloomBlur or ShaderEffect.BloomExtract or ShaderEffect.ShadowMask;
+        bool smooth = _effect is ShaderEffect.BloomBlur or ShaderEffect.BloomExtract or ShaderEffect.ShadowMask or ShaderEffect.ProjectedShadow;
         Context.PSSetSampler(0, smooth ? _linearSampler : _pointSampler);
         var frame = Context.Map(_frameBuffer, MapMode.WriteDiscard);
         try { frame.AsSpan<Vector4>(1)[0] = new Vector4(TargetWidth, TargetHeight, source.IsRenderTarget ? 1 : 0, 0); }

@@ -1243,6 +1243,12 @@ namespace Client.MirScenes.Dialogs
     }
     public sealed class OptionDialog : MirPanel
     {
+        private static readonly Size GeneralSize = new(260, 328);
+        private static readonly Size GraphicsSize = new(520, 364);
+        private readonly MirControl[] _generalControls;
+        private readonly GraphicsOptionsPage _graphicsPage;
+        private readonly MirButton _generalTab, _graphicsTab;
+
         public MirButton SkillModeOn, SkillModeOff;
         public MirButton SkillBarOn, SkillBarOff;
         public MirButton EffectOn, EffectOff;
@@ -1260,7 +1266,7 @@ namespace Client.MirScenes.Dialogs
         public OptionDialog()
         {
             AutoSize = false;
-            Size = new Size(260, 328);
+            Size = GeneralSize;
             Movable = true;
             Sort = true;
 
@@ -1570,6 +1576,39 @@ namespace Client.MirScenes.Dialogs
                 ("Sound effects", SoundBar.Location.Y - 4), ("Music", MusicSoundBar.Location.Y - 4),
                 ("Allow observing", ObserveOn.Location.Y), ("Modern movement", NewMoveOn.Location.Y)
             }) AddCaption(this, row.Item1, new Rectangle(16, row.Item2, 135, 17));
+
+            _generalControls = Controls.Where(control => control != CloseButton).ToArray();
+            _graphicsPage = new GraphicsOptionsPage { Parent = this, Location = new Point(16, 66) };
+            _generalTab = AddTab("General", 16, showGraphics: false);
+            _graphicsTab = AddTab("Graphics", 100, showGraphics: true);
+            _generalTab.Selected = true;
+        }
+
+        private MirButton AddTab(string text, int x, bool showGraphics)
+        {
+            var tab = new MirButton
+            {
+                Parent = this, Location = new Point(x, 37), Size = new Size(78, 23), AutoSize = false,
+                Skin = UiSurface.Button, Text = text, Sound = SoundList.ButtonA
+            };
+            tab.Click += (_, _) => SelectTab(showGraphics);
+            return tab;
+        }
+
+        private void SelectTab(bool showGraphics)
+        {
+            if (_graphicsTab.Selected == showGraphics) return;
+
+            Size previousSize = Size;
+            Size = showGraphics ? GraphicsSize : GeneralSize;
+            Location = new Point(
+                Math.Clamp(Location.X + (previousSize.Width - Size.Width) / 2, 0, Math.Max(0, Settings.ScreenWidth - Size.Width)),
+                Math.Clamp(Location.Y, 0, Math.Max(0, Settings.ScreenHeight - Size.Height)));
+            CloseButton.Location = new Point(Size.Width - 26, 5);
+            foreach (MirControl control in _generalControls) control.Visible = !showGraphics;
+            _graphicsPage.Visible = showGraphics;
+            _graphicsTab.Selected = showGraphics;
+            _generalTab.Selected = !showGraphics;
         }
 
         private void ToggleObserve(bool allow)

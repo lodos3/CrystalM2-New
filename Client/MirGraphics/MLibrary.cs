@@ -649,7 +649,8 @@ namespace Client.MirGraphics
         // Only checked/dithered sprites need an additional repaired GPU texture.
         public void DrawProjectedShadow(int index, Point location, Point worldCell)
         {
-            if (!Settings.DynamicShadows || !Settings.ShadowSources.Allows(_fileName) || DXManager.Blending ||
+            if (!Settings.DynamicShadows || Settings.ShadowOpacityPercent == 0 ||
+                !Settings.ShadowSources.Allows(_fileName) || DXManager.Blending ||
                 DXManager.ProjectedShadowsDrawn >= DXManager.MaxProjectedShadowsPerMapDraw)
                 return;
 
@@ -662,6 +663,8 @@ namespace Client.MirGraphics
             imagePoint.Offset(mi.X, mi.Y);
             ShadowProjection direction = GameScene.Scene?.MapControl?.GetShadowProjection(worldCell)
                                         ?? ShadowProjection.Sunlight;
+            float length = Settings.ShadowLengthPercent / 100f;
+            direction = new ShadowProjection(direction.Horizontal * length, direction.Vertical * length);
             if (!direction.IsProjectedVisible(imagePoint, mi.Width, mi.Height,
                                               Settings.ScreenWidth, Settings.ScreenHeight))
                 return;

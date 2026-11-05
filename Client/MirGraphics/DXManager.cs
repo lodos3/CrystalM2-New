@@ -205,9 +205,10 @@ namespace Client.MirGraphics
                                                AtmosphericWeatherFrame weatherFrame, Color hazeTint)
         {
             float intensity = AtmosphereIntensity.Scale(Settings.AtmosphereIntensityPercent);
+            float vignette = Settings.VignetteIntensityPercent / 100f;
             PostProcessConstants[0] = new Vector4(
                 AtmosphereExposure.Brightness(weatherFrame.CloudCover, intensity),
-                0.22f, 1f, 0.80f);
+                0.22f * vignette, 1f, 1f - 0.20f * vignette);
             PostProcessConstants[2] = new Vector4(atmosphere.R / 255f, atmosphere.G / 255f,
                                                    atmosphere.B / 255f,
                                                    Math.Clamp(gradeStrength * intensity, 0f, 0.4f));
@@ -244,10 +245,13 @@ namespace Client.MirGraphics
 
             Matrix original = Sprite.Transform;
             ShaderEffect originalShader = Device.PixelShader;
+            float scale = halfResolution ? 2f : 1f;
+            float blurRadius = Settings.ShadowSoftness / scale;
+            Span<Vector4> originalConstants = stackalloc Vector4[6];
+            if (blurRadius > 0) Device.CopyPixelShaderConstants(originalConstants);
             Sprite.Flush();
             try
             {
-                float scale = halfResolution ? 2f : 1f;
                 Matrix projection = Matrix.Identity;
                 projection.M11 = scale;
                 projection.M21 = -horizontal * scale;
@@ -255,8 +259,22 @@ namespace Client.MirGraphics
                 projection.M41 = topLeft.X + horizontal * sourceHeight;
                 projection.M42 = topLeft.Y + (1f + vertical) * sourceHeight;
                 Sprite.Transform = projection;
-                if (halfResolution) Device.PixelShader = ShaderEffect.ShadowMask;
-                Draw(texture, sourceRect, Vector3.Zero, Color.FromArgb(92, 0, 0, 0));
+
+                Vector3 origin = Vector3.Zero;
+                if (blurRadius > 0)
+                {
+                    // Expand the quad so the soft edge can extend beyond the sprite.
+                    int padding = (int)Math.Ceiling(blurRadius) + 1;
+                    sourceRect.Inflate(padding, padding);
+                    origin = new Vector3(-padding, -padding, 0);
+                    Device.PixelShader = ShaderEffect.ProjectedShadow;
+                    Device.SetPixelShaderConstant(0, [new Vector4(blurRadius / texture.Width,
+                        blurRadius / texture.Height, 0, 0)]);
+                }
+                else if (halfResolution) Device.PixelShader = ShaderEffect.ShadowMask;
+
+                int alpha = (int)Math.Round(Settings.ShadowOpacityPercent * 255 / 100d);
+                Draw(texture, sourceRect, origin, Color.FromArgb(alpha, 0, 0, 0));
                 ProjectedShadowsDrawn++;
                 Sprite.Flush();
             }
@@ -264,6 +282,7 @@ namespace Client.MirGraphics
             {
                 Sprite.Transform = original;
                 Device.PixelShader = originalShader;
+                if (blurRadius > 0) Device.SetPixelShaderConstant(0, originalConstants);
             }
         }
 

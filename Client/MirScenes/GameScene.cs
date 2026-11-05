@@ -10501,6 +10501,8 @@ namespace Client.MirScenes
 
         internal ShadowProjection GetShadowProjection(Point worldCell)
         {
+            if (!Settings.ShadowsFollowLights) return ShadowProjection.Sunlight;
+
             LightSetting setting = Lights == LightSetting.Normal ? GameScene.Scene.Lights : Lights;
             if (AmbientLightTransition.Target(setting, MapDarkLight).ToArgb() == Color.White.ToArgb())
                 return ShadowProjection.Sunlight;
@@ -10817,7 +10819,7 @@ namespace Client.MirScenes
                 _weatherFrame = default;
             }
 
-            if (Settings.DynamicShadows)
+            if (Settings.DynamicShadows && Settings.ShadowsFollowLights && Settings.ShadowOpacityPercent > 0)
             {
                 UpdateStaticLights();
                 IndexMovingLights();
@@ -10870,11 +10872,13 @@ namespace Client.MirScenes
             // Continue the light pass when transitioning into day, then avoid
             // its render target and blend operations once daylight is fully white.
             if (ambient.ToArgb() != Color.White.ToArgb() ||
-                Settings.LightingBloom ||
+                (Settings.LightingBloom && Settings.BloomIntensityPercent > 0) ||
                 GameScene.User.Poison.HasFlag(PoisonType.Blindness))
             {
                 DrawLights(ambient);
             }
+            // Composite emission after darkness, or release the blur buffers when disabled.
+            LightBloomPass.Composite();
 
             if (Settings.DropView || GameScene.DropViewTime > CMain.Time)
             {
@@ -11516,11 +11520,6 @@ namespace Client.MirScenes
             DXManager.Sprite.End();
             DXManager.Device.PixelShader = previousLightShader;
             DXManager.Sprite.Begin();
-
-            // Composite extracted lights after multiplicative darkness and
-            // before UI. The emission buffer contains no ambient colour.
-            if (Settings.LightingBloom)
-                LightBloomPass.Composite();
         }
 
         private static void OnMouseClick(object sender, EventArgs e)

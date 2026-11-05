@@ -53,6 +53,23 @@ float4 PSShadowMask(Output input) : SV_TARGET
 {
     return float4(0, 0, 0, SampleStraight(input.Uv).a * input.Tint.a);
 }
+float ProjectedShadowAlpha(float2 uv)
+{
+    // The source texture ends at the sprite edges. Treat the padded area as clear.
+    return SpriteTexture.Sample(SpriteSampler, uv).a * all(uv >= 0) * all(uv <= 1);
+}
+float4 PSProjectedShadow(Output input) : SV_TARGET
+{
+    float2 dx = float2(C[0].x, 0);
+    float2 dy = float2(0, C[0].y);
+    float2 uv = input.Uv;
+    float alpha = 4 * ProjectedShadowAlpha(uv);
+    alpha += 2 * (ProjectedShadowAlpha(uv - dx) + ProjectedShadowAlpha(uv + dx) +
+                  ProjectedShadowAlpha(uv - dy) + ProjectedShadowAlpha(uv + dy));
+    alpha += ProjectedShadowAlpha(uv - dx - dy) + ProjectedShadowAlpha(uv + dx - dy) +
+             ProjectedShadowAlpha(uv - dx + dy) + ProjectedShadowAlpha(uv + dx + dy);
+    return float4(0, 0, 0, alpha * input.Tint.a / 16);
+}
 // Atmosphere runs only when compositing the world texture, before the HUD.
 float4 PSAtmosphere(Output input) : SV_TARGET
 {

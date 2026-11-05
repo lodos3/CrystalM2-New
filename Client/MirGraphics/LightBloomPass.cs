@@ -37,7 +37,7 @@ namespace Client.MirGraphics
 
         internal static void Composite()
         {
-            if (!Settings.LightingBloom)
+            if (!Settings.LightingBloom || Settings.BloomIntensityPercent == 0)
             {
                 ReleaseTarget();
                 return;
@@ -84,7 +84,7 @@ namespace Client.MirGraphics
                 DXManager.SetSurface(originalSurface);
                 DXManager.Device.Blend = SpriteBlendMode.Additive;
                 BlurConstants[0] = new Vector4(0, 1f / _size.Height, 0, 0);
-                BlurConstants[1] = new Vector4(0.575f, 0, 0, 0);
+                BlurConstants[1] = new Vector4(0.575f * Settings.BloomIntensityPercent / 100f, 0, 0, 0);
                 DXManager.Device.SetPixelShaderConstant(0, BlurConstants);
                 DXManager.Sprite.Transform = Matrix.CreateScale(
                     (float)Settings.ScreenWidth / _size.Width,
