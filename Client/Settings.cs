@@ -89,6 +89,8 @@ namespace Client
         public static bool LightingBloom = false, MapLightOcclusion = false;
         public static int BloomDivisor = 4;
         public static int BloomIntensityPercent = 100, VignetteIntensityPercent = 100;
+        public static int AmbientDarknessPercent = 100, SpellLightIntensityPercent = 100,
+            MapLightIntensityPercent = 100, SpellBlendIntensityPercent = 100;
         public static int WeatherParticleCap = 256;
         public static int AtmosphereIntensityPercent = 100;
         public static bool FPSCap = true;
@@ -251,6 +253,10 @@ namespace Client
             BloomDivisor = Math.Clamp(Reader.ReadInt32("Graphics", "BloomDivisor", BloomDivisor), 2, 8);
             BloomIntensityPercent = ReadGraphicsRange("BloomIntensityPercent", BloomIntensityPercent, 0, 200);
             VignetteIntensityPercent = ReadGraphicsRange("VignetteIntensityPercent", VignetteIntensityPercent, 0, 100);
+            AmbientDarknessPercent = ReadGraphicsRange(nameof(AmbientDarknessPercent), AmbientDarknessPercent, 0, 100);
+            SpellLightIntensityPercent = ReadGraphicsRange(nameof(SpellLightIntensityPercent), SpellLightIntensityPercent, 0, 200);
+            MapLightIntensityPercent = ReadGraphicsRange(nameof(MapLightIntensityPercent), MapLightIntensityPercent, 0, 200);
+            SpellBlendIntensityPercent = ReadGraphicsRange(nameof(SpellBlendIntensityPercent), SpellBlendIntensityPercent, 0, 200);
             WeatherParticleCap = Math.Clamp(Reader.ReadInt32("Graphics", "WeatherParticleCap", WeatherParticleCap), 64, 1024);
             AtmosphereIntensityPercent = Math.Clamp(Reader.ReadInt32("Graphics", "AtmosphereIntensityPercent", AtmosphereIntensityPercent), 0, 100);
             Resolution = Reader.ReadInt32("Graphics", "Resolution", Resolution);
@@ -416,6 +422,10 @@ namespace Client
             Write(nameof(BloomIntensityPercent), BloomIntensityPercent);
             Write(nameof(BloomDivisor), BloomDivisor);
             Write(nameof(MapLightOcclusion), MapLightOcclusion);
+            Write(nameof(AmbientDarknessPercent), AmbientDarknessPercent);
+            Write(nameof(SpellLightIntensityPercent), SpellLightIntensityPercent);
+            Write(nameof(MapLightIntensityPercent), MapLightIntensityPercent);
+            Write(nameof(SpellBlendIntensityPercent), SpellBlendIntensityPercent);
             Reader.Save();
 
             void Write(string key, object value) => Reader.Write("Graphics", key, value.ToString(), save: false);

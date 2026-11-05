@@ -292,6 +292,27 @@ namespace Client.MirGraphics
             Draw(texture, sourceRect, position, color);
         }
 
+        internal static void DrawShapedLight(Texture texture, Point location, int radius, Color tint, float intensity)
+        {
+            ShaderEffect previous = Device.PixelShader;
+            Span<Vector4> constants = stackalloc Vector4[6];
+            Device.CopyPixelShaderConstants(constants);
+            Device.PixelShader = ShaderEffect.ShapedLight;
+            try
+            {
+                Device.SetPixelShaderConstant(0, [new Vector4((float)radius / texture.Width,
+                    (float)radius / texture.Height, intensity, 0)]);
+                Draw(texture, new Rectangle(-radius, -radius, texture.Width + radius * 2, texture.Height + radius * 2),
+                    new Vector3(location.X, location.Y, 0), tint);
+                Sprite.Flush();
+            }
+            finally
+            {
+                Device.PixelShader = previous;
+                Device.SetPixelShaderConstant(0, constants);
+            }
+        }
+
         public static void Draw(Texture texture, Rectangle? sourceRect, Vector3? position, Color color)
         {
             Sprite.Draw(texture, sourceRect, position, RendererDevice.ToVector(color));

@@ -62,6 +62,41 @@ static class Program
         upload[0] = 0;
         Assertions.True(source[0] == 13, "Upload must never mutate decoded sprite source.");
 
+        foreach (int phase in new[] { 0, 1 })
+        {
+            const int width = 12, height = 10, pitch = 52;
+            byte[] world = new byte[pitch * height];
+            for (int y = 2; y < 8; y++)
+            for (int x = 3; x < 10; x++)
+            {
+                if (((x + y) & 1) != phase) continue;
+                int p = y * pitch + x * 4;
+                world[p + 2] = 8;
+                world[p + 3] = 255;
+            }
+            world[4] = 77;
+            world[7] = 255;
+            world[9] = 4;
+            world[11] = 255;
+            Assertions.True(BakedShadowRepair.Smooth(world, width, height, pitch),
+                "Repair checker shadows in either parity with a padded row pitch.");
+            for (int x = 5; x < 8; x++)
+            {
+                int p = 4 * pitch + x * 4;
+                Assertions.True(world[p + 2] == 0 && world[p + 3] is >= 120 and <= 128,
+                    "Replace the opaque dots and transparent holes with stable translucent coverage.");
+            }
+            Assertions.True(world[4] == 77 && world[7] == 255 && world[9] == 4 && world[11] == 255,
+                "Preserve nearby colour and solid dark details.");
+            byte[] softened = world.ToArray();
+            Assertions.True(!BakedShadowRepair.Smooth(world, width, height, pitch) && world.SequenceEqual(softened),
+                "Do not reprocess already-softened artwork.");
+        }
+        byte[] darkTiles = Enumerable.Repeat(new byte[] { 0, 0, 8, 255, 30, 40, 50, 255 }, 32)
+            .SelectMany(pair => pair).ToArray();
+        Assertions.True(!BakedShadowRepair.Smooth(darkTiles, 8, 8, 32),
+            "Opaque dark tile patterns are not transparent checker shadows.");
+
         BakedSpriteCommand command = BakedArtPolicy.ForArtwork(7, 10, 20, 2, 2);
         Assertions.True(command.TintR == 255 && command.TintG == 255 &&
                         command.TintB == 255 && command.TintA == 255,

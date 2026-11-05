@@ -343,10 +343,10 @@ namespace Client.MirObjects
 
             if (Blend)
             {
-                BodyLibrary.DrawBlend(
+                BodyLibrary.DrawEffectBlend(
                     DrawFrame + FrameIndex,
                     AnimationOffset == default ? DrawLocation : GetDrawWithOffset(),
-                    DrawColour, true,
+                    DrawColour,
                     0.8F);
             }
             else
@@ -361,17 +361,15 @@ namespace Client.MirObjects
         // The spell's actual animated frame contributes its own alpha silhouette
         // to the light map, rather than being represented solely by a round glow.
         // This is called only while the light render target is active.
-        public bool DrawLightMask()
+        public bool DrawLightMask(Color tint, float intensity, ref int pixelBudget)
         {
             if (BodyLibrary == null || (FrameIndex >= FrameCount && !Repeat))
                 return false;
 
-            BodyLibrary.Draw(
+            return BodyLibrary.DrawLightShape(
                 DrawFrame + FrameIndex,
                 AnimationOffset == default ? DrawLocation : GetDrawWithOffset(),
-                Color.White,
-                true);
-            return true;
+                tint, true, intensity, ref pixelBudget);
         }
 
         public override bool MouseOver(Point p)

@@ -1244,7 +1244,7 @@ namespace Client.MirScenes.Dialogs
     public sealed class OptionDialog : MirPanel
     {
         private static readonly Size GeneralSize = new(260, 328);
-        private static readonly Size GraphicsSize = new(520, 364);
+        private static readonly Size GraphicsSize = new(520, 469);
         private readonly MirControl[] _generalControls;
         private readonly GraphicsOptionsPage _graphicsPage;
         private readonly MirButton _generalTab, _graphicsTab;

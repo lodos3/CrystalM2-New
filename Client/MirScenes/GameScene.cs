@@ -10832,6 +10832,7 @@ namespace Client.MirScenes
                 WetSurfacePass.Draw(_mapMaterials, _weatherFrame, User.Movement,
                                     User.OffSetMove, OffSetX, OffSetY,
                                     ViewRangeX, ViewRangeY, Width, Height);
+            _animatedMapLights.Clear();
             DrawSpellParticles(ground: true);
             DrawObjects();
             DrawSpellParticles(ground: false);
@@ -10851,7 +10852,7 @@ namespace Client.MirScenes
 
             LightSetting setting = Lights == LightSetting.Normal ? GameScene.Scene.Lights : Lights;
             Color targetAmbient = AmbientLightTransition.Target(setting, MapDarkLight);
-            Color ambient = _ambientLighting.Sample(targetAmbient, CMain.Time);
+            Color ambient = ApplyAmbientDarkness(_ambientLighting.Sample(targetAmbient, CMain.Time));
             if (Settings.EnvironmentAtmosphere)
             {
                 Color desiredTint = AtmosphereColourGrade.Target(setting, Weather, MapDarkLight);
@@ -10869,10 +10870,9 @@ namespace Client.MirScenes
                 _fogFade.Reset();
             }
 
-            // Continue the light pass when transitioning into day, then avoid
-            // its render target and blend operations once daylight is fully white.
             if (ambient.ToArgb() != Color.White.ToArgb() ||
                 (Settings.LightingBloom && Settings.BloomIntensityPercent > 0) ||
+                _animatedMapLights.Count != 0 || HasSpellLights() ||
                 GameScene.User.Poison.HasFlag(PoisonType.Blindness))
             {
                 DrawLights(ambient);
@@ -11124,6 +11124,8 @@ namespace Client.MirScenes
                         int animationoffset = M2CellInfo[x, y].TileAnimationOffset ^ 0x2000;
                         index += animationoffset * (AnimationCount % animation);
                         Libraries.MapLibs[190].DrawUp(index, drawX, drawY);
+                        CaptureAnimatedMapLight(Libraries.MapLibs[190], index,
+                            new Point(drawX, drawY - Libraries.MapLibs[190].GetSize(index).Height), false, x, y, false);
                     }
 
                     #endregion
@@ -11148,14 +11150,18 @@ namespace Client.MirScenes
                                     byte animationTick = M2CellInfo[x, y].MiddleAnimationTick;
                                     index += (AnimationCount % (animation + (animation * animationTick))) / (1 + animationTick);
 
-                                    if (blend && (animation == 10 || animation == 8)) //diamond mines, abyss blends
+                                    MLibrary library = Libraries.MapLibs[M2CellInfo[x, y].MiddleIndex];
+                                    bool additive = blend && (animation == 10 || animation == 8); // diamond mines, abyss
+                                    if (additive)
                                     {
-                                        Libraries.MapLibs[M2CellInfo[x, y].MiddleIndex].DrawUpBlend(index, new Point(drawX, drawY));
+                                        library.DrawUpBlend(index, new Point(drawX, drawY));
                                     }
                                     else
                                     {
-                                        Libraries.MapLibs[M2CellInfo[x, y].MiddleIndex].DrawUp(index, drawX, drawY);
+                                        library.DrawUp(index, drawX, drawY);
                                     }
+                                    CaptureAnimatedMapLight(library, index,
+                                        new Point(drawX, drawY - library.GetSize(index).Height), false, x, y, additive);
                                 }
                             }
                             s = Libraries.MapLibs[M2CellInfo[x, y].MiddleIndex].GetSize(index);
@@ -11213,20 +11219,14 @@ namespace Client.MirScenes
                     if (s.Width == CellWidth && s.Height == CellHeight && animation == 0) continue;
                     if ((s.Width == CellWidth * 2) && (s.Height == CellHeight * 2) && (animation == 0)) continue;
 
-                    if (blend)
-                    {
-                        if (fileIndex == 14 || fileIndex == 27 || (fileIndex > 99 & fileIndex < 199))
-                            Libraries.MapLibs[fileIndex].DrawBlend(index, new Point(drawX, drawY - (3 * CellHeight)), Color.White, true);
-                        else
-                            Libraries.MapLibs[fileIndex].DrawBlend(index, new Point(drawX, drawY - s.Height), Color.White, (index >= 2723 && index <= 2732));
-                    }
-                    else
-                    {
-                        if (fileIndex == 28 && Libraries.MapLibs[fileIndex].GetOffSet(index) != Point.Empty)
-                            Libraries.MapLibs[fileIndex].Draw(index, new Point(drawX, drawY - CellHeight), Color.White, true);
-                        else
-                            Libraries.MapLibs[fileIndex].Draw(index, drawX, drawY - s.Height);
-                    }
+                    MLibrary front = Libraries.MapLibs[fileIndex];
+                    bool highBlend = blend && (fileIndex is 14 or 27 || fileIndex is > 99 and < 199);
+                    bool offsetFront = !blend && fileIndex == 28 && front.GetOffSet(index) != Point.Empty;
+                    bool useOffset = highBlend || offsetFront || (blend && index is >= 2723 and <= 2732);
+                    Point frontPosition = new(drawX, drawY - (highBlend ? 3 * CellHeight : offsetFront ? CellHeight : s.Height));
+                    if (blend) front.DrawBlend(index, frontPosition, Color.White, useOffset);
+                    else front.Draw(index, frontPosition, Color.White, useOffset);
+                    if (animation > 0) CaptureAnimatedMapLight(front, index, frontPosition, useOffset, x, y, blend);
                     #endregion
                 }
 
@@ -11312,214 +11312,6 @@ namespace Client.MirScenes
             light = Color.FromArgb(255, Math.Max(20, light.R - (count * 10)), Math.Max(20, light.G - (count * 10)), Math.Max(20, light.B - (count * 10)));
 
             return light;
-        }
-
-        private void DrawLights(Color darkness)
-        {
-            if (DXManager.Lights == null || DXManager.Lights.Count == 0) return;
-
-            if (DXManager.LightTexture == null || DXManager.LightTexture.Disposed)
-            {
-                DXManager.LightTexture = new Texture(DXManager.Device, Settings.ScreenWidth, Settings.ScreenHeight, true);
-                DXManager.LightSurface = DXManager.LightTexture.GetSurface();
-            }
-
-            Surface oldSurface = DXManager.CurrentSurface;
-            DXManager.SetSurface(DXManager.LightSurface);
-
-            #region Ambient Light
-
-            if (MapObject.User.Poison.HasFlag(PoisonType.Blindness))
-            {
-                darkness = GetBlindLight(darkness);
-            }
-
-            // Keep emitted light separate from ambient. Otherwise the ambient
-            // colour itself crosses the bloom threshold on brighter maps.
-            DXManager.Device.Clear(Color.Black);
-
-            #endregion
-
-            int light;
-            Point p;
-            DXManager.SetBlend(true);
-            DXManager.Device.Blend = SpriteBlendMode.Additive;
-
-            #region Object Lights (Player/Mob/NPC)
-            foreach (var ob in Objects.Values)
-            {
-                if (ob.Light > 0 && (!ob.Dead || ob == MapObject.User || ob.Race == ObjectType.Spell))
-                {
-                    light = ob.Light;
-
-                    int lightRange = light % 15;
-                    if (lightRange >= DXManager.Lights.Count)
-                        lightRange = DXManager.Lights.Count - 1;
-
-                    p = ob.DrawLocation;
-
-                    Color lightColour = ob.LightColour;
-
-                    if (ob.Race == ObjectType.Player)
-                    {
-                        switch (light / 15)
-                        {
-                            case 0://no light source
-                                lightColour = Color.FromArgb(255, 60, 60, 60);
-                                break;
-                            case 1:
-                                lightColour = Color.FromArgb(255, 120, 120, 120);
-                                break;
-                            case 2://Candle
-                                lightColour = Color.FromArgb(255, 180, 180, 180);
-                                break;
-                            case 3://Torch
-                                lightColour = Color.FromArgb(255, 240, 240, 240);
-                                break;
-                            default://Peddler Torch
-                                lightColour = Color.FromArgb(255, 255, 255, 255);
-                                break;
-                        }
-                    }
-                    else if (ob.Race == ObjectType.Merchant)
-                    {
-                        lightColour = Color.FromArgb(255, 120, 120, 120);
-                    }
-
-                    if (MapObject.User.Poison.HasFlag(PoisonType.Blindness))
-                    {
-                        lightColour = GetBlindLight(lightColour);
-                    }
-
-                    // Spell sprites illuminate using the animation's own alpha silhouette.
-                    // Other objects (torch, player, NPC) retain their soft radial light.
-                    bool drawnSpellShape = ob is SpellObject spell && spell.DrawLightMask();
-                    if (!drawnSpellShape && DXManager.Lights[lightRange] != null && !DXManager.Lights[lightRange].Disposed)
-                    {
-                        p.Offset(-(DXManager.LightSizes[lightRange].X / 2) - (CellWidth / 2), -(DXManager.LightSizes[lightRange].Y / 2) - (CellHeight / 2) - 5);
-                        DXManager.Draw(DXManager.Lights[lightRange], null, new Vector3((float)p.X, (float)p.Y, 0.0F), lightColour);
-                    }
-                }
-
-                #region Object Effect Lights
-                if (!Settings.Effect) continue;
-                for (int e = 0; e < ob.Effects.Count; e++)
-                {
-                    Effect effect = ob.Effects[e];
-                    if (!effect.Blend || CMain.Time < effect.Start || effect.Light <= 0) continue;
-
-                    light = Math.Min(effect.Light, DXManager.Lights.Count - 1);
-                    p = effect.DrawLocation;
-
-                    var lightColour = effect.LightColour;
-
-                    if (MapObject.User.Poison.HasFlag(PoisonType.Blindness))
-                    {
-                        lightColour = GetBlindLight(lightColour);
-                    }
-
-                    if (effect.Library != null && effect.CurrentFrame >= 0 && effect.CurrentFrame < effect.Count)
-                    {
-                        effect.Library.Draw(effect.BaseIndex + effect.CurrentFrame, p, lightColour, true);
-                    }
-                    else if (DXManager.Lights[light] != null && !DXManager.Lights[light].Disposed)
-                    {
-                        p.Offset(-(DXManager.LightSizes[light].X / 2) - (CellWidth / 2), -(DXManager.LightSizes[light].Y / 2) - (CellHeight / 2) - 5);
-                        DXManager.Draw(DXManager.Lights[light], null, new Vector3((float)p.X, (float)p.Y, 0.0F), lightColour);
-                    }
-
-                }
-                #endregion
-            }
-            #endregion
-
-            #region Map Effect Lights
-            if (Settings.Effect)
-            {
-                for (int e = 0; e < Effects.Count; e++)
-                {
-                    Effect effect = Effects[e];
-                    if (!effect.Blend || CMain.Time < effect.Start) continue;
-
-                    if (effect.Light <= 0) continue;
-                    light = Math.Min(effect.Light, DXManager.Lights.Count - 1);
-
-                    p = effect.DrawLocation;
-
-                    var lightColour = effect.LightColour;
-
-                    if (MapObject.User.Poison.HasFlag(PoisonType.Blindness))
-                    {
-                        lightColour = GetBlindLight(lightColour);
-                    }
-
-                    if (effect.Library != null && effect.CurrentFrame >= 0 && effect.CurrentFrame < effect.Count)
-                    {
-                        effect.Library.Draw(effect.BaseIndex + effect.CurrentFrame, p, lightColour, true);
-                    }
-                    else if (DXManager.Lights[light] != null && !DXManager.Lights[light].Disposed)
-                    {
-                        p.Offset(-(DXManager.LightSizes[light].X / 2) - (CellWidth / 2), -(DXManager.LightSizes[light].Y / 2) - (CellHeight / 2) - 5);
-                        DXManager.Draw(DXManager.Lights[light], null, new Vector3((float)p.X, (float)p.Y, 0.0F), lightColour);
-                    }
-                }
-            }
-            #endregion
-
-            #region Map Lights
-            UpdateStaticLights();
-            int centerX = MapObject.User.Movement.X, centerY = MapObject.User.Movement.Y;
-            foreach (CachedMapLight emitter in _staticLightCache.Items)
-            {
-                if (!_staticLightCache.InViewport(emitter, centerX, centerY, ViewRangeX, ViewRangeY))
-                    continue;
-
-                int x = emitter.X, y = emitter.Y;
-                light = emitter.Index;
-                Color lightIntensity = emitter.Colour;
-
-                int imageIndex = (M2CellInfo[x, y].FrontImage & 0x7FFF) - 1;
-                int fileIndex = M2CellInfo[x, y].FrontIndex;
-
-                if (MapObject.User.Poison.HasFlag(PoisonType.Blindness))
-                    lightIntensity = GetBlindLight(lightIntensity);
-
-                p = new Point(
-                    (x + OffSetX - centerX) * CellWidth + MapObject.User.OffSetMove.X,
-                    (y + OffSetY - centerY) * CellHeight + MapObject.User.OffSetMove.Y + 32);
-
-                if (M2CellInfo[x, y].FrontAnimationFrame > 0 && imageIndex >= 0 &&
-                    fileIndex >= 0 && fileIndex < Libraries.MapLibs.Length &&
-                    Libraries.MapLibs[fileIndex] != null)
-                    p.Offset(Libraries.MapLibs[fileIndex].GetOffSet(imageIndex));
-
-                if (light >= 0 && light < DXManager.Lights.Count &&
-                    DXManager.Lights[light] != null && !DXManager.Lights[light].Disposed)
-                {
-                    p.Offset(-(DXManager.LightSizes[light].X / 2) - (CellWidth / 2) + 10,
-                             -(DXManager.LightSizes[light].Y / 2) - (CellHeight / 2) - 5);
-                    DXManager.Draw(DXManager.Lights[light], null,
-                                   new Vector3((float)p.X, (float)p.Y, 0.0F), lightIntensity);
-                }
-            }
-            #endregion
-
-            DXManager.SetBlend(false);
-            DXManager.SetSurface(oldSurface);
-
-            DXManager.Device.Blend = SpriteBlendMode.Multiply;
-            ShaderEffect previousLightShader = DXManager.Device.PixelShader;
-            DXManager.Device.PixelShader = ShaderEffect.LightComposite;
-            DXManager.Device.SetPixelShaderConstant(0, stackalloc Vector4[]
-            {
-                new Vector4(darkness.R / 255f, darkness.G / 255f, darkness.B / 255f, 1f)
-            });
-
-            DXManager.Draw(DXManager.LightTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White);
-
-            DXManager.Sprite.End();
-            DXManager.Device.PixelShader = previousLightShader;
-            DXManager.Sprite.Begin();
         }
 
         private static void OnMouseClick(object sender, EventArgs e)

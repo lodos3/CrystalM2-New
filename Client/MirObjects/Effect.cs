@@ -28,6 +28,7 @@ namespace Client.MirObjects
         public long RepeatUntil;
 
         public bool DrawBehind = false;
+        protected virtual int DrawnFrame => BaseIndex + CurrentFrame;
 
         public long CurrentDelay;
         public long Delay;
@@ -127,10 +128,13 @@ namespace Client.MirObjects
 
 
             if (Blend)
-                Library.DrawBlend(BaseIndex + CurrentFrame, DrawLocation, Color.White, true, Rate);
+                Library.DrawEffectBlend(DrawnFrame, DrawLocation, Color.White, Rate);
             else
-                Library.Draw(BaseIndex + CurrentFrame, DrawLocation, Color.White, true);
+                Library.Draw(DrawnFrame, DrawLocation, Color.White, true);
         }
+
+        internal bool DrawLightMask(Color tint, float intensity, ref int pixelBudget) => Library != null && CurrentFrame >= 0 &&
+            CurrentFrame < Count && Library.DrawLightShape(DrawnFrame, DrawLocation, tint, true, intensity, ref pixelBudget);
 
         public void Clear()
         {
@@ -147,6 +151,7 @@ namespace Client.MirObjects
         public int Interval, FrameCount, Skip;
         public int Direction;
         public bool Explode;
+        protected override int DrawnFrame => BaseIndex + CurrentFrame % Math.Max(1, FrameCount) + Direction * (Skip + FrameCount);
         private Spell _particleSpell;
         private int _particleMapGeneration;
         private long _nextParticleTime;
@@ -221,7 +226,7 @@ namespace Client.MirObjects
             if (CMain.Time < Start) return;
 
 
-            int index = BaseIndex + (CurrentFrame % FrameCount) + Direction * (Skip + FrameCount);
+            int index = DrawnFrame;
 
             DrawLocation = new Point((Source.X - MapObject.User.Movement.X + MapControl.OffSetX) * MapControl.CellWidth,
                                        (Source.Y - MapObject.User.Movement.Y + MapControl.OffSetY) * MapControl.CellHeight);
@@ -236,7 +241,7 @@ namespace Client.MirObjects
             if (!Blend)
                 Library.Draw(index, DrawLocation, Color.White, true);
             else
-                Library.DrawBlend(index, DrawLocation, Color.White, true, Rate);
+                Library.DrawEffectBlend(index, DrawLocation, Color.White, Rate);
         }
 
     }

@@ -128,6 +128,20 @@ internal static class Program
         using (var image = device.Capture(backBuffer))
             Check(image.GetPixel(8, 8).R > coreRed && image.GetPixel(8, 8).R < 255,
                 "Lower shadow opacity must darken the scene less.");
+
+        device.Clear(Color.Black);
+        device.PixelShader = ShaderEffect.ShapedLight;
+        device.Blend = SpriteBlendMode.Additive;
+        device.SetPixelShaderConstant(0, [new Vector4(0.5f, 0.5f, 0.75f, 0)]);
+        device.Sprite.Draw(red, paddedShadow, new Vector3(7, 7, 0), Vector4.One);
+        using (var image = device.Capture(backBuffer))
+        {
+            Color centre = image.GetPixel(8, 8), edge = image.GetPixel(7, 8);
+            Check(centre.R > edge.R && edge.R > 0 && edge.G == 0 && edge.B == 0,
+                "Shaped emission must follow the source frame and spread its colour beyond the edge.");
+            Near(Color.Black, image.GetPixel(6, 8), "A shaped light must leave unrelated pixels dark.");
+        }
+        device.Blend = SpriteBlendMode.Alpha;
         device.PixelShader = ShaderEffect.Artwork;
 
         long bytes = device.TextureBytes;

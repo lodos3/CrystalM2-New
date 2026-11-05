@@ -11,7 +11,7 @@ internal sealed class GraphicsOptionsPage : MirControl
 
     internal GraphicsOptionsPage()
     {
-        Size = new Size(488, 284);
+        Size = new Size(488, 391);
         Visible = false;
 
         AddHeading("Post processing", 0);
@@ -29,6 +29,15 @@ internal sealed class GraphicsOptionsPage : MirControl
             value => Settings.BloomIntensityPercent = value);
         AddSlider("Bloom divisor", 0, 241, 2, 8, "", () => Settings.BloomDivisor, value => Settings.BloomDivisor = value,
             "Lower values use a larger blur buffer.");
+        MirPanel.AddCaption(this, "Lighting and effects", new Rectangle(0, 269, 235, 22), muted: false);
+        AddSlider("Ambient shade", 0, 295, 0, 100, "%", () => Settings.AmbientDarknessPercent,
+            value => Settings.AmbientDarknessPercent = value);
+        AddSlider("Spell light", 0, 319, 0, 200, "%", () => Settings.SpellLightIntensityPercent,
+            value => Settings.SpellLightIntensityPercent = value);
+        AddSlider("Map light", 0, 343, 0, 200, "%", () => Settings.MapLightIntensityPercent,
+            value => Settings.MapLightIntensityPercent = value);
+        AddSlider("Spell blend", 0, 367, 0, 200, "%", () => Settings.SpellBlendIntensityPercent,
+            value => Settings.SpellBlendIntensityPercent = value, "Opacity of additive spell sprites.");
 
         const int right = 253;
         AddHeading("Projected shadows", right);
@@ -59,6 +68,7 @@ internal sealed class GraphicsOptionsPage : MirControl
         _libraryStatus = MirPanel.AddCaption(this, "", new Rectangle(right, 250, 230, 16));
         UpdateLibraryStatus();
         MirPanel.AddCaption(this, "Use relative paths separated by semicolons.", new Rectangle(right, 266, 235, 16));
+        MirPanel.AddCaption(this, "Baked checker shadows are softened on load.", new Rectangle(right, 296, 235, 20));
     }
 
     private void AddHeading(string text, int x) =>

@@ -21,14 +21,16 @@ internal sealed class SpellParticleRenderer
         catch { _atlas.Dispose(); throw; }
     }
 
-    public void Draw(ReadOnlySpan<SpellParticle> particles, Vector2 camera, long now, bool ground)
+    public void Draw(ReadOnlySpan<SpellParticle> particles, Vector2 camera, long now, bool ground,
+                     float intensity = 1f, bool emission = false)
     {
+        if (intensity <= 0) return;
         SpriteBlendMode previous = _device.Blend;
         ShaderEffect shader = _device.PixelShader;
         try
         {
             _device.PixelShader = ShaderEffect.Artwork;
-            _device.Blend = ground ? SpriteBlendMode.Alpha : SpriteBlendMode.Additive;
+            _device.Blend = ground && !emission ? SpriteBlendMode.Alpha : SpriteBlendMode.Additive;
             foreach (ref readonly SpellParticle particle in particles)
             {
                 if ((particle.Shape == SpellParticleShape.Halo) != ground) continue;
@@ -41,7 +43,7 @@ internal sealed class SpellParticleRenderer
                     bounds.Top >= _device.TargetHeight) continue;
 
                 Vector4 tint = RendererDevice.ToVector(particle.Colour);
-                tint.W *= (1 - age) * (1 - age);
+                tint.W *= Math.Clamp((1 - age) * (1 - age) * intensity, 0, 1);
                 _device.Sprite.Draw(_atlas, SpellParticleAtlas.Part(particle.Shape, particle.Direction), bounds, tint);
             }
         }

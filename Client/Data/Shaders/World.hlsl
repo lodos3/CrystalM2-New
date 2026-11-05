@@ -70,6 +70,21 @@ float4 PSProjectedShadow(Output input) : SV_TARGET
              ProjectedShadowAlpha(uv - dx + dy) + ProjectedShadowAlpha(uv + dx + dy);
     return float4(0, 0, 0, alpha * input.Tint.a / 16);
 }
+float3 LightSource(float2 uv)
+{
+    float4 pixel = SpriteTexture.Sample(SpriteSampler, uv);
+    return pixel.rgb * pixel.a * all(uv >= 0) * all(uv <= 1);
+}
+float4 PSShapedLight(Output input) : SV_TARGET
+{
+    float2 dx = float2(C[0].x, 0), dy = float2(0, C[0].y);
+    float2 uv = input.Uv;
+    float3 light = 4 * LightSource(uv);
+    light += 2 * (LightSource(uv - dx) + LightSource(uv + dx) + LightSource(uv - dy) + LightSource(uv + dy));
+    light += LightSource(uv - dx - dy) + LightSource(uv + dx - dy) +
+             LightSource(uv - dx + dy) + LightSource(uv + dx + dy);
+    return float4(light * input.Tint.rgb * (input.Tint.a * C[0].z / 16), 1);
+}
 // Atmosphere runs only when compositing the world texture, before the HUD.
 float4 PSAtmosphere(Output input) : SV_TARGET
 {

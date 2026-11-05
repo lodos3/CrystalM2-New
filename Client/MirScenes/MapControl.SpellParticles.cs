@@ -274,6 +274,16 @@ public sealed partial class MapControl
         if (!Settings.Effect || _spellParticles.Active.IsEmpty) return;
 
         Point camera = ToMouseLocation(Point.Empty);
-        DXManager.Device.SpellParticles.Draw(_spellParticles.Active, new Vector2(camera.X, camera.Y), CMain.Time, ground);
+        DXManager.Device.SpellParticles.Draw(_spellParticles.Active, new Vector2(camera.X, camera.Y), CMain.Time, ground,
+            ground ? 1f : Settings.SpellBlendIntensityPercent / 100f);
+    }
+
+    private void DrawSpellParticleLights(float intensity)
+    {
+        if (_spellParticles.Active.IsEmpty) return;
+        Point position = ToMouseLocation(Point.Empty);
+        Vector2 camera = new(position.X, position.Y);
+        DXManager.Device.SpellParticles.Draw(_spellParticles.Active, camera, CMain.Time, ground: true, intensity, emission: true);
+        DXManager.Device.SpellParticles.Draw(_spellParticles.Active, camera, CMain.Time, ground: false, intensity, emission: true);
     }
 }
