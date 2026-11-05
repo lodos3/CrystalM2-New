@@ -288,7 +288,8 @@ public sealed partial class MapControl
             GraphicsTuning.Offset(GraphicsLayer.Spell).Linked || GraphicsTuning.Offset(GraphicsLayer.Particles).Linked);
         Vector2 camera = new(position.X, position.Y);
         var light = GraphicsTuning.Light(LightSource.Spell);
-        float radius = light.Radius.Current / 100f, warmth = light.Warmth.Current * 0.003f;
+        // Keep individual sparks small. The spell frame and its halo handle large-area light.
+        float radius = Math.Min(light.Radius.Current, 250) / 100f, warmth = light.Warmth.Current * 0.003f;
         DXManager.Device.SpellParticles.Draw(_spellParticles.Active, camera, CMain.Time, ground: true,
             intensity, emission: true, radius, warmth);
         DXManager.Device.SpellParticles.Draw(_spellParticles.Active, camera, CMain.Time, ground: false,

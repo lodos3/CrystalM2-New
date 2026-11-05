@@ -130,6 +130,7 @@ internal static class Program
                 "Lower shadow opacity must darken the scene less.");
 
         TestShapedLight(device, backBuffer, red);
+        TestHdrHalo(device, backBuffer);
         TestArtworkStyles(device, backBuffer, translucent);
         TestGroundWeather(device, backBuffer);
         TestWeatherSilhouette(device, backBuffer);
@@ -324,6 +325,30 @@ internal static class Program
         device.AuxiliaryTexture = null;
         device.PixelShader = ShaderEffect.Artwork;
         device.Blend = SpriteBlendMode.Alpha;
+    }
+
+    private static void TestHdrHalo(RendererDevice device, Surface target)
+    {
+        using var light = new Texture(device, 64, 64, true, hdr: true);
+        using var lightSurface = light.GetSurface();
+        var bounds = new Rectangle(0, 0, 64, 64);
+        device.SetRenderTarget(lightSurface);
+        device.Clear(Color.Black);
+        device.Blend = SpriteBlendMode.Additive;
+        device.PixelShader = ShaderEffect.LightHalo;
+        device.Ui.Fill(bounds, new Vector4(3, 0.6f, 0, 1));
+        device.SetRenderTarget(target);
+        device.Clear(Color.Black);
+        device.Blend = SpriteBlendMode.Alpha;
+        device.PixelShader = ShaderEffect.BloomBlur;
+        device.SetPixelShaderConstant(0, [Vector4.Zero, new(0.2f, 0, 0, 0)]);
+        device.Sprite.Draw(light, bounds, bounds, Vector4.One);
+        using var image = device.Capture(target);
+        Color centre = image.GetPixel(32, 32), falloff = image.GetPixel(54, 32);
+        Check(centre.R > 140 && falloff.R is > 10 and < 60,
+            $"Halo intensity above 100% must survive in the light buffer. Centre {centre}, falloff {falloff}.");
+        Near(Color.Black, image.GetPixel(2, 2), "The halo must fall to zero outside its radius.");
+        device.PixelShader = ShaderEffect.Artwork;
     }
 
     private static void TestSpellArtwork(RendererDevice device, Surface target)

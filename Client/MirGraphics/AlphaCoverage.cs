@@ -26,15 +26,20 @@ namespace Client.MirGraphics
 
         internal Size VisibleSize { get; }
         internal bool HasCutout { get; }
+        internal PointF EmissionPivot { get; }
+        internal Color EmissionColour { get; }
         internal int StorageBytes => _visibleBits.Length;
 
-        private AlphaCoverage(int width, int height, byte[] bits, Size visibleSize, bool hasCutout)
+        private AlphaCoverage(int width, int height, byte[] bits, Size visibleSize, bool hasCutout,
+                              PointF emissionPivot, Color emissionColour)
         {
             _width = width;
             _height = height;
             _visibleBits = bits;
             VisibleSize = visibleSize;
             HasCutout = hasCutout;
+            EmissionPivot = emissionPivot;
+            EmissionColour = emissionColour;
         }
 
         internal static AlphaCoverage Capture(ReadOnlySpan<byte> bgra, int width, int height, int pitch)
@@ -51,6 +56,7 @@ namespace Client.MirGraphics
             byte[] bits = new byte[(pixels >> 3) + ((pixels & 7) == 0 ? 0 : 1)];
             int minX = width, minY = height, maxX = -1, maxY = -1;
             bool hasCutout = false;
+            long energy = 0, lightX = 0, lightY = 0, lightR = 0, lightG = 0, lightB = 0;
 
             for (int y = 0; y < height; y++)
             {
@@ -59,9 +65,19 @@ namespace Client.MirGraphics
                 for (int x = 0; x < width; x++)
                 {
                     // Format.A8R8G8B8 is BGRA in little-endian system memory.
-                    byte alpha = bgra[rowOffset + x * 4 + 3];
+                    int offset = rowOffset + x * 4;
+                    byte alpha = bgra[offset + 3];
                     hasCutout |= alpha < 255;
                     if (alpha == 0) continue;
+                    int b = bgra[offset], g = bgra[offset + 1], r = bgra[offset + 2];
+                    int peak = Math.Max(r, Math.Max(g, b));
+                    int weight = peak * peak * alpha >> 8;
+                    energy += weight;
+                    lightX += (long)x * weight;
+                    lightY += (long)y * weight;
+                    lightR += (long)r * weight;
+                    lightG += (long)g * weight;
+                    lightB += (long)b * weight;
 
                     int bitIndex = pixelOffset + x;
                     bits[bitIndex >> 3] |= (byte)(1 << (bitIndex & 7));
@@ -76,7 +92,13 @@ namespace Client.MirGraphics
             // Retain the legacy dimensions for fully transparent images.
             Size size = maxX < 0 ? new Size(width, height) :
                 new Size(maxX - minX + 1, maxY - minY + 1);
-            return new AlphaCoverage(width, height, bits, size, hasCutout);
+            var pivot = energy > 0
+                ? new PointF((float)((double)lightX / energy + 0.5), (float)((double)lightY / energy + 0.5))
+                : new PointF(width * 0.5f, height * 0.5f);
+            long brightest = Math.Max(lightR, Math.Max(lightG, lightB));
+            Color colour = brightest == 0 ? Color.White : Color.FromArgb(
+                (int)(lightR * 255 / brightest), (int)(lightG * 255 / brightest), (int)(lightB * 255 / brightest));
+            return new AlphaCoverage(width, height, bits, size, hasCutout, pivot, colour);
         }
 
         // An 8x8 alternating alpha patch indicates binary checkerboard dithering.

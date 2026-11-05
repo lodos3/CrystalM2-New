@@ -137,9 +137,12 @@ namespace Client.MirObjects
         internal Point LightPosition => GraphicsTuning.LightPosition(LightSource.Spell, DrawLocation,
             OwnerOffsetLinked || GraphicsTuning.Offset(GraphicsLayer.Spell).Linked);
 
-        internal bool DrawLightMask(Color tint, float intensity, ref int pixelBudget) => Library != null && CurrentFrame >= 0 &&
-            CurrentFrame < Count && Library.DrawLightShape(DrawnFrame, LightPosition,
-                tint, true, intensity, ref pixelBudget, LightSource.Spell);
+        internal bool DrawLightMask(Color tint, float intensity, ref int pixelBudget, out Point centre)
+        {
+            centre = LightPosition;
+            return Library != null && CurrentFrame >= 0 && CurrentFrame < Count &&
+                Library.DrawLightShape(DrawnFrame, centre, tint, true, intensity, ref pixelBudget, LightSource.Spell, out centre);
+        }
 
         public void Clear()
         {

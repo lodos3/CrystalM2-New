@@ -21,9 +21,14 @@ public sealed unsafe class Texture : IDisposable
     internal bool IsWorldArtwork { get; set; }
     internal bool HasCutout { get; set; }
     public bool Disposed { get; private set; }
-    internal long Bytes => (long)Width * Height * 4;
+    private readonly int _bytesPerPixel = 4;
+    internal long Bytes => (long)Width * Height * _bytesPerPixel;
+    internal bool IsHdrLightBuffer => _bytesPerPixel == 8;
 
     public Texture(RendererDevice owner, int width, int height, bool renderTarget = false)
+        : this(owner, width, height, renderTarget, false) { }
+
+    internal Texture(RendererDevice owner, int width, int height, bool renderTarget, bool hdr)
     {
         if (width <= 0 || height <= 0 || width > 16384 || height > 16384)
             throw new ArgumentOutOfRangeException(nameof(width), "Invalid D3D11 texture dimensions.");
@@ -31,12 +36,13 @@ public sealed unsafe class Texture : IDisposable
         Width = width;
         Height = height;
         IsRenderTarget = renderTarget;
+        _bytesPerPixel = hdr ? 8 : 4;
         try
         {
             Resource = owner.NativeDevice.CreateTexture2D(new Texture2DDescription
             {
                 Width = (uint)width, Height = (uint)height, MipLevels = 1, ArraySize = 1,
-                Format = Format.B8G8R8A8_UNorm, SampleDescription = SampleDescription.Default,
+                Format = hdr ? Format.R16G16B16A16_Float : Format.B8G8R8A8_UNorm, SampleDescription = SampleDescription.Default,
                 Usage = ResourceUsage.Default,
                 BindFlags = BindFlags.ShaderResource | (renderTarget ? BindFlags.RenderTarget : BindFlags.None)
             });
@@ -67,6 +73,7 @@ public sealed unsafe class Texture : IDisposable
     public DataRectangle BeginUpload()
     {
         ObjectDisposedException.ThrowIf(Disposed, this);
+        if (_bytesPerPixel != 4) throw new InvalidOperationException("This texture is a floating-point render target.");
         if (_uploadMemory != null) throw new InvalidOperationException("Texture is already being uploaded.");
         int pitch = checked(Width * 4), bytes = checked(pitch * Height);
         _uploadMemory = NativeMemory.AllocZeroed((nuint)bytes);

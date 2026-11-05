@@ -128,36 +128,53 @@ internal sealed class GraphicsOptionsPage : MirControl
             button.Click += (_, _) => SelectEmitter();
             var placement = new MirControl { Parent = emitterPanel, Size = emitterPanel.Size };
             var optics = new MirControl { Parent = emitterPanel, Size = emitterPanel.Size, Visible = false };
-            bool shaped = source is LightSource.MapAnimation or LightSource.Spell;
+            bool shaped = GraphicsTuning.IsEffectLight(source);
             _content = placement;
             Caption(name + " light", 0, 0);
             var light = GraphicsTuning.Light(source);
-            AddValue("Strength", 0, 22, light.Strength);
+            AddValue(shaped ? "Intensity" : "Strength", 0, 22, light.Strength);
             AddValue(shaped ? "Size" : "Radius", 0, 46, light.Radius);
-            AddValue("Warmth", 0, 70, light.Warmth);
-            AddValue("Offset X", 0, 94, light.Offset.X, "px");
-            AddValue("Offset Y", 0, 118, light.Offset.Y, "px");
-            AddChoice("Projection", 0, 142, light.Shape, ["Authored", "Radial", "Cone"]);
-            AddValue("Direction", 0, 166, light.Direction, "°", hint: "Cone direction. Zero points right.");
-            AddValue("Beam width", 0, 190, light.Beam, "°");
+            if (shaped)
+            {
+                AddValue("Offset X", 0, 70, light.Offset.X, "px");
+                AddValue("Offset Y", 0, 94, light.Offset.Y, "px");
+                AddValue("Gaussian blur", 0, 118, light.Blur, "px", hint: "Screen-space blur on the authored shape.");
+                AddValue("Glow radius", 0, 142, light.GlowRadius, "px", hint: "Radius of the soft floor light around the source.");
+                AddValue("Glow intensity", 0, 166, light.GlowStrength);
+                AddChoice("Projection", 0, 190, light.Shape, ["Authored", "Radial", "Cone"]);
+            }
+            else
+            {
+                AddValue("Warmth", 0, 70, light.Warmth);
+                AddValue("Offset X", 0, 94, light.Offset.X, "px");
+                AddValue("Offset Y", 0, 118, light.Offset.Y, "px");
+                AddChoice("Projection", 0, 142, light.Shape, ["Authored", "Radial", "Cone"]);
+                AddValue("Direction", 0, 166, light.Direction, "°", hint: "Cone direction. Zero points right.");
+                AddValue("Beam width", 0, 190, light.Beam, "°");
+            }
             AddButton(placement, "Test light", new Rectangle(0, 216, 96, 21),
                 () => GameScene.Scene?.MapControl?.PreviewLight(source));
-            AddButton(placement, shaped ? "Colour and blur" : "Colour", new Rectangle(107, 216, 122, 21), () =>
+            AddButton(placement, shaped ? "Colour and beam" : "Colour", new Rectangle(107, 216, 122, 21), () =>
             {
                 placement.Visible = false;
                 optics.Visible = true;
             });
 
             _content = optics;
-            Caption(name + " colour" + (shaped ? " and blur" : ""), 0, 0);
+            Caption(name + " colour" + (shaped ? " and beam" : ""), 0, 0);
             if (shaped)
-                AddValue("Gaussian blur", 0, 25, light.Blur, "px", hint: "Screen-space blur. Size is set separately on the light page.");
-            AddToggle("Override emitter colour", 0, 54, () => light.CustomColour.Current != 0,
+            {
+                AddValue("Warmth", 0, 24, light.Warmth);
+                AddValue("Direction", 0, 47, light.Direction, "°", hint: "Cone direction. Zero points right.");
+                AddValue("Beam width", 0, 70, light.Beam, "°");
+            }
+            int colourRow = shaped ? 94 : 54;
+            AddToggle("Override emitter colour", 0, colourRow, () => light.CustomColour.Current != 0,
                 enabled => light.CustomColour.Current = enabled ? 1 : 0);
-            AddValue("Red", 0, 82, light.Red, "");
-            AddValue("Green", 0, 106, light.Green, "");
-            AddValue("Blue", 0, 130, light.Blue, "");
-            var swatch = new MirControl { Parent = optics, Location = new Point(0, 160), Size = new Size(229, 20), NotControl = true };
+            AddValue("Red", 0, colourRow + 24, light.Red, "");
+            AddValue("Green", 0, colourRow + 47, light.Green, "");
+            AddValue("Blue", 0, colourRow + 70, light.Blue, "");
+            var swatch = new MirControl { Parent = optics, Location = new Point(0, colourRow + 96), Size = new Size(229, 18), NotControl = true };
             swatch.BeforeDraw += (_, _) => DXManager.Device.Ui.Fill(swatch.DisplayRectangle, light.Colour);
             AddButton(optics, "Test light", new Rectangle(0, 216, 96, 21),
                 () => GameScene.Scene?.MapControl?.PreviewLight(source));
@@ -419,8 +436,9 @@ internal sealed class GraphicsOptionsPage : MirControl
         var value = AddButton(_content, Format(), new Rectangle(x + 191, y, 44, 20), () => { });
         value.Hint = "Reset " + label;
         value.Click += (_, _) => SetAndSave(reset);
-        AddButton(_content, "−", new Rectangle(x + 87, y, 19, 20), () => SetAndSave(read() - 1)).Hint = "Decrease " + label;
-        AddButton(_content, "+", new Rectangle(x + 169, y, 19, 20), () => SetAndSave(read() + 1)).Hint = "Increase " + label;
+        string stepHint = maximum - minimum >= 1000 ? " Shift steps by 10. Ctrl steps by 50." : "";
+        AddButton(_content, "−", new Rectangle(x + 87, y, 19, 20), () => SetAndSave(read() - Step())).Hint = "Decrease " + label + stepHint;
+        AddButton(_content, "+", new Rectangle(x + 169, y, 19, 20), () => SetAndSave(read() + Step())).Hint = "Increase " + label + stepHint;
 
         var slider = new GraphicsSlider(fraction => SetValue(minimum + (int)Math.Round(fraction * (maximum - minimum))), Commit)
         {
@@ -435,9 +453,16 @@ internal sealed class GraphicsOptionsPage : MirControl
             DXManager.Device.Ui.Draw(UiSurface.ScrollThumb,
                 new Rectangle(bounds.X + (int)((bounds.Width - 8) * fraction), bounds.Y + 2, 8, 16));
         };
-        slider.MouseWheel += (_, e) => SetAndSave(read() + Math.Sign(e.Delta));
+        slider.MouseWheel += (_, e) => SetAndSave(read() + Math.Sign(e.Delta) * Step());
 
         string Format() => $"{read()}{unit}";
+        int Step()
+        {
+            if (maximum - minimum < 1000) return 1;
+            Keys modifiers = Control.ModifierKeys;
+            if ((modifiers & Keys.Control) != 0) return 50;
+            return (modifiers & Keys.Shift) != 0 ? 10 : 1;
+        }
 
         void SetValue(int next)
         {

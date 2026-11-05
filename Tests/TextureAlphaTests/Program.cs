@@ -38,6 +38,17 @@ var empty = AlphaCoverage.Capture(new byte[32], 3, 2, 16);
 Verify(empty.VisibleSize == new Size(3, 2), "Empty sprites preserve legacy size fallback.");
 Verify(!empty.VisiblePixel(0, 0), "Empty sprites must be transparent.");
 
+byte[] emitter = new byte[12 * 8 * 4];
+for (int i = 3; i < emitter.Length; i += 4) emitter[i] = 255; // Opaque black animation backing.
+int flame = (2 * 12 + 8) * 4;
+emitter[flame] = 16;
+emitter[flame + 1] = 112;
+emitter[flame + 2] = 240;
+var light = AlphaCoverage.Capture(emitter, 12, 8, 48);
+Verify(light.EmissionPivot == new PointF(8.5f, 2.5f), "Scaling must anchor the bright pixel through black padding.");
+Verify(light.EmissionColour.R == 255 && light.EmissionColour.G > 100 && light.EmissionColour.B < 25,
+       "The halo must retain the frame's warm emission colour.");
+
 byte[] wide = new byte[17 * 4];
 wide[16 * 4 + 3] = 255;
 var packed = AlphaCoverage.Capture(wide, 17, 1, 68);

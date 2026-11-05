@@ -831,25 +831,41 @@ namespace Client.MirGraphics
         }
 
         internal bool DrawLightShape(int index, Point point, Color colour, bool offset, float intensity,
-                                     ref int pixelBudget, LightSource source)
+                                     ref int pixelBudget, LightSource source, out Point centre)
         {
+            centre = point;
             MImage image = GetImageMetadata(index);
             if (image == null || image.Width <= 0 || image.Height <= 0) return false;
             if (offset) point.Offset(image.X, image.Y);
 
+            var emitter = GraphicsTuning.Light(source);
+            if (emitter.Shape.Current == 0 &&
+                !ShapedLightPass.PotentiallyVisible(point, new Size(image.Width, image.Height), emitter))
+                return true;
+            if (!CheckImage(index)) return false;
+
+            PointF pivot = image.EmissionPivot;
+            centre = new Point(point.X + (int)MathF.Round(pivot.X), point.Y + (int)MathF.Round(pivot.Y));
+            Color spriteColour = image.EmissionColour;
+            Color halo = emitter.CustomColour.Current != 0 ? colour : Color.FromArgb(colour.A,
+                colour.R * spriteColour.R / 255, colour.G * spriteColour.G / 255, colour.B * spriteColour.B / 255);
+            ShapedLightPass.AddHalo(centre, halo, intensity, emitter);
+            image.CleanTime = CMain.Time + Settings.CleanDelay;
+            if (emitter.Shape.Current != 0) return false;
+
             Rectangle bounds = ShapedLightPass.ScaleFrame(point, image.Width, image.Height,
-                GraphicsTuning.Light(source).Radius.Current);
+                emitter.Radius.Current, pivot);
             Rectangle footprint = bounds;
-            int blur = GraphicsTuning.Light(source).Blur.Current;
+            int blur = emitter.Blur.Current;
             footprint.Inflate(blur, blur);
             Rectangle visible = Rectangle.Intersect(footprint, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight));
             int pixels = visible.Width * visible.Height;
-            if (pixels <= 0 || pixels > pixelBudget || !CheckImage(index))
-                return false;
+            int divisor = ShapedLightPass.BlurDivisor(blur);
+            int cost = (pixels + divisor * divisor - 1) / (divisor * divisor);
+            if (cost == 0 || cost > pixelBudget) return true; // Keep the cheaper halo when the shape budget is used.
 
             ShapedLightPass.Add(source, image.Image, bounds, colour, intensity);
-            pixelBudget -= pixels;
-            image.CleanTime = CMain.Time + Settings.CleanDelay;
+            pixelBudget -= cost;
             return true;
         }
         public void Draw(int index, Rectangle section, Point point, Color colour, bool offSet)
@@ -1022,6 +1038,8 @@ namespace Client.MirGraphics
         public Size TrueSize;
 
         private AlphaCoverage _alphaCoverage;
+        internal PointF EmissionPivot => _alphaCoverage.EmissionPivot;
+        internal Color EmissionColour => _alphaCoverage.EmissionColour;
         private Texture _repairedShadowTexture;
         private int _repairedShadowBytes;
         private long _repairedShadowLastUsed;

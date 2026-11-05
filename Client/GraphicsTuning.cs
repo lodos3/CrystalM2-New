@@ -33,10 +33,10 @@ internal static class GraphicsTuning
         }
     }
 
-    internal sealed class Position(string key, bool canLink = true)
+    internal sealed class Position(string key, bool canLink = true, int range = 128)
     {
-        public readonly Value X = new(key + "X", 0, -128, 128);
-        public readonly Value Y = new(key + "Y", 0, -128, 128);
+        public readonly Value X = new(key + "X", 0, -range, range);
+        public readonly Value Y = new(key + "Y", 0, -range, range);
         public readonly Value Link = canLink ? new(key + "Linked", 0, 0, 1) : null;
         public bool Linked => Link is { Current: 1 };
         public Point Pixels => Apply(Point.Empty);
@@ -51,14 +51,18 @@ internal static class GraphicsTuning
 
     internal sealed class Emitter(LightSource source)
     {
-        public readonly Position Offset = new(source + "LightOffset");
-        public readonly Value Strength = new(source + "LightStrength", 100, 0, 300);
-        public readonly Value Radius = new(source + "LightRadius", 100, 25, 250);
+        public readonly Position Offset = new(source + "LightOffset", range: IsEffectLight(source) ? 2048 : 128);
+        public readonly Value Strength = new(source + "LightStrength", 100, 0, IsEffectLight(source) ? 1200 : 300);
+        public readonly Value Radius = new(source + "LightRadius", 100, 25, IsEffectLight(source) ? 1600 : 250);
         public readonly Value Warmth = new(source + "LightWarmth", 0, -100, 100);
         public readonly Value Shape = new(source + "LightShape", 0, 0, 2);
         public readonly Value Direction = new(source + "LightDirection", 0, 0, 360);
         public readonly Value Beam = new(source + "LightBeam", 65, 12, 175);
-        public readonly Value Blur = new(source + "LightBlur", 4, 0, 32);
+        public readonly Value Blur = new(source + "LightBlur", 4, 0, 192);
+        public readonly Value GlowRadius = IsEffectLight(source)
+            ? new(source + "LightGlowRadius", source == LightSource.MapAnimation ? 160 : 128, 0, 1024) : null;
+        public readonly Value GlowStrength = IsEffectLight(source)
+            ? new(source + "LightGlowStrength", 45, 0, 200) : null;
         public readonly Value CustomColour = new(source + "LightCustomColour", 0, 0, 1);
         public readonly Value Red = new(source + "LightRed", 255, 0, 255);
         public readonly Value Green = new(source + "LightGreen", 255, 0, 255);
@@ -75,6 +79,7 @@ internal static class GraphicsTuning
 
     internal static Position Offset(GraphicsLayer layer) => Offsets[(int)layer];
     internal static Emitter Light(LightSource source) => Emitters[(int)source];
+    internal static bool IsEffectLight(LightSource source) => source is LightSource.MapAnimation or LightSource.Spell;
     internal static Value Blend(GraphicsLayer layer) => Blends[(int)layer];
 
     internal static GraphicsLayer Layer(ObjectType type) => type switch

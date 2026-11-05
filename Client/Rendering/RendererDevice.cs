@@ -262,7 +262,9 @@ public sealed unsafe class RendererDevice : IDisposable
         try
         {
             var values = frame.AsSpan<Vector4>(2);
-            values[0] = new Vector4(TargetWidth, TargetHeight, source.IsRenderTarget ? 1 : 0, style);
+            // Floating-point emission stores additive RGB. Its alpha can
+            // exceed one and must not be used to unpremultiply the light.
+            values[0] = new Vector4(TargetWidth, TargetHeight, source.IsRenderTarget && !source.IsHdrLightBuffer ? 1 : 0, style);
             values[1] = new Vector4(_textureAdjustment, 0);
         }
         finally { Context.Unmap(_frameBuffer, 0); }
@@ -305,6 +307,8 @@ public sealed unsafe class RendererDevice : IDisposable
     {
         Sprite.Flush();
         var description = surface.Texture.Resource.Description;
+        if (description.Format != Format.B8G8R8A8_UNorm)
+            throw new InvalidOperationException("Bitmap capture requires a BGRA8 render target.");
         description.BindFlags = BindFlags.None;
         description.Usage = ResourceUsage.Staging;
         description.CPUAccessFlags = CpuAccessFlags.Read;

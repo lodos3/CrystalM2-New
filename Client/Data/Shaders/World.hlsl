@@ -257,18 +257,38 @@ float4 PSProjectedShadow(Output input) : SV_TARGET
              ProjectedShadowAlpha(uv - dx + dy) + ProjectedShadowAlpha(uv + dx + dy);
     return float4(0, 0, 0, alpha * input.Tint.a / 16);
 }
+float3 ShapedEmission(float2 uv)
+{
+    float4 pixel = SampleStraight(uv);
+    float3 source = C[0].x > 0 ? max(pixel.r, max(pixel.g, pixel.b)).xxx : pixel.rgb;
+    return source * pixel.a;
+}
+
 float4 PSShapedLight(Output input) : SV_TARGET
 {
-    float4 pixel = SampleStraight(input.Uv);
-    float3 source = C[0].x > 0 ? max(pixel.r, max(pixel.g, pixel.b)).xxx : pixel.rgb;
-    return float4(source * pixel.a * input.Tint.rgb * input.Tint.a, 1);
+    float3 energy;
+    if (C[0].y > 1)
+    {
+        float2 dx = ddx(input.Uv) * 0.25, dy = ddy(input.Uv) * 0.25;
+        energy = (ShapedEmission(input.Uv - dx - dy) + ShapedEmission(input.Uv + dx - dy) +
+                  ShapedEmission(input.Uv - dx + dy) + ShapedEmission(input.Uv + dx + dy)) * 0.25;
+    }
+    else energy = ShapedEmission(input.Uv);
+    return float4(energy * input.Tint.rgb * input.Tint.a, 1);
+}
+
+float4 PSLightHalo(Output input) : SV_TARGET
+{
+    float2 p = ((input.Uv - input.Bounds.xy) / (input.Bounds.zw - input.Bounds.xy)) * 2 - 1;
+    float falloff = saturate(1 - dot(p, p));
+    return float4(input.Tint.rgb * (falloff * falloff * falloff * input.Tint.a), 1);
 }
 
 float4 PSGaussianLight(Output input) : SV_TARGET
 {
     float3 value = SpriteTexture.SampleLevel(SpriteSampler, input.Uv, 0).rgb;
     float weights = 1;
-    int radius = min(8, (int)C[0].z);
+    int radius = min(24, (int)C[0].z);
     [loop] for (int i = 1; i <= radius; i++)
     {
         float w = exp(-i * i * C[0].w);

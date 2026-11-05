@@ -353,14 +353,14 @@ namespace Client.MirObjects
         internal Point LightPosition => GraphicsTuning.LightPosition(LightSource.Spell,
             AnimationOffset == default ? DrawLocation : GetDrawWithOffset(), GraphicsTuning.Offset(GraphicsLayer.Spell).Linked);
 
-        public bool DrawLightMask(Color tint, float intensity, ref int pixelBudget)
+        internal bool DrawLightMask(Color tint, float intensity, ref int pixelBudget, out Point centre)
         {
+            centre = LightPosition;
             if (BodyLibrary == null || (FrameIndex >= FrameCount && !Repeat))
                 return false;
 
-            return BodyLibrary.DrawLightShape(
-                DrawFrame + FrameIndex,
-            LightPosition, tint, true, intensity, ref pixelBudget, LightSource.Spell);
+            return BodyLibrary.DrawLightShape(DrawFrame + FrameIndex,
+                centre, tint, true, intensity, ref pixelBudget, LightSource.Spell, out centre);
         }
 
         public override bool MouseOver(Point p)
