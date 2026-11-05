@@ -145,6 +145,7 @@ internal static class Program
         device.PixelShader = ShaderEffect.Artwork;
         TestArtworkStyles(device, backBuffer, translucent);
         TestGroundWeather(device, backBuffer);
+        TestSpellArtwork(device, backBuffer);
 
         long bytes = device.TextureBytes;
         int textures = device.TextureCount;
@@ -218,6 +219,31 @@ internal static class Program
         device.PixelShader = ShaderEffect.Artwork;
     }
 
+    private static void TestSpellArtwork(RendererDevice device, Surface target)
+    {
+        using var spell = new Texture(device, 2, 2);
+        var upload = spell.BeginUpload();
+        for (int y = 0; y < 2; y++)
+            upload.Data.Write(new byte[] { 0, 0, 0, 255, 16, 48, 152, 255 });
+        spell.EndUpload();
+        Color terrain = Color.FromArgb(25, 65, 50);
+        device.Clear(terrain);
+        device.PixelShader = ShaderEffect.SpellArtwork;
+        device.SetPixelShaderConstant(0, [new(0.05f, 0.18f, 1, 1), new(1, 0, 0.25f, 0.45f)]);
+        device.Sprite.Draw(spell, null, Vector3.Zero, Vector4.One);
+        using var beforeGlow = device.Capture(target);
+        Near(terrain, beforeGlow.GetPixel(0, 0), "A black spell backing must leave the terrain untouched.");
+        Near(Color.FromArgb(152, 48, 16), beforeGlow.GetPixel(1, 0), "The keyed base pass must retain the bright spell.");
+        device.ArtworkBlend = SpriteBlendMode.Screen;
+        device.SetPixelShaderConstant(1, [new(1, 1, 0.25f, 0.45f)]);
+        device.Sprite.Draw(spell, null, Vector3.Zero, Vector4.One);
+        using var withGlow = device.Capture(target);
+        Near(terrain, withGlow.GetPixel(0, 0), "The second pass must not restore the black backing.");
+        Check(withGlow.GetPixel(1, 0).R > beforeGlow.GetPixel(1, 0).R + 15, "The glow pass must boost the spell independently.");
+        device.ArtworkBlend = null;
+        device.PixelShader = ShaderEffect.Artwork;
+    }
+
     private static void TestArtworkStyles(RendererDevice device, Surface target, Texture translucent)
     {
         var background = Color.FromArgb(100, 100, 100);
@@ -281,7 +307,7 @@ internal static class Program
         device.TextureFilter = TextureFilterMode.Pixel;
         device.PixelShader = ShaderEffect.Atmosphere;
         device.SetPixelShaderConstant(0, [new(1, 0, 1, 1), new(0.5f, 0.5f, 0, -1), Vector4.Zero,
-            Vector4.Zero, Vector4.Zero, Vector4.Zero, new(1, 1, 1, 0)]);
+            Vector4.Zero, Vector4.Zero, Vector4.Zero, new(1, 1, 1, 0), new(0, 1, 0, 1)]);
         device.Clear(Color.Black);
         device.Sprite.Draw(translucent, null, Vector3.Zero, Vector4.One);
         using (var image = device.Capture(target))

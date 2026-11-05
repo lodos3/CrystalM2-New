@@ -343,21 +343,8 @@ namespace Client.MirObjects
             if (FrameIndex >= FrameCount && !Repeat) return;
             if (BodyLibrary == null) return;
 
-            if (Blend)
-            {
-                BodyLibrary.DrawEffectBlend(
-                    DrawFrame + FrameIndex,
-                    AnimationOffset == default ? DrawLocation : GetDrawWithOffset(),
-                    DrawColour,
-                    0.8F);
-            }
-            else
-            {
-                BodyLibrary.Draw(DrawFrame + FrameIndex,
-                    AnimationOffset == default ? DrawLocation : GetDrawWithOffset(),
-                    DrawColour,
-                    true);
-            }
+            BodyLibrary.DrawSpellFrame(DrawFrame + FrameIndex,
+                AnimationOffset == default ? DrawLocation : GetDrawWithOffset(), DrawColour, Blend, 0.8f);
         }
 
         // The spell's actual animated frame contributes its own alpha silhouette

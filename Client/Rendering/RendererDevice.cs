@@ -19,7 +19,7 @@ namespace Client.Rendering;
 // this Vortice D3D11 device; there is no alternate client or renderer selector.
 public sealed unsafe class RendererDevice : IDisposable
 {
-    internal const int EffectConstantCount = 7;
+    internal const int EffectConstantCount = 8;
     internal ID3D11Device NativeDevice { get; private set; }
     internal ID3D11DeviceContext Context { get; private set; }
     private IDXGIFactory2 _factory;
@@ -222,7 +222,7 @@ public sealed unsafe class RendererDevice : IDisposable
         Context.RSSetViewport(new Viewport(TargetWidth, TargetHeight));
         Context.RSSetState(_rasterizer);
         Context.OMSetDepthStencilState(_noDepth);
-        bool artwork = _effect is ShaderEffect.Artwork or ShaderEffect.Normal or ShaderEffect.Grayscale or ShaderEffect.Magic;
+        bool artwork = _effect is ShaderEffect.Artwork or ShaderEffect.Normal or ShaderEffect.Grayscale or ShaderEffect.Magic or ShaderEffect.SpellArtwork;
         SpriteBlendMode blend = artwork ? _artworkBlend ?? _blend : _blend;
         Context.OMSetBlendState(_blends[(int)blend], new Color4(_blendRate, _blendRate, _blendRate, _blendRate));
         Context.IASetPrimitiveTopology(PrimitiveTopology.TriangleList);

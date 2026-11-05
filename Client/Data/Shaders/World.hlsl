@@ -1,6 +1,6 @@
 // Baked BGRA art is sampled without sRGB conversion or inferred relighting.
 cbuffer Frame : register(b0) { float2 Viewport; float SourcePremultiplied; float RenderStyle; };
-cbuffer Effect : register(b1) { float4 C[7]; };
+cbuffer Effect : register(b1) { float4 C[8]; };
 Texture2D SpriteTexture : register(t0);
 SamplerState SpriteSampler : register(s0);
 struct Input { float2 Position : POSITION; float2 Uv : TEXCOORD0; float4 Tint : COLOR0; float4 Bounds : TEXCOORD1; };
@@ -127,6 +127,22 @@ float4 PSMagic(Output input) : SV_TARGET
     pixel.a *= C[0].a;
     return PrepareBlend(pixel);
 }
+float4 PSSpellArtwork(Output input) : SV_TARGET
+{
+    float4 pixel = SampleArtwork(input);
+    float peak = max(pixel.r, max(pixel.g, pixel.b));
+    if (C[1].x > 0)
+        pixel.a *= smoothstep(C[0].x, C[0].x + C[0].y, peak);
+    pixel *= input.Tint;
+    float luma = dot(pixel.rgb, float3(0.299, 0.587, 0.114));
+    pixel.rgb = max(luma + (pixel.rgb - luma) * C[0].w, 0) * C[0].z;
+    if (C[1].y > 0)
+    {
+        pixel.a *= smoothstep(C[1].z, C[1].z + 0.35, peak);
+        pixel.rgb *= C[1].w;
+    }
+    return PrepareBlend(pixel);
+}
 // The emission texture contains no ambient colour. Add ambient exactly once
 // during multiplicative world composition; bloom sees only emitted light.
 float4 PSLightComposite(Output input) : SV_TARGET
@@ -231,12 +247,22 @@ float4 PSAtmosphere(Output input) : SV_TARGET
     int style = (int)C[6].w;
     int shader = style / 4;
     int tone = style % 4;
-    if (shader == 3)
+    float fx = C[7].w;
+    if ((shader == 3 || shader == 4) && fx > 0)
     {
-        float2 dx = float2(1 / Viewport.x, 0), dy = float2(0, 1 / Viewport.y);
+        float spread = shader == 3 ? 1 : 1 + fx;
+        float2 dx = float2(spread / Viewport.x, 0), dy = float2(0, spread / Viewport.y);
         float3 neighbours = SampleStraight(input.Uv - dx).rgb + SampleStraight(input.Uv + dx).rgb
                           + SampleStraight(input.Uv - dy).rgb + SampleStraight(input.Uv + dy).rgb;
-        pixel.rgb = saturate(pixel.rgb + 0.18 * (4 * pixel.rgb - neighbours * input.Tint.rgb));
+        float3 average = neighbours * input.Tint.rgb * 0.25;
+        pixel.rgb = shader == 3 ? saturate(pixel.rgb + 0.72 * fx * (pixel.rgb - average)) :
+                                  lerp(pixel.rgb, average, saturate(fx * 0.5));
+    }
+    if (shader == 5 && fx > 0)
+    {
+        float2 drift = (input.Uv - 0.5) * fx * 5 / Viewport;
+        pixel.r = SampleStraight(input.Uv + drift).r * input.Tint.r;
+        pixel.b = SampleStraight(input.Uv - drift).b * input.Tint.b;
     }
     float fog = saturate((C[4].y - input.Uv.y) * C[4].z) * C[3].x;
     pixel.rgb = lerp(pixel.rgb, C[3].yzw, fog);
@@ -248,13 +274,18 @@ float4 PSAtmosphere(Output input) : SV_TARGET
     pixel.rgb = lerp(pixel.rgb, C[5].yzw, C[5].x);
     pixel.rgb *= C[6].rgb;
     float luminance = dot(pixel.rgb, float3(0.299, 0.587, 0.114));
-    pixel.rgb = luminance + (pixel.rgb - luminance) * (1 + C[1].w);
+    float chroma = max(pixel.r, max(pixel.g, pixel.b)) - min(pixel.r, min(pixel.g, pixel.b));
+    pixel.rgb = luminance + (pixel.rgb - luminance) * (1 + C[1].w + C[7].z * (1 - saturate(chroma)));
     pixel.rgb = (pixel.rgb - 0.5) * (1 + C[1].z) + 0.5;
+    pixel.rgb += (1 - saturate(luminance)) * C[7].x + max(pixel.rgb - 0.45, 0) * (C[7].y - 1);
     if (tone == 1) pixel.rgb = max(pixel.rgb, 0) / (1 + max(pixel.rgb, 0) * 0.3);
     if (tone == 2) pixel.rgb = smoothstep(0, 1, pixel.rgb);
     if (C[0].z != 1) pixel.rgb = pow(max(pixel.rgb, 0), C[0].z);
-    if (shader == 1) pixel.rgb = dot(pixel.rgb, float3(0.299, 0.587, 0.114));
-    if (shader == 2) pixel.rgb = round(saturate(pixel.rgb) * 7) / 7;
+    if (shader == 1) pixel.rgb = lerp(pixel.rgb, dot(pixel.rgb, float3(0.299, 0.587, 0.114)), saturate(fx));
+    if (shader == 2) pixel.rgb = lerp(pixel.rgb, round(saturate(pixel.rgb) * 7) / 7, saturate(fx));
+    if (shader == 6) pixel.rgb += (WeatherNoise(floor(input.Position.xy) + 19.7) - 0.5) * 0.16 * fx;
+    if (shader == 7) pixel.rgb = lerp(pixel.rgb, 1 - saturate(pixel.rgb), saturate(fx));
+    if (shader == 8) pixel.rgb *= 1 - (floor(input.Position.y) % 2) * 0.25 * saturate(fx);
     return pixel;
 }
 // Bloom receives the light mask, never the baked world artwork.

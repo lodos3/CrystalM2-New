@@ -796,11 +796,25 @@ namespace Client.MirGraphics
             mi.CleanTime = CMain.Time + Settings.CleanDelay;
         }
 
-        public void DrawEffectBlend(int index, Point point, Color colour, float rate)
+        internal void DrawSpellFrame(int index, Point point, Color colour, bool additive, float rate)
         {
-            float strength = Math.Clamp(rate * Settings.SpellBlendIntensityPercent / 100f, 0, 1);
+            float strength = additive ? Math.Clamp(rate * Settings.SpellBlendIntensityPercent / 100f, 0, 1) : 1;
             if (strength == 0) return;
-            DrawBlend(index, point, Color.FromArgb((int)MathF.Round(colour.A * strength), colour), true);
+            colour = Color.FromArgb((int)MathF.Round(colour.A * strength), colour);
+            if (GraphicsTuning.SpellComposite.Current == 0)
+            {
+                if (additive) DrawBlend(index, point, colour, true);
+                else Draw(index, point, colour, true);
+                return;
+            }
+
+            MImage frame = GetImageMetadata(index);
+            if (frame == null) return;
+            point.Offset(frame.X, frame.Y);
+            if (!SpriteVisibility.IsVisible(point.X, point.Y, frame.Width, frame.Height, Settings.ScreenWidth, Settings.ScreenHeight) ||
+                !CheckImage(index)) return;
+            DXManager.DrawSpellArtwork(frame.Image, point, colour, additive);
+            frame.CleanTime = CMain.Time + Settings.CleanDelay;
         }
 
         public bool DrawLightShape(int index, Point point, Color colour, bool offset, float intensity,

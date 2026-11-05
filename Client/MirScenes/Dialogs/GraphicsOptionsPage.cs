@@ -131,13 +131,18 @@ internal sealed class GraphicsOptionsPage : MirControl
         AddChoice("Tone curve", 0, 167, GraphicsTuning.Tone, ["Linear", "Soft highlight", "S-curve"]);
         AddSlider("Vignette", 0, 191, 0, 100, "%", () => Settings.VignetteIntensityPercent,
             value => Settings.VignetteIntensityPercent = value, 100);
-        AddChoice("World shader", 0, 215, GraphicsTuning.PostShader, ["Standard", "Monochrome", "Posterize", "Sharpen"]);
+        AddChoice("World shader", 0, 215, GraphicsTuning.PostShader,
+            ["Standard", "Monochrome", "Posterize", "Sharpen", "Soft focus", "Chromatic", "Film grain", "Invert", "Scanlines"]);
         AddChoice("Death effect", 0, 239, GraphicsTuning.DeathLook, ["Grayscale", "Post settings", "Original"]);
+        AddValue("Shader effect", 0, 263, GraphicsTuning.PostShaderStrength);
 
         Caption("Atmosphere and effects", Right, 0);
         AddToggle("Environment atmosphere", Right, 23, () => Settings.EnvironmentAtmosphere, value => Settings.EnvironmentAtmosphere = value);
         AddSlider("Atmosphere", Right, 47, 0, 100, "%", () => Settings.AtmosphereIntensityPercent,
             value => Settings.AtmosphereIntensityPercent = value, 100);
+        AddValue("Black lift", Right, 71, GraphicsTuning.BlackLift);
+        AddValue("Highlights", Right, 95, GraphicsTuning.Highlights);
+        AddValue("Vibrance", Right, 119, GraphicsTuning.Vibrance);
         AddToggle("Light bloom", Right, 167, () => Settings.LightingBloom, value => Settings.LightingBloom = value);
         AddSlider("Bloom strength", Right, 191, 0, 200, "%", () => Settings.BloomIntensityPercent,
             value => Settings.BloomIntensityPercent = value, 100);
@@ -189,9 +194,18 @@ internal sealed class GraphicsOptionsPage : MirControl
         AddChoice("Corpses", Right, 142, GraphicsTuning.CorpseBlend, BlendModes);
         AddChoice("Target highlight", Right, 166, GraphicsTuning.HighlightBlend, BlendModes);
         AddChoice("Ground particles", Right, 190, GraphicsTuning.GroundParticleBlend, BlendModes);
-        AddSlider("Spell opacity", 0, 224, 0, 200, "%", () => Settings.SpellBlendIntensityPercent,
+        Caption("Spell compositing", 0, 213);
+        Caption("Spell glow and colour", Right, 213);
+        AddChoice("Spell passes", 0, 235, GraphicsTuning.SpellComposite, ["Authored", "Black key", "Black key + glow", "Glow only"]);
+        AddSlider("Spell opacity", 0, 257, 0, 200, "%", () => Settings.SpellBlendIntensityPercent,
             value => Settings.SpellBlendIntensityPercent = value, 100);
-        Caption("Click a mode to cycle through blend options.", 0, 274, 488);
+        AddValue("Black cutoff", 0, 279, GraphicsTuning.SpellBlackCutoff);
+        AddValue("Black feather", 0, 301, GraphicsTuning.SpellBlackFeather);
+        AddValue("Spell exposure", Right, 235, GraphicsTuning.SpellExposure);
+        AddValue("Spell colours", Right, 257, GraphicsTuning.SpellSaturation);
+        AddValue("Glow cutoff", Right, 279, GraphicsTuning.SpellGlowCutoff);
+        AddValue("Glow power", Right, 301, GraphicsTuning.SpellGlowStrength);
+        AddChoice("Glow blend", 0, 190, GraphicsTuning.SpellGlowBlend, ["Additive", "Screen"]);
     }
 
     private void BuildShadows()

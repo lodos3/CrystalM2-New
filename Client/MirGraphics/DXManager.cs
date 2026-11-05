@@ -45,7 +45,8 @@ namespace Client.MirGraphics
             new Vector4(0f, 0.78f, 0.84f, 0.94f),
             new Vector4(0f, 0.78f, 1.38f, 0.095f),
             new Vector4(0f, 0.80f, 0.90f, 1.0f),
-            Vector4.One
+            Vector4.One,
+            new Vector4(0, 1, 0, 1)
         };
 
         public static bool GrayScale;
@@ -235,6 +236,8 @@ namespace Client.MirGraphics
                 _ => Vector3.One
             };
             PostProcessConstants[6] = new Vector4(grade, GraphicsTuning.Tone.Current + 4 * GraphicsTuning.PostShader.Current);
+            PostProcessConstants[7] = new Vector4(GraphicsTuning.BlackLift.Current / 100f, GraphicsTuning.Highlights.Current / 100f,
+                GraphicsTuning.Vibrance.Current / 100f, GraphicsTuning.PostShaderStrength.Current / 100f);
             Sprite.Flush();
             Device.PixelShader = PostProcessingPixelShader;
             Device.SetPixelShaderConstant(0, PostProcessConstants);
@@ -332,6 +335,44 @@ namespace Client.MirGraphics
         {
             Sprite.Draw(texture, sourceRect, position, RendererDevice.ToVector(color));
             CMain.DPSCounter++;
+        }
+
+        internal static void DrawSpellArtwork(Texture texture, Point position, Color colour, bool additive)
+        {
+            ShaderEffect shader = Device.PixelShader;
+            SpriteBlendMode blend = Device.Blend;
+            SpriteBlendMode? artworkBlend = Device.ArtworkBlend;
+            Span<Vector4> constants = stackalloc Vector4[RendererDevice.EffectConstantCount];
+            Device.CopyPixelShaderConstants(constants);
+            int style = GraphicsTuning.SpellComposite.Current;
+            bool key = style is 1 or 2;
+            var shape = new Vector4(GraphicsTuning.SpellBlackCutoff.Current / 100f, GraphicsTuning.SpellBlackFeather.Current / 100f,
+                GraphicsTuning.SpellExposure.Current / 100f, GraphicsTuning.SpellSaturation.Current / 100f);
+            var glow = new Vector4(key ? 1 : 0, 0, GraphicsTuning.SpellGlowCutoff.Current / 100f,
+                GraphicsTuning.SpellGlowStrength.Current / 100f);
+            var origin = new Vector3(position.X, position.Y, 0);
+            try
+            {
+                Device.PixelShader = ShaderEffect.SpellArtwork;
+                if (additive) Device.Blend = SpriteBlendMode.Additive;
+                Device.SetPixelShaderConstant(0, [shape, glow]);
+                Draw(texture, null, origin, colour);
+                if (style is 2 or 3 && glow.W > 0)
+                {
+                    Device.ArtworkBlend = GraphicsTuning.SpellGlowBlend.Current == 0 ? SpriteBlendMode.Additive : SpriteBlendMode.Screen;
+                    glow.Y = 1;
+                    Device.SetPixelShaderConstant(1, [glow]);
+                    Draw(texture, null, origin, colour);
+                }
+            }
+            finally
+            {
+                Sprite.Flush();
+                Device.ArtworkBlend = artworkBlend;
+                Device.Blend = blend;
+                Device.PixelShader = shader;
+                Device.SetPixelShaderConstant(0, constants);
+            }
         }
 
         internal static ArtworkBlendScope BlendArtwork(GraphicsLayer layer) => new(GraphicsTuning.Blend(layer).Current);
