@@ -34,6 +34,20 @@ public sealed partial class MapControl
             }
         }
 
+        UpdateStaticLights();
+        foreach (CachedMapLight light in _staticLightCache.Items)
+        {
+            if (drawn >= 40) break;
+            if (_shapedMapLightCells.Contains(new Point(light.X, light.Y))) continue;
+            Point raw = MapLightOrigin(light);
+            Point actual = GraphicsTuning.LightPosition(LightSource.Map, raw);
+            if (raw != actual && screen.Contains(actual))
+            {
+                Guide(raw, actual, Color.Gold);
+                drawn++;
+            }
+        }
+
         Point cell = ToMouseLocation(User.CurrentLocation);
         cell.Offset(CellWidth, CellHeight);
         foreach (GraphicsLayer layer in GraphicsTuning.Layers)

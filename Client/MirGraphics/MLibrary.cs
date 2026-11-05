@@ -818,6 +818,18 @@ namespace Client.MirGraphics
             frame.CleanTime = CMain.Time + Settings.CleanDelay;
         }
 
+        internal void DrawTexturePreview(int index, Rectangle bounds)
+        {
+            if (!CheckImage(index)) return;
+            MImage frame = _images[index];
+            float scale = Math.Min((float)bounds.Width / frame.Width, (float)bounds.Height / frame.Height);
+            int width = Math.Max(1, (int)MathF.Round(frame.Width * scale));
+            int height = Math.Max(1, (int)MathF.Round(frame.Height * scale));
+            var destination = new Rectangle(bounds.X + (bounds.Width - width) / 2, bounds.Y + (bounds.Height - height) / 2, width, height);
+            DXManager.Sprite.Draw(frame.Image, new Rectangle(0, 0, frame.Width, frame.Height), destination, Vector4.One);
+            frame.CleanTime = CMain.Time + Settings.CleanDelay;
+        }
+
         public bool DrawLightShape(int index, Point point, Color colour, bool offset, float intensity,
                                    ref int pixelBudget, int spreadPercent = 100)
         {

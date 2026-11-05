@@ -1,5 +1,11 @@
 // Baked BGRA art is sampled without sRGB conversion or inferred relighting.
-cbuffer Frame : register(b0) { float2 Viewport; float SourcePremultiplied; float RenderStyle; };
+cbuffer Frame : register(b0)
+{
+    float2 Viewport;
+    float SourcePremultiplied;
+    float RenderStyle;
+    float4 TextureAdjustment;
+};
 cbuffer Effect : register(b1) { float4 C[8]; };
 Texture2D SpriteTexture : register(t0);
 SamplerState SpriteSampler : register(s0);
@@ -38,13 +44,22 @@ float4 LoadPremultiplied(int2 texel, int2 first, int2 last)
 bool Similar(float4 a, float4 b)
 {
     float4 delta = abs(a - b);
-    return max(max(delta.r, delta.g), max(delta.b, delta.a)) < 0.08;
+    return max(max(delta.r, delta.g), max(delta.b, delta.a)) < TextureAdjustment.x;
+}
+
+float4 CubicWeights(float t)
+{
+    float t2 = t * t, t3 = t2 * t;
+    return float4(-0.5 * t + t2 - 0.5 * t3, 1 - 2.5 * t2 + 1.5 * t3,
+                  0.5 * t + 2 * t2 - 1.5 * t3, -0.5 * t2 + 0.5 * t3);
 }
 
 float4 SampleArtwork(Output input)
 {
-    int filter = (int)RenderStyle / 8;
-    if (filter == 0) return SampleStraight(input.Uv);
+    int filter = (int)RenderStyle / 16;
+    float mix = TextureAdjustment.y;
+    float detail = SourcePremultiplied > 0.5 ? 0 : TextureAdjustment.z;
+    if ((filter == 0 || mix <= 0) && detail <= 0) return SampleStraight(input.Uv);
 
     uint width, height;
     SpriteTexture.GetDimensions(width, height);
@@ -55,11 +70,14 @@ float4 SampleArtwork(Output input)
     int2 extent = int2(width, height) - 1;
     int2 first = clamp(int2(round(input.Bounds.xy * size)), 0, extent);
     int2 last = clamp(int2(round(input.Bounds.zw * size)) - 1, first, extent);
+    int2 nearest = int2(floor(position));
     float4 pixel;
-    if (filter >= 2 && max(footprint.x, footprint.y) < 1.01 &&
+    if (filter == 0 || mix <= 0)
+        pixel = LoadPremultiplied(nearest, first, last);
+    else if ((filter == 2 || filter == 3) && max(footprint.x, footprint.y) < 1.01 &&
         (filter == 3 || min(footprint.x, footprint.y) < 0.99))
     {
-        int2 texel = int2(floor(position));
+        int2 texel = nearest;
         float2 quadrant = frac(position);
         float4 left = LoadPremultiplied(texel + int2(-1, 0), first, last);
         float4 right = LoadPremultiplied(texel + int2(1, 0), first, last);
@@ -88,22 +106,46 @@ float4 SampleArtwork(Output input)
         float2 fromCentre = position - 0.5;
         int2 texel = int2(floor(fromCentre));
         float2 fraction = frac(fromCentre);
-        if (max(fraction.x, fraction.y) < 0.001) return SampleStraight(input.Uv);
-        float4 top = lerp(LoadPremultiplied(texel, first, last),
-                          LoadPremultiplied(texel + int2(1, 0), first, last), fraction.x);
-        float4 bottom = lerp(LoadPremultiplied(texel + int2(0, 1), first, last),
-                             LoadPremultiplied(texel + int2(1, 1), first, last), fraction.x);
-        pixel = lerp(top, bottom, fraction.y);
+        if (max(fraction.x, fraction.y) < 0.001 && detail <= 0) return SampleStraight(input.Uv);
+        if (filter == 4 && max(fraction.x, fraction.y) >= 0.001)
+        {
+            float4 wx = CubicWeights(fraction.x), wy = CubicWeights(fraction.y);
+            pixel = 0;
+            [unroll] for (int y = 0; y < 4; y++)
+            [unroll] for (int x = 0; x < 4; x++)
+                pixel += wx[x] * wy[y] * LoadPremultiplied(texel + int2(x - 1, y - 1), first, last);
+            pixel.a = saturate(pixel.a);
+            pixel.rgb = clamp(pixel.rgb, 0, pixel.a);
+        }
+        else
+        {
+            float4 top = lerp(LoadPremultiplied(texel, first, last),
+                              LoadPremultiplied(texel + int2(1, 0), first, last), fraction.x);
+            float4 bottom = lerp(LoadPremultiplied(texel + int2(0, 1), first, last),
+                                 LoadPremultiplied(texel + int2(1, 1), first, last), fraction.x);
+            pixel = lerp(top, bottom, fraction.y);
+        }
     }
+    if (mix < 1 && mix > 0 && filter != 0)
+        pixel = lerp(LoadPremultiplied(nearest, first, last), pixel, mix);
     pixel.rgb = pixel.a > 0.00001 ? pixel.rgb / pixel.a : 0;
+    if (detail > 0 && pixel.a > 0)
+    {
+        float4 surround = LoadPremultiplied(nearest + int2(-1, 0), first, last)
+                        + LoadPremultiplied(nearest + int2(1, 0), first, last)
+                        + LoadPremultiplied(nearest + int2(0, -1), first, last)
+                        + LoadPremultiplied(nearest + int2(0, 1), first, last);
+        if (surround.a > 0.001)
+            pixel.rgb = saturate(pixel.rgb + detail * 0.45 * (pixel.rgb - surround.rgb / surround.a));
+    }
     return pixel;
 }
 
 float4 PrepareBlend(float4 pixel)
 {
-    int blend = (int)RenderStyle % 8;
-    if (blend == 4) pixel.rgb *= pixel.a; // Screen.
-    if (blend == 5) pixel.rgb = lerp(1, pixel.rgb, pixel.a); // Artwork multiply.
+    int blend = (int)RenderStyle % 16;
+    if (blend == 4 || blend == 7) pixel.rgb *= pixel.a; // Screen and channel maximum.
+    if (blend == 5 || blend == 8) pixel.rgb = lerp(1, pixel.rgb, pixel.a); // Multiply and channel minimum.
     return pixel;
 }
 

@@ -64,7 +64,7 @@ internal static class GraphicsTuning
     internal static readonly GraphicsLayer[] Layers = Enum.GetValues<GraphicsLayer>();
     internal static readonly LightSource[] LightSources = Enum.GetValues<LightSource>();
     private static readonly Position[] Offsets = Layers.Select(layer => new Position(layer + "Offset")).ToArray();
-    private static readonly Value[] Blends = Layers.Select(layer => new Value(layer + "BlendMode", 0, 0, 5)).ToArray();
+    private static readonly Value[] Blends = Layers.Select(layer => new Value(layer + "BlendMode", 0, 0, 7)).ToArray();
     private static readonly Emitter[] Emitters = LightSources.Select(source => new Emitter(source)).ToArray();
 
     internal static Position Offset(GraphicsLayer layer) => Offsets[(int)layer];
@@ -130,10 +130,13 @@ internal static class GraphicsTuning
         (WeatherSnow.Current != 0 ? WeatherSetting.Snow : WeatherSetting.None) |
         (WeatherFog.Current != 0 ? WeatherSetting.Fog : WeatherSetting.None);
     internal static readonly Value BloomThreshold = new("BloomThreshold", 58, 0, 100);
-    internal static readonly Value TextureFilter = new("TextureFilter", 0, 0, 3);
-    internal static readonly Value CorpseBlend = new("CorpseBlendMode", 0, 0, 5);
-    internal static readonly Value HighlightBlend = new("HighlightBlendMode", 0, 0, 5);
-    internal static readonly Value GroundParticleBlend = new("GroundParticleBlendMode", 0, 0, 5);
+    internal static readonly Value TextureFilter = new("TextureFilter", 0, 0, 4);
+    internal static readonly Value TextureEdgeMatch = new("TextureEdgeMatch", 8, 1, 45);
+    internal static readonly Value TextureSmoothing = new("TextureSmoothing", 100, 0, 100);
+    internal static readonly Value TextureDetail = new("TextureDetail", 0, 0, 100);
+    internal static readonly Value CorpseBlend = new("CorpseBlendMode", 0, 0, 7);
+    internal static readonly Value HighlightBlend = new("HighlightBlendMode", 0, 0, 7);
+    internal static readonly Value GroundParticleBlend = new("GroundParticleBlendMode", 0, 0, 7);
 
     internal static readonly Value BakedEnabled = new("BakedShadowRepair", 1, 0, 1);
     internal static readonly Value BakedJoin = new("BakedShadowJoinEdges", 1, 0, 1);

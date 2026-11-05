@@ -282,6 +282,20 @@ internal static class Program
             Near(modes[0].Expected, image.GetPixel(4, 0), "Resetting the artwork override must restore the authored blend.");
         }
 
+        foreach (var (mode, expected) in new[]
+        {
+            (SpriteBlendMode.Maximum, Color.FromArgb(90, 140, 220)),
+            (SpriteBlendMode.Minimum, Color.FromArgb(40, 140, 137))
+        })
+        {
+            device.Clear(Color.FromArgb(40, 140, 220));
+            device.ArtworkBlend = mode;
+            device.Sprite.Draw(translucent, null, Vector3.Zero, Vector4.One);
+            device.ArtworkBlend = null;
+            using var image = device.Capture(target);
+            Near(expected, image.GetPixel(0, 0), $"Incorrect channel blend for {mode}.");
+        }
+
         using var atlas = new Texture(device, 4, 3);
         var upload = atlas.BeginUpload();
         byte[] opaqueWhite = [255, 255, 255, 255];
@@ -318,6 +332,22 @@ internal static class Program
         device.Sprite.Draw(atlas, source, new Rectangle(0, 0, 3, 3), Vector4.One);
         using (var image = device.Capture(target))
             Near(Color.FromArgb(64, 64, 64), image.GetPixel(1, 1), "HD must resolve diagonal coverage at native size.");
+
+        device.TextureFilter = TextureFilterMode.Cubic;
+        device.Clear(Color.Black);
+        device.Sprite.Draw(atlas, source, destination, Vector4.One);
+        using (var image = device.Capture(target))
+        {
+            Color edge = image.GetPixel(2, 2);
+            Check(edge.R is > 30 and < 250 && edge.R == edge.G, "Bicubic reconstruction must smooth diagonal coverage.");
+            Near(Color.Black, image.GetPixel(5, 1), "Bicubic taps must not pull colour from another atlas region.");
+        }
+        device.TextureAdjustment = new Vector3(0.08f, 0, 0);
+        device.Clear(Color.Black);
+        device.Sprite.Draw(atlas, source, destination, Vector4.One);
+        using (var image = device.Capture(target))
+            Near(Color.Black, image.GetPixel(2, 2), "Zero filter mix must restore nearest-neighbour output.");
+        device.TextureAdjustment = new Vector3(0.08f, 1, 0);
 
         device.TextureFilter = TextureFilterMode.Pixel;
         device.PixelShader = ShaderEffect.Atmosphere;

@@ -62,7 +62,7 @@ public sealed partial class MapControl
         device.PixelShader = ShaderEffect.WeatherGround;
         device.Blend = SpriteBlendMode.Alpha;
         device.Opacity = 1;
-        float seconds = now % 600_000 / 1000f;
+        float seconds = now / 1000f;
         float wind = GraphicsTuning.WeatherWind.Current / 100f;
         float seed = (Index & 1023) * 3.17f;
         device.SetPixelShaderConstant(0, [new(floor.X, floor.Y, wet, snow),

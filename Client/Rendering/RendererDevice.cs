@@ -40,6 +40,7 @@ public sealed unsafe class RendererDevice : IDisposable
     private SpriteBlendMode _blend;
     private SpriteBlendMode? _artworkBlend;
     private TextureFilterMode _textureFilter;
+    private Vector3 _textureAdjustment = new(0.08f, 1, 0);
     private ShaderEffect _effect;
     private float _blendRate = 1, _opacity = 1;
     public SpriteBatch Sprite { get; private set; }
@@ -70,6 +71,11 @@ public sealed unsafe class RendererDevice : IDisposable
     {
         get => _textureFilter;
         set { if (_textureFilter == value) return; Sprite.Flush(); _textureFilter = value; }
+    }
+    public Vector3 TextureAdjustment
+    {
+        get => _textureAdjustment;
+        set { if (_textureAdjustment == value) return; Sprite.Flush(); _textureAdjustment = value; }
     }
     public ShaderEffect PixelShader
     {
@@ -132,7 +138,7 @@ public sealed unsafe class RendererDevice : IDisposable
             _linearSampler = device.CreateSamplerState(SamplerDescription.LinearClamp);
             _rasterizer = device.CreateRasterizerState(new RasterizerDescription(CullMode.None, FillMode.Solid));
             _noDepth = device.CreateDepthStencilState(DepthStencilDescription.None);
-            _frameBuffer = device.CreateBuffer(16, BindFlags.ConstantBuffer, ResourceUsage.Dynamic, CpuAccessFlags.Write);
+            _frameBuffer = device.CreateBuffer(32, BindFlags.ConstantBuffer, ResourceUsage.Dynamic, CpuAccessFlags.Write);
             _effectBuffer = device.CreateBuffer(EffectConstantCount * 16, BindFlags.ConstantBuffer, ResourceUsage.Dynamic, CpuAccessFlags.Write);
             // Correct accumulated alpha for intermediate map/UI textures.
             _blends[0] = device.CreateBlendState(new BlendDescription(
@@ -149,6 +155,11 @@ public sealed unsafe class RendererDevice : IDisposable
             var subtractive = new BlendDescription(DxBlend.SourceAlpha, DxBlend.One, DxBlend.Zero, DxBlend.One);
             subtractive.RenderTarget[0].BlendOperation = BlendOperation.ReverseSubtract;
             _blends[(int)SpriteBlendMode.Subtractive] = device.CreateBlendState(subtractive);
+            var channelBlend = new BlendDescription(DxBlend.One, DxBlend.One, DxBlend.Zero, DxBlend.One);
+            channelBlend.RenderTarget[0].BlendOperation = BlendOperation.Max;
+            _blends[(int)SpriteBlendMode.Maximum] = device.CreateBlendState(channelBlend);
+            channelBlend.RenderTarget[0].BlendOperation = BlendOperation.Min;
+            _blends[(int)SpriteBlendMode.Minimum] = device.CreateBlendState(channelBlend);
             Sprite = new SpriteBatch(this);
             Resize(width, height);
         }
@@ -235,8 +246,13 @@ public sealed unsafe class RendererDevice : IDisposable
             ShaderEffect.ProjectedShadow or ShaderEffect.ShapedLight or ShaderEffect.ConeLight;
         Context.PSSetSampler(0, smooth ? _linearSampler : _pointSampler);
         var frame = Context.Map(_frameBuffer, MapMode.WriteDiscard);
-        int style = (int)blend + (artwork ? 8 * (int)_textureFilter : 0);
-        try { frame.AsSpan<Vector4>(1)[0] = new Vector4(TargetWidth, TargetHeight, source.IsRenderTarget ? 1 : 0, style); }
+        int style = (int)blend + (artwork ? 16 * (int)_textureFilter : 0);
+        try
+        {
+            var values = frame.AsSpan<Vector4>(2);
+            values[0] = new Vector4(TargetWidth, TargetHeight, source.IsRenderTarget ? 1 : 0, style);
+            values[1] = new Vector4(_textureAdjustment, 0);
+        }
         finally { Context.Unmap(_frameBuffer, 0); }
         var constants = Context.Map(_effectBuffer, MapMode.WriteDiscard);
         try { _constants.AsSpan().CopyTo(constants.AsSpan<Vector4>(EffectConstantCount)); }

@@ -226,17 +226,22 @@ public sealed partial class MapControl
             if (_shapedMapLightCells.Contains(new Point(emitter.X, emitter.Y)) ||
                 !_staticLightCache.InViewport(emitter, centre.X, centre.Y, ViewRangeX, ViewRangeY)) continue;
 
-            Point origin = new((emitter.X + OffSetX - centre.X) * CellWidth + User.OffSetMove.X + 10,
-                (emitter.Y + OffSetY - centre.Y) * CellHeight + User.OffSetMove.Y + 32);
-            CellInfo cell = M2CellInfo[emitter.X, emitter.Y];
-            int frame = (cell.FrontImage & 0x7FFF) - 1;
-            if (cell.FrontAnimationFrame > 0 && frame >= 0 && (uint)cell.FrontIndex < (uint)Libraries.MapLibs.Length &&
-                Libraries.MapLibs[cell.FrontIndex] is { } library)
-                origin.Offset(library.GetOffSet(frame));
             Color tint = TintLight(emitter.Colour, LightSource.Map, blind);
-            DrawRadialLight(emitter.Index, GraphicsTuning.LightPosition(LightSource.Map, origin),
+            DrawRadialLight(emitter.Index, GraphicsTuning.LightPosition(LightSource.Map, MapLightOrigin(emitter)),
                 ScaleLight(tint, intensity), LightSource.Map);
         }
+    }
+
+    private Point MapLightOrigin(CachedMapLight emitter)
+    {
+        Point origin = ToMouseLocation(new Point(emitter.X, emitter.Y));
+        origin.Offset(10, 32);
+        CellInfo cell = M2CellInfo[emitter.X, emitter.Y];
+        int frame = (cell.FrontImage & 0x7FFF) - 1;
+        if (cell.FrontAnimationFrame > 0 && frame >= 0 && (uint)cell.FrontIndex < (uint)Libraries.MapLibs.Length &&
+            Libraries.MapLibs[cell.FrontIndex] is { } library)
+            origin.Offset(library.GetOffSet(frame));
+        return origin;
     }
 
     private static Color ScaleLight(Color tint, float intensity) => Color.FromArgb(tint.A,

@@ -7,7 +7,7 @@ namespace Client.MirScenes.Dialogs;
 internal sealed class GraphicsOptionsPage : MirControl
 {
     private const int Right = 253;
-    private static readonly string[] BlendModes = ["Authored", "Alpha", "Additive", "Screen", "Multiply", "Subtract"];
+    private static readonly string[] BlendModes = ["Authored", "Alpha", "Additive", "Screen", "Multiply", "Subtract", "Max channel", "Min channel"];
     private enum Preview { World, Floor, Ambient, Baked, Textures, WeatherSource }
 
     private MirControl _content;
@@ -231,7 +231,7 @@ internal sealed class GraphicsOptionsPage : MirControl
         AddChoice("Target highlight", Right, 166, GraphicsTuning.HighlightBlend, BlendModes);
         AddChoice("Ground particles", Right, 190, GraphicsTuning.GroundParticleBlend, BlendModes);
         Caption("Spell compositing", 0, 213);
-        Caption("Spell glow and colour", Right, 213);
+        AddChoice("Glow blend", Right, 213, GraphicsTuning.SpellGlowBlend, ["Additive", "Screen"]);
         AddChoice("Spell passes", 0, 235, GraphicsTuning.SpellComposite, ["Authored", "Black key", "Black key + glow", "Glow only"]);
         AddSlider("Spell opacity", 0, 257, 0, 200, "%", () => Settings.SpellBlendIntensityPercent,
             value => Settings.SpellBlendIntensityPercent = value, 100);
@@ -241,7 +241,6 @@ internal sealed class GraphicsOptionsPage : MirControl
         AddValue("Spell colours", Right, 257, GraphicsTuning.SpellSaturation);
         AddValue("Glow cutoff", Right, 279, GraphicsTuning.SpellGlowCutoff);
         AddValue("Glow power", Right, 301, GraphicsTuning.SpellGlowStrength);
-        AddChoice("Glow blend", 0, 190, GraphicsTuning.SpellGlowBlend, ["Additive", "Screen"]);
     }
 
     private void BuildShadows()
@@ -294,13 +293,46 @@ internal sealed class GraphicsOptionsPage : MirControl
     private void BuildTextures()
     {
         Caption("Live GPU texture scaling", 0, 0, 488);
-        AddChoice("Texture filter", 0, 27, GraphicsTuning.TextureFilter, ["Pixel", "Smooth", "Edge-aware 2x", "HD"], Preview.Textures);
-        Caption("Pixel keeps the original hard edges.", 0, 63, 488);
-        Caption("Smooth interpolates between texture pixels when scaled.", 0, 86, 488);
-        Caption("Edge-aware 2x reconstructs diagonal edges when enlarged.", 0, 109, 488);
-        Caption("HD also smooths diagonal edges at native size.", 0, 132, 488);
-        Caption("Applies to world art, effects, icons and UI textures.", 0, 165, 488);
-        Caption("Changes are rendered live on the GPU.", 0, 188, 488);
+        AddChoice("Texture filter", 0, 27, GraphicsTuning.TextureFilter,
+            ["Pixel", "Smooth", "Edge-aware 2x", "HD", "Bicubic"], Preview.Textures);
+        AddValue("Filter mix", 0, 53, GraphicsTuning.TextureSmoothing, "%", Preview.Textures,
+            "Blend between the original pixels and reconstructed texture.");
+        AddValue("Edge match", Right, 27, GraphicsTuning.TextureEdgeMatch, "%", Preview.Textures,
+            "How similar colours must be to join an edge in Edge-aware or HD.");
+        AddValue("Detail", Right, 53, GraphicsTuning.TextureDetail, "%", Preview.Textures,
+            "Sharpen texture detail without sharpening transparent alpha.");
+        Caption("Pixel reference", 0, 94);
+        Caption("Selected GPU filter", Right, 94);
+        var reference = new MirControl { Parent = _content, Location = new Point(0, 117), Size = new Size(235, 166), NotControl = true };
+        var filtered = new MirControl { Parent = _content, Location = new Point(Right, 117), Size = new Size(235, 166), NotControl = true };
+        reference.BeforeDraw += (_, _) => DrawTexturePreview(reference.DisplayRectangle, true);
+        filtered.BeforeDraw += (_, _) => DrawTexturePreview(filtered.DisplayRectangle, false);
+        Caption("Preview uses your current character sprite. Filtering also applies to UI and effects.", 0, 292, 488);
+    }
+
+    private static void DrawTexturePreview(Rectangle bounds, bool reference)
+    {
+        RendererDevice device = DXManager.Device;
+        device.Ui.Fill(bounds, Color.FromArgb(255, 22, 25, 30));
+        var actor = GameScene.User;
+        if (actor?.BodyLibrary == null) return;
+        TextureFilterMode filter = device.TextureFilter;
+        Vector3 tuning = device.TextureAdjustment;
+        try
+        {
+            if (reference)
+            {
+                device.TextureFilter = TextureFilterMode.Pixel;
+                device.TextureAdjustment = new Vector3(0.08f, 0, 0);
+            }
+            bounds.Inflate(-5, -5);
+            actor.BodyLibrary.DrawTexturePreview(actor.DrawFrame + actor.ArmourOffSet, bounds);
+        }
+        finally
+        {
+            device.TextureFilter = filter;
+            device.TextureAdjustment = tuning;
+        }
     }
 
     private static string LayerName(GraphicsLayer layer) => layer switch
@@ -437,8 +469,7 @@ internal sealed class GraphicsOptionsPage : MirControl
     private void ApplyPreview(Preview preview)
     {
         if (preview == Preview.Baked) GraphicsTuning.ApplyBakedSettings();
-        if (preview == Preview.Textures && DXManager.Device != null)
-            DXManager.Device.TextureFilter = (TextureFilterMode)GraphicsTuning.TextureFilter.Current;
+        if (preview == Preview.Textures) DXManager.ApplyTextureSettings();
         if (GameScene.Scene?.MapControl is { } map)
         {
             if (preview is Preview.Floor or Preview.Baked or Preview.Textures) map.FloorValid = false;

@@ -71,7 +71,7 @@ namespace Client.MirGraphics
         public static void Create()
         {
             Device = new RendererDevice(Program.Form.Handle, Settings.ScreenWidth, Settings.ScreenHeight);
-            Device.TextureFilter = (TextureFilterMode)GraphicsTuning.TextureFilter.Current;
+            ApplyTextureSettings();
             Sprite = Device.Sprite;
             Opacity = BlendingRate = 1f;
             Blending = GrayScale = false;
@@ -410,6 +410,8 @@ namespace Client.MirGraphics
                     3 => SpriteBlendMode.Screen,
                     4 => SpriteBlendMode.ArtworkMultiply,
                     5 => SpriteBlendMode.Subtractive,
+                    6 => SpriteBlendMode.Maximum,
+                    7 => SpriteBlendMode.Minimum,
                     _ => null
                 };
             }
@@ -470,6 +472,14 @@ namespace Client.MirGraphics
         {
             Opacity = opacity >= 1 || opacity < 0 ? 1f : opacity;
             Device.Opacity = Opacity;
+        }
+
+        internal static void ApplyTextureSettings()
+        {
+            if (Device == null) return;
+            Device.TextureFilter = (TextureFilterMode)GraphicsTuning.TextureFilter.Current;
+            Device.TextureAdjustment = new Vector3(GraphicsTuning.TextureEdgeMatch.Current, GraphicsTuning.TextureSmoothing.Current,
+                GraphicsTuning.TextureDetail.Current) / 100f;
         }
 
         public static void SetBlend(bool value, float rate = 1F, BlendMode mode = BlendMode.NORMAL)
