@@ -191,7 +191,48 @@ float4 PSSpellArtwork(Output input) : SV_TARGET
 // during multiplicative world composition; bloom sees only emitted light.
 float4 PSLightComposite(Output input) : SV_TARGET
 {
-    return float4(saturate(SampleStraight(input.Uv).rgb + C[0].rgb), 1);
+    float3 ambient = C[0].rgb;
+    if (C[0].w > 0)
+    {
+        float3 terrain = AuxiliaryTexture.Load(int3(0, 0, 0)).rgb;
+        float3 weights = float3(0.2126, 0.7152, 0.0722);
+        float luma = dot(terrain, weights);
+        if (luma > 0.015)
+        {
+            float brightness = dot(ambient, weights);
+            float3 chroma = clamp(terrain / luma, 0.42, 1.75);
+            float3 sampled = max(brightness, C[1].x) * chroma * float3(1 + C[1].y, 1, 1 - C[1].y);
+            float strength = C[0].w * (1 - smoothstep(0.72, 0.99, brightness));
+            ambient = lerp(ambient, sampled, strength);
+        }
+    }
+    return float4(saturate(SampleStraight(input.Uv).rgb + ambient), 1);
+}
+
+float4 PSMapColourDownsample(Output input) : SV_TARGET
+{
+    float3 sum = 0;
+    [unroll] for (int y = 0; y < 4; y++)
+    [unroll] for (int x = 0; x < 4; x++)
+    {
+        float2 stepUv = (float2(x, y) - 1.5) * 0.25 / Viewport;
+        sum += SpriteTexture.SampleLevel(SpriteSampler, input.Uv + stepUv, 0).rgb;
+    }
+    return float4(sum / 16, 1);
+}
+
+float4 PSMapColourAverage(Output input) : SV_TARGET
+{
+    uint width, height;
+    SpriteTexture.GetDimensions(width, height);
+    float3 sum = 0;
+    [loop] for (uint y = 0; y < height; y++)
+    [loop] for (uint x = 0; x < width; x++)
+        sum += SpriteTexture.Load(int3(x, y, 0)).rgb;
+    float3 mean = sum / (width * height);
+    if (C[0].x < 1)
+        mean = lerp(AuxiliaryTexture.Load(int3(0, 0, 0)).rgb, mean, C[0].x);
+    return float4(mean, 1);
 }
 // A separate repaired alpha mask uses linear filtering. The original sprite
 // continues to use point sampling, with its baked RGB and alpha untouched.
@@ -251,9 +292,20 @@ float4 PSConeLight(Output input) : SV_TARGET
 }
 float WeatherNoise(float2 p)
 {
-    float2 i = floor(p), f = frac(p);
+    int2 i = int2(floor(p));
+    float2 f = frac(p);
     f = f * f * (3 - 2 * f);
-    float4 h = frac(sin(dot(i, float2(127.1, 311.7)) + float4(0, 127.1, 311.7, 438.8)) * 43758.5453);
+    // Hash integer corners directly. Adjacent cells must use the exact same
+    // corner bits even far from the origin, where float hashes develop seams.
+    uint4 x = asuint(i.x) + uint4(0, 1, 0, 1);
+    uint4 y = asuint(i.y) + uint4(0, 0, 1, 1);
+    uint4 hash = x * 73856093u ^ y * 19349663u;
+    hash ^= hash >> 16;
+    hash *= 0x7feb352du;
+    hash ^= hash >> 15;
+    hash *= 0x846ca68bu;
+    hash ^= hash >> 16;
+    float4 h = (hash & 0x00ffffffu) / 16777216.0;
     return lerp(lerp(h.x, h.y, f.x), lerp(h.z, h.w, f.x), f.y);
 }
 
@@ -285,10 +337,10 @@ float4 PSWeatherGround(Output input) : SV_TARGET
         wet = saturate(C[0].z * input.Tint.r * (0.08 + pool * 0.40));
         float2 drops = world / float2(28, 18);
         float2 cell = floor(drops);
-        float2 centre = 0.24 + 0.52 * float2(WeatherNoise(cell + 0.27), WeatherNoise(cell + 19.13));
+        float2 centre = 0.34 + 0.32 * float2(WeatherNoise(cell + 0.27), WeatherNoise(cell + 19.13));
         float phase = frac(C[1].w * (1.2 + centre.x) + centre.y * 2);
         float distance = length(frac(drops) - centre);
-        float ring = (1 - smoothstep(0.024, 0.067, abs(distance - phase * 0.29))) *
+        float ring = (1 - smoothstep(0.024, 0.067, abs(distance - phase * 0.25))) *
             smoothstep(0, 0.1, phase);
         sheen = pool * saturate(C[0].z * input.Tint.r) * (0.15 + C[2].y * ring * (1 - phase) * 0.38);
     }

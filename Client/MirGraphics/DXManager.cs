@@ -544,6 +544,7 @@ namespace Client.MirGraphics
             WetSurfacePass.DisposeAll();
             WeatherMaskPass.DisposeAll();
             ShapedLightPass.DisposeAll();
+            MapAmbientPass.DisposeAll();
             MainSurface?.Dispose();
             MainSurface = null;
 

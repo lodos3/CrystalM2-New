@@ -254,7 +254,7 @@ public sealed unsafe class RendererDevice : IDisposable
             Context.PSSetSampler(1, _linearSampler);
         }
         bool smooth = _effect is ShaderEffect.BloomBlur or ShaderEffect.BloomExtract or ShaderEffect.ShadowMask or
-            ShaderEffect.ProjectedShadow or ShaderEffect.GaussianLight or ShaderEffect.ConeLight ||
+            ShaderEffect.ProjectedShadow or ShaderEffect.GaussianLight or ShaderEffect.ConeLight or ShaderEffect.MapColourDownsample ||
             _effect == ShaderEffect.ShapedLight && _constants[0].Y > 0;
         Context.PSSetSampler(0, smooth ? _linearSampler : _pointSampler);
         var frame = Context.Map(_frameBuffer, MapMode.WriteDiscard);

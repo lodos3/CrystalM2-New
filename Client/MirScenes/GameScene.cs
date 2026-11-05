@@ -10637,6 +10637,7 @@ namespace Client.MirScenes
         {
             ResetMap();
             _ambientLighting.Reset();
+            MapAmbientPass.Reset();
             _atmosphereFade.Reset();
             _fogFade.Reset();
             _weatherController.Reset();
@@ -10795,7 +10796,13 @@ namespace Client.MirScenes
         {
             if (User == null) return;
 
+            LightSetting setting = Lights == LightSetting.Normal ? GameScene.Scene.Lights : Lights;
+            Color targetAmbient = ApplyAmbientDarkness(AmbientLightTransition.Target(setting, MapDarkLight), setting);
+            Color ambient = _ambientLighting.Sample(targetAmbient, CMain.Time);
+            bool mapColour = GraphicsTuning.MapColour.Current > 0 && ambient.ToArgb() != Color.White.ToArgb() &&
+                !User.Poison.HasFlag(PoisonType.Blindness);
             _captureWeather = LocalWeatherActive;
+            if (!_captureWeather) WeatherMaskPass.DisposeAll();
             _scenerySprites.Clear();
             _weatherActors.Clear();
             bool drawFloorDirectly = GraphicsTuning.Blend(GraphicsLayer.Ground).Current != 0 ||
@@ -10828,6 +10835,7 @@ namespace Client.MirScenes
             {
                 DXManager.Draw(DXManager.FloorTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White);
             }
+            bool captureMapColours = mapColour && MapAmbientPass.CaptureFloor(ControlTexture, CMain.Time);
 
             bool legacyWeather = GraphicsTuning.WeatherSource.Current != 0;
             if (Settings.EnvironmentAtmosphere)
@@ -10855,7 +10863,8 @@ namespace Client.MirScenes
                                     ViewRangeX, ViewRangeY, Width, Height);
             _animatedMapLights.Clear();
             DrawSpellParticles(ground: true);
-            DrawObjects();
+            DrawObjects(captureMapColours);
+            if (captureMapColours) MapAmbientPass.Finish(_scenerySprites, CMain.Time);
             if (_captureWeather) DrawLocalWeather();
             DrawWorldObjectLabels();
             DrawSpellParticles(ground: false);
@@ -10872,9 +10881,6 @@ namespace Client.MirScenes
 
             //Render Death, 
 
-            LightSetting setting = Lights == LightSetting.Normal ? GameScene.Scene.Lights : Lights;
-            Color targetAmbient = ApplyAmbientDarkness(AmbientLightTransition.Target(setting, MapDarkLight), setting);
-            Color ambient = _ambientLighting.Sample(targetAmbient, CMain.Time);
             if (Settings.EnvironmentAtmosphere)
             {
                 Color desiredTint = AtmosphereColourGrade.Target(setting, Weather, MapDarkLight);
@@ -10896,7 +10902,7 @@ namespace Client.MirScenes
                 _animatedMapLights.Count != 0 || HasSpellLights() || HasDaylightEmitters() || LightPreviewActive ||
                 GameScene.User.Poison.HasFlag(PoisonType.Blindness))
             {
-                DrawLights(ambient);
+                DrawLights(ambient, mapColour ? MapAmbientPass.Average : null);
             }
             // Composite emission after darkness, or release the blur buffers when disabled.
             LightBloomPass.Composite();
@@ -11119,9 +11125,9 @@ namespace Client.MirScenes
             }
         }
 
-        private void DrawObjects()
+        private void DrawObjects(bool captureMapColours)
         {
-            var sceneryCapture = _captureWeather ? _scenerySprites : null;
+            var sceneryCapture = _captureWeather || captureMapColours ? _scenerySprites : null;
             var actorCapture = _captureWeather ? _weatherActors : null;
             var animationOffset = GraphicsTuning.Offset(GraphicsLayer.MapAnimation);
             var middleOffset = GraphicsTuning.Offset(GraphicsLayer.Middle);

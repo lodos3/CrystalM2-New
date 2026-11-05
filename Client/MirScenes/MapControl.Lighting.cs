@@ -104,7 +104,7 @@ public sealed partial class MapControl
         int Channel(int value) => (int)MathF.Round((255 - (255 - value) * intensity) * daylight);
     }
 
-    private void DrawLights(Color ambient)
+    private void DrawLights(Color ambient, Texture mapColour)
     {
         if (DXManager.Lights.Count == 0) return;
         if (DXManager.LightTexture == null || DXManager.LightTexture.Disposed)
@@ -149,10 +149,19 @@ public sealed partial class MapControl
         ShaderEffect previousShader = DXManager.Device.PixelShader;
         if (ambient.ToArgb() != Color.White.ToArgb())
         {
-            DXManager.Device.Blend = SpriteBlendMode.Multiply;
-            DXManager.Device.PixelShader = ShaderEffect.LightComposite;
-            DXManager.Device.SetPixelShaderConstant(0, [new Vector4(ambient.R / 255f, ambient.G / 255f, ambient.B / 255f, 1f)]);
-            DXManager.Draw(DXManager.LightTexture, null, Vector3.Zero, Color.White);
+            var device = DXManager.Device;
+            Texture previous = device.AuxiliaryTexture;
+            device.Blend = SpriteBlendMode.Multiply;
+            device.PixelShader = ShaderEffect.LightComposite;
+            try
+            {
+                device.AuxiliaryTexture = mapColour;
+                device.SetPixelShaderConstant(0, [new(ambient.R / 255f, ambient.G / 255f, ambient.B / 255f,
+                    mapColour == null ? 0 : GraphicsTuning.MapColour.Current / 100f),
+                    new(GraphicsTuning.NightFloor.Current / 100f, GraphicsTuning.LightWarmth.Current * 0.003f, 0, 0)]);
+                DXManager.Draw(DXManager.LightTexture, null, Vector3.Zero, Color.White);
+            }
+            finally { device.AuxiliaryTexture = previous; }
         }
         // Multiplication cannot illuminate white ambient. Add a restrained contribution in daylight.
         int daylight = blind ? 0 : (int)MathF.Round(Math.Min(ambient.R, Math.Min(ambient.G, ambient.B)) *

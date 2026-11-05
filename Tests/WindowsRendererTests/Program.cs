@@ -133,6 +133,7 @@ internal static class Program
         TestArtworkStyles(device, backBuffer, translucent);
         TestGroundWeather(device, backBuffer);
         TestWeatherSilhouette(device, backBuffer);
+        TestMapAmbient(device, backBuffer, intermediate);
         TestSpellArtwork(device, backBuffer);
         TestConeProjection(device, backBuffer, red);
 
@@ -205,6 +206,14 @@ internal static class Program
         Near(first.GetPixel(20, 16), shifted.GetPixel(30, 22), "Accumulation and fog must remain anchored through camera motion.");
         Check(shifted.GetPixel(30, 22).B > 16, "Snow and fog should visibly affect the floor.");
         Near(Color.Black, shifted.GetPixel(58, 22), "A skipped obstacle tile must receive no weather coverage.");
+
+        device.Clear(Color.Black);
+        device.SetPixelShaderConstant(0, [Vector4.Zero, new(32 - 46 * 271, -7031, 0.9f, 0), Vector4.Zero]);
+        device.Ui.Fill(new Rectangle(0, 0, 64, 64), Color.White);
+        using var distantFog = device.Capture(target);
+        for (int y = 0; y < 64; y++)
+            Check(Math.Abs(distantFog.GetPixel(31, y).B - distantFog.GetPixel(32, y).B) <= 5,
+                "Adjacent noise cells far from the origin must share the same edge.");
         device.PixelShader = ShaderEffect.Artwork;
     }
 
@@ -275,6 +284,46 @@ internal static class Program
             Near(Color.Black, image.GetPixel(5, 5), "The Gaussian must leave unrelated pixels dark.");
         }
         device.PixelShader = ShaderEffect.Artwork;
+    }
+
+    private static void TestMapAmbient(RendererDevice device, Surface target, Texture darkEmission)
+    {
+        using var terrain = new Texture(device, 32, 32, true);
+        using var terrainSurface = terrain.GetSurface();
+        using var reduced = new Texture(device, 8, 8, true);
+        using var reducedSurface = reduced.GetSurface();
+        using var mean = new Texture(device, 1, 1, true);
+        using var meanSurface = mean.GetSurface();
+
+        device.SetRenderTarget(terrainSurface);
+        device.Clear(Color.FromArgb(70, 135, 48));
+        device.Ui.Fill(new Rectangle(0, 0, 32, 16), Color.FromArgb(30, 185, 72));
+        device.SetRenderTarget(reducedSurface);
+        device.PixelShader = ShaderEffect.MapColourDownsample;
+        device.Sprite.Draw(terrain, new Rectangle(0, 0, 32, 32), new Rectangle(0, 0, 8, 8), Vector4.One);
+        device.SetRenderTarget(meanSurface);
+        device.PixelShader = ShaderEffect.MapColourAverage;
+        device.SetPixelShaderConstant(0, [Vector4.One]);
+        device.Sprite.Draw(reduced, new Rectangle(0, 0, 8, 8), new Rectangle(0, 0, 1, 1), Vector4.One);
+        using (var image = device.Capture(meanSurface))
+            Near(Color.FromArgb(50, 160, 60), image.GetPixel(0, 0), "Terrain reduction must average the visible scene colours.");
+
+        device.SetRenderTarget(target);
+        device.Clear(Color.White);
+        device.PixelShader = ShaderEffect.LightComposite;
+        device.Blend = SpriteBlendMode.Multiply;
+        device.AuxiliaryTexture = mean;
+        device.SetPixelShaderConstant(0, [new(0, 0, 0, 1), new(0.15f, 0, 0, 0)]);
+        device.Sprite.Draw(darkEmission, null, Vector3.Zero, Vector4.One);
+        using (var image = device.Capture(target))
+        {
+            Color night = image.GetPixel(2, 2);
+            Check(night.G > 35 && night.G > night.R * 2 && night.G > night.B * 2,
+                "A green scene must give even a black night preset a green ambient colour.");
+        }
+        device.AuxiliaryTexture = null;
+        device.PixelShader = ShaderEffect.Artwork;
+        device.Blend = SpriteBlendMode.Alpha;
     }
 
     private static void TestSpellArtwork(RendererDevice device, Surface target)

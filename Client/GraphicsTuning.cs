@@ -93,6 +93,8 @@ internal static class GraphicsTuning
     internal static readonly Value DayGlow = new("DayGlow", 14, 0, 100);
     internal static readonly Value DayBrightness = new("DayBrightness", 100, 0, 100);
     internal static readonly Value LightWarmth = new("AmbientWarmth", 0, -100, 100);
+    internal static readonly Value MapColour = new("AmbientMapColour", 100, 0, 100);
+    internal static readonly Value NightFloor = new("AmbientNightFloor", 14, 0, 35);
     internal static readonly Position AllLights = new("AllLightOffset");
     internal static readonly Position GroupOffset = new("LinkedOffset", canLink: false);
     internal static readonly Value OffsetGuides = new("OffsetGuides", 0, 0, 1);

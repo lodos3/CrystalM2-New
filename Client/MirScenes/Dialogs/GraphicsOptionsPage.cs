@@ -142,7 +142,7 @@ internal sealed class GraphicsOptionsPage : MirControl
             AddValue("Beam width", 0, 190, light.Beam, "°");
             AddButton(placement, "Test light", new Rectangle(0, 216, 96, 21),
                 () => GameScene.Scene?.MapControl?.PreviewLight(source));
-            AddButton(placement, "Colour and blur", new Rectangle(107, 216, 122, 21), () =>
+            AddButton(placement, shaped ? "Colour and blur" : "Colour", new Rectangle(107, 216, 122, 21), () =>
             {
                 placement.Visible = false;
                 optics.Visible = true;
@@ -179,7 +179,10 @@ internal sealed class GraphicsOptionsPage : MirControl
             }
         }
         _content = page;
-        Caption("Authored keeps sprite-shaped emitters.", 0, 289);
+        AddValue("Map tint", 0, 285, GraphicsTuning.MapColour, "%", Preview.Ambient,
+            "Blend dark ambient light towards the average colour of the visible map tiles.");
+        AddValue("Night floor", 0, 307, GraphicsTuning.NightFloor, "%", Preview.Ambient,
+            "Minimum brightness for the sampled night tint. Set Map tint to 0 for authored ambient lighting.");
     }
 
     private void BuildPost()
