@@ -129,20 +129,7 @@ internal static class Program
             Check(image.GetPixel(8, 8).R > coreRed && image.GetPixel(8, 8).R < 255,
                 "Lower shadow opacity must darken the scene less.");
 
-        device.Clear(Color.Black);
-        device.PixelShader = ShaderEffect.ShapedLight;
-        device.Blend = SpriteBlendMode.Additive;
-        device.SetPixelShaderConstant(0, [new Vector4(0.5f, 0.5f, 0.75f, 0)]);
-        device.Sprite.Draw(red, paddedShadow, new Vector3(7, 7, 0), Vector4.One);
-        using (var image = device.Capture(backBuffer))
-        {
-            Color centre = image.GetPixel(8, 8), edge = image.GetPixel(7, 8);
-            Check(centre.R > edge.R && edge.R > 0 && edge.G == 0 && edge.B == 0,
-                "Shaped emission must follow the source frame and spread its colour beyond the edge.");
-            Near(Color.Black, image.GetPixel(6, 8), "A shaped light must leave unrelated pixels dark.");
-        }
-        device.Blend = SpriteBlendMode.Alpha;
-        device.PixelShader = ShaderEffect.Artwork;
+        TestShapedLight(device, backBuffer, red);
         TestArtworkStyles(device, backBuffer, translucent);
         TestGroundWeather(device, backBuffer);
         TestWeatherSilhouette(device, backBuffer);
@@ -247,6 +234,46 @@ internal static class Program
         Near(Color.FromArgb(22, 25, 23), image.GetPixel(36, 24), "Fog must follow the solid foreground sprite.");
         Near(Color.FromArgb(22, 25, 23), image.GetPixel(46, 24), "Opaque black artwork must still block fog.");
         device.AuxiliaryTexture = null;
+        device.PixelShader = ShaderEffect.Artwork;
+    }
+
+    private static void TestShapedLight(RendererDevice device, Surface target, Texture red)
+    {
+        using var shape = new Texture(device, 32, 32, true);
+        using var shapeSurface = shape.GetSurface();
+        using var horizontal = new Texture(device, 32, 32, true);
+        using var horizontalSurface = horizontal.GetSurface();
+        var rect = new Rectangle(0, 0, 32, 32);
+
+        device.SetRenderTarget(shapeSurface);
+        device.Clear(Color.Black);
+        device.PixelShader = ShaderEffect.ShapedLight;
+        device.Blend = SpriteBlendMode.Additive;
+        device.SetPixelShaderConstant(0, [new(1, 0, 0, 0)]);
+        device.Sprite.Draw(red, new Rectangle(0, 0, 2, 2), new Rectangle(12, 12, 8, 8), new Vector4(0, 1, 0, 1));
+        using (var image = device.Capture(shapeSurface))
+        {
+            Near(Color.Lime, image.GetPixel(12, 14), "Custom tint must recolour the source without keeping its original hue.");
+            Near(Color.Black, image.GetPixel(11, 14), "A larger frame must keep a crisp edge with blur at zero.");
+        }
+
+        device.SetRenderTarget(horizontalSurface);
+        device.PixelShader = ShaderEffect.GaussianLight;
+        device.Blend = SpriteBlendMode.Alpha;
+        device.SetPixelShaderConstant(0, [new(1f / 32, 0, 4, 0.154f)]);
+        device.Sprite.Draw(shape, rect, rect, Vector4.One);
+
+        device.SetRenderTarget(target);
+        device.Clear(Color.Black);
+        device.SetPixelShaderConstant(0, [new(0, 1f / 32, 4, 0.154f)]);
+        device.Sprite.Draw(horizontal, rect, rect, Vector4.One);
+        using (var image = device.Capture(target))
+        {
+            Color centre = image.GetPixel(16, 16), side = image.GetPixel(10, 16), diagonal = image.GetPixel(10, 10);
+            Check(centre.G > side.G && side.G > diagonal.G && diagonal.G > 0,
+                "The Gaussian must extend smoothly along both axes around the scaled shape.");
+            Near(Color.Black, image.GetPixel(5, 5), "The Gaussian must leave unrelated pixels dark.");
+        }
         device.PixelShader = ShaderEffect.Artwork;
     }
 

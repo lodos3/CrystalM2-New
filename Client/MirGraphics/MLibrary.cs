@@ -830,22 +830,24 @@ namespace Client.MirGraphics
             frame.CleanTime = CMain.Time + Settings.CleanDelay;
         }
 
-        public bool DrawLightShape(int index, Point point, Color colour, bool offset, float intensity,
-                                   ref int pixelBudget, int spreadPercent = 100)
+        internal bool DrawLightShape(int index, Point point, Color colour, bool offset, float intensity,
+                                     ref int pixelBudget, LightSource source)
         {
             MImage image = GetImageMetadata(index);
             if (image == null || image.Width <= 0 || image.Height <= 0) return false;
             if (offset) point.Offset(image.X, image.Y);
 
-            int radius = Math.Max(1, (int)MathF.Round(Math.Clamp(Math.Min(image.Width, image.Height) / 8, 2, 6) * spreadPercent / 100f));
-            var bounds = new Rectangle(point, new Size(image.Width, image.Height));
-            bounds.Inflate(radius, radius);
-            Rectangle visible = Rectangle.Intersect(bounds, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight));
+            Rectangle bounds = ShapedLightPass.ScaleFrame(point, image.Width, image.Height,
+                GraphicsTuning.Light(source).Radius.Current);
+            Rectangle footprint = bounds;
+            int blur = GraphicsTuning.Light(source).Blur.Current;
+            footprint.Inflate(blur, blur);
+            Rectangle visible = Rectangle.Intersect(footprint, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight));
             int pixels = visible.Width * visible.Height;
             if (pixels <= 0 || pixels > pixelBudget || !CheckImage(index))
                 return false;
 
-            DXManager.DrawShapedLight(image.Image, bounds.Location, radius, colour, intensity);
+            ShapedLightPass.Add(source, image.Image, bounds, colour, intensity);
             pixelBudget -= pixels;
             image.CleanTime = CMain.Time + Settings.CleanDelay;
             return true;

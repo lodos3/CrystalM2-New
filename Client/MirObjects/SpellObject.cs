@@ -360,7 +360,7 @@ namespace Client.MirObjects
 
             return BodyLibrary.DrawLightShape(
                 DrawFrame + FrameIndex,
-                LightPosition, tint, true, intensity, ref pixelBudget, GraphicsTuning.Light(LightSource.Spell).Radius.Current);
+            LightPosition, tint, true, intensity, ref pixelBudget, LightSource.Spell);
         }
 
         public override bool MouseOver(Point p)

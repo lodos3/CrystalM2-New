@@ -139,7 +139,7 @@ namespace Client.MirObjects
 
         internal bool DrawLightMask(Color tint, float intensity, ref int pixelBudget) => Library != null && CurrentFrame >= 0 &&
             CurrentFrame < Count && Library.DrawLightShape(DrawnFrame, LightPosition,
-                tint, true, intensity, ref pixelBudget, GraphicsTuning.Light(LightSource.Spell).Radius.Current);
+                tint, true, intensity, ref pixelBudget, LightSource.Spell);
 
         public void Clear()
         {

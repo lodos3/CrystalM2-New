@@ -44,8 +44,8 @@ public sealed partial class MapControl
         Size size = library.GetSize(frame);
         if (offset) position.Offset(library.GetOffSet(frame));
         position = GraphicsTuning.LightPosition(LightSource.MapAnimation, position, originLinked);
-        var bounds = new Rectangle(position, size);
-        bounds.Inflate(15, 15);
+        var bounds = ShapedLightPass.ScaleFrame(position, size.Width, size.Height, emitter.Radius.Current);
+        bounds.Inflate(emitter.Blur.Current, emitter.Blur.Current);
         if (size.IsEmpty || !bounds.IntersectsWith(new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight))) return;
 
         _animatedMapLights.Add(new AnimatedMapLight(library, frame, position, new Point(x, y),
@@ -61,7 +61,7 @@ public sealed partial class MapControl
             Color tint = TintLight(light.Tint, LightSource.MapAnimation, blind);
             var emitter = GraphicsTuning.Light(LightSource.MapAnimation);
             if (emitter.Shape.Current != 0 || !light.Library.DrawLightShape(light.Frame, light.Position, tint, false,
-                intensity * light.Strength, ref pixelBudget, emitter.Radius.Current))
+                intensity * light.Strength, ref pixelBudget, LightSource.MapAnimation))
             {
                 Size size = light.Library.GetSize(light.Frame);
                 Point center = new(light.Position.X + size.Width / 2, light.Position.Y + size.Height / 2);
@@ -119,6 +119,7 @@ public sealed partial class MapControl
         DXManager.SetSurface(DXManager.LightSurface);
         DXManager.Device.Clear(Color.Black); // Bloom sees emission without ambient.
         DXManager.SetBlend(true);
+        ShapedLightPass.Reset();
         try
         {
             DrawObjectLights(Settings.Effect ? Settings.SpellLightIntensityPercent / 100f *
@@ -128,9 +129,16 @@ public sealed partial class MapControl
             if (LightPreviewActive)
             {
                 var preview = GraphicsTuning.Light(_lightPreviewSource);
-                Color tint = TintLight(Color.FromArgb(200, 225, 255), _lightPreviewSource, blind);
-                DrawRadialLight(3, ActorLightPosition(User, _lightPreviewSource), ScaleLight(tint, preview.Intensity), _lightPreviewSource);
+                Color tint = TintLight(Color.White, _lightPreviewSource, blind);
+                Point point = ActorLightPosition(User, _lightPreviewSource);
+                int budget = ShapedLightPixelBudget;
+                bool shown = (_lightPreviewSource is LightSource.MapAnimation or LightSource.Spell) &&
+                    preview.Shape.Current == 0 && User.BodyLibrary != null &&
+                    User.BodyLibrary.DrawLightShape(User.DrawFrame + User.ArmourOffSet, point, tint, true,
+                        preview.Intensity, ref budget, _lightPreviewSource);
+                if (!shown) DrawRadialLight(3, point, ScaleLight(tint, preview.Intensity), _lightPreviewSource);
             }
+            ShapedLightPass.Composite();
         }
         finally
         {
@@ -269,8 +277,12 @@ public sealed partial class MapControl
             tint.G, (int)Math.Clamp(tint.B * (1 - 0.30f * bias), 0, 255));
     }
 
-    private Color TintLight(Color tint, LightSource source, bool blind) =>
-        blind ? GetBlindLight(tint) : WarmLight(tint, GraphicsTuning.Light(source).Warmth.Current);
+    private Color TintLight(Color tint, LightSource source, bool blind)
+    {
+        var light = GraphicsTuning.Light(source);
+        if (light.CustomColour.Current != 0) tint = light.Colour;
+        return blind ? GetBlindLight(tint) : WarmLight(tint, light.Warmth.Current);
+    }
 
     private static void DrawRadialLight(int index, Point point, Color tint, LightSource source)
     {

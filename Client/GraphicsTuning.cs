@@ -58,7 +58,13 @@ internal static class GraphicsTuning
         public readonly Value Shape = new(source + "LightShape", 0, 0, 2);
         public readonly Value Direction = new(source + "LightDirection", 0, 0, 360);
         public readonly Value Beam = new(source + "LightBeam", 65, 12, 175);
+        public readonly Value Blur = new(source + "LightBlur", 4, 0, 32);
+        public readonly Value CustomColour = new(source + "LightCustomColour", 0, 0, 1);
+        public readonly Value Red = new(source + "LightRed", 255, 0, 255);
+        public readonly Value Green = new(source + "LightGreen", 255, 0, 255);
+        public readonly Value Blue = new(source + "LightBlue", 255, 0, 255);
         public float Intensity => Strength.Current / 100f;
+        public Color Colour => Color.FromArgb(Red.Current, Green.Current, Blue.Current);
     }
 
     internal static readonly GraphicsLayer[] Layers = Enum.GetValues<GraphicsLayer>();
