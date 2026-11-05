@@ -6,6 +6,13 @@ public sealed partial class MapControl
 {
     private float _surfaceWetness, _surfaceSnow, _groundFog;
     private long _weatherTime = -1;
+    private readonly List<WorldSpriteCapture.Draw> _floorWeatherCutouts = new();
+    private readonly List<WorldSpriteCapture.Draw> _scenerySprites = new();
+    private readonly List<WorldSpriteCapture.Draw> _weatherActors = new();
+    private bool _captureWeather;
+
+    private bool LocalWeatherActive => GraphicsTuning.WeatherSource.Current == 0 &&
+        (Weather != WeatherSetting.None || _surfaceWetness > 0.001f || _surfaceSnow > 0.001f || _groundFog > 0.001f);
 
     private void ResetLocalWeather()
     {
@@ -39,8 +46,15 @@ public sealed partial class MapControl
         var viewport = new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight);
         Point start = new(Math.Max(0, User.Movement.X - ViewRangeX), Math.Max(1, User.Movement.Y - ViewRangeY));
         Point end = new(Math.Min(Width - 1, User.Movement.X + ViewRangeX), Math.Min(Height - 1, User.Movement.Y + ViewRangeY));
-        DrawGroundWeather(floor, weatherOrigin, viewport, start, end, now, rain);
-        if (rain || snow) DrawPrecipitation(weatherOrigin, viewport, start, end, now, rain, snow);
+        var device = DXManager.Device;
+        Texture previous = device.AuxiliaryTexture;
+        device.AuxiliaryTexture = WeatherMaskPass.Render(_floorWeatherCutouts, _scenerySprites, _weatherActors);
+        try
+        {
+            DrawGroundWeather(floor, weatherOrigin, viewport, start, end, now, rain);
+            if (rain || snow) DrawPrecipitation(weatherOrigin, viewport, start, end, now, rain, snow);
+        }
+        finally { device.AuxiliaryTexture = previous; }
     }
 
     private static float Approach(float value, bool accumulating, float seconds, float fill, float drain) =>
@@ -70,14 +84,19 @@ public sealed partial class MapControl
             new(seed, rain ? 1 : 0, 0, 0)]);
         try
         {
+            if (_mapMaterials.Regions.Count == 0)
+            {
+                var terrain = new Rectangle(floor.X + start.X * CellWidth, floor.Y + start.Y * CellHeight,
+                    (end.X - start.X + 1) * CellWidth, (end.Y - start.Y + 1) * CellHeight);
+                device.Ui.Fill(Rectangle.Intersect(viewport, terrain), Color.FromArgb(255, 204, 255, 255));
+                return;
+            }
+
             for (int y = start.Y; y <= end.Y; y++)
             for (int x = start.X; x <= end.X; x++)
             {
                 var bounds = new Rectangle(floor.X + x * CellWidth, floor.Y + y * CellHeight, CellWidth, CellHeight);
-                if (!bounds.IntersectsWith(viewport) || IsStaticOccluder(x, y)) continue;
-                var cell = M2CellInfo[x, y];
-                if (cell.MiddleImage == 0 && cell.FrontImage == 0 && M2CellInfo[x & ~1, y & ~1].BackImage == 0)
-                    continue;
+                if (!bounds.IntersectsWith(viewport)) continue;
 
                 float wetResponse = 0.80f, snowResponse = 1;
                 if (_mapMaterials.TrySample(x, y, out MaterialRegion material))
@@ -86,15 +105,7 @@ public sealed partial class MapControl
                     if (material.Material == MapMaterial.Water) wetResponse = snowResponse = 0;
                     else if (material.Material == MapMaterial.Foliage) snowResponse = 0.35f;
                 }
-                int edges = 0;
-                if (fog > 0)
-                {
-                    if (IsStaticOccluder(x - 1, y)) edges |= 1;
-                    if (IsStaticOccluder(x + 1, y)) edges |= 2;
-                    if (IsStaticOccluder(x, y - 1)) edges |= 4;
-                    if (IsStaticOccluder(x, y + 1)) edges |= 8;
-                }
-                device.Ui.Fill(bounds, Color.FromArgb(edges + 1, (int)(wetResponse * 255), (int)(snowResponse * 255), 255));
+                device.Ui.Fill(bounds, Color.FromArgb(255, (int)(wetResponse * 255), (int)(snowResponse * 255), 255));
             }
         }
         finally
@@ -112,49 +123,75 @@ public sealed partial class MapControl
         float density = GraphicsTuning.Precipitation.Current / 100f;
         if (density <= 0) return;
         float wind = GraphicsTuning.WeatherWind.Current / 100f;
-        Matrix original = DXManager.Sprite.Transform;
+        var device = DXManager.Device;
+        Matrix original = device.Sprite.Transform;
+        ShaderEffect shader = device.PixelShader;
+        SpriteBlendMode blend = device.Blend;
         using var artwork = DXManager.BlendArtwork(GraphicsLayer.Weather);
         try
         {
+            device.PixelShader = ShaderEffect.WeatherParticle;
+            device.Blend = device.ArtworkBlend ?? SpriteBlendMode.Alpha;
             for (int y = start.Y; y <= end.Y; y++)
             for (int x = start.X; x <= end.X; x++)
             {
                 int left = origin.X + x * CellWidth, top = origin.Y + y * CellHeight;
                 if (left < -CellWidth || left >= viewport.Right + CellWidth || top < -CellHeight ||
-                    top > viewport.Bottom + 150 || IsStaticOccluder(x, y)) continue;
+                    top > viewport.Bottom + 190) continue;
                 uint seed = WeatherHash(unchecked((uint)x * 73856093u ^ (uint)y * 19349663u ^ (uint)Index * 83492791u));
-                for (int i = 0; i < 2; i++)
+                float gust = MathF.Sin(x * 0.17f + y * 0.26f - now * 0.0009f);
+                float amount = density * (0.85f + 0.4f * gust);
+                for (int i = 0; i < 3; i++)
                 {
                     uint key = WeatherHash(seed + (uint)i * 251u);
-                    if (rain) Drop(key, 650, 116, true);
-                    if (snow) Drop(key ^ 0x5d124cd7u, 2300, 130, false);
+                    if (rain) Drop(key, true);
+                    if (snow) Drop(key ^ 0x5d124cd7u, false);
                 }
 
-                void Drop(uint key, int lifetime, int height, bool streak)
+                void Drop(uint key, bool streak)
                 {
-                    long clock = now + (key >> 16) % lifetime;
+                    int lifetime = streak ? 360 + (int)(key >> 5 & 511) : 1500 + (int)(key >> 5 & 2047);
+                    long clock = now + (key >> 16);
                     uint cycle = WeatherHash(key ^ (uint)(clock / lifetime));
-                    if ((cycle & 255) >= 96 * density) return;
+                    if ((cycle & 255) >= 61 * amount) return;
                     float age = clock % lifetime / (float)lifetime;
-                    float xOffset = (int)(cycle >> 8 & 31) + (age - 0.5f) * wind * (streak ? 17 : 35);
-                    float yOffset = (int)(cycle >> 13 & 15) - (1 - age) * height;
-                    if (streak && age > 0.87f)
+                    uint shape = WeatherHash(cycle + 16411);
+                    float groundX = left + (cycle >> 8 & 255) * (CellWidth / 256f);
+                    float groundY = top + (cycle >> 16 & 255) * (CellHeight / 256f);
+                    float height = 72 + (shape >> 9 & 95);
+                    float drift = (wind * (15 + gust * 14) + (int)(shape & 31) - 15) * (streak ? 1 : 1.65f);
+                    int brightness = 100 + (int)(shape >> 24 & 127);
+                    float fade = Math.Min(1, age * 9);
+                    if (streak && age > 0.89f)
                     {
                         if (_surfaceWetness > 0.15f)
-                            DXManager.Device.Ui.Fill(new Rectangle(left + (int)xOffset - 2, top + 8, 5, 1),
-                                Color.FromArgb((int)((1 - age) * 450), 184, 215, 248));
+                        {
+                            int span = (int)(4 + (age - 0.89f) * (28 + (shape >> 16 & 31)));
+                            device.Ui.Fill(new Rectangle((int)groundX - span / 2, (int)groundY - 2, span, 4),
+                                Color.FromArgb((int)((1 - age) * 740), 2, brightness, 0));
+                        }
                         return;
                     }
-                    int size = streak ? 1 : 2 + (int)(cycle >> 19 & 1);
-                    DXManager.Sprite.Transform = Matrix.CreateRotationZ(streak ? wind * 0.13f : 0) *
-                        Matrix.CreateTranslation(left + xOffset, top + yOffset, 0) * original;
-                    DXManager.Device.Ui.Fill(new Rectangle(0, 0, size, streak ? 10 : size),
-                        streak ? Color.FromArgb(150, 172, 207, 247) : Color.FromArgb(219, 228, 240, 255));
-                    DXManager.Sprite.Transform = original;
+                    float progress = streak ? age / 0.89f : age;
+                    float sway = streak ? 0 : MathF.Sin((progress * 2 + (shape >> 16 & 63) / 20f) * MathF.PI) * (3 + wind * 3);
+                    float angle = streak ? -MathF.Atan2(drift, height) : 0;
+                    int width = streak ? 2 + (int)(shape >> 8 & 1) : 2 + (int)(shape >> 7 & 3);
+                    int length = streak ? 5 + (int)(shape >> 16 & 15) : width;
+                    device.Sprite.Transform = Matrix.CreateRotationZ(angle) *
+                        Matrix.CreateTranslation(groundX - (1 - progress) * drift + sway, groundY - (1 - progress) * height, 0) * original;
+                    device.Ui.Fill(new Rectangle(0, 0, width, length),
+                        Color.FromArgb((int)(fade * (streak ? 80 + (shape >> 2 & 95) : 120 + (shape >> 3 & 111))),
+                            streak ? 0 : 1, brightness, 0));
+                    device.Sprite.Transform = original;
                 }
             }
         }
-        finally { DXManager.Sprite.Transform = original; }
+        finally
+        {
+            device.PixelShader = shader;
+            device.Blend = blend;
+            device.Sprite.Transform = original;
+        }
     }
 
     private static uint WeatherHash(uint n)

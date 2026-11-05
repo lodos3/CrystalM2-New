@@ -41,6 +41,7 @@ public sealed unsafe class RendererDevice : IDisposable
     private SpriteBlendMode? _artworkBlend;
     private TextureFilterMode _textureFilter;
     private Vector3 _textureAdjustment = new(0.08f, 1, 0);
+    private Texture _auxiliaryTexture;
     private ShaderEffect _effect;
     private float _blendRate = 1, _opacity = 1;
     public SpriteBatch Sprite { get; private set; }
@@ -76,6 +77,11 @@ public sealed unsafe class RendererDevice : IDisposable
     {
         get => _textureAdjustment;
         set { if (_textureAdjustment == value) return; Sprite.Flush(); _textureAdjustment = value; }
+    }
+    internal Texture AuxiliaryTexture
+    {
+        get => _auxiliaryTexture;
+        set { if (ReferenceEquals(_auxiliaryTexture, value)) return; Sprite.Flush(); _auxiliaryTexture = value; }
     }
     public ShaderEffect PixelShader
     {
@@ -242,6 +248,11 @@ public sealed unsafe class RendererDevice : IDisposable
         Context.VSSetShader(_vertexShader);
         Context.PSSetShader(_shaders[(int)_effect]);
         Context.PSSetShaderResource(0, source.View);
+        if (_auxiliaryTexture is { Disposed: false })
+        {
+            Context.PSSetShaderResource(1, _auxiliaryTexture.View);
+            Context.PSSetSampler(1, _linearSampler);
+        }
         bool smooth = _effect is ShaderEffect.BloomBlur or ShaderEffect.BloomExtract or ShaderEffect.ShadowMask or
             ShaderEffect.ProjectedShadow or ShaderEffect.ShapedLight or ShaderEffect.ConeLight;
         Context.PSSetSampler(0, smooth ? _linearSampler : _pointSampler);

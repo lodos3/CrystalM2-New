@@ -25,14 +25,16 @@ namespace Client.MirGraphics
         internal int ShadowHeight => (_height + 1) / 2;
 
         internal Size VisibleSize { get; }
+        internal bool HasCutout { get; }
         internal int StorageBytes => _visibleBits.Length;
 
-        private AlphaCoverage(int width, int height, byte[] bits, Size visibleSize)
+        private AlphaCoverage(int width, int height, byte[] bits, Size visibleSize, bool hasCutout)
         {
             _width = width;
             _height = height;
             _visibleBits = bits;
             VisibleSize = visibleSize;
+            HasCutout = hasCutout;
         }
 
         internal static AlphaCoverage Capture(ReadOnlySpan<byte> bgra, int width, int height, int pitch)
@@ -48,6 +50,7 @@ namespace Client.MirGraphics
             int pixels = checked(width * height);
             byte[] bits = new byte[(pixels >> 3) + ((pixels & 7) == 0 ? 0 : 1)];
             int minX = width, minY = height, maxX = -1, maxY = -1;
+            bool hasCutout = false;
 
             for (int y = 0; y < height; y++)
             {
@@ -56,8 +59,9 @@ namespace Client.MirGraphics
                 for (int x = 0; x < width; x++)
                 {
                     // Format.A8R8G8B8 is BGRA in little-endian system memory.
-                    if (bgra[rowOffset + x * 4 + 3] == 0)
-                        continue;
+                    byte alpha = bgra[rowOffset + x * 4 + 3];
+                    hasCutout |= alpha < 255;
+                    if (alpha == 0) continue;
 
                     int bitIndex = pixelOffset + x;
                     bits[bitIndex >> 3] |= (byte)(1 << (bitIndex & 7));
@@ -72,7 +76,7 @@ namespace Client.MirGraphics
             // Retain the legacy dimensions for fully transparent images.
             Size size = maxX < 0 ? new Size(width, height) :
                 new Size(maxX - minX + 1, maxY - minY + 1);
-            return new AlphaCoverage(width, height, bits, size);
+            return new AlphaCoverage(width, height, bits, size, hasCutout);
         }
 
         // An 8x8 alternating alpha patch indicates binary checkerboard dithering.

@@ -10795,6 +10795,9 @@ namespace Client.MirScenes
         {
             if (User == null) return;
 
+            _captureWeather = LocalWeatherActive;
+            _scenerySprites.Clear();
+            _weatherActors.Clear();
             bool drawFloorDirectly = GraphicsTuning.Blend(GraphicsLayer.Ground).Current != 0 ||
                 GraphicsTuning.Blend(GraphicsLayer.Middle).Current != 0 ||
                 GraphicsTuning.Blend(GraphicsLayer.Front).Current != 0;
@@ -10850,10 +10853,11 @@ namespace Client.MirScenes
                 WetSurfacePass.Draw(_mapMaterials, _weatherFrame, User.Movement,
                                     GraphicsTuning.Offset(GraphicsLayer.Ground).Apply(User.OffSetMove), OffSetX, OffSetY,
                                     ViewRangeX, ViewRangeY, Width, Height);
-            if (!legacyWeather) DrawLocalWeather();
             _animatedMapLights.Clear();
             DrawSpellParticles(ground: true);
             DrawObjects();
+            if (_captureWeather) DrawLocalWeather();
+            DrawWorldObjectLabels();
             DrawSpellParticles(ground: false);
 
             //render weather
@@ -10990,6 +10994,7 @@ namespace Client.MirScenes
 
         private void DrawFloorTiles()
         {
+            _floorWeatherCutouts.Clear();
             Point ground = GraphicsTuning.Offset(GraphicsLayer.Ground).Pixels;
             Point middle = GraphicsTuning.Offset(GraphicsLayer.Middle).Pixels;
             Point front = GraphicsTuning.Offset(GraphicsLayer.Front).Pixels;
@@ -11046,6 +11051,7 @@ namespace Client.MirScenes
                             (s.Width == CellWidth * 2 && s.Height == CellHeight * 2))
                         {
                             using var artwork = DXManager.BlendArtwork(GraphicsLayer.Middle);
+                            using var capture = new WorldSpriteCapture.Scope(_floorWeatherCutouts, WorldSpriteCapture.Kind.CutoutTile);
                             lib.Draw(midIndex, drawX + middle.X, drawY + middle.Y);
                         }
                     }
@@ -11080,6 +11086,7 @@ namespace Client.MirScenes
                                  (s.Width == CellWidth * 2 && s.Height == CellHeight * 2)))
                             {
                                 using var artwork = DXManager.BlendArtwork(GraphicsLayer.Front);
+                                using var capture = new WorldSpriteCapture.Scope(_floorWeatherCutouts, WorldSpriteCapture.Kind.CutoutTile);
                                 lib.Draw(frontIndex, drawX + front.X, drawY + front.Y);
                             }
                         }
@@ -11114,6 +11121,8 @@ namespace Client.MirScenes
 
         private void DrawObjects()
         {
+            var sceneryCapture = _captureWeather ? _scenerySprites : null;
+            var actorCapture = _captureWeather ? _weatherActors : null;
             var animationOffset = GraphicsTuning.Offset(GraphicsLayer.MapAnimation);
             var middleOffset = GraphicsTuning.Offset(GraphicsLayer.Middle);
             var frontOffset = GraphicsTuning.Offset(GraphicsLayer.Front);
@@ -11134,7 +11143,7 @@ namespace Client.MirScenes
                 {
                     if (x < 0) continue;
                     if (x >= Width) break;
-                    M2CellInfo[x, y].DrawDeadObjects();
+                    M2CellInfo[x, y].DrawDeadObjects(actorCapture);
                 }
             }
 
@@ -11162,6 +11171,7 @@ namespace Client.MirScenes
                         int animationoffset = M2CellInfo[x, y].TileAnimationOffset ^ 0x2000;
                         index += animationoffset * (AnimationCount % animation);
                         using var artwork = DXManager.BlendArtwork(GraphicsLayer.MapAnimation);
+                        using var capture = new WorldSpriteCapture.Scope(sceneryCapture, WorldSpriteCapture.Kind.Scenery);
                         Point position = animationOffset.Apply(new Point(drawX, drawY));
                         Libraries.MapLibs[190].DrawUp(index, position.X, position.Y);
                         CaptureAnimatedMapLight(Libraries.MapLibs[190], index,
@@ -11195,6 +11205,7 @@ namespace Client.MirScenes
                                     MLibrary library = Libraries.MapLibs[M2CellInfo[x, y].MiddleIndex];
                                     bool additive = blend && (animation == 10 || animation == 8); // diamond mines, abyss
                                     using var artwork = DXManager.BlendArtwork(GraphicsLayer.MapAnimation, GraphicsLayer.Middle);
+                                    using var capture = new WorldSpriteCapture.Scope(sceneryCapture, WorldSpriteCapture.Kind.Scenery);
                                     position = animationOffset.Apply(position, middleOffset.Linked);
                                     if (additive)
                                     {
@@ -11213,6 +11224,7 @@ namespace Client.MirScenes
                             if ((s.Width != CellWidth || s.Height != CellHeight) && (s.Width != (CellWidth * 2) || s.Height != (CellHeight * 2)) && !blend)
                             {
                                 using var artwork = DXManager.BlendArtwork(animation > 0 ? GraphicsLayer.MapAnimation : GraphicsLayer.Middle, GraphicsLayer.Middle);
+                                using var capture = new WorldSpriteCapture.Scope(sceneryCapture, WorldSpriteCapture.Kind.Scenery);
                                 Libraries.MapLibs[M2CellInfo[x, y].MiddleIndex].DrawUp(index, position.X, position.Y);
                             }
                         }
@@ -11273,6 +11285,7 @@ namespace Client.MirScenes
                     frontPosition = frontOffset.Apply(frontPosition);
                     if (animation > 0) frontPosition = animationOffset.Apply(frontPosition, frontOffset.Linked);
                     using var frontArtwork = DXManager.BlendArtwork(animation > 0 ? GraphicsLayer.MapAnimation : GraphicsLayer.Front, GraphicsLayer.Front);
+                    using var frontCapture = new WorldSpriteCapture.Scope(sceneryCapture, WorldSpriteCapture.Kind.Scenery);
                     if (blend) front.DrawBlend(index, frontPosition, Color.White, useOffset);
                     else front.Draw(index, frontPosition, Color.White, useOffset);
                     if (animation > 0) CaptureAnimatedMapLight(front, index, frontPosition, useOffset, x, y, blend,
@@ -11284,7 +11297,7 @@ namespace Client.MirScenes
                 {
                     if (x < 0) continue;
                     if (x >= Width) break;
-                    M2CellInfo[x, y].DrawObjects();
+                    M2CellInfo[x, y].DrawObjects(actorCapture);
                 }
             }
 
@@ -11328,14 +11341,17 @@ namespace Client.MirScenes
             }
 
             foreach (var ob in Objects.Values)
-            {
                 ob.DrawEffects(Settings.Effect);
+        }
 
+        private static void DrawWorldObjectLabels()
+        {
+            foreach (var ob in Objects.Values)
+            {
                 if (Settings.NameView && !(ob is ItemObject) && !ob.Dead)
                     ob.DrawName();
 
                 ob.DrawChat();
-                //ob.DrawHealth();
                 ob.DrawPoison();
                 ob.DrawDamages();
             }

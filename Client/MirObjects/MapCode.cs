@@ -52,7 +52,7 @@
                 return mo.ObjectID == ObjectID;
             });
         }
-        public void DrawObjects()
+        internal void DrawObjects(List<MirGraphics.WorldSpriteCapture.Draw> weatherActors)
         {
             if (CellObjects == null) return;
 
@@ -72,7 +72,7 @@
                         else if (actor is NPCObject npc && npc.BodyLibrary != null)
                             npc.BodyLibrary.DrawProjectedShadow(npc.DrawFrame, npc.DrawLocation, npc.CurrentLocation, linked, preview);
                     }
-                    actor.Draw();
+                    DrawActor(actor, weatherActors);
                     continue;
                 }
 
@@ -87,7 +87,7 @@
                         case Monster.SSabukWall2:
                         case Monster.SSabukWall3:
                         case Monster.HellLord:
-                            CellObjects[i].Draw();
+                            DrawActor(CellObjects[i], weatherActors);
                             break;
                         default:
                             continue;
@@ -96,7 +96,7 @@
             }
         }
 
-        public void DrawDeadObjects()
+        internal void DrawDeadObjects(List<MirGraphics.WorldSpriteCapture.Draw> weatherActors)
         {
             if (CellObjects == null) return;
             for (int i = 0; i < CellObjects.Count; i++)
@@ -118,8 +118,15 @@
                     }
                 }
 
-                CellObjects[i].Draw();
+                DrawActor(CellObjects[i], weatherActors);
             }
+        }
+
+        private static void DrawActor(MapObject actor, List<MirGraphics.WorldSpriteCapture.Draw> weatherActors)
+        {
+            using var capture = new MirGraphics.WorldSpriteCapture.Scope(
+                actor is SpellObject ? null : weatherActors, MirGraphics.WorldSpriteCapture.Kind.Actor);
+            actor.Draw();
         }
 
         public void Sort()

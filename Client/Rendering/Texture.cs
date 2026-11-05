@@ -18,6 +18,8 @@ public sealed unsafe class Texture : IDisposable
     public int Width { get; }
     public int Height { get; }
     public bool IsRenderTarget { get; }
+    internal bool IsWorldArtwork { get; set; }
+    internal bool HasCutout { get; set; }
     public bool Disposed { get; private set; }
     internal long Bytes => (long)Width * Height * 4;
 

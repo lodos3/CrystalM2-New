@@ -8,7 +8,9 @@ cbuffer Frame : register(b0)
 };
 cbuffer Effect : register(b1) { float4 C[8]; };
 Texture2D SpriteTexture : register(t0);
+Texture2D AuxiliaryTexture : register(t1);
 SamplerState SpriteSampler : register(s0);
+SamplerState AuxiliarySampler : register(s1);
 struct Input { float2 Position : POSITION; float2 Uv : TEXCOORD0; float4 Tint : COLOR0; float4 Bounds : TEXCOORD1; };
 struct Output
 {
@@ -248,18 +250,39 @@ float WeatherNoise(float2 p)
     return lerp(lerp(h.x, h.y, f.x), lerp(h.z, h.w, f.x), f.y);
 }
 
+float WeatherVisibility(float2 screen)
+{
+    return 1 - AuxiliaryTexture.Sample(AuxiliarySampler, screen / Viewport).a;
+}
+
+float4 PSWeatherOcclusion(Output input) : SV_TARGET
+{
+    float4 pixel = SampleStraight(input.Uv);
+    float brightest = max(pixel.r, max(pixel.g, pixel.b));
+    // Reconstructed baked shadows are translucent black. Solid dark artwork
+    // still occludes weather, as does the coloured fringe of a sprite.
+    float shadow = (1 - step(1.5 / 255, brightest)) * (1 - step(254.5 / 255, pixel.a));
+    return float4(0, 0, 0, pixel.a * input.Tint.a * (1 - shadow));
+}
+
 float4 PSWeatherGround(Output input) : SV_TARGET
 {
+    float visibility = WeatherVisibility(input.Position.xy);
+    if (visibility < 0.001) return 0;
     float2 world = input.Position.xy - C[0].xy + C[2].xx;
     float snow = 0, wet = 0, sheen = 0, fog = 0;
     if (C[0].z > 0.001 && input.Tint.r > 0)
     {
         float basins = WeatherNoise(world / float2(41, 24)) * 0.72 + WeatherNoise(world / 11) * 0.28;
         float pool = smoothstep(0.18, 0.5, basins + saturate(C[0].z) * 0.38 - 0.28);
-        wet = saturate(C[0].z * input.Tint.r * (0.22 + pool * 0.43));
+        wet = saturate(C[0].z * input.Tint.r * (0.08 + pool * 0.40));
         float2 drops = world / float2(28, 18);
-        float phase = frac(C[1].w * 1.8 + WeatherNoise(floor(drops) + 0.27));
-        float ring = 1 - smoothstep(0.024, 0.075, abs(length(frac(drops) - 0.5) - phase * 0.47));
+        float2 cell = floor(drops);
+        float2 centre = 0.24 + 0.52 * float2(WeatherNoise(cell + 0.27), WeatherNoise(cell + 19.13));
+        float phase = frac(C[1].w * (1.2 + centre.x) + centre.y * 2);
+        float distance = length(frac(drops) - centre);
+        float ring = (1 - smoothstep(0.024, 0.067, abs(distance - phase * 0.29))) *
+            smoothstep(0, 0.1, phase);
         sheen = pool * saturate(C[0].z * input.Tint.r) * (0.15 + C[2].y * ring * (1 - phase) * 0.38);
     }
     if (C[0].w > 0.001 && input.Tint.g > 0)
@@ -273,14 +296,7 @@ float4 PSWeatherGround(Output input) : SV_TARGET
     {
         float2 p = input.Position.xy - C[1].xy + C[2].xx;
         float mist = WeatherNoise(p / float2(135, 38)) * 0.73 + WeatherNoise(p / float2(46, 17)) * 0.27;
-        float2 local = saturate((input.Uv - input.Bounds.xy) / (input.Bounds.zw - input.Bounds.xy));
-        int edge = (int)round(input.Tint.a * 255) - 1;
-        float fade = 1;
-        if ((edge & 1) != 0) fade *= smoothstep(0, 0.43, local.x);
-        if ((edge & 2) != 0) fade *= smoothstep(0, 0.43, 1 - local.x);
-        if ((edge & 4) != 0) fade *= smoothstep(0, 0.48, local.y);
-        if ((edge & 8) != 0) fade *= smoothstep(0, 0.48, 1 - local.y);
-        fog = fade * saturate(smoothstep(0.19, 0.89, mist) * C[1].z * 0.68);
+        fog = saturate(smoothstep(0.19, 0.89, mist) * C[1].z * 0.68);
     }
     // Compose the weather contributions in premultiplied space before returning straight alpha.
     float3 colour = float3(0.13, 0.22, 0.32) * wet;
@@ -290,7 +306,31 @@ float4 PSWeatherGround(Output input) : SV_TARGET
     alpha = lerp(alpha, 1, snow);
     colour = lerp(colour, float3(0.73, 0.82, 0.88), fog);
     alpha = lerp(alpha, 1, fog);
-    return float4(colour / max(alpha, 0.0001), alpha);
+    return float4(colour / max(alpha, 0.0001), alpha * visibility);
+}
+
+float4 PSWeatherParticle(Output input) : SV_TARGET
+{
+    float2 local = (input.Uv - input.Bounds.xy) / (input.Bounds.zw - input.Bounds.xy);
+    float2 centre = (local - 0.5) * 2;
+    float3 cold = lerp(float3(0.53, 0.68, 0.82), float3(0.85, 0.94, 1), input.Tint.g);
+    float shape;
+    if (input.Tint.r < 0.002)
+    {
+        float width = lerp(0.24, 0.78, local.y);
+        shape = (1 - smoothstep(width * 0.2, width, abs(centre.x))) *
+            smoothstep(0, 0.75, local.y) * (1 - smoothstep(0.87, 1, local.y));
+    }
+    else if (input.Tint.r < 0.006)
+    {
+        shape = 1 - smoothstep(0.04, 1, length(centre));
+        cold = lerp(cold, 1, 0.5);
+    }
+    else
+    {
+        shape = 1 - smoothstep(0.08, 0.39, abs(length(centre) - 0.67));
+    }
+    return PrepareBlend(float4(cold, shape * input.Tint.a * WeatherVisibility(input.Position.xy)));
 }
 
 // Atmosphere runs only when compositing the world texture, before the HUD.

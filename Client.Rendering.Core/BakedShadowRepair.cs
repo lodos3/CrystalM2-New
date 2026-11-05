@@ -166,7 +166,7 @@ public static class BakedShadowRepair
         int kernel = radius + 1;
         int normalization = kernel * kernel * kernel * kernel * 100;
         int opacity = Math.Clamp(settings.OpacityPercent, 0, 200);
-        int maxAlpha = Math.Min(255, (128 * opacity + 50) / 100);
+        int maxAlpha = Math.Min(254, (128 * opacity + 50) / 100); // Reserve opaque black for solid artwork.
         for (int y = Math.Max(0, top - radius); y <= Math.Min(height - 1, bottom + radius); y++)
         for (int x = Math.Max(0, left - radius); x <= Math.Min(width - 1, right + radius); x++)
         {

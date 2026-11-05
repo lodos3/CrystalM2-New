@@ -78,7 +78,11 @@ public sealed unsafe class SpriteBatch : IDisposable
             _owner.DrawCalls++;
             _owner.SpritesSubmitted += count / 6;
         }
-        finally { _owner.Context.PSUnsetShaderResource(0); }
+        finally
+        {
+            _owner.Context.PSUnsetShaderResource(0);
+            if (_owner.AuxiliaryTexture != null) _owner.Context.PSUnsetShaderResource(1);
+        }
     }
 
     internal void Discard()

@@ -333,6 +333,7 @@ namespace Client.MirGraphics
 
         public static void Draw(Texture texture, Rectangle? sourceRect, Vector3? position, Color color)
         {
+            WorldSpriteCapture.Record(texture, sourceRect, position, color);
             Sprite.Draw(texture, sourceRect, position, RendererDevice.ToVector(color));
             CMain.DPSCounter++;
         }
@@ -562,6 +563,7 @@ namespace Client.MirGraphics
             LightBloomPass.DisposeAll();
             AtmosphereFogOverlay.DisposeAll();
             WetSurfacePass.DisposeAll();
+            WeatherMaskPass.DisposeAll();
             MainSurface?.Dispose();
             MainSurface = null;
 

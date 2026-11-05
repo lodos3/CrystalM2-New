@@ -1065,6 +1065,8 @@ namespace Client.MirGraphics
                     // Snapshot alpha BEFORE UnlockRectangle. Never retain the native pointer.
                     var pixels = new Span<byte>((void*)locked.Data.DataPointer, checked(locked.Pitch * height));
                     _alphaCoverage = AlphaCoverage.Capture(pixels, width, height, locked.Pitch);
+                    Image.IsWorldArtwork = worldArtwork;
+                    Image.HasCutout = _alphaCoverage.HasCutout;
                     TrueSize = _alphaCoverage.VisibleSize;
                     HasBakedShadow = worldArtwork && GraphicsTuning.RepairBakedShadows &&
                         SmoothShadowLayer(pixels, locked.Pitch, mapShadowBackup, index, mask: false);

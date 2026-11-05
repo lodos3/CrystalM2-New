@@ -145,6 +145,7 @@ internal static class Program
         device.PixelShader = ShaderEffect.Artwork;
         TestArtworkStyles(device, backBuffer, translucent);
         TestGroundWeather(device, backBuffer);
+        TestWeatherSilhouette(device, backBuffer);
         TestSpellArtwork(device, backBuffer);
         TestConeProjection(device, backBuffer, red);
 
@@ -217,6 +218,35 @@ internal static class Program
         Near(first.GetPixel(20, 16), shifted.GetPixel(30, 22), "Accumulation and fog must remain anchored through camera motion.");
         Check(shifted.GetPixel(30, 22).B > 16, "Snow and fog should visibly affect the floor.");
         Near(Color.Black, shifted.GetPixel(58, 22), "A skipped obstacle tile must receive no weather coverage.");
+        device.PixelShader = ShaderEffect.Artwork;
+    }
+
+    private static void TestWeatherSilhouette(RendererDevice device, Surface target)
+    {
+        using var sprite = new Texture(device, 4, 1);
+        var data = sprite.BeginUpload();
+        data.Data.Write(new byte[] { 0, 0, 0, 0, 0, 0, 0, 128, 26, 129, 39, 255, 0, 0, 0, 255 });
+        sprite.EndUpload();
+        using var mask = new Texture(device, 64, 64, true);
+        using var maskSurface = mask.GetSurface();
+        device.SetRenderTarget(maskSurface);
+        device.Clear(Color.Transparent);
+        device.PixelShader = ShaderEffect.WeatherOcclusion;
+        device.Sprite.Draw(sprite, new Rectangle(0, 0, 4, 1), new Rectangle(12, 12, 40, 28), Vector4.One);
+        device.SetRenderTarget(target);
+
+        device.Clear(Color.FromArgb(22, 25, 23));
+        device.AuxiliaryTexture = mask;
+        device.PixelShader = ShaderEffect.WeatherGround;
+        device.SetPixelShaderConstant(0, [Vector4.Zero, new(0, 0, 3, 0), Vector4.Zero]);
+        device.Ui.Fill(new Rectangle(0, 0, 32, 64), Color.White);
+        device.Ui.Fill(new Rectangle(32, 0, 32, 64), Color.White);
+        using var image = device.Capture(target);
+        Check(Enumerable.Range(12, 28).Any(y => image.GetPixel(26, y).B > 45),
+            "Fog must cover the translucent baked shadow pixels.");
+        Near(Color.FromArgb(22, 25, 23), image.GetPixel(36, 24), "Fog must follow the solid foreground sprite.");
+        Near(Color.FromArgb(22, 25, 23), image.GetPixel(46, 24), "Opaque black artwork must still block fog.");
+        device.AuxiliaryTexture = null;
         device.PixelShader = ShaderEffect.Artwork;
     }
 
