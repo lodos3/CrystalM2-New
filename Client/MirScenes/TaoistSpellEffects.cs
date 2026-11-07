@@ -125,7 +125,9 @@ internal static partial class TaoistSpellEffects
         Vector2 head = prepare ? feet - Vector2.UnitY * (14 + travel * 80) :
             body + Ellipse(phase - .55f, 36, 22);
         frame.Sprite(feet, 83, 43, Shape.Wisp, Teal, .84f, Layer.Ground);
-        HealMotes(frame, body, 33, progress, 48);
+        frame.Sprite(body, 105, 104, Shape.Wisp, Jade, .35f, Layer.Glow, light: true);
+        HealMotes(frame, body, 33, progress, 56);
+        frame.Sprite(head, 102, 95, Shape.Wisp, prepare ? InkBlue : Jade, .39f, Layer.Glow, light: true);
         frame.Sprite(head, 86, 79, Shape.Wisp, prepare ? InkBlue : Teal, .55f, Layer.Glow, light: true);
         frame.Sprite(head, 52, 56, Shape.Orb, prepare ? Blue : Jade, .72f, light: true);
         frame.Sprite(head, 16, 20, Shape.Flash, White, .98f, Layer.EmissiveCore, phase * .37f);
@@ -138,6 +140,23 @@ internal static partial class TaoistSpellEffects
             Layer depth = prepare ? Layer.Emissive : Depth(turn - .55f);
             frame.Sprite(point, 4 + 8 * frame.Unit(i + 7), 5 + 7 * frame.Unit(i + 1), Shape.Spark,
                 i % 5 == 0 ? Ice : i % 2 == 0 ? Mint : Jade, .86f - age * .58f, depth, turn);
+        }
+        // Fine sparks rise through the larger healing ribbons. Each has its own
+        // deterministic phase so they glitter instead of moving as one ring.
+        for (int i = 0; i < 22; i++)
+        {
+            float age = Fract(progress * 1.53f + frame.Unit(i + 261));
+            float turn = i * 2.39996f + age * 2.1f;
+            Vector2 point = body + Ellipse(turn, 16 + 21 * frame.Unit(i + 17),
+                16 + 12 * frame.Unit(i + 63)) - Vector2.UnitY * (age * (28 + 20 * frame.Unit(i + 111)));
+            float twinkle = MathF.Sin(age * MathF.PI);
+            int colour = i % 5 == 0 ? Ivory : i % 2 == 0 ? Mint : Ice;
+            frame.Sprite(point, 2 + frame.Unit(i + 35) * 4, 3 + frame.Unit(i + 83) * 6,
+                i % 6 == 0 ? Shape.Flash : Shape.Spark, colour, .89f * twinkle,
+                Layer.EmissiveCore, turn, light: i % 9 == 0);
+            if (i % 8 == 0)
+                frame.Sprite(point, 17, 18, Shape.Orb, Jade, .27f * twinkle,
+                    Layer.Glow, light: true);
         }
     }
 
