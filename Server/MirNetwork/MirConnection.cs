@@ -476,7 +476,10 @@ namespace Server.MirNetwork
                     Magic((C.Magic)p);
                     break;
                 case (short)ClientPacketIds.SelectSpecialisation:
-                    SelectSpecialisation((C.SelectSpecialisation)p);
+                case (short)ClientPacketIds.TalentDraft:
+                    break;
+                case (short)ClientPacketIds.SpellPerkDraft:
+                    if (Stage == GameStage.Game) Player?.ApplySpellPerkDraft((C.SpellPerkDraft)p);
                     break;
                 case (short)ClientPacketIds.SwitchGroup:
                     SwitchGroup((C.SwitchGroup)p);
@@ -1556,7 +1559,7 @@ namespace Server.MirNetwork
 
             if (p.Key != 0 && (actor is HeroObject) != (p.Key > 16)) return;
             UserMagic selected = actor.Info.Magics.Find(magic => magic.Spell == p.Spell);
-            if (selected == null || (p.Key != 0 && (SpellCurriculum.IsPassive(p.Spell) || actor.GetMagic(p.Spell) == null)))
+            if (selected == null || (p.Key != 0 && (SpellCurriculum.IsPassive(p.Spell) || TalentRotations.IsFinisher(p.Spell) || actor.GetMagic(p.Spell) == null)))
                 return;
 
             if (p.Key != 0)
@@ -1575,16 +1578,11 @@ namespace Server.MirNetwork
 
             if (actor.Dead) return;
 
+            if (SpellCurriculum.IsRetired(p.Spell)) return;
             if (!actor.Dead && (actor.ActionTime > Envir.Time || actor.SpellTime > Envir.Time))
                 _retryList.Enqueue(p);
             else
                 actor.BeginMagic(p.Spell, p.Direction, p.TargetID, p.Location, p.SpellTargetLock);
-        }
-
-        private void SelectSpecialisation(C.SelectSpecialisation p)
-        {
-            if (Stage != GameStage.Game || Player == null) return;
-            Player.SelectSpecialisation(p);
         }
 
         private void SwitchGroup(C.SwitchGroup p)

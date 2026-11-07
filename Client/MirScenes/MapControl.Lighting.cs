@@ -138,35 +138,46 @@ public sealed partial class MapControl
             DXManager.SetSurface(world);
         }
 
-        ShaderEffect previousShader = DXManager.Device.PixelShader;
-        if (ambient.ToArgb() != Color.White.ToArgb())
+        var device = DXManager.Device;
+        ShaderEffect previousShader = device.PixelShader;
+        SpriteBlendMode previousBlend = device.Blend;
+        Texture previousAuxiliary = device.AuxiliaryTexture;
+        Span<Vector4> constants = stackalloc Vector4[RendererDevice.EffectConstantCount];
+        device.CopyPixelShaderConstants(constants);
+        try
         {
-            var device = DXManager.Device;
-            Texture previous = device.AuxiliaryTexture;
-            device.Blend = SpriteBlendMode.Multiply;
             device.PixelShader = ShaderEffect.LightComposite;
-            try
+            if (ambient.ToArgb() != Color.White.ToArgb())
             {
+                device.Blend = SpriteBlendMode.Multiply;
                 device.AuxiliaryTexture = mapColour;
                 device.SetPixelShaderConstant(0, [new(ambient.R / 255f, ambient.G / 255f, ambient.B / 255f,
                     mapColour == null ? 0 : GraphicsTuning.MapColour.Current / 100f),
                     new(GraphicsTuning.NightFloor.Current / 100f, GraphicsTuning.LightWarmth.Current * 0.003f, 0, 0)]);
                 DXManager.Draw(DXManager.LightTexture, null, Vector3.Zero, Color.White);
             }
-            finally { device.AuxiliaryTexture = previous; }
+
+            // Apply spill to the finished scene, with a weaker contribution in darkness.
+            // Screen uses the available highlight headroom on each surface.
+            float ambientLevel = Math.Min(ambient.R, Math.Min(ambient.G, ambient.B)) / 255f;
+            float spill = (0.25f + 0.75f * ambientLevel) *
+                Math.Max(GraphicsTuning.DayGlow.Current, LightPreviewActive ? 42 : 0) / 100f;
+            if (!blind && spill > 0)
+            {
+                device.Blend = SpriteBlendMode.Screen;
+                device.AuxiliaryTexture = null;
+                device.SetPixelShaderConstant(0, [Vector4.Zero, new(0, 0, spill, 0)]);
+                DXManager.Draw(DXManager.LightTexture, null, Vector3.Zero, Color.White);
+            }
         }
-        // Multiplication cannot illuminate white ambient. Add a restrained contribution in daylight.
-        int daylight = blind ? 0 : (int)MathF.Round(Math.Min(ambient.R, Math.Min(ambient.G, ambient.B)) *
-            Math.Max(GraphicsTuning.DayGlow.Current, LightPreviewActive ? 42 : 0) / 100f);
-        if (daylight > 0)
+        finally
         {
-            DXManager.Device.PixelShader = ShaderEffect.Artwork;
-            DXManager.Device.Blend = SpriteBlendMode.Additive;
-            DXManager.Draw(DXManager.LightTexture, null, Vector3.Zero, Color.FromArgb(daylight, Color.White));
+            device.Sprite.Flush();
+            device.AuxiliaryTexture = previousAuxiliary;
+            device.Blend = previousBlend;
+            device.PixelShader = previousShader;
+            device.SetPixelShaderConstant(0, constants);
         }
-        DXManager.Sprite.End();
-        DXManager.Device.PixelShader = previousShader;
-        DXManager.Sprite.Begin();
     }
 
     private void DrawObjectLights(float spellIntensity, bool blind)
@@ -213,7 +224,7 @@ public sealed partial class MapControl
 
         void DrawEffectLight(Effect effect)
         {
-            if (shaped >= MaxShapedSpellLights || !effect.Blend || effect.Light <= 0 || CMain.Time < effect.Start ||
+            if (shaped >= MaxShapedSpellLights || effect.Art.IsParticle || !effect.Blend || effect.Light <= 0 || CMain.Time < effect.Start ||
                 effect.CurrentFrame < 0 || effect.CurrentFrame >= effect.Count) return;
             shaped++;
             Color tint = TintLight(effect.LightColour, LightSource.Spell, blind);
@@ -300,6 +311,15 @@ public sealed partial class MapControl
         colour.Y *= intensity;
         colour.Z *= intensity;
         var sourceRect = new Rectangle(0, 0, texture.Width, texture.Height);
+        float direction = tuning.Direction.Current * MathF.PI / 180f;
+        float beam = tuning.Beam.Current * MathF.PI / 360f;
+        Vector4? cone = tuning.Shape.Current == 2
+            ? new Vector4(MathF.Cos(direction), MathF.Sin(direction), MathF.Cos(beam), MathF.Cos(beam * 0.7f)) : null;
+        if (GraphicsTuning.IsEffectLight(source) && tuning.Blur.Current > 0)
+        {
+            ShapedLightPass.AddProjection(source, texture, bounds, colour, cone);
+            return;
+        }
         if (tuning.Shape.Current != 2)
         {
             DXManager.Sprite.Draw(texture, sourceRect, bounds, colour);
@@ -310,13 +330,10 @@ public sealed partial class MapControl
         ShaderEffect shader = device.PixelShader;
         Span<Vector4> constants = stackalloc Vector4[RendererDevice.EffectConstantCount];
         device.CopyPixelShaderConstants(constants);
-        float direction = tuning.Direction.Current * MathF.PI / 180f;
-        float beam = tuning.Beam.Current * MathF.PI / 360f;
         device.PixelShader = ShaderEffect.ConeLight;
         try
         {
-            device.SetPixelShaderConstant(0, [new(MathF.Cos(direction), MathF.Sin(direction),
-                MathF.Cos(beam), MathF.Cos(beam * 0.7f))]);
+            device.SetPixelShaderConstant(0, [cone.Value]);
             DXManager.Sprite.Draw(texture, sourceRect, bounds, colour);
         }
         finally

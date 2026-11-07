@@ -120,7 +120,7 @@ namespace Client.MirObjects
                         {
                             Effects.Clear();
 
-                            var effects = MapControl.Effects.Where(x => x.Library == Libraries.Monsters[(ushort)Monster.HellLord]);
+                            var effects = MapControl.Effects.Where(x => x.Art.Library == Libraries.Monsters[(ushort)Monster.HellLord]);
 
                             foreach (var effect in effects)
                                 effect.Repeat = false;
@@ -803,7 +803,7 @@ namespace Client.MirObjects
                             case Monster.Snake16:
                             case Monster.Snake17:
                                 Effects.Add(new Effect(Libraries.Monsters[(ushort)BaseImage], 304, 6, Frame.Count * Frame.Interval, this));
-                                Effects.Add(new Effect(Libraries.Magic2, 1280, 10, Frame.Count * Frame.Interval, this));
+                                Effects.Add(new Effect(new SpellVisual(Spell.PoisonCloud), Frame.Count * Frame.Interval, this));
                                 break;
                             case Monster.HellCannibal:
                                 Effects.Add(new Effect(Libraries.Monsters[(ushort)Monster.HellCannibal], 310 + (int)Direction * 12, 12, 12 * Frame.Interval, this));
@@ -870,7 +870,7 @@ namespace Client.MirObjects
                             case Monster.Snake16:
                             case Monster.Snake17:
                                 SoundManager.PlaySound(BaseSound + 9);
-                                Effects.Add(new Effect(Libraries.Magic2, 1330, 10, Frame.Count * Frame.Interval, this));
+                                Effects.Add(new Effect(new SpellVisual(Spell.EnergyShield), Frame.Count * Frame.Interval, this));
                                 break;
                             case Monster.Behemoth:
                                 Effects.Add(new Effect(Libraries.Monsters[(ushort)Monster.Behemoth], 697 + (int)Direction * 7, 7, Frame.Count * Frame.Interval, this));
@@ -1230,11 +1230,11 @@ namespace Client.MirObjects
                 if (effectid >= 0)
                     TrackableEffect.effectlist[effectid].RemoveNoComplete();
 
-                TrackableEffect NetDropped = new TrackableEffect(new Effect(Libraries.MagicC, 7, 1, 1000, this) { Repeat = true, RepeatUntil = (ShockTime - 1500) });
+                TrackableEffect NetDropped = new TrackableEffect(new Effect(Spell.BindingShot, 7, 1, 1000, this) { Repeat = true, RepeatUntil = (ShockTime - 1500) });
                 NetDropped.Complete += (o1, e1) =>
                 {
                     SoundManager.PlaySound(20000 + 130 * 10 + 6);//sound M130-6
-                    Effects.Add(new TrackableEffect(new Effect(Libraries.MagicC, 8, 8, 700, this)));
+                    Effects.Add(new TrackableEffect(new Effect(Spell.BindingShot, 8, 8, 700, this)));
                 };
                 Effects.Add(NetDropped);
             }
@@ -2417,7 +2417,7 @@ namespace Client.MirObjects
                                                 ob = MapControl.GetObject(TargetID);
                                                 if (ob != null)
                                                 {
-                                                    ob.Effects.Add(new Effect(Libraries.Magic2, 1410, 10, 400, ob));
+                                                    ob.Effects.Add(new Effect(new SpellVisual(Spell.TrapHexagon), 400, ob));
                                                     SoundManager.PlaySound(BaseSound + 6);
                                                 }
                                                 break;
@@ -2574,13 +2574,13 @@ namespace Client.MirObjects
                                                 ob = MapControl.GetObject(TargetID);
                                                 if (ob != null)
                                                 {
-                                                    ob.Effects.Add(new Effect(Libraries.Magic2, 10, 5, 300, ob));
+                                                    ob.Effects.Add(new Effect(new SpellVisual(Spell.ThunderBolt), 300, ob));
                                                 }
                                                 break;
                                             case Monster.LeftGuard:
                                                 if (MapControl.GetObject(TargetID) != null)
                                                 {
-                                                    CreateProjectile(10, Libraries.Magic, true, 6, 30, 4);
+                                                    CreateProjectile(0, Spell.FireBall, true, 6, 30, 4);
                                                 }
                                                 break;
                                             case Monster.MinotaurKing:
@@ -2593,7 +2593,7 @@ namespace Client.MirObjects
                                             case Monster.FrostTiger:
                                                 if (MapControl.GetObject(TargetID) != null)
                                                 {
-                                                    CreateProjectile(410, Libraries.Magic2, true, 4, 30, 6);
+                                                    CreateProjectile(0, Spell.FrostCrunch, true, 4, 30, 6);
                                                 }
                                                 break;
 
@@ -2614,7 +2614,7 @@ namespace Client.MirObjects
                                                 ob = MapControl.GetObject(TargetID);
                                                 if (ob != null)
                                                 {
-                                                    ob.Effects.Add(new Effect(Libraries.Magic2, 1250, 15, 1000, ob));
+                                                    ob.Effects.Add(new Effect(new SpellVisual(Spell.Poisoning), 1000, ob));
                                                     SoundManager.PlaySound(BaseSound + 6);
                                                 }
                                                 break;
@@ -2622,7 +2622,7 @@ namespace Client.MirObjects
                                                 ob = MapControl.GetObject(TargetID);
                                                 if (ob != null)
                                                 {
-                                                    ob.Effects.Add(new Effect(Libraries.Magic2, 10, 5, 300, ob));
+                                                    ob.Effects.Add(new Effect(new SpellVisual(Spell.ThunderBolt), 300, ob));
                                                     SoundManager.PlaySound(BaseSound + 6);
                                                 }
                                                 break;
@@ -2676,7 +2676,7 @@ namespace Client.MirObjects
                                                 }
                                                 break;
                                             case Monster.WhiteFoxman:
-                                                missile = CreateProjectile(1160, Libraries.Magic, true, 3, 30, 7);
+                                                missile = CreateProjectile(0, Spell.SoulFireBall, true, 3, 30, 7);
 
                                                 if (missile.Target != null)
                                                 {
@@ -3423,7 +3423,7 @@ namespace Client.MirObjects
                                                 }
                                                 break;
                                             case Monster.WhiteFoxman:
-                                                missile = CreateProjectile(1160, Libraries.Magic, true, 3, 30, 7);
+                                                missile = CreateProjectile(0, Spell.SoulFireBall, true, 3, 30, 7);
 
                                                 if (missile.Target != null)
                                                 {
@@ -3789,7 +3789,7 @@ namespace Client.MirObjects
             return ++FrameIndex;
         }
 
-        public override Missile CreateProjectile(int baseIndex, MLibrary library, bool blend, int count, int interval, int skip, int lightDistance = 6, bool direction16 = true, Color? lightColour = null, uint targetID = 0)
+        public override Missile CreateProjectile(int baseIndex, EffectArt library, bool blend, int count, int interval, int skip, int lightDistance = 6, bool direction16 = true, Color? lightColour = null, uint targetID = 0)
         {
             if (targetID == 0)
             {

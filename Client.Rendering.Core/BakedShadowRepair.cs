@@ -14,9 +14,28 @@ public static class BakedShadowRepair
     // Repair transparent checker shadows at their authored position. Dense
     // colour-matched seeds distinguish shadows from dark outlines and isolated pixels.
     public static bool Smooth(Span<byte> bgra, int width, int height, int pitch, bool joinTileEdges = false,
-                              BakedShadowSettings? tuning = null)
+                              BakedShadowSettings? tuning = null) =>
+        Process(bgra, width, height, pitch, joinTileEdges, tuning ?? BakedShadowSettings.Default, strip: false);
+
+    // This copy is used only as effect coverage. Keep opaque dark armour and omit the
+    // shadow dots using the same connected checkerboard detection as the world renderer.
+    public static bool StripFromMask(Span<byte> bgra, int width, int height, int pitch)
     {
-        BakedShadowSettings settings = tuning ?? BakedShadowSettings.Default;
+        bool stripped = Process(bgra, width, height, pitch, false, BakedShadowSettings.Default, strip: true);
+        if (!HasOfflineRepair(bgra, width, height, pitch)) return stripped;
+        for (int y = 0; y < height; y++)
+        for (int x = 0; x < width; x++)
+        {
+            int p = y * pitch + x * 4;
+            if (bgra[p + 3] is > 0 and <= 128 && (bgra[p] | bgra[p + 1] | bgra[p + 2]) == 0)
+                bgra[p + 3] = 0;
+        }
+        return true;
+    }
+
+    private static bool Process(Span<byte> bgra, int width, int height, int pitch, bool joinTileEdges,
+                                BakedShadowSettings settings, bool strip)
+    {
         if (width < 2 || height < 2) return false;
         int seedWidth = Math.Min(width, height == 2 ? 4 : 3);
         int seedHeight = Math.Min(height, width == 2 ? 4 : 3);
@@ -72,7 +91,14 @@ public static class BakedShadowRepair
             }
 
             if (selected == null) return false;
-            PaintShadow(bgra, selected, width, height, pitch, left, top, right, bottom, joinTileEdges, settings);
+            if (strip)
+            {
+                for (int y = top; y <= bottom; y++)
+                for (int x = left; x <= right; x++)
+                    if (selected[y * width + x] != 0) bgra[y * pitch + x * 4 + 3] = 0;
+            }
+            else
+                PaintShadow(bgra, selected, width, height, pitch, left, top, right, bottom, joinTileEdges, settings);
             return true;
         }
         finally

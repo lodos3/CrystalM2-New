@@ -26,7 +26,7 @@ public sealed unsafe class RendererDevice : IDisposable
     private IDXGISwapChain1 _swapChain;
     private ID3D11VertexShader _vertexShader;
     private ID3D11InputLayout _layout;
-    private ID3D11SamplerState _pointSampler, _linearSampler;
+    private ID3D11SamplerState _pointSampler, _linearSampler, _particleSampler;
     private ID3D11RasterizerState _rasterizer;
     private ID3D11DepthStencilState _noDepth;
     private ID3D11Buffer _frameBuffer, _effectBuffer;
@@ -135,13 +135,18 @@ public sealed unsafe class RendererDevice : IDisposable
                 new InputElementDescription("POSITION", 0, Format.R32G32_Float, 0, 0),
                 new InputElementDescription("TEXCOORD", 0, Format.R32G32_Float, 8, 0),
                 new InputElementDescription("COLOR", 0, Format.R32G32B32A32_Float, 16, 0),
-                new InputElementDescription("TEXCOORD", 1, Format.R32G32B32A32_Float, 32, 0)
+                new InputElementDescription("TEXCOORD", 1, Format.R32G32B32A32_Float, 32, 0),
+                new InputElementDescription("TEXCOORD", 2, Format.R32_Float, 48, 0)
             }, vertexCode.Span);
             foreach (ShaderEffect effect in Enum.GetValues<ShaderEffect>())
                 _shaders[(int)effect] = device.CreatePixelShader(Compile("PS" + effect, "ps_4_0").Span);
 
             _pointSampler = device.CreateSamplerState(SamplerDescription.PointClamp);
             _linearSampler = device.CreateSamplerState(SamplerDescription.LinearClamp);
+            var particleSampler = SamplerDescription.LinearClamp;
+            particleSampler.Filter = Filter.Anisotropic;
+            particleSampler.MaxAnisotropy = 8;
+            _particleSampler = device.CreateSamplerState(particleSampler);
             _rasterizer = device.CreateRasterizerState(new RasterizerDescription(CullMode.None, FillMode.Solid));
             _noDepth = device.CreateDepthStencilState(DepthStencilDescription.None);
             _frameBuffer = device.CreateBuffer(32, BindFlags.ConstantBuffer, ResourceUsage.Dynamic, CpuAccessFlags.Write);
@@ -240,7 +245,8 @@ public sealed unsafe class RendererDevice : IDisposable
         Context.RSSetState(_rasterizer);
         Context.OMSetDepthStencilState(_noDepth);
         bool artwork = _effect is ShaderEffect.Artwork or ShaderEffect.Normal or ShaderEffect.Grayscale or ShaderEffect.Magic or ShaderEffect.SpellArtwork;
-        SpriteBlendMode blend = artwork ? _artworkBlend ?? _blend : _blend;
+        bool particle = _effect == ShaderEffect.ParticleCoverage;
+        SpriteBlendMode blend = artwork || particle ? _artworkBlend ?? _blend : _blend;
         Context.OMSetBlendState(_blends[(int)blend], new Color4(_blendRate, _blendRate, _blendRate, _blendRate));
         Context.IASetPrimitiveTopology(PrimitiveTopology.TriangleList);
         Context.IASetInputLayout(_layout);
@@ -255,8 +261,9 @@ public sealed unsafe class RendererDevice : IDisposable
         }
         bool smooth = _effect is ShaderEffect.BloomBlur or ShaderEffect.BloomExtract or ShaderEffect.ShadowMask or
             ShaderEffect.ProjectedShadow or ShaderEffect.GaussianLight or ShaderEffect.ConeLight or ShaderEffect.MapColourDownsample ||
+            _effect is ShaderEffect.WeatherSceneryBlur or ShaderEffect.WeatherGround or ShaderEffect.WeatherParticle or ShaderEffect.WeatherMaskView ||
             _effect == ShaderEffect.ShapedLight && _constants[0].Y > 0;
-        Context.PSSetSampler(0, smooth ? _linearSampler : _pointSampler);
+        Context.PSSetSampler(0, particle ? _particleSampler : smooth ? _linearSampler : _pointSampler);
         var frame = Context.Map(_frameBuffer, MapMode.WriteDiscard);
         int style = (int)blend + (artwork ? 16 * (int)_textureFilter : 0);
         try
@@ -374,6 +381,7 @@ public sealed unsafe class RendererDevice : IDisposable
         _vertexShader?.Dispose();
         _pointSampler?.Dispose();
         _linearSampler?.Dispose();
+        _particleSampler?.Dispose();
         _noDepth?.Dispose();
         _rasterizer?.Dispose();
         _swapChain?.Dispose();

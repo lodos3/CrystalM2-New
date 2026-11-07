@@ -11,13 +11,14 @@ Texture2D SpriteTexture : register(t0);
 Texture2D AuxiliaryTexture : register(t1);
 SamplerState SpriteSampler : register(s0);
 SamplerState AuxiliarySampler : register(s1);
-struct Input { float2 Position : POSITION; float2 Uv : TEXCOORD0; float4 Tint : COLOR0; float4 Bounds : TEXCOORD1; };
+struct Input { float2 Position : POSITION; float2 Uv : TEXCOORD0; float4 Tint : COLOR0; float4 Bounds : TEXCOORD1; float Depth : TEXCOORD2; };
 struct Output
 {
     float4 Position : SV_POSITION;
     float2 Uv : TEXCOORD0;
     float4 Tint : COLOR0;
     nointerpolation float4 Bounds : TEXCOORD1;
+    nointerpolation float Depth : TEXCOORD2;
 };
 Output VSMain(Input input)
 {
@@ -27,6 +28,7 @@ Output VSMain(Input input)
     output.Uv = input.Uv;
     output.Tint = input.Tint;
     output.Bounds = input.Bounds;
+    output.Depth = input.Depth;
     return output;
 }
 float4 SampleStraight(float2 uv)
@@ -152,6 +154,22 @@ float4 PrepareBlend(float4 pixel)
 }
 
 float4 PSArtwork(Output input) : SV_TARGET { return PrepareBlend(SampleArtwork(input) * input.Tint); }
+float4 PSParticleCoverage(Output input) : SV_TARGET
+{
+    // Limit the footprint of subpixel strips to the atlas gutter (32 of 256 texels).
+    float2 limit = (input.Bounds.zw - input.Bounds.xy) * 0.125;
+    float2 dx = clamp(ddx(input.Uv), -limit, limit);
+    float2 dy = clamp(ddy(input.Uv), -limit, limit);
+    float alpha = SpriteTexture.SampleGrad(SpriteSampler, input.Uv, dx, dy).r;
+    if (input.Depth > 0)
+    {
+        float occluder = AuxiliaryTexture.Load(int3(int2(input.Position.xy), 0)).r;
+        if (floor(occluder) > input.Depth) alpha *= 1 - saturate(frac(occluder) * 2);
+    }
+    float3 colour = input.Tint.rgb;
+    if ((int)RenderStyle % 16 == 4) colour /= max(1, max(colour.r, max(colour.g, colour.b)));
+    return PrepareBlend(float4(colour, input.Tint.a * alpha));
+}
 float4 PSNormal(Output input) : SV_TARGET
 {
     float4 pixel = SampleArtwork(input) * input.Tint;
@@ -187,10 +205,51 @@ float4 PSSpellArtwork(Output input) : SV_TARGET
     }
     return PrepareBlend(pixel);
 }
+float4 PSWeaponSpellMask(Output input) : SV_TARGET
+{
+    float coverage = C[0].z > 0.5 ? SampleStraight(input.Uv).r : SampleArtwork(input).a;
+    float2 local = (input.Uv - input.Bounds.xy) / max(input.Bounds.zw - input.Bounds.xy, 0.0001);
+    float phase = C[0].x;
+    float band = 0.5 + 0.5 * sin(local.x * 8 + local.y * 11 - phase);
+    float sheen = pow(band, 3);
+    if (C[0].y == 1)
+    {
+        float flicker = sin(local.x * 24 + phase * 2 + local.y * 7) * 0.9;
+        band = 0.5 + 0.5 * sin(local.y * 22 + phase + flicker);
+        sheen = pow(band, 2) * (0.75 + 0.25 * sin(local.x * 13 - phase * 2));
+    }
+    else if (C[0].y == 2)
+    {
+        float facet = sin(local.x * 25 - local.y * 19 + phase);
+        band = 0.5 + 0.5 * sin(local.y * 16 - local.x * 7 + facet - phase);
+        sheen = pow(band, 7);
+    }
+    else if (C[0].y == 3)
+    {
+        band = 0.5 + 0.5 * sin((local.x * 0.6 + local.y) * 12 - phase);
+        sheen = pow(band, 8);
+    }
+    else if (C[0].y == 4)
+    {
+        float jitter = sin(local.y * 37 + phase * 2) * .84 + sin(local.y * 83 - phase) * .36;
+        float first = 1 - smoothstep(.03, .14, abs(sin(local.x * 23 - local.y * 16 + jitter + phase)));
+        float second = 1 - smoothstep(.02, .10, abs(sin(local.x * 39 + local.y * 24 - jitter - phase * .8)));
+        band = .27 + .29 * sin(local.y * 14 - phase);
+        sheen = saturate(first * .96 + second * .59);
+    }
+    float3 colour = lerp(input.Tint.rgb, C[1].rgb, sheen * 0.72);
+    return float4(colour * (0.84 + 0.5 * sheen), coverage * input.Tint.a * (0.61 + 0.25 * band + 0.14 * sheen));
+}
 // The emission texture contains no ambient colour. Add ambient exactly once
 // during multiplicative world composition; bloom sees only emitted light.
 float4 PSLightComposite(Output input) : SV_TARGET
 {
+    float3 emission = max(0, SampleStraight(input.Uv).rgb);
+    if (C[1].z > 0)
+    {
+        float peak = max(emission.r, max(emission.g, emission.b));
+        return float4(emission * C[1].z / (1 + peak), 1);
+    }
     float3 ambient = C[0].rgb;
     if (C[0].w > 0)
     {
@@ -206,7 +265,7 @@ float4 PSLightComposite(Output input) : SV_TARGET
             ambient = lerp(ambient, sampled, strength);
         }
     }
-    return float4(saturate(SampleStraight(input.Uv).rgb + ambient), 1);
+    return float4(saturate(emission + ambient), 1);
 }
 
 float4 PSMapColourDownsample(Output input) : SV_TARGET
@@ -329,24 +388,103 @@ float WeatherNoise(float2 p)
     return lerp(lerp(h.x, h.y, f.x), lerp(h.z, h.w, f.x), f.y);
 }
 
-float WeatherVisibility(float2 screen)
+float4 PSWeatherTerrainMask(Output input) : SV_TARGET
 {
-    return 1 - AuxiliaryTexture.Sample(AuxiliarySampler, screen / Viewport).a;
+    float2 outside = abs(input.Position.xy - input.Tint.xy) - input.Tint.zw;
+    float blocked = step(max(outside.x, outside.y), 0);
+    // Euclidean distance rounds the outside of each tile span. Max blending
+    // selects the closest span and keeps the exact placement flag in red.
+    float rim = C[0].x > 0 ? saturate(1 - length(max(outside, 0)) / C[0].x) : blocked;
+    return float4(blocked, rim, 0, 1);
+}
+
+float4 PSWeatherSceneryBlur(Output input) : SV_TARGET
+{
+    float coverage = 0;
+    [unroll] for (int y = -1; y <= 1; y++)
+    [unroll] for (int x = -1; x <= 1; x++)
+    {
+        float weight = (2 - abs(x)) * (2 - abs(y)) / 16.0;
+        coverage += weight * SpriteTexture.SampleLevel(SpriteSampler, input.Uv + float2(x, y) * C[0].xy, C[0].z).a;
+    }
+    return float4(coverage, 0, 0, 1);
+}
+
+float WeatherSceneryBlur(float2 screen)
+{
+    return C[3].z > 0 ? SpriteTexture.SampleLevel(SpriteSampler, screen / Viewport, 0).r : 0;
+}
+
+float WeatherVisibility(float2 screen, float softness)
+{
+    float4 mask = AuxiliaryTexture.Load(int3(int2(screen), 0));
+    if (mask.r > 0.5 || mask.a >= 1) return 0;
+    if (softness <= 0) return 1 - mask.a;
+
+    float sceneryFade = saturate(WeatherSceneryBlur(screen) * 2.15) * C[3].z;
+    float edge = 1 - max(mask.g, sceneryFade);
+    if (C[4].x > 0 && edge > 0 && edge < 1)
+    {
+        float2 world = screen - C[3].xy + C[3].ww;
+        float noise = WeatherNoise(world / float2(24, 17)) * 2 - 1;
+        edge += noise * C[4].x * 2 * edge * (1 - edge);
+    }
+    return (1 - mask.a) * lerp(1, smoothstep(0, 1, edge), softness);
+}
+
+float4 PSWeatherMaskView(Output input) : SV_TARGET
+{
+    float4 mask = AuxiliaryTexture.Load(int3(int2(input.Position.xy), 0));
+    float scenery = C[4].z == 2 ? 0 : max(mask.a, WeatherSceneryBlur(input.Position.xy) * C[3].z * 0.6);
+    float terrain = C[4].z == 1 ? 0 : max(mask.r, mask.g * 0.55);
+    float3 colour = lerp(float3(1, 0.51, 0.13), float3(0.13, 0.68, 1), scenery / max(0.001, scenery + terrain));
+    return float4(colour, max(scenery, terrain) * 0.76);
+}
+
+float SceneryCoverage(Output input)
+{
+    float4 pixel = SampleStraight(input.Uv);
+    float brightest = max(pixel.r, max(pixel.g, pixel.b));
+    if (pixel.a > 0 && brightest < 1.5 / 255)
+    {
+        // Reconstructed shadows are translucent. Legacy shadows can still
+        // have opaque black dots alternating with transparent texels.
+        if (pixel.a < 254.5 / 255) return 0;
+        uint width, height;
+        SpriteTexture.GetDimensions(width, height);
+        int2 texel = int2(input.Uv * float2(width, height));
+        float cardinal = SpriteTexture.Load(int3(texel + int2(1, 0), 0)).a +
+            SpriteTexture.Load(int3(texel - int2(1, 0), 0)).a +
+            SpriteTexture.Load(int3(texel + int2(0, 1), 0)).a +
+            SpriteTexture.Load(int3(texel - int2(0, 1), 0)).a;
+        if (cardinal < 0.5)
+        {
+            float diagonal = SpriteTexture.Load(int3(texel + int2(1, 1), 0)).a +
+                SpriteTexture.Load(int3(texel - int2(1, 1), 0)).a +
+                SpriteTexture.Load(int3(texel + int2(1, -1), 0)).a +
+                SpriteTexture.Load(int3(texel - int2(1, -1), 0)).a;
+            if (diagonal >= 2) return 0;
+        }
+    }
+    return pixel.a * input.Tint.a;
 }
 
 float4 PSWeatherOcclusion(Output input) : SV_TARGET
 {
-    float4 pixel = SampleStraight(input.Uv);
-    float brightest = max(pixel.r, max(pixel.g, pixel.b));
-    // Reconstructed baked shadows are translucent black. Solid dark artwork
-    // still occludes weather, as does the coloured fringe of a sprite.
-    float shadow = (1 - step(1.5 / 255, brightest)) * (1 - step(254.5 / 255, pixel.a));
-    return float4(0, 0, 0, pixel.a * input.Tint.a * (1 - shadow));
+    return float4(0, 0, 0, SceneryCoverage(input));
+}
+
+float4 PSSpellOcclusion(Output input) : SV_TARGET
+{
+    float coverage = SceneryCoverage(input);
+    // The integer part carries the foremost scene row. The fractional part
+    // carries the alpha of that silhouette so translucent edges stay smooth.
+    return coverage > 0 ? float4(input.Depth + coverage * .5, 0, 0, 1) : 0;
 }
 
 float4 PSWeatherGround(Output input) : SV_TARGET
 {
-    float visibility = WeatherVisibility(input.Position.xy);
+    float visibility = WeatherVisibility(input.Position.xy, 1);
     if (visibility < 0.001) return 0;
     float2 world = input.Position.xy - C[0].xy + C[2].xx;
     float snow = 0, wet = 0, sheen = 0, fog = 0;
@@ -355,14 +493,7 @@ float4 PSWeatherGround(Output input) : SV_TARGET
         float basins = WeatherNoise(world / float2(41, 24)) * 0.72 + WeatherNoise(world / 11) * 0.28;
         float pool = smoothstep(0.18, 0.5, basins + saturate(C[0].z) * 0.38 - 0.28);
         wet = saturate(C[0].z * input.Tint.r * (0.08 + pool * 0.40));
-        float2 drops = world / float2(28, 18);
-        float2 cell = floor(drops);
-        float2 centre = 0.34 + 0.32 * float2(WeatherNoise(cell + 0.27), WeatherNoise(cell + 19.13));
-        float phase = frac(C[1].w * (1.2 + centre.x) + centre.y * 2);
-        float distance = length(frac(drops) - centre);
-        float ring = (1 - smoothstep(0.024, 0.067, abs(distance - phase * 0.25))) *
-            smoothstep(0, 0.1, phase);
-        sheen = pool * saturate(C[0].z * input.Tint.r) * (0.15 + C[2].y * ring * (1 - phase) * 0.38);
+        sheen = pool * saturate(C[0].z * input.Tint.r) * 0.15;
     }
     if (C[0].w > 0.001 && input.Tint.g > 0)
     {
@@ -409,7 +540,7 @@ float4 PSWeatherParticle(Output input) : SV_TARGET
     {
         shape = 1 - smoothstep(0.08, 0.39, abs(length(centre) - 0.67));
     }
-    return PrepareBlend(float4(cold, shape * input.Tint.a * WeatherVisibility(input.Position.xy)));
+    return PrepareBlend(float4(cold, shape * input.Tint.a * WeatherVisibility(input.Position.xy, C[4].y)));
 }
 
 // Atmosphere runs only when compositing the world texture, before the HUD.

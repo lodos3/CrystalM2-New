@@ -95,10 +95,28 @@ namespace Server.MirDatabase
         public Spell Spell;
         public MagicInfo Info;
 
-        public byte Level, Key;
-        public ushort Experience;
+        public const byte EffectiveRank = 3;
+        public byte Level => EffectiveRank;
+        public byte Key;
         public bool IsTempSpell;
-        public long CastTime;
+        public long CastTime = int.MinValue;
+        internal SpellPerkProfile Perks;
+        public int Perk(SpellPerk perk) => Perks?.Rank(Spell, perk) ?? 0;
+        public int ManaCost
+        {
+            get
+            {
+                int cost = Info.BaseCost + EffectiveRank * Info.LevelCost;
+                int rank = Perk(SpellPerk.Economy);
+                return rank == 0 || cost == 0 ? cost : Math.Max(0, cost - Math.Max(1, cost * rank / 10));
+            }
+        }
+        public byte CastRange => Info.Range == 0 ? (byte)0 : (byte)Math.Min(byte.MaxValue, Info.Range + Perk(SpellPerk.Reach));
+        public int Area(int radius) => radius + Perk(SpellPerk.Radius);
+        public int EffectDuration(int time) => Scale(time, 100 + 15 * Perk(SpellPerk.Duration));
+        public int ScalePower(int power) => Scale(power, 100 + 8 * Perk(SpellPerk.Power));
+        public int CastRecovery(int milliseconds) => Scale(milliseconds, 100 - 10 * Perk(SpellPerk.Recharge));
+        private static int Scale(int amount, int percent) => (int)Math.Clamp((long)amount * percent / 100, int.MinValue, int.MaxValue);
 
         private MagicInfo GetMagicInfo(Spell spell)
         {
@@ -122,9 +140,9 @@ namespace Server.MirDatabase
             Spell = (Spell) reader.ReadByte();
             Info = GetMagicInfo(Spell);
 
-            Level = reader.ReadByte();
+            _ = reader.ReadByte(); // Retired proficiency rank.
             Key = reader.ReadByte();
-            Experience = reader.ReadUInt16();
+            _ = reader.ReadUInt16();
 
             if (version < 15) return;
             IsTempSpell = reader.ReadBoolean();
@@ -136,9 +154,9 @@ namespace Server.MirDatabase
         {
             writer.Write((byte) Spell);
 
-            writer.Write(Level);
+            writer.Write(EffectiveRank);
             writer.Write(Key);
-            writer.Write(Experience);
+            writer.Write((ushort)0);
             writer.Write(IsTempSpell);
             writer.Write(CastTime);
         }
@@ -154,12 +172,14 @@ namespace Server.MirDatabase
 
         public ClientMagic CreateClientMagic()
         {
+            int cost = ManaCost;
+            byte costPerRank = (byte)Math.Max(0, (cost - byte.MaxValue + EffectiveRank - 1) / EffectiveRank);
             return new ClientMagic
             {
                     Name = Info.Name,
                     Spell = Spell,
-                    BaseCost = Info.BaseCost,
-                    LevelCost = Info.LevelCost,
+                    BaseCost = (byte)(cost - EffectiveRank * costPerRank),
+                    LevelCost = costPerRank,
                     Icon = Info.Icon,
                     Level1 = Info.Level1,
                     Level2 = Info.Level2,
@@ -169,17 +189,16 @@ namespace Server.MirDatabase
                     Need3 = Info.Need3,
                     Level = Level,
                     Key = Key,
-                    Experience = Experience,
                     IsTempSpell = IsTempSpell,
                     Delay = GetDelay(),
-                    Range = Info.Range,
+                    Range = CastRange,
                     CastTime = CastTime - Envir.Time
             };
         }
 
         public int GetDamage(int DamageBase)
         {
-            return (int)((DamageBase + GetPower()) * GetMultiplier());
+            return ScalePower((int)((DamageBase + RollPower()) * GetMultiplier()));
         }
 
         public float GetMultiplier()
@@ -187,7 +206,9 @@ namespace Server.MirDatabase
             return (Info.MultiplierBase + (Level * Info.MultiplierBonus));
         }
 
-        public int GetPower()
+        public int GetPower() => ScalePower(RollPower());
+
+        private int RollPower()
         {
             return (int)Math.Round((MPower() / 4F) * (Level + 1) + DefPower());
         }
@@ -213,12 +234,15 @@ namespace Server.MirDatabase
 
         public int GetPower(int power)
         {
-            return (int)Math.Round(power / 4F * (Level + 1) + DefPower());
+            return ScalePower((int)Math.Round(power / 4F * (Level + 1) + DefPower()));
         }
 
         public long GetDelay()
         {
-            return Math.Max(0, Info.DelayBase - (long)Level * Info.DelayReduction);
+            long delay = Math.Max(0, Info.DelayBase - (long)Level * Info.DelayReduction);
+            if (Spell == Spell.FlamingSword) delay = Math.Max(delay, 10000);
+            if (Spell == Spell.CounterAttack) delay = Math.Max(delay, 7000);
+            return delay * (100 - 10 * Perk(SpellPerk.Recharge)) / 100;
         }
     }
 }

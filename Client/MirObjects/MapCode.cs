@@ -27,6 +27,9 @@
         public List<MapObject> CellObjects;
 
         public bool FishingCell;
+        internal bool AdditionalMovementBlock;
+        internal bool AllowsWeather => !FishingCell && !AdditionalMovementBlock &&
+            (BackImage & 0x20000000) == 0 && (FrontImage & 0x8000) == 0;
 
         public void AddObject(MapObject ob)
         {
@@ -118,14 +121,15 @@
                     }
                 }
 
-                DrawActor(CellObjects[i], weatherActors);
+                DrawActor(CellObjects[i], weatherActors, groundCorpse: true);
             }
         }
 
-        private static void DrawActor(MapObject actor, List<MirGraphics.WorldSpriteCapture.Draw> weatherActors)
+        private static void DrawActor(MapObject actor, List<MirGraphics.WorldSpriteCapture.Draw> weatherActors, bool groundCorpse = false)
         {
             using var capture = new MirGraphics.WorldSpriteCapture.Scope(
-                actor is SpellObject ? null : weatherActors, MirGraphics.WorldSpriteCapture.Kind.Actor);
+                actor is SpellObject ? null : weatherActors, MirGraphics.WorldSpriteCapture.Kind.Actor,
+                groundCorpse ? -1 : actor.CurrentLocation.Y);
             actor.Draw();
         }
 
@@ -261,6 +265,7 @@
                         MapCells[x, y].BackImage = (short)BitConverter.ToInt16(Bytes, offset);
                         offset += 2;
                         MapCells[x, y].MiddleImage = (short)BitConverter.ToInt16(Bytes, offset);
+                        MapCells[x, y].AdditionalMovementBlock = (MapCells[x, y].MiddleImage & 0x8000) != 0;
                         offset += 2;
                         MapCells[x, y].FrontImage = (short)BitConverter.ToInt16(Bytes, offset);
                         offset += 2;
@@ -356,6 +361,7 @@
                         MapCells[x, y].BackImage = (short)BitConverter.ToInt16(Bytes, offset);
                         offset += 2;
                         MapCells[x, y].MiddleImage = (short)BitConverter.ToInt16(Bytes, offset);
+                        MapCells[x, y].AdditionalMovementBlock = (MapCells[x, y].MiddleImage & 0x8000) != 0;
                         offset += 2;
                         MapCells[x, y].FrontImage = (short)BitConverter.ToInt16(Bytes, offset);
                         offset += 2;
@@ -398,6 +404,7 @@
                         MapCells[x, y].BackImage = (short)BitConverter.ToInt16(Bytes, offset);
                         offset += 2;
                         MapCells[x, y].MiddleImage = (short)BitConverter.ToInt16(Bytes, offset);
+                        MapCells[x, y].AdditionalMovementBlock = (MapCells[x, y].MiddleImage & 0x8000) != 0;
                         offset += 2;
                         MapCells[x, y].FrontImage = (short)BitConverter.ToInt16(Bytes, offset);
                         offset += 2;
@@ -446,6 +453,9 @@
                     for (int y = 0; y < Height; y++)
                     {//12
                         MapCells[x, y] = new CellInfo();
+                        // The server reads these collision bits before decoding the image indices.
+                        MapCells[x, y].AdditionalMovementBlock =
+                            ((BitConverter.ToInt16(Bytes, offset) | BitConverter.ToInt16(Bytes, offset + 2)) & 0x8000) != 0;
                         MapCells[x, y].BackIndex = 0;
                         MapCells[x, y].MiddleIndex = 1;
                         MapCells[x, y].BackImage = (short)(BitConverter.ToInt16(Bytes, offset) ^ xor);

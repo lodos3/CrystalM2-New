@@ -12,6 +12,8 @@ namespace Client.MirGraphics
         // shadow masks; ordinary sprite textures retain their existing policy.
         internal static readonly ShadowMaskBudget ShadowMasks =
             new ShadowMaskBudget(16L * 1024 * 1024);
+        internal static readonly ShadowMaskBudget SpellMasks =
+            new ShadowMaskBudget(16L * 1024 * 1024);
         public static List<MirControl> ControlList = new List<MirControl>();
 
         public static RendererDevice Device;
@@ -511,7 +513,7 @@ namespace Client.MirGraphics
                     continue;
                 }
 
-                m.CleanRepairedShadow(CMain.Time);
+                m.CleanDerivedMasks(CMain.Time);
                 if (CMain.Time <= m.CleanTime) continue;
 
                 m.DisposeTexture(false);
@@ -543,6 +545,7 @@ namespace Client.MirGraphics
             AtmosphereFogOverlay.DisposeAll();
             WetSurfacePass.DisposeAll();
             WeatherMaskPass.DisposeAll();
+            SpellOcclusionPass.DisposeAll();
             ShapedLightPass.DisposeAll();
             MapAmbientPass.DisposeAll();
             MainSurface?.Dispose();

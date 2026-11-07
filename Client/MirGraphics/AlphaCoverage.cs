@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using CrystalM2.Rendering.Core;
 
 namespace Client.MirGraphics
 {
@@ -11,6 +12,8 @@ namespace Client.MirGraphics
         private readonly int _width;
         private readonly int _height;
         private bool? _checkerboard;
+        private bool _measuredWeapon;
+        private WeaponMaskTrace? _weaponTrace;
 
         // Run checker detection only for sprite frames that actually cast a shadow.
         internal bool HasCheckerboard
@@ -25,19 +28,17 @@ namespace Client.MirGraphics
         internal int ShadowHeight => (_height + 1) / 2;
 
         internal Size VisibleSize { get; }
-        internal bool HasCutout { get; }
         internal PointF EmissionPivot { get; }
         internal Color EmissionColour { get; }
         internal int StorageBytes => _visibleBits.Length;
 
-        private AlphaCoverage(int width, int height, byte[] bits, Size visibleSize, bool hasCutout,
+        private AlphaCoverage(int width, int height, byte[] bits, Size visibleSize,
                               PointF emissionPivot, Color emissionColour)
         {
             _width = width;
             _height = height;
             _visibleBits = bits;
             VisibleSize = visibleSize;
-            HasCutout = hasCutout;
             EmissionPivot = emissionPivot;
             EmissionColour = emissionColour;
         }
@@ -55,7 +56,6 @@ namespace Client.MirGraphics
             int pixels = checked(width * height);
             byte[] bits = new byte[(pixels >> 3) + ((pixels & 7) == 0 ? 0 : 1)];
             int minX = width, minY = height, maxX = -1, maxY = -1;
-            bool hasCutout = false;
             long energy = 0, lightX = 0, lightY = 0, lightR = 0, lightG = 0, lightB = 0;
 
             for (int y = 0; y < height; y++)
@@ -67,7 +67,6 @@ namespace Client.MirGraphics
                     // Format.A8R8G8B8 is BGRA in little-endian system memory.
                     int offset = rowOffset + x * 4;
                     byte alpha = bgra[offset + 3];
-                    hasCutout |= alpha < 255;
                     if (alpha == 0) continue;
                     int b = bgra[offset], g = bgra[offset + 1], r = bgra[offset + 2];
                     int peak = Math.Max(r, Math.Max(g, b));
@@ -98,7 +97,7 @@ namespace Client.MirGraphics
             long brightest = Math.Max(lightR, Math.Max(lightG, lightB));
             Color colour = brightest == 0 ? Color.White : Color.FromArgb(
                 (int)(lightR * 255 / brightest), (int)(lightG * 255 / brightest), (int)(lightB * 255 / brightest));
-            return new AlphaCoverage(width, height, bits, size, hasCutout, pivot, colour);
+            return new AlphaCoverage(width, height, bits, size, pivot, colour);
         }
 
         // An 8x8 alternating alpha patch indicates binary checkerboard dithering.
@@ -160,6 +159,16 @@ namespace Client.MirGraphics
                 return false;
             int index = y * _width + x;
             return (_visibleBits[index >> 3] & (1 << (index & 7))) != 0;
+        }
+
+        internal WeaponMaskTrace? GetWeaponTrace()
+        {
+            if (!_measuredWeapon)
+            {
+                if (WeaponMaskTrace.TryMeasure(_visibleBits, _width, _height, out var trace)) _weaponTrace = trace;
+                _measuredWeapon = true;
+            }
+            return _weaponTrace;
         }
     }
 }

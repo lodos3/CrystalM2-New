@@ -1,113 +1,51 @@
 using System;
 using System.Linq;
-static void Check(bool condition, string message) { if (!condition) throw new Exception(message); }
-MirClass[] classes = { MirClass.Warrior, MirClass.Wizard, MirClass.Taoist, MirClass.Assassin, MirClass.Archer };
-int[] counts = { 21, 27, 29, 21, 24 };
+
+static void Check(bool condition, string message)
+{
+    if (!condition) throw new InvalidOperationException(message);
+}
+
+MirClass[] classes = [MirClass.Warrior, MirClass.Wizard, MirClass.Taoist, MirClass.Assassin, MirClass.Archer];
+int[] counts = [18, 27, 25, 17, 21];
 for (int i = 0; i < classes.Length; i++)
 {
-    var skills = SpellCurriculum.ForClass(classes[i]);
-    Check(skills.Count == counts[i], "Class catalog count");
-    Check(skills.Distinct().Count() == skills.Count, "Duplicate spell");
+    MirClass actorClass = classes[i];
+    var skills = SpellCurriculum.ForClass(actorClass);
+    Check(skills.Distinct().Count() == counts[i] && skills.Count == counts[i], $"Unique curriculum for {actorClass}");
     foreach (Spell spell in skills)
     {
-        Check(SpellCurriculum.Owns(classes[i], spell), "Missing owner");
-        foreach (MirClass other in classes.Where(c => c != classes[i]))
-            Check(!SpellCurriculum.Owns(other, spell), "Cross-class entitlement");
+        Check(!SpellCurriculum.IsRetired(spell), $"Exclude retired ability {spell}");
+        Check(SpellCurriculum.ShouldGrant(actorClass, spell, 100, 20, false), $"Auto-learn {spell} for its owner");
+        Check(!SpellCurriculum.ShouldGrant(actorClass, spell, 100, 20, true), $"Reconcile {spell} without a duplicate");
+        if (SpellPerks.Supports(actorClass))
+            Check(SpellPerks.For(spell).Count >= 2 && SpellPerks.For(spell).Select(option => option.Perk).Distinct().Count() == SpellPerks.For(spell).Count,
+                $"Provide at least two distinct choices for {spell}");
+        foreach (MirClass other in classes.Where(c => c != actorClass))
+            Check(!SpellCurriculum.CanUseLegacy(other, spell, 100, 20, false), $"Reject native {spell} on {other}");
     }
 }
-Check(SpellCurriculum.IsUnlocked(MirClass.Wizard, Spell.FireBall, 1, 7), "Starter wizard cast");
-Check(SpellCurriculum.IsUnlocked(MirClass.Taoist, Spell.Healing, 1, 7), "Starter healer cast");
-Check(SpellCurriculum.IsUnlocked(MirClass.Archer, Spell.StraightShot, 1, 9), "Starter archer cast");
-Check(!SpellCurriculum.IsUnlocked(MirClass.Warrior, Spell.ShoulderDash, 29, 30), "Premature grant");
-Check(SpellCurriculum.IsUnlocked(MirClass.Warrior, Spell.ShoulderDash, 30, 30), "Exact level gate");
-Check(SpellCurriculum.IsUnlocked(MirClass.Warrior, Spell.ShoulderDash, 90, 30), "Skipping levels");
-Check(!SpellCurriculum.IsUnlocked(MirClass.Warrior, Spell.FireBall, 90, 7), "Foreign spell");
-Check(SpellCurriculum.ShouldGrant(MirClass.Wizard, Spell.FireBall, 1, 7, false), "Fresh grant");
-Check(!SpellCurriculum.ShouldGrant(MirClass.Wizard, Spell.FireBall, 1, 7, true), "Repeated migration should not duplicate");
-Check(!SpellCurriculum.ShouldGrant(MirClass.Warrior, Spell.ShoulderDash, 29, 30, false), "Not yet entitled");
-Check(!SpellCurriculum.Owns(MirClass.Wizard, Spell.FastMove), "Unseeded FastMove");
-Check(!SpellCurriculum.Owns(MirClass.Wizard, Spell.Blink), "Equipment-only Blink");
-Check(!SpellCurriculum.Owns(MirClass.Warrior, Spell.BattleCry), "Custom BattleCry");
-Check(SpellCurriculum.Name(MirClass.Taoist, CombatSpecialisation.Third) == "Spirit Binder", "Spec mapping");
-Check(!SpellCurriculum.IsValid((CombatSpecialisation)255), "Invalid spec value");
-// These tests must fail to compile without the spec catalogue implementation.
-Check(SpellCurriculum.SpecialisationUnlockLevel == 20, "Specialisation level threshold");
-foreach (MirClass actorClass in classes)
-{
-    Check(!SpellCurriculum.CanSelect(actorClass, 19, CombatSpecialisation.Unchosen, CombatSpecialisation.First),
-        "Reject early selection");
-    Check(SpellCurriculum.CanSelect(actorClass, 20, CombatSpecialisation.Unchosen, CombatSpecialisation.First),
-        "Accept initial choice");
-    Check(!SpellCurriculum.CanSelect(actorClass, 90, CombatSpecialisation.First, CombatSpecialisation.Second),
-        "No unplanned respec");
-    Check(!SpellCurriculum.CanSelect(actorClass, 90, CombatSpecialisation.Unchosen, (CombatSpecialisation)255),
-        "Reject invalid byte");
-    Check(!SpellCurriculum.CanSelect(actorClass, 90, CombatSpecialisation.Unchosen, CombatSpecialisation.Unchosen),
-        "Reject unchosen selection");
 
-    var required = new int[4];
-    foreach (Spell spell in SpellCurriculum.ForClass(actorClass))
-    {
-        var home = SpellCurriculum.RequiredSpecialisation(actorClass, spell);
-        Check(SpellCurriculum.IsValid(home), "Every skill has a valid home");
-        required[(int)home]++;
-        for (int slot = 0; slot <= 3; slot++)
-        {
-            var selected = (CombatSpecialisation)slot;
-            Check(SpellCurriculum.CanUse(actorClass, selected, spell) ==
-                  (home == CombatSpecialisation.Unchosen || home == selected),
-                "Strict class-specific combat loadout");
-        }
-    }
-    for (int slot = 0; slot <= 3; slot++)
-        Check(required[slot] > 0, "All three specs and a shared kit have abilities");
+Check(SpellCurriculum.IsUnlocked(MirClass.Wizard, Spell.FireBall, 1, 7), "Starter Wizard ability");
+Check(SpellCurriculum.IsUnlocked(MirClass.Taoist, Spell.Healing, 1, 7), "Starter Taoist ability");
+Check(SpellCurriculum.IsUnlocked(MirClass.Warrior, Spell.Fencing, 1, 7), "Starter Warrior ability");
+Check(!SpellCurriculum.IsUnlocked(MirClass.Warrior, Spell.ShoulderDash, 29, 30), "Shoulder Dash requires character level 30");
+Check(SpellCurriculum.IsUnlocked(MirClass.Warrior, Spell.ShoulderDash, 30, 30), "Grant the spell at its defined level");
+Check(!SpellCurriculum.CanUseLegacy(MirClass.Warrior, Spell.ArcaneHammer, 90, 20, true), "Retired spells cannot be granted by equipment");
+Check(SpellCurriculum.CanUseLegacy(MirClass.Taoist, Spell.Blink, 10, 19, true), "Explicit equipment can grant a legacy ability");
+Check(SpellPerks.Points(9) == 0 && SpellPerks.Points(10) == 1 && SpellPerks.Points(23) == 14, "Point budget follows character level");
 
-    for (int slot = 1; slot <= 3; slot++)
-    {
-        var spec = (CombatSpecialisation)slot;
-        var ability = SpecialisationAbilities.Signature(actorClass, spec);
-        Check(ability != null && ability.Windup > 0 && ability.Cooldown > ability.Windup,
-            $"Missing usable signature for {actorClass} {spec}");
-        Check(!SpellCurriculum.IsUnlocked(actorClass, ability!.Spell, 19, 25) &&
-            SpellCurriculum.IsUnlocked(actorClass, ability.Spell, 20, 25), "Separate unlock and proficiency levels");
-        var traits = SpecialisationAbilities.TraitsFor(ability.Spell);
-        Check(traits.Select(t => t.Level).SequenceEqual(new byte[] { 20, 32, 45 }), "Three trait milestones");
-        var stats = new Stats();
-        SpecialisationAbilities.ApplyTraitStats(stats, actorClass, spec, 19);
-        Check(stats.Equals(new Stats()), "Traits unlock with their spec");
-        SpecialisationAbilities.ApplyTraitStats(stats, actorClass, spec, 20);
-        Check(!stats.Equals(new Stats()), "Every specialisation applies a real stat trait");
-    }
-}
-Check(SpellCurriculum.CanUse(MirClass.Warrior, CombatSpecialisation.Unchosen, Spell.None),
-    "Unarmed default attack stays available");
-Check(!SpellCurriculum.CanUse(MirClass.Warrior, CombatSpecialisation.First, Spell.ThunderBolt),
-    "Cross-class spell must not bypass the loadout");
-Check(SpellCurriculum.CanUse(MirClass.Wizard, CombatSpecialisation.Unchosen, Spell.Blink),
-    "Existing non-curriculum equipment spells keep their existing rules");
-Check(SpellCurriculum.RequiredSpecialisation(MirClass.Warrior, Spell.Slaying) == CombatSpecialisation.First,
-    "Warrior passive belongs to Iron Vow");
-Check(!SpellCurriculum.CanUse(MirClass.Warrior, CombatSpecialisation.Second, Spell.Slaying),
-    "Red Tempest must not gain Iron Vow passive");
-
-foreach (MirClass actorClass in new[] { MirClass.Warrior, MirClass.Wizard, MirClass.Taoist })
-{
-    var activeCounts = new int[3];
-    for (int i = 0; i < activeCounts.Length; i++)
-    {
-        var spec = (CombatSpecialisation)(i + 1);
-        var ability = SpecialisationAbilities.Signature(actorClass, spec)!;
-        Check(SpellCombos.For(ability.Spell) != null && SpecialisationAbilities.TraitsFor(ability.Spell).Count == 3,
-            $"Each {actorClass} loadout needs a combo and three traits");
-        activeCounts[i] = SpellCurriculum.ForClass(actorClass).Count(spell =>
-            SpellCurriculum.RequiredSpecialisation(actorClass, spell) == spec && !SpellCurriculum.IsPassive(spell));
-    }
-    Check(activeCounts.Max() - activeCounts.Min() <= 1, $"{actorClass} role kits should differ by at most one active");
-}
-
-foreach (Spell builder in new[] { Spell.Thrusting, Spell.HalfMoon, Spell.ProtectionField, Spell.GreatFireBall,
-    Spell.FrostCrunch, Spell.ThunderBolt })
-    Check(SpellCurriculum.UnlockLevel(builder, 35) == 20, "Core setup spell available at specialisation unlock");
+SpellPerkPick splash = new(Spell.FlamingSword, SpellPerk.Splash, 1);
+SpellPerkPick burn = new(Spell.FlamingSword, SpellPerk.Burn, 1);
+Check(SpellPerks.Validate(MirClass.Warrior, 11, [splash, burn], _ => true, out _), "Valid splash-to-burn path");
+Check(!SpellPerks.Validate(MirClass.Warrior, 11, [burn], _ => true, out _), "Burn requires splash");
+Check(!SpellPerks.Validate(MirClass.Warrior, 10, [splash, burn], _ => true, out _), "Reject overspending");
+Check(!SpellPerks.Validate(MirClass.Warrior, 50, [splash, splash], _ => true, out _), "Reject duplicate ranks");
+Check(!SpellPerks.Validate(MirClass.Warrior, 50, [splash], _ => false, out _), "Reject a perk for an unlearned spell");
+Check(!SpellPerks.Validate(MirClass.Wizard, 50, [splash], _ => true, out _), "Reject foreign spell perks");
+Check(!SpellPerks.Validate(MirClass.Warrior, 50,
+    [new(Spell.ShoulderDash, SpellPerk.DashImpact, 1), new(Spell.ShoulderDash, SpellPerk.DashDistance, 1)],
+    _ => true, out _), "Dash choices are exclusive");
 
 var progress = new SpellComboProgress();
 var embers = SpellCombos.For(Spell.AshSeal);
@@ -120,5 +58,41 @@ var rime = SpellCombos.For(Spell.GlacialGate);
 Check(progress.Build(rime, 11000, 3) && !progress.Spend(11000, 4) && progress.Count(11000, 3) == 1,
     "A mismatched target does not consume a mark");
 Check(progress.Spend(11000, 3) && progress.Count(11000, 3) == 0, "Matching targets consume their mark once");
+
+Check(TalentAbilities.All.Count == 57 && TalentAbilities.All.Select(a => a.Spell.Spell).Distinct().Count() == 57,
+    "All original actions have distinct registered spell IDs");
+Check(TalentCatalog.Points(10, true) == 1 && TalentCatalog.Points(62, false) == 15 && TalentCatalog.Points(71, false) == 18,
+    "Independent level-derived talent budgets");
+foreach (MirClass actorClass in new[] { MirClass.Warrior, MirClass.Wizard, MirClass.Taoist })
+foreach (var spec in new[] { CombatSpecialisation.First, CombatSpecialisation.Second, CombatSpecialisation.Third })
+{
+    TalentTree tree = TalentCatalog.Tree(actorClass, spec);
+    TalentAbility[] six = TalentAbilities.All.Where(a => a.Spell.Class == actorClass && a.Spell.Spec == spec).ToArray();
+    Check(tree.Nodes.Length == 24 && six.Length == 6 && six.Count(a => a.Kind == TalentAbilityKind.Control) == 1 &&
+        six.Count(a => a.Kind == TalentAbilityKind.Counter) == 1, "Every spec receives a full talent and spell catalogue");
+    for (int engine = 0; engine < 3; engine++)
+    {
+        TalentPick[] picks = tree.Nodes.Where(node => node.Row switch
+        {
+            1 or 2 => true,
+            3 or 5 or 6 => node.Column is 0 or 2,
+            4 => node.Column == engine,
+            7 or 8 => node.Column == 0,
+            _ => false
+        }).Select(node => new TalentPick(node.Id, node.MaxRank,
+            (byte)(actorClass == MirClass.Wizard && spec == CombatSpecialisation.Second && node.Row == 5 && node.Column == 0 ? 1 : 0))).ToArray();
+        Check(TalentCatalog.Validate(tree, 71, picks, out string? reason), reason ?? "Both optional spells fit an off-column engine and capstone");
+        var build = new TalentLoadout(actorClass, spec, [], picks);
+        Check(six.All(a => build.CanUse(71, a.Spell.Spell)) && build.Engine == engine,
+            $"{actorClass}/{spec} engine {build.Engine}/{engine}, missing {string.Join(", ", six.Where(a => !build.CanUse(71, a.Spell.Spell)).Select(a => a.Spell.Name))}");
+        var recipe = TalentRotations.Get(actorClass, spec, engine);
+        Spell action = TalentRotations.ActionForFinisher(recipe.Finisher, engine);
+        Check(TalentRotations.IsFinisher(recipe.Finisher) && !TalentRotations.IsFinisher(action) &&
+            build.CanUse(71, action), "Every chosen rotation resolves to a bindable action in that spec");
+        Check(!TalentCatalog.Validate(tree, 71, [..picks, new(tree.At(4, (engine + 1) % 3).Id, 1, 0)], out _), "A second engine is rejected");
+    }
+}
+Check(!new TalentLoadout(MirClass.Assassin, CombatSpecialisation.First, [], []).CanUse(71, Spell.ArcaneHammer),
+    "Legacy classes cannot cast a foreign talent ability even if a record exists");
 
 Console.WriteLine("Spell curriculum tests passed.");

@@ -108,7 +108,7 @@ internal sealed class GraphicsOptionsPage : MirControl
         AddValue("Evening shade", 0, 94, GraphicsTuning.Evening, "%", Preview.Ambient);
         AddValue("Night shade", 0, 118, GraphicsTuning.Night, "%", Preview.Ambient);
         AddValue("Warmth", 0, 142, GraphicsTuning.LightWarmth, "%", Preview.Ambient);
-        AddValue("Daytime glow", 0, 166, GraphicsTuning.DayGlow);
+        AddValue("Light spill", 0, 166, GraphicsTuning.DayGlow);
         AddValue("All lights X", 0, 190, GraphicsTuning.AllLights.X, "px");
         AddValue("All lights Y", 0, 214, GraphicsTuning.AllLights.Y, "px");
         AddSlider("All spell light", 0, 238, 0, 200, "%", () => Settings.SpellLightIntensityPercent,
@@ -123,7 +123,7 @@ internal sealed class GraphicsOptionsPage : MirControl
         {
             LightSource source = GraphicsTuning.LightSources[i];
             string name = LightName(source);
-            var emitterPanel = new MirControl { Parent = page, Location = new Point(Right, 77), Size = new Size(235, 242), Visible = false };
+            var emitterPanel = new MirControl { Parent = page, Location = new Point(Right, 71), Size = new Size(235, 257), Visible = false };
             var button = AddButton(page, name, new Rectangle(Right + (i % 4) * 59, 22 + (i / 4) * 25, 55, 22), () => { });
             button.Click += (_, _) => SelectEmitter();
             var placement = new MirControl { Parent = emitterPanel, Size = emitterPanel.Size };
@@ -138,10 +138,11 @@ internal sealed class GraphicsOptionsPage : MirControl
             {
                 AddValue("Offset X", 0, 70, light.Offset.X, "px");
                 AddValue("Offset Y", 0, 94, light.Offset.Y, "px");
-                AddValue("Gaussian blur", 0, 118, light.Blur, "px", hint: "Screen-space blur on the authored shape.");
+                AddValue("Gaussian blur", 0, 118, light.Blur, "px", hint: "Softens the shape, projection and particle light in screen pixels.");
                 AddValue("Glow radius", 0, 142, light.GlowRadius, "px", hint: "Radius of the soft floor light around the source.");
                 AddValue("Glow intensity", 0, 166, light.GlowStrength);
-                AddChoice("Projection", 0, 190, light.Shape, ["Authored", "Radial", "Cone"]);
+                AddValue("Glow blur", 0, 190, light.GlowBlur, "px", hint: "Separate Gaussian blur for the floor glow.");
+                AddChoice("Projection", 0, 214, light.Shape, ["Authored", "Radial", "Cone"]);
             }
             else
             {
@@ -152,9 +153,9 @@ internal sealed class GraphicsOptionsPage : MirControl
                 AddValue("Direction", 0, 166, light.Direction, "°", hint: "Cone direction. Zero points right.");
                 AddValue("Beam width", 0, 190, light.Beam, "°");
             }
-            AddButton(placement, "Test light", new Rectangle(0, 216, 96, 21),
+            AddButton(placement, "Test light", new Rectangle(0, shaped ? 235 : 216, 96, 21),
                 () => GameScene.Scene?.MapControl?.PreviewLight(source));
-            AddButton(placement, shaped ? "Colour and beam" : "Colour", new Rectangle(107, 216, 122, 21), () =>
+            AddButton(placement, shaped ? "Colour and beam" : "Colour", new Rectangle(107, shaped ? 235 : 216, 122, 21), () =>
             {
                 placement.Visible = false;
                 optics.Visible = true;
@@ -242,9 +243,27 @@ internal sealed class GraphicsOptionsPage : MirControl
         AddWeatherToggle("Snow", 74, GraphicsTuning.WeatherSnow);
         AddWeatherToggle("Ground fog", 98, GraphicsTuning.WeatherFog);
         AddWeatherToggle("Thunderstorm", 122, GraphicsTuning.WeatherStorm);
-        Caption("Rain and snow build up, then fade.", 0, 158);
-        Caption("Client weather can combine effects.", 0, 180);
-        Caption("Server legacy uses the map's settings.", 0, 202);
+        Caption("Weather edges", 0, 155);
+        AddChoice("Edge style", 0, 178, GraphicsTuning.WeatherEdgeStyle, ["Natural", "Soft", "Silhouette"],
+            hint: "Natural adds breakup. Soft uses an even fade. Silhouette follows the sprite closely.");
+        AddValue("Scenery fade", 0, 202, GraphicsTuning.WeatherSceneryFade, "px",
+            hint: "Soften weather around the shape of middle and front scenery. Used by Natural and Soft.");
+        AddValue("Tile fade", 0, 226, GraphicsTuning.WeatherTileFade, "px",
+            hint: "Round the transition outside blocked ground and fishing tiles.");
+        AddValue("Edge breakup", 0, 250, GraphicsTuning.WeatherEdgeBreakup,
+            hint: "Vary the Natural fade along the terrain. The variation stays in place as you move.");
+        AddValue("Drop fade", 0, 274, GraphicsTuning.WeatherDropFade,
+            hint: "How much the soft edge fades rain and snow before they reach the mask.");
+        Caption("Mask view", 0, 298, 105);
+        string[] masks = ["Off", "Scenery", "Tile flags", "Both"];
+        MirButton maskView = null;
+        maskView = AddButton(_content, masks[GraphicsTuning.WeatherMaskView], new Rectangle(111, 298, 118, 20), () =>
+        {
+            GraphicsTuning.WeatherMaskView = (GraphicsTuning.WeatherMaskView + 1) % masks.Length;
+            maskView.Text = masks[GraphicsTuning.WeatherMaskView];
+            ApplyPreview(Preview.World);
+        });
+        maskView.Hint = "Inspect weather blockers. Blue shows scenery and amber shows map tile flags.";
 
         Caption("Weather intensity", Right, 0);
         AddValue("Precipitation", Right, 24, GraphicsTuning.Precipitation);
@@ -252,10 +271,12 @@ internal sealed class GraphicsOptionsPage : MirControl
         AddValue("Snow cover", Right, 72, GraphicsTuning.SurfaceSnow);
         AddValue("Fog density", Right, 96, GraphicsTuning.FogDensity);
         AddValue("Wind", Right, 120, GraphicsTuning.WeatherWind);
-        Caption("Server legacy effects", Right, 163);
-        AddToggle("Legacy fog layers", Right, 186, () => Settings.EnvironmentFogLayers, value => Settings.EnvironmentFogLayers = value);
-        AddToggle("Legacy wet surfaces", Right, 210, () => Settings.AtmosphereWetSurfaces, value => Settings.AtmosphereWetSurfaces = value);
-        AddToggle("Legacy lightning", Right, 234, () => Settings.AtmosphereLightning, value => Settings.AtmosphereLightning = value);
+        Caption("Server weather options", Right, 163);
+        AddToggle("Fog and clouds", Right, 186, () => Settings.EnvironmentFogLayers, value => Settings.EnvironmentFogLayers = value);
+        AddToggle("Wet surfaces", Right, 210, () => Settings.AtmosphereWetSurfaces, value => Settings.AtmosphereWetSurfaces = value);
+        AddToggle("Lightning", Right, 234, () => Settings.AtmosphereLightning, value => Settings.AtmosphereLightning = value);
+        Caption("Mask view uses blue for scenery", Right, 270);
+        Caption("and amber for blocked map tiles.", Right, 290);
 
         void AddWeatherToggle(string label, int y, GraphicsTuning.Value value) =>
             AddToggle(label, 0, y, () => value.Current != 0, enabled => value.Current = enabled ? 1 : 0);
@@ -277,7 +298,8 @@ internal sealed class GraphicsOptionsPage : MirControl
         AddChoice("Corpses", Right, 142, GraphicsTuning.CorpseBlend, BlendModes);
         AddChoice("Target highlight", Right, 166, GraphicsTuning.HighlightBlend, BlendModes);
         AddChoice("Ground particles", Right, 190, GraphicsTuning.GroundParticleBlend, BlendModes);
-        Caption("Spell compositing", 0, 213);
+        AddValue("Spell VFX size", 0, 213, GraphicsTuning.SpellVisualSize, "%", hint:
+            "Scale projectile bodies, impacts and airborne particles. Ground coverage and weapon masks keep their anchors.");
         AddChoice("Glow blend", Right, 213, GraphicsTuning.SpellGlowBlend, ["Additive", "Screen"]);
         AddChoice("Spell passes", 0, 235, GraphicsTuning.SpellComposite, ["Authored", "Black key", "Black key + glow", "Glow only"]);
         AddSlider("Spell opacity", 0, 257, 0, 200, "%", () => Settings.SpellBlendIntensityPercent,
@@ -410,7 +432,8 @@ internal sealed class GraphicsOptionsPage : MirControl
         };
     }
 
-    private void AddChoice(string label, int x, int y, GraphicsTuning.Value value, string[] names, Preview preview = Preview.World)
+    private void AddChoice(string label, int x, int y, GraphicsTuning.Value value, string[] names, Preview preview = Preview.World,
+                           string hint = null)
     {
         Caption(label, x, y, 105);
         MirButton button = null;
@@ -421,6 +444,7 @@ internal sealed class GraphicsOptionsPage : MirControl
             ApplyPreview(preview);
             Settings.SaveGraphicsEffects();
         });
+        if (hint != null) button.Hint = hint;
     }
 
     private void AddValue(string label, int x, int y, GraphicsTuning.Value value, string unit = "%",

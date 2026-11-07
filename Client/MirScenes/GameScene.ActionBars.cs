@@ -142,7 +142,7 @@ public sealed partial class GameScene
     }
 
     private static bool CanAssignActionSpell(UserObject actor, ClientMagic magic) =>
-        !SpellCurriculum.IsPassive(magic.Spell) && SpellCurriculum.CanUse(actor.Class, actor.Specialisation, magic.Spell);
+        actor.CanBindAction(magic.Spell);
 
     private static void SendAssignment(ClientMagic magic, byte slot, byte previous)
     {

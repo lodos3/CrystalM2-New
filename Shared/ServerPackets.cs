@@ -855,6 +855,92 @@ namespace ServerPackets
         }
     }
 
+    public sealed class TalentState : Packet
+    {
+        public override short Index => (short)ServerPacketIds.TalentState;
+        public uint ObjectID;
+        public CombatSpecialisation Spec;
+        public bool Accepted;
+        public string Message = "";
+        public TalentProfile Profile;
+        public TalentBinding[] ActiveBindings = [];
+
+        protected override void ReadPacket(BinaryReader reader)
+        {
+            ObjectID = reader.ReadUInt32();
+            Spec = (CombatSpecialisation)reader.ReadByte();
+            Accepted = reader.ReadBoolean();
+            Message = reader.ReadString();
+            Profile = TalentProfile.Read(reader);
+            ActiveBindings = TalentProfile.ReadBindings(reader);
+        }
+
+        protected override void WritePacket(BinaryWriter writer)
+        {
+            writer.Write(ObjectID);
+            writer.Write((byte)Spec);
+            writer.Write(Accepted);
+            writer.Write(Message);
+            Profile.Write(writer);
+            TalentProfile.WriteBindings(writer, ActiveBindings);
+        }
+    }
+
+    public sealed class SpellPerkState : Packet
+    {
+        public override short Index => (short)ServerPacketIds.SpellPerkState;
+        public uint ObjectID;
+        public int Revision;
+        public string Message = "";
+        public SpellPerkPick[] Picks = [];
+
+        protected override void ReadPacket(BinaryReader reader)
+        {
+            ObjectID = reader.ReadUInt32();
+            Revision = reader.ReadInt32();
+            Message = reader.ReadString();
+            Picks = SpellPerkProfile.ReadPicks(reader);
+        }
+
+        protected override void WritePacket(BinaryWriter writer)
+        {
+            writer.Write(ObjectID);
+            writer.Write(Revision);
+            writer.Write(Message);
+            SpellPerkProfile.WritePicks(writer, Picks);
+        }
+    }
+
+    public sealed class RotationState : Packet
+    {
+        public override short Index => (short)ServerPacketIds.RotationState;
+        public uint ObjectID, TargetID;
+        public Spell Finisher;
+        public byte Step;
+        public bool Ready;
+        public ushort Remaining;
+
+        protected override void ReadPacket(BinaryReader reader)
+        {
+            ObjectID = reader.ReadUInt32();
+            TargetID = reader.ReadUInt32();
+            Finisher = (Spell)reader.ReadByte();
+            Step = reader.ReadByte();
+            Ready = reader.ReadBoolean();
+            Remaining = reader.ReadUInt16();
+        }
+
+        protected override void WritePacket(BinaryWriter writer)
+        {
+            writer.Write(ObjectID);
+            writer.Write(TargetID);
+            writer.Write((byte)Finisher);
+            writer.Write(Step);
+            writer.Write(Ready);
+            writer.Write(Remaining);
+        }
+    }
+
     public sealed class UserSlotsRefresh : Packet
     {
         public override short Index

@@ -6,7 +6,7 @@ using S = ServerPackets;
 
 namespace Server.MirObjects
 {
-    public abstract class MapObject
+    public abstract partial class MapObject
     {
         protected static MessageQueue MessageQueue
         {
@@ -1014,6 +1014,8 @@ namespace Server.MirObjects
         public PoisonType PType;
         public int Value;
         public long Duration, Time, TickTime, TickSpeed;
+        internal bool TalentDose, CopiedDose;
+        internal int NextTickBonus, DoseGeneration, RedStrength;
 
         public Poison() { }
 

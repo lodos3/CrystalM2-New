@@ -1,250 +1,285 @@
 using System.Drawing;
-using System.Net;
-using System.Net.Sockets;
 using System.Reflection;
 using Server;
 using Server.MirDatabase;
 using Server.MirEnvir;
-using Server.MirNetwork;
 using Server.MirObjects;
+using C = ClientPackets;
+using S = ServerPackets;
 
 static void Check(bool ok, string message)
 {
     if (!ok) throw new InvalidOperationException(message);
 }
 
-var originalDirectory = Directory.GetCurrentDirectory();
-var databaseDirectory = Directory.CreateTempSubdirectory("crystal-spec-tests-");
-Directory.SetCurrentDirectory(databaseDirectory.FullName);
+string original = Directory.GetCurrentDirectory();
+string installed = args.Length == 1 ? Path.GetFullPath(args[0]) : null;
+var scratch = Directory.CreateTempSubdirectory("crystal-spell-perk-tests-");
+Directory.SetCurrentDirectory(scratch.FullName);
 try
 {
-    Check(Envir.Edit.LoadDB(), "Create and read a versioned world database");
-    var tuned = Envir.Edit.MagicInfoList.Single(m => m.Spell == Spell.SteelCut);
-    tuned.PowerBase = 13;
-    Envir.Edit.SaveDB();
-    Check(Envir.Main.LoadDB(), "Read the editor's saved definitions on the server");
+    CheckActorDatabaseVersions();
+    Check(Envir.Main.LoadDB(), "Load default magic definitions");
     Envir.Main.BuffInfoList.AddRange(BuffInfo.Load());
-    foreach (var ability in SpecialisationAbilities.All)
-    {
-        var rows = Envir.Main.MagicInfoList.Where(m => m.Spell == ability.Spell).ToArray();
-        Check(rows.Length == 1 && rows[0].Level1 > ability.UnlockLevel, $"Seed one definition with separate rank gates for {ability.Name}");
-        Check(rows[0].BaseCost == ability.Mana && rows[0].DelayBase == ability.Cooldown,
-            $"Keep cost and cooldown synchronized for {ability.Name}");
-    }
-    Check(Envir.Main.MagicInfoList.Single(m => m.Spell == Spell.SteelCut).PowerBase == 13,
-        "Loading defaults again must preserve an edited power value");
-
-    foreach (var ability in SpecialisationAbilities.All)
-        ExerciseSpell(ability);
-    foreach (var ability in SpecialisationAbilities.All.Where(a => SpellCombos.For(a.Spell) != null))
-        ExerciseSpell(ability, exerciseCombo: true);
+    Check(!Envir.Main.MagicInfoList.Any(magic => SpellCurriculum.IsRetired(magic.Spell)), "New worlds seed legacy spells only");
+    CheckAutoLearn();
+    CheckWarriorPerks();
+    CheckWizardPerks();
+    CheckTaoistPerks();
+    CheckRejectedDatabaseFilesArePreserved();
+    if (installed != null) CheckInstalledDatabase(installed);
 }
 finally
 {
-    Directory.SetCurrentDirectory(originalDirectory);
-    databaseDirectory.Delete(recursive: true);
+    Directory.SetCurrentDirectory(original);
+    if (scratch.FullName.StartsWith(Path.GetFullPath(Path.GetTempPath()), StringComparison.OrdinalIgnoreCase))
+        scratch.Delete(recursive: true);
 }
 
-Console.WriteLine("All 18 spell dispatches, nine original-spell combo rotations and the Magic database round-trip passed.");
+Console.WriteLine("Spell auto-learning, perk combat, perk saves and database checks passed.");
 
-static void ExerciseSpell(SpecialisationAbility ability, bool exerciseCombo = false)
+static void CheckAutoLearn()
 {
-    const int size = 12;
+    foreach (MirClass actorClass in new[] { MirClass.Warrior, MirClass.Wizard, MirClass.Taoist })
+    {
+        var caster = new TestPlayer { Info = new CharacterInfo { Class = actorClass, Level = 1 } };
+        caster.Learn();
+        Check(caster.Info.Magics.Count == 1, $"Start {actorClass} with their first spell");
+        caster.Info.Level = 100;
+        caster.Learn();
+        caster.Learn();
+        Check(caster.Info.Magics.Select(m => m.Spell).SequenceEqual(SpellCurriculum.ForClass(actorClass)),
+            $"{actorClass} auto-learns every native spell once");
+    }
+
+    // A previous class build may have stored its key on a spell replacement.
+    Envir.Main.MagicInfoList.Add(new MagicInfo { Name = "Drake's Echo", Spell = Spell.DrakesEcho, Level1 = 30 });
+    var migrated = new TestPlayer { Info = new CharacterInfo { Class = MirClass.Warrior, Level = 60, Specialisation = CombatSpecialisation.Second } };
+    migrated.Info.Magics.Add(new UserMagic(Spell.DrakesEcho) { Key = 4 });
+    migrated.Learn();
+    Check(migrated.Info.Specialisation == CombatSpecialisation.Unchosen && migrated.GetMagic(Spell.DrakesEcho) == null &&
+        migrated.Info.Magics.All(magic => !SpellCurriculum.IsRetired(magic.Spell)) && migrated.GetMagic(Spell.TwinDrakeBlade)?.Key == 4,
+        "Convert replacement spell bindings when migrating a player");
+    Envir.Main.MagicInfoList.RemoveAll(magic => magic.Spell == Spell.DrakesEcho);
+}
+
+static void CheckWarriorPerks()
+{
+    var (caster, map) = MakeCaster(MirClass.Warrior);
+    var primary = MakeMonster("Primary", map, new Point(5, 4));
+    var nearby = MakeMonster("Nearby", map, new Point(5, 5));
+    var distant = MakeMonster("Distant", map, new Point(8, 8));
+    SetTime(20000);
+    caster.Apply([new(Spell.FlamingSword, SpellPerk.Splash, 2), new(Spell.FlamingSword, SpellPerk.Burn, 1),
+        new(Spell.TwinDrakeBlade, SpellPerk.DrakeEcho, 1), new(Spell.ShoulderDash, SpellPerk.DashDistance, 1)]);
+    Check(caster.Info.SpellPerks.Revision == 1 && caster.Sent.OfType<S.SpellPerkState>().Last().Message == "Spell perks applied.",
+        "Server accepts the player-owned spell draft");
+    caster.Apply([new(Spell.FlamingSword, SpellPerk.Burn, 1)]);
+    Check(caster.Info.SpellPerks.Revision == 1, "Reject an invalid draft atomically");
+
+    caster.SpellToggle(Spell.FlamingSword, SpellToggleState.True);
+    Check(caster.FlamingSword, "Flaming Sword can arm through the legacy toggle");
+    caster.Attack(MirDirection.Right, Spell.FlamingSword);
+    Check(primary.HP == primary.MaxHealth && caster.ActionList.Any(action => action.Type == DelayedType.Damage), "Wait for the weapon hit");
+    Drain(caster);
+    Check(primary.HP < primary.MaxHealth && nearby.HP < nearby.MaxHealth && distant.HP == distant.MaxHealth,
+        "Flaming Sword splash and delayed burn resolve against nearby targets");
+    Check(caster.Sent.OfType<S.MapEffect>().Any(effect => effect.Effect == SpellEffect.SpellPerkBurn && effect.Location == nearby.CurrentLocation),
+        "Burn sends its own particle event");
+
+    int hp = primary.HP;
+    caster.Process(new DelayedAction(DelayedType.Damage, Envir.Main.Time, primary, 20, DefenceType.AC, false, caster.GetMagic(Spell.TwinDrakeBlade), true));
+    Drain(caster);
+    Check(hp - primary.HP > 20, "The confirmed second drake hit schedules a third hit");
+
+    caster.LogTime = Envir.Main.Time + 500;
+    caster.Apply([]);
+    Check(caster.Info.SpellPerks.Revision == 1 && caster.Sent.OfType<S.SpellPerkState>().Last().Message.Contains("combat"),
+        "Reject perk changes in combat");
+    SetTime(60000);
+    caster.Magic(Spell.ShoulderDash, MirDirection.Up, 0, caster.CurrentLocation);
+    Check(caster.Sent.OfType<S.UserDash>().Count() >= 1, "Shoulder Dash retains its movement packets");
+}
+
+static void CheckWizardPerks()
+{
+    var (caster, map) = MakeCaster(MirClass.Wizard);
+    var target = MakeMonster("Strike target", map, new Point(6, 4));
+    var neighbour = MakeMonster("Chain target", map, new Point(7, 4));
+    SetTime(90000);
+    caster.Apply([new(Spell.ThunderBolt, SpellPerk.Chain, 1), new(Spell.FireWall, SpellPerk.Radius, 1),
+        new(Spell.FireWall, SpellPerk.Duration, 1), new(Spell.Teleport, SpellPerk.Economy, 1)]);
+    caster.Magic(Spell.ThunderBolt, MirDirection.Right, target.ObjectID, target.CurrentLocation);
+    Drain(caster);
+    Check(target.HP < target.MaxHealth && neighbour.HP < neighbour.MaxHealth && caster.Sent.OfType<S.ObjectProjectile>().Any(p => p.Spell == Spell.ThunderBolt),
+        "Thunder Bolt chains through the real cast and sends the arc endpoint IDs");
+    var wall = caster.GetMagic(Spell.FireWall);
+    map.Process(new DelayedAction(DelayedType.Magic, Envir.Main.Time, caster, wall, 20, new Point(8, 8)));
+    Check(map.Spells.Count(s => s.Spell == Spell.FireWall) == 9 &&
+        map.Spells.Where(s => s.Spell == Spell.FireWall).All(s => s.ExpireTime - Envir.Main.Time == 23000),
+        "Fire Wall has its expanded cross and duration");
+    var teleport = caster.GetMagic(Spell.Teleport);
+    Check(teleport.ManaCost < teleport.Info.BaseCost + UserMagic.EffectiveRank * teleport.Info.LevelCost, "Efficiency changes real mana cost");
+}
+
+static void CheckTaoistPerks()
+{
+    var (caster, map) = MakeCaster(MirClass.Taoist);
+    TestPlayer ally = AddCaster(MirClass.Warrior, map, new Point(5, 4));
+    List<PlayerObject> group = [caster, ally];
+    caster.GroupMembers = ally.GroupMembers = group;
+    SetTime(120000);
+    caster.Apply([new(Spell.Healing, SpellPerk.EchoHeal, 1), new(Spell.PoisonCloud, SpellPerk.Radius, 1),
+        new(Spell.PoisonCloud, SpellPerk.Duration, 1)]);
+    caster.Info.HP = caster.MaxHealth - 70;
+    ally.Info.HP = ally.MaxHealth - 70;
+    caster.Magic(Spell.Healing, MirDirection.Right, ally.ObjectID, ally.CurrentLocation);
+    Drain(caster);
+    Check(ally.HealAmount > caster.HealAmount && caster.HealAmount > 0,
+        "Healing echoes at reduced strength to a second wounded ally");
+    Check(caster.Sent.OfType<S.MapEffect>().Any(p => p.Value == (byte)Spell.Healing && p.Location == caster.CurrentLocation),
+        "The echo has its own effect at the second recipient");
+    var cloud = caster.GetMagic(Spell.PoisonCloud);
+    map.Process(new DelayedAction(DelayedType.Magic, Envir.Main.Time, caster, cloud, 20, new Point(8, 8), (byte)0));
+    var cells = map.Spells.Where(spell => spell.Spell == Spell.PoisonCloud).ToArray();
+    Check(cells.Length == 25 && cells.All(spell => spell.ExpireTime - Envir.Main.Time == 6900 &&
+        spell.GetInfo() is S.ObjectSpell art && art.Location == spell.CurrentLocation),
+        "Poison Cloud sends particle fields for all expanded cells and extends their lifetime");
+}
+
+static (TestPlayer Caster, Map Map) MakeCaster(MirClass actorClass)
+{
+    const int size = 16;
     var map = new Map(new MapInfo()) { Width = size, Height = size, Cells = new Cell[size, size], DoorIndex = new Door[size, size] };
     for (int x = 0; x < size; x++)
     for (int y = 0; y < size; y++)
         map.Cells[x, y] = new Cell { Attribute = CellAttribute.Walk };
-
-    // A real connection uses an ephemeral loopback socket. No external server is contacted.
-    using var listener = new TcpListener(IPAddress.Loopback, 0);
-    listener.Start();
-    using var client = new TcpClient();
-    client.Connect((IPEndPoint)listener.LocalEndpoint);
-    using var server = listener.AcceptTcpClient();
-    var caster = new PlayerObject
-    {
-        Info = new CharacterInfo
-        {
-            Name = "Combat test", Class = ability.Class, Specialisation = ability.Spec, Level = 45, MP = 150, HP = 200
-        },
-        Stats = new Stats
-        {
-            [Stat.HP] = 500, [Stat.MP] = 150, [Stat.SkillGainMultiplier] = 1, [Stat.Accuracy] = 100,
-            [Stat.MinDC] = 45, [Stat.MaxDC] = 45, [Stat.MinMC] = 45, [Stat.MaxMC] = 45, [Stat.MinSC] = 45, [Stat.MaxSC] = 45
-        },
-        Connection = new MirConnection(1, server),
-        AMode = AttackMode.Peace,
-        ArmourRate = 1,
-        DamageRate = 1,
-        CurrentLocation = new Point(4, 4)
-    };
-    caster.CurrentMap = map;
-    caster.Node = new LinkedListNode<MapObject>(caster);
-    caster.Info.Mount = new MountInfo(caster);
-    map.AddObject(caster);
-    var magic = new UserMagic(ability.Spell);
-    caster.Info.Magics.Add(magic);
-
-    var enemy = MakeMonster("Combat test enemy", map, new Point(5, 4));
-    var chain = new List<MonsterObject>();
-    if (ability.Spell == Spell.StormRelay)
-        for (int i = 0; i < 4; i++)
-            chain.Add(MakeMonster("Relay target", map, new Point(6 + i, 4)));
-    if (ability.Spell == Spell.Distil)
-        enemy.PoisonList.Add(new Poison { Owner = caster, PType = PoisonType.Green, Value = 6, Duration = 4, TickSpeed = 1000 });
-
-    MonsterObject pet = null;
-    if (ability.Target == AbilityTarget.Companion)
-    {
-        pet = MakeMonster(ability.Spell == Spell.SpiritCommand ? Settings.SkeletonName : Settings.VampireName,
-            map, new Point(4, 5));
-        pet.Master = caster;
-        pet.HP -= 100;
-        caster.Pets.Add(pet);
-    }
-
-    uint target = ability.Target is AbilityTarget.Enemy or AbilityTarget.Companion ? enemy.ObjectID : 0;
-    if (ability.Spec != CombatSpecialisation.Unchosen)
-    {
-        caster.Info.Specialisation = CombatSpecialisation.Unchosen;
-        caster.Magic(ability.Spell, MirDirection.Right, target, enemy.CurrentLocation);
-        Check(caster.MP == 150 && caster.ActionList.Count == 0, $"{ability.Name} must require the selected specialisation");
-        caster.Info.Specialisation = ability.Spec;
-    }
-
-    if (ability.Target == AbilityTarget.Enemy)
-    {
-        caster.Magic(ability.Spell, MirDirection.Right, 0, enemy.CurrentLocation);
-        Check(caster.MP == 150 && caster.ActionList.Count == 0, $"{ability.Name} cannot spend mana without a valid target");
-    }
-
-    if (exerciseCombo)
-    {
-        PrimeCombo(ability.Spell, caster, enemy, map);
-        SpellComboProgress before = ReadCombo(caster);
-        uint key = SpellCombos.For(ability.Spell).TargetBound ? enemy.ObjectID : 0;
-        Check(before.Count(Envir.Main.Time, key) == 1, $"{ability.Name} must get one confirmed combo stack");
-        if (key != 0)
-            Check(before.Count(Envir.Main.Time, key + 1) == 0, $"{ability.Name} cannot spend another target's mark");
-    }
-
-    int health = enemy.HP;
-    caster.Magic(ability.Spell, MirDirection.Right, target, enemy.CurrentLocation);
-    Check(caster.MP == 150 - magic.Info.BaseCost && caster.ActionList.Count == 1,
-        $"{ability.Name} must schedule one paid cast");
-    Check(caster.ActionList[0].Time - caster.ActionList[0].StartTime == ability.Windup && enemy.HP == health,
-        $"{ability.Name} must wait for the authored wind-up");
-
-    // Dispatch queued effects with the same concrete actor handler used by the server loop.
-    int resolved = 0;
-    if (ability.Spell == Spell.CinderMine)
-    {
-        map.GetCell(enemy.CurrentLocation).Remove(enemy);
-        var arm = caster.ActionList[0];
-        caster.ActionList.RemoveAt(0);
-        caster.Process(arm);
-        resolved++;
-        Check(caster.ActionList.Count == 1 && enemy.HP == health, "An empty mine should arm and wait");
-        map.GetCell(enemy.CurrentLocation).Add(enemy);
-    }
-    while (caster.ActionList.Count > 0 && resolved < 16)
-    {
-        var action = caster.ActionList[0];
-        caster.ActionList.RemoveAt(0);
-        caster.Process(action);
-        resolved++;
-    }
-
-    Check(caster.ActionList.Count == 0, $"{ability.Name} must have a finite resolution");
-    if (ability.Target == AbilityTarget.Companion)
-        Check(pet.HP > pet.MaxHealth - 100 && pet.Target == enemy, $"{ability.Name} must heal and direct the owned companion");
-    else if (ability.Target == AbilityTarget.Ally)
-    {
-        if (ability.Spell == Spell.LanternLink)
-            Check(caster.HP > 200, "Lantern Link must heal missing health");
-        int before = caster.HP;
-        int remaining = caster.Attacked(enemy, 10, DefenceType.None);
-        Check(remaining == 0 && caster.HP == before, $"{ability.Name} must absorb an actual incoming hit");
-    }
-    else
-        Check(enemy.HP < health, $"{ability.Name} must damage a legal enemy");
-
-    if (ability.Spell == Spell.AshSeal) Check(resolved == 3 && magic.Experience is > 0 and <= 3, "Ash Seal pulses three times and trains only once");
-    if (ability.Spell == Spell.CinderMine) Check(resolved == 2, "Cinder Mine detonates once after a target enters");
-    if (ability.Spell == Spell.Distil) Check(enemy.PoisonList.Count == 0, "Distil must consume its owner's poison");
-    if (ability.Spell == Spell.StormRelay)
-        Check(resolved == 4 && chain.Take(3).All(t => t.HP < t.MaxHealth) &&
-            chain[3].HP == chain[3].MaxHealth && magic.Experience is > 0 and <= 3,
-            "Storm Relay must hit at most four distinct targets and train once");
-    if (exerciseCombo)
-        Check(ReadCombo(caster).Count(Envir.Main.Time, enemy.ObjectID) == 0,
-            $"{ability.Name} must consume its eligible combo on resolution");
+    return (AddCaster(actorClass, map, new Point(4, 4)), map);
 }
 
-static SpellComboProgress ReadCombo(HumanObject caster) => (SpellComboProgress)typeof(HumanObject)
-    .GetField("_combo", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(caster)!;
-
-static void PrimeCombo(Spell spender, PlayerObject caster, MonsterObject enemy, Map map)
+static TestPlayer AddCaster(MirClass actorClass, Map map, Point location)
 {
-    long now = Envir.Main.Time;
-    switch (spender)
+    var caster = new TestPlayer
     {
-        case Spell.Notchbreaker:
-        case Spell.RedWake:
-            Spell attack = spender == Spell.Notchbreaker ? Spell.FlamingSword : Spell.HalfMoon;
-            caster.Process(new DelayedAction(DelayedType.Damage, now, enemy, 20, DefenceType.AC, false,
-                new UserMagic(attack)));
-            if (spender == Spell.RedWake)
-            {
-                var secondary = MakeMonster("Cleave target", map, new Point(4, 5));
-                caster.Process(new DelayedAction(DelayedType.Damage, now, secondary, 20, DefenceType.AC, false,
-                    new UserMagic(attack)));
-            }
-            break;
-        case Spell.Interpose:
-            caster.Stats[Stat.MinAC] = caster.Stats[Stat.MaxAC] = 12;
-            caster.AddBuff(BuffType.ProtectionField, caster, 5000, new Stats(), refreshStats: false);
-            caster.Attacked(enemy, 10, DefenceType.AC);
-            break;
-        case Spell.LanternLink:
-            var heal = new DelayedAction(DelayedType.Magic, now, new UserMagic(Spell.Healing), 50, caster);
-            var regen = typeof(HumanObject).GetMethod("ProcessRegen", BindingFlags.Instance | BindingFlags.NonPublic)!;
-            caster.Process(heal);
-            Check(ReadCombo(caster).Count(now) == 0, "Queueing a heal does not award Healing Reserve");
-            caster.HP = caster.MaxHealth;
-            caster.HealTime = now - 1;
-            regen.Invoke(caster, null);
-            Check(ReadCombo(caster).Count(now) == 0, "Overhealing does not award Healing Reserve");
-            caster.HP = 200;
-            caster.Process(heal);
-            caster.HealTime = now - 1;
-            regen.Invoke(caster, null);
-            break;
-        case Spell.Distil:
-            var cloud = new SpellObject { Spell = Spell.PoisonCloud, Caster = caster, CurrentMap = map, TickSpeed = 1000, Value = 10 };
-            cloud.ProcessSpell(enemy);
-            break;
-        default:
-            Spell builder = spender switch
-            {
-                Spell.AshSeal => Spell.GreatFireBall,
-                Spell.GlacialGate => Spell.FrostCrunch,
-                Spell.StormRelay => Spell.ThunderBolt,
-                Spell.SpiritCommand => Spell.SoulFireBall,
-                _ => throw new InvalidOperationException()
-            };
-            var build = new DelayedAction(DelayedType.Magic, now, new UserMagic(builder), 20, enemy, enemy.CurrentLocation);
-            caster.Process(build);
-            if (spender == Spell.GlacialGate)
-            {
-                int health = enemy.HP;
-                map.Process(new DelayedAction(DelayedType.Magic, now, caster, new UserMagic(Spell.IceThrust),
-                    caster.CurrentLocation, MirDirection.Right, 20, 20));
-                Check(health - enemy.HP == 25 && ReadCombo(caster).Count(now, enemy.ObjectID) == 0,
-                    "Ice Thrust must shatter Rime once for 25% extra damage");
-                caster.Process(build);
-            }
-            break;
+        Info = new CharacterInfo { Name = "Perk test", Level = 70, Class = actorClass, HP = 500, MP = 250 },
+        Stats = new Stats { [Stat.HP] = 500, [Stat.MP] = 250, [Stat.MinDC] = 40, [Stat.MaxDC] = 40,
+            [Stat.MinMC] = 40, [Stat.MaxMC] = 40, [Stat.Accuracy] = 100 },
+        ArmourRate = 1, DamageRate = 1, AMode = AttackMode.Peace, CurrentLocation = location, CurrentMap = map
+    };
+    caster.Node = new LinkedListNode<MapObject>(caster);
+    caster.Info.Mount = new MountInfo(caster);
+    caster.Learn();
+    map.AddObject(caster);
+    return caster;
+}
+
+static void Drain(TestPlayer caster)
+{
+    int actions = 0;
+    while (caster.ActionList.Count > 0)
+    {
+        Check(++actions < 20, "All perk hits finish in bounded time");
+        var action = caster.ActionList.MinBy(entry => entry.Time);
+        caster.ActionList.Remove(action);
+        SetTime(Math.Max(Envir.Main.Time, action.Time));
+        caster.Process(action);
+    }
+}
+
+static void SetTime(long time) => typeof(Envir).GetProperty(nameof(Envir.Time))!.SetValue(Envir.Main, time);
+
+static void CheckInstalledDatabase(string source)
+{
+    File.Copy(Path.Combine(source, "Server.MirDB"), Envir.DatabasePath, true);
+    File.Copy(Path.Combine(source, "Server.MirADB"), Envir.AccountPath, true);
+    int worldVersion = BitConverter.ToInt32(File.ReadAllBytes(Envir.DatabasePath));
+    int accountVersion = BitConverter.ToInt32(File.ReadAllBytes(Envir.AccountPath));
+    Check(Envir.Main.LoadDB() && Envir.Main.LoadAccounts(), "Open installed save copies");
+    int mapCount = Envir.Main.MapInfoList.Count;
+    var characters = Envir.Main.CharacterList.Select(character => (character.Index, character.Level, character.Class, character.Name)).ToArray();
+    Envir.Main.SaveDB();
+    Envir.Main.SaveAccounts();
+    Check(BitConverter.ToInt32(File.ReadAllBytes(Envir.DatabasePath)) == Envir.Version &&
+        BitConverter.ToInt32(File.ReadAllBytes(Envir.AccountPath)) == Envir.Version, "Write both installed save copies in the current format");
+    Check(Envir.Main.LoadDB() && Envir.Main.LoadAccounts() && Envir.Main.MapInfoList.Count == mapCount &&
+        Envir.Main.CharacterList.Select(character => (character.Index, character.Level, character.Class, character.Name)).SequenceEqual(characters),
+        "Reload migrated copies with all map and character records");
+    Console.WriteLine($"Migrated copies of world v{worldVersion} and accounts v{accountVersion} to v{Envir.Version} with {mapCount} maps and {characters.Length} characters.");
+}
+
+static void CheckRejectedDatabaseFilesArePreserved()
+{
+    using var stream = new MemoryStream();
+    using var writer = new BinaryWriter(stream);
+    writer.Write(Envir.Version + 1);
+    writer.Write(Envir.CustomVersion);
+    byte[] unsupported = stream.ToArray();
+
+    File.WriteAllBytes(Envir.DatabasePath, unsupported);
+    File.WriteAllBytes(Envir.AccountPath, unsupported);
+    Check(!Envir.Main.LoadDB(), "Reject a newer world database");
+    Check(!Envir.Main.LoadAccounts(), "Reject a newer account database");
+    Envir.Main.SaveDB();
+    Envir.Main.SaveAccounts();
+    Check(File.ReadAllBytes(Envir.DatabasePath).SequenceEqual(unsupported), "Preserve the rejected world database");
+    Check(File.ReadAllBytes(Envir.AccountPath).SequenceEqual(unsupported), "Preserve the rejected account database");
+}
+
+static void CheckActorDatabaseVersions()
+{
+    CharacterInfo[] actors =
+    [
+        new CharacterInfo { Name = "Character test", CreationIP = string.Empty, Heroes = new HeroInfo[1] },
+        new HeroInfo(new ClientPackets.NewHero { Name = "Hero test" })
+    ];
+    foreach (var actor in actors)
+    {
+        actor.Specialisation = CombatSpecialisation.Second;
+        actor.Level = 45;
+        var talent = new TalentPick(TalentCatalog.Tree(actor.Class).At(1, 0).Id, 1, 0);
+        actor.Talents.Apply(actor.Specialisation, [talent], []);
+        actor.Talents.SaveBindings(actor.Specialisation, [new TalentBinding(Spell.SteelCut, actor is HeroInfo ? (byte)17 : (byte)1)]);
+        SpellPerkPick[] points = [new(Spell.FlamingSword, SpellPerk.Splash, 1), new(Spell.FlamingSword, SpellPerk.Burn, 2)];
+        actor.SpellPerks.Apply(points);
+        using var perkStream = new MemoryStream();
+        using var perkWriter = new BinaryWriter(perkStream);
+        actor.SpellPerks.Write(perkWriter);
+        using var profileStream = new MemoryStream();
+        using var profileWriter = new BinaryWriter(profileStream);
+        actor.Talents.Write(profileWriter);
+        foreach (var (version, customVersion, expected) in new[]
+        {
+            (118, 0, actor.Specialisation),
+            (119, 1, CombatSpecialisation.Unchosen),
+            (120, 1, actor.Specialisation),
+            (121, 1, actor.Specialisation),
+            (122, 1, actor.Specialisation)
+        })
+        {
+            const int nextRecord = 0x12345678;
+            using var stream = new MemoryStream();
+            using var writer = new BinaryWriter(stream);
+            actor.Save(writer);
+            if (version < 122) stream.Position -= perkStream.Length;
+            if (version < 121) stream.Position -= profileStream.Length;
+            // The legacy writer ended the actor record before the specialisation byte.
+            if (version == 119) stream.Position--;
+            writer.Write(nextRecord);
+            stream.Position = 0;
+
+            using var reader = new BinaryReader(stream);
+            CharacterInfo loaded = actor is HeroInfo
+                ? new HeroInfo(reader, version, customVersion)
+                : new CharacterInfo(reader, version, customVersion);
+            Check(loaded.Name == actor.Name && loaded.Specialisation == expected,
+                $"Read {actor.Name} with the expected specialisation from schema {version}.{customVersion}");
+            Check(loaded.Talents.Picks(CombatSpecialisation.Unchosen).Length == (version >= 121 ? 1 : 0), "Read versioned build without consuming neighbouring records");
+            if (version >= 121) Check(loaded.Talents.Picks(CombatSpecialisation.Unchosen)[0] == talent &&
+                loaded.Talents.Bindings(actor.Specialisation).SequenceEqual(actor.Talents.Bindings(actor.Specialisation)), "Preserve talent picks and bindings");
+            Check(loaded.SpellPerks.Picks.SequenceEqual(version == 122 ? points : []), "Load versioned spell points and picks");
+            Check(reader.ReadInt32() == nextRecord,
+                $"Read exactly one {actor.Name} record from schema {version}.{customVersion}");
+        }
     }
 }
 
@@ -261,4 +296,18 @@ static MonsterObject MakeMonster(string name, Map map, Point location)
     monster.SetHP(info.Stats[Stat.HP]);
     map.AddObject(monster);
     return monster;
+}
+
+
+sealed class TestPlayer : PlayerObject
+{
+    public readonly List<Packet> Sent = [];
+    public override void Enqueue(Packet packet) => Sent.Add(packet);
+    public override void Broadcast(Packet packet) { }
+    public void Learn() => ReconcileCurriculumSpells(false);
+    public void Apply(SpellPerkPick[] picks)
+    {
+        typeof(PlayerObject).GetMethod("ApplySpellPerkDraft", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(this,
+            [new C.SpellPerkDraft { ObjectID = ObjectID, Revision = Info.SpellPerks.Revision, Apply = true, Picks = picks }]);
+    }
 }

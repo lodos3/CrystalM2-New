@@ -53,8 +53,8 @@ namespace Server.MirEnvir
         public static object LoadLock = new object();
 
         public const int MinVersion = 60;
-        public const int Version = 118;
-        public const int CustomVersion = 0;
+        public const int Version = 122;
+        public const int CustomVersion = 1;
         public static readonly string DatabasePath = Path.Combine(".", "Server.MirDB");
         public static readonly string AccountPath = Path.Combine(".", "Server.MirADB");
         public static readonly string BackUpPath = Path.Combine(".", "Back Up");
@@ -68,6 +68,8 @@ namespace Server.MirEnvir
 
         public static int LoadVersion;
         public static int LoadCustomVersion;
+        private bool _worldDatabaseLoaded;
+        private bool _accountDatabaseLoaded;
 
         private readonly DateTime _startTime = DateTime.UtcNow;
         public readonly Stopwatch Stopwatch = Stopwatch.StartNew();
@@ -292,33 +294,6 @@ namespace Server.MirEnvir
 
         private void FillMagicInfoList()
         {
-            foreach (var ability in SpecialisationAbilities.All)
-            {
-                if (MagicExists(ability.Spell)) continue;
-                bool starter = ability.Spec == CombatSpecialisation.Unchosen;
-                MagicInfoList.Add(new MagicInfo
-                {
-                    Spell = ability.Spell,
-                    Name = ability.Name,
-                    Icon = ability.Icon,
-                    Range = ability.Range,
-                    BaseCost = ability.Mana,
-                    LevelCost = 1,
-                    Level1 = starter ? (byte)7 : (byte)25,
-                    Level2 = starter ? (byte)13 : (byte)35,
-                    Level3 = starter ? (byte)20 : (byte)45,
-                    Need1 = 180,
-                    Need2 = 420,
-                    Need3 = 900,
-                    DelayBase = ability.Cooldown,
-                    DelayReduction = 100,
-                    PowerBase = ability.Power,
-                    PowerBonus = 2,
-                    MultiplierBase = ability.Scaling,
-                    MultiplierBonus = .04f
-                });
-            }
-
             //Warrior
             if (!MagicExists(Spell.Fencing))
                 MagicInfoList.Add(new MagicInfo { Name = "Fencing", Spell = Spell.Fencing, Icon = 2, Level1 = 7, Level2 = 9, Level3 = 12, Need1 = 270, Need2 = 600, Need3 = 1300, Range = 0 });
@@ -2047,16 +2022,16 @@ namespace Server.MirEnvir
                     }
                 }
 
-                StartEnvir();
+                if (!StartEnvir()) return;
                 var canstartserver = CanStartEnvir();
                 if (canstartserver != "true")
                 {
                     MessageQueue.Enqueue(canstartserver);
                     StopEnvir();
-                    _thread = null;
-                    Stop();
                     return;
                 }
+
+                if (!LoadAccounts()) return;
 
                 if (Settings.Multithreaded)
                 {
@@ -2240,8 +2215,11 @@ namespace Server.MirEnvir
 
                 MessageQueue.Enqueue(GameLanguage.ServerTextMap.GetLocalization((ServerTextKeys.OuterWorkloopErrorLine), line, ex));
             }
-
-            _thread = null;
+            finally
+            {
+                Running = false;
+                _thread = null;
+            }
         }
 
         private void ThreadLoop(MobThread Info)
@@ -2467,6 +2445,7 @@ namespace Server.MirEnvir
         {
             if (File.Exists(DatabasePath))
             {
+                if (!_worldDatabaseLoaded) return;
                 if (!Directory.Exists(DatabaseBackUpPath)) Directory.CreateDirectory(DatabaseBackUpPath);
 
                 var fileName =
@@ -2498,7 +2477,7 @@ namespace Server.MirEnvir
 
                 writer.Write(ItemInfoList.Count);
                 for (var i = 0; i < ItemInfoList.Count; i++)
-                    ItemInfoList[i].Save(writer);
+                    ItemInfoList[i].Save(writer, CustomVersion);
 
                 writer.Write(MonsterInfoList.Count);
                 for (var i = 0; i < MonsterInfoList.Count; i++)
@@ -2576,6 +2555,8 @@ namespace Server.MirEnvir
 
         public void SaveAccounts()
         {
+            if (!_accountDatabaseLoaded && File.Exists(AccountPath)) return;
+
             while (Saving)
                 Thread.Sleep(1);
 
@@ -2796,7 +2777,7 @@ namespace Server.MirEnvir
 
         public void BeginSaveAccounts()
         {
-            if (Saving) return;
+            if (Saving || !_accountDatabaseLoaded) return;
 
             Saving = true;
 
@@ -2845,10 +2826,36 @@ namespace Server.MirEnvir
             Saving = false;
         }
 
+        private static bool ReadDatabaseVersion(BinaryReader reader, string path)
+        {
+            LoadVersion = reader.ReadInt32();
+            LoadCustomVersion = reader.ReadInt32();
+
+            if (LoadVersion < MinVersion)
+            {
+                MessageQueue.Enqueue(GameLanguage.ServerTextMap.GetLocalization(ServerTextKeys.CannotLoadDatabaseMinSupported, LoadVersion, MinVersion));
+                return false;
+            }
+
+            if (LoadVersion > Version)
+            {
+                MessageQueue.Enqueue(GameLanguage.ServerTextMap.GetLocalization(ServerTextKeys.CannotLoadDatabaseMaxSupported, LoadVersion, Version));
+                return false;
+            }
+
+            // The legacy 119.1 format carries custom world data and predates actor specialisations.
+            int expectedCustomVersion = LoadVersion >= 119 ? 1 : 0;
+            if (LoadCustomVersion == expectedCustomVersion) return true;
+
+            MessageQueue.Enqueue($"Unsupported database format {LoadVersion}.{LoadCustomVersion} in {path}.");
+            return false;
+        }
+
         public bool LoadDB()
         {
             lock (LoadLock)
             {
+                _worldDatabaseLoaded = false;
                 if (!File.Exists(DatabasePath))
                 {
                     SaveDB();
@@ -2857,19 +2864,7 @@ namespace Server.MirEnvir
                 using (var stream = File.OpenRead(DatabasePath))
                 using (var reader = new BinaryReader(stream))
                 {
-                    LoadVersion = reader.ReadInt32();
-                    LoadCustomVersion = reader.ReadInt32();
-
-                    if (LoadVersion < MinVersion)
-                    {
-                        MessageQueue.Enqueue(GameLanguage.ServerTextMap.GetLocalization((ServerTextKeys.CannotLoadDatabaseMinSupported), LoadVersion, MinVersion));
-                        return false;
-                    }
-                    else if (LoadVersion > Version)
-                    {
-                        MessageQueue.Enqueue(GameLanguage.ServerTextMap.GetLocalization((ServerTextKeys.CannotLoadDatabaseMaxSupported), LoadVersion, Version));
-                        return false;
-                    }
+                    if (!ReadDatabaseVersion(reader, DatabasePath)) return false;
 
                     MapIndex = reader.ReadInt32();
                     ItemIndex = reader.ReadInt32();
@@ -2963,12 +2958,13 @@ namespace Server.MirEnvir
                         RespawnTick = new RespawnTimer(reader);
                 }
                 Settings.LinkGuildCreationItems(ItemInfoList);
+                _worldDatabaseLoaded = true;
             }
 
             return true;
         }
 
-        public void LoadAccounts()
+        public bool LoadAccounts()
         {
             //reset ranking
             for (var i = 0; i < RankClass.Count(); i++)
@@ -2987,6 +2983,7 @@ namespace Server.MirEnvir
 
             lock (LoadLock)
             {
+                _accountDatabaseLoaded = false;
                 if (!File.Exists(AccountPath))
                 {
                     SaveAccounts();
@@ -2995,8 +2992,7 @@ namespace Server.MirEnvir
                 using (var stream = File.OpenRead(AccountPath))
                 using (var reader = new BinaryReader(stream))
                 {
-                    LoadVersion = reader.ReadInt32();
-                    LoadCustomVersion = reader.ReadInt32();
+                    if (!ReadDatabaseVersion(reader, AccountPath)) return false;
                     NextAccountID = reader.ReadInt32();
                     NextCharacterID = reader.ReadInt32();
                     NextUserItemID = reader.ReadUInt64();
@@ -3110,7 +3106,10 @@ namespace Server.MirEnvir
                         }
                     }
                 }
+                _accountDatabaseLoaded = true;
             }
+
+            return true;
         }
 
         public void LoadGuilds()
@@ -3333,7 +3332,7 @@ namespace Server.MirEnvir
             IPBlocks[ipAddress] = Now.Add(value);
         }
 
-        private void StartEnvir()
+        private bool StartEnvir()
         {
             Players.Clear();
             StartPoints.Clear();
@@ -3345,7 +3344,7 @@ namespace Server.MirEnvir
             Heroes.Clear();
             MonsterCount = 0;
 
-            LoadDB();
+            if (!LoadDB()) return false;
 
             BuffInfoList.Clear();
             foreach (var buff in BuffInfo.Load())
@@ -3432,7 +3431,8 @@ namespace Server.MirEnvir
             MonsterNPC = NPCScript.GetOrAdd((uint)Random.Next(2000000, 2999999), Settings.MonsterNPCFilename, NPCScriptType.AutoMonster);
             RobotNPC = NPCScript.GetOrAdd((uint)Random.Next(3000000, 3999999), Settings.RobotNPCFilename, NPCScriptType.Robot);
 
-            MessageQueue.Enqueue(GameLanguage.ServerTextMap.GetLocalization(ServerTextKeys.EnvirStarted));           
+            MessageQueue.Enqueue(GameLanguage.ServerTextMap.GetLocalization(ServerTextKeys.EnvirStarted));
+            return true;
 
         }
 
@@ -3440,8 +3440,6 @@ namespace Server.MirEnvir
         private void StartNetwork()
         {
             Connections.Clear();
-
-            LoadAccounts();
 
             LoadGuilds();
 

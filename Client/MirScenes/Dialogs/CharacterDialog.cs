@@ -1,8 +1,6 @@
 ﻿using Client.MirControls;
 using Client.MirGraphics;
-using Client.MirNetwork;
 using Client.MirObjects;
-using C = ClientPackets;
 using Client.MirSounds;
 
 namespace Client.MirScenes.Dialogs
@@ -20,8 +18,9 @@ namespace Client.MirScenes.Dialogs
         private readonly MirLabel _nameLabel, _identityLabel;
         private readonly CharacterStatsPane _combat, _attributes;
         private readonly MagicButton[] _magics;
-        private readonly MirButton[] _specialisationButtons;
-        private readonly MirLabel _specialisationLabel;
+        private readonly MirLabel _perkPoints;
+        private readonly MirButton _skillFilter;
+        private bool _showPassives;
         private readonly UserObject _actor;
         private int _spellOffset;
 
@@ -276,32 +275,18 @@ namespace Client.MirScenes.Dialogs
                 Location = new Point(203, 62),
             };
 
-            // The save stores exactly one selection for each actor. Spell rows remain
-            // available for review, but inactive spells cannot be dragged or cast.
-            _specialisationButtons = new MirButton[3];
-            for (int i = 0; i < _specialisationButtons.Length; i++)
+            if (SpellPerks.Supports(actor.Class))
             {
-                CombatSpecialisation choice = (CombatSpecialisation)(i + 1);
-                string name = SpellCurriculum.Name(actor.Class, choice);
-                SpecialisationAbility signature = SpecialisationAbilities.Signature(actor.Class, choice);
-                var button = new MirButton
-                {
-                    Parent = SkillPage,
-                    Skin = UiSurface.Button,
-                    Text = name,
-                    Hint = signature == null ? name : SpecialisationPreview(name, signature),
-                    AutoSize = false,
-                    Size = new Size(74, 24),
-                    Location = new Point(8 + i * 76, 8),
-                    Sound = SoundList.ButtonA
-                };
-                button.Click += (_, _) => ChooseSpecialisation(choice);
-                _specialisationButtons[i] = button;
+                var perks = new MirButton { Parent = SkillPage, Skin = UiSurface.Button, Text = "Spell Perks", AutoSize = false,
+                    Location = new Point(8, 10), Size = new Size(105, 23) };
+                perks.Click += (_, _) => GameScene.Scene.OpenSpellPerks(_actor);
+                _perkPoints = AddCaption(SkillPage, "", new Rectangle(120, 10, 117, 22), false);
             }
-            _specialisationLabel = AddCaption(SkillPage, "", new Rectangle(8, 38, 231, 20), false);
+            AddCaption(SkillPage, "Spells unlock as you level.", new Rectangle(8, 37, 230, 20), false);
 
             _magics = new MagicButton[5];
             for (int i = 0; i < _magics.Length; i++)
+            {
                 _magics[i] = new MagicButton
                 {
                     Parent = SkillPage,
@@ -309,48 +294,20 @@ namespace Client.MirScenes.Dialogs
                     Location = new Point(8, 64 + i * 33),
                     HeroMagic = gridType == MirGridType.HeroEquipment
                 };
+            }
+
+            _skillFilter = new MirButton { Parent = SkillPage, Skin = UiSurface.Button, Text = "Active", AutoSize = false,
+                Location = new Point(8, 250), Size = new Size(69, 22), Hint = "Toggle between active spells and passives." };
+            _skillFilter.Click += (_, _) =>
+            {
+                _showPassives = !_showPassives;
+                _spellOffset = 0;
+                _skillFilter.Text = _showPassives ? "Passive" : "Active";
+                RefreshSpells();
+            };
 
             AddSpellPageButton(UiGlyph.Left, "Previous spells", 90, -_magics.Length);
             AddSpellPageButton(UiGlyph.Right, "Next spells", 140, _magics.Length);
-        }
-
-        private static string SpecialisationPreview(string name, SpecialisationAbility signature) =>
-            $"{name}\n{signature.Name} · Level {signature.UnlockLevel}\n{signature.Description}\n" +
-            (SpellCombos.For(signature.Spell) is { } combo ? $"{combo.Rotation}\n" : "") +
-            string.Join("\n", SpecialisationAbilities.TraitsFor(signature.Spell)
-                .Select(trait => $"Level {trait.Level} · {trait.Name}\n{trait.Description}"));
-
-        private void ChooseSpecialisation(CombatSpecialisation requested)
-        {
-            if (GameScene.Observing || _actor.Specialisation != CombatSpecialisation.Unchosen) return;
-            if (!SpellCurriculum.CanSelect(_actor.Class, _actor.Level, _actor.Specialisation, requested))
-            {
-                GameScene.Scene.OutputMessage("Specialisations unlock at level " +
-                    SpellCurriculum.SpecialisationUnlockLevel + ".");
-                return;
-            }
-
-            string name = SpellCurriculum.Name(_actor.Class, requested);
-            var signature = SpecialisationAbilities.Signature(_actor.Class, requested);
-            if (signature == null) return;
-            var confirm = new MirMessageBox(SpecialisationPreview(name, signature) +
-                "\n\nChoose this permanent specialisation?", MirMessageBoxButtons.YesNo);
-            confirm.Size = new Size(460, 346);
-            confirm.Location = new Point((Settings.ScreenWidth - 460) / 2, (Settings.ScreenHeight - 346) / 2);
-            confirm.Label.Size = new Size(412, 246);
-            confirm.YesButton.Location = new Point(confirm.YesButton.Location.X, 300);
-            confirm.NoButton.Location = new Point(confirm.NoButton.Location.X, 300);
-            confirm.YesButton.Click += (_, _) =>
-            {
-                Network.Enqueue(new C.SelectSpecialisation
-                {
-                    ForHero = _actor is UserHeroObject,
-                    Specialisation = requested
-                });
-                confirm.Dispose();
-            };
-            confirm.NoButton.Click += (_, _) => confirm.Dispose();
-            confirm.Show();
         }
 
         private MirButton CreateTab(string text, int left, int width) => new()
@@ -380,8 +337,7 @@ namespace Client.MirScenes.Dialogs
             button.Click += (_, _) =>
             {
                 int next = _spellOffset + delta;
-                if (next < 0 || (delta > 0 && next >= _actor.Magics.Count)) return;
-                _spellOffset = next;
+                _spellOffset = Math.Max(0, next);
                 RefreshSpells();
             };
         }
@@ -428,33 +384,22 @@ namespace Client.MirScenes.Dialogs
 
             if (SkillPage.Visible)
             {
-                if (_actor.Specialisation == CombatSpecialisation.Unchosen)
-                    _specialisationLabel.Text = _actor.Level < SpellCurriculum.SpecialisationUnlockLevel
-                        ? "Specialisation unlocks at level " + SpellCurriculum.SpecialisationUnlockLevel
-                        : "Choose a specialisation";
-                else
-                    _specialisationLabel.Text = "Specialisation: " +
-                        SpellCurriculum.Name(_actor.Class, _actor.Specialisation);
-
-                for (int i = 0; i < _specialisationButtons.Length; i++)
-                    _specialisationButtons[i].Selected = _actor.Specialisation == (CombatSpecialisation)(i + 1);
-
+                if (_perkPoints != null)
+                    _perkPoints.Text = $"{SpellPerks.Points(_actor.Level) - _actor.SpellPerkPicks.Sum(pick => pick.Rank)} unspent points";
                 RefreshSpells();
             }
         }
 
         private void RefreshSpells()
         {
+            var spells = _actor.Magics.Where(magic => _actor.CanUseBuildSpell(magic.Spell) &&
+                SpellCurriculum.IsPassive(magic.Spell) == _showPassives).OrderBy(magic => magic.Level1).ToArray();
+            _spellOffset = Math.Min(_spellOffset, Math.Max(0, spells.Length - 1) / _magics.Length * _magics.Length);
             for (int i = 0; i < _magics.Length; i++)
             {
                 int index = i + _spellOffset;
-                _magics[i].Visible = index < _actor.Magics.Count;
-                if (_magics[i].Visible)
-                {
-                    ClientMagic magic = _actor.Magics[index];
-                    _magics[i].Update(magic,
-                        SpellCurriculum.CanUse(_actor.Class, _actor.Specialisation, magic.Spell));
-                }
+                _magics[i].Visible = index < spells.Length;
+                if (_magics[i].Visible) _magics[i].Update(spells[index]);
             }
         }
 

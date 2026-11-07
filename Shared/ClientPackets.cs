@@ -1131,6 +1131,38 @@ namespace ClientPackets
         }
     }
 
+    public sealed class TalentDraft : Packet
+    {
+        public override short Index => (short)ClientPacketIds.TalentDraft;
+        public uint ObjectID;
+        public int Revision;
+        public bool Query;
+        public CombatSpecialisation Spec;
+        public TalentPick[] ClassPicks = [], SpecPicks = [];
+
+        protected override void ReadPacket(BinaryReader reader)
+        {
+            ObjectID = reader.ReadUInt32();
+            Query = reader.ReadBoolean();
+            if (Query) return;
+            Revision = reader.ReadInt32();
+            Spec = (CombatSpecialisation)reader.ReadByte();
+            ClassPicks = TalentProfile.ReadPicks(reader);
+            SpecPicks = TalentProfile.ReadPicks(reader);
+        }
+
+        protected override void WritePacket(BinaryWriter writer)
+        {
+            writer.Write(ObjectID);
+            writer.Write(Query);
+            if (Query) return;
+            writer.Write(Revision);
+            writer.Write((byte)Spec);
+            TalentProfile.WritePicks(writer, ClassPicks);
+            TalentProfile.WritePicks(writer, SpecPicks);
+        }
+    }
+
     public sealed class Magic : Packet
     {
         public override short Index { get { return (short)ClientPacketIds.Magic; } }
@@ -2702,6 +2734,31 @@ namespace ClientPackets
 
         protected override void WritePacket(BinaryWriter writer)
         { }
+    }
+
+    public sealed class SpellPerkDraft : Packet
+    {
+        public override short Index => (short)ClientPacketIds.SpellPerkDraft;
+        public uint ObjectID;
+        public int Revision;
+        public bool Apply;
+        public SpellPerkPick[] Picks = [];
+
+        protected override void ReadPacket(BinaryReader reader)
+        {
+            ObjectID = reader.ReadUInt32();
+            Revision = reader.ReadInt32();
+            Apply = reader.ReadBoolean();
+            if (Apply) Picks = SpellPerkProfile.ReadPicks(reader);
+        }
+
+        protected override void WritePacket(BinaryWriter writer)
+        {
+            writer.Write(ObjectID);
+            writer.Write(Revision);
+            writer.Write(Apply);
+            if (Apply) SpellPerkProfile.WritePicks(writer, Picks);
+        }
     }
 
     public sealed class DeleteItem : Packet

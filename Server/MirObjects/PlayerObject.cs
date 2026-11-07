@@ -9,7 +9,7 @@ using Timer = Server.MirEnvir.Timer;
 
 namespace Server.MirObjects
 {
-    public class PlayerObject : HumanObject
+    public partial class PlayerObject : HumanObject
     {
         private long NextTradeTime;
         private long NextGroupInviteTime;
@@ -538,7 +538,7 @@ namespace Server.MirObjects
             switch (action.Type)
             {
                 case DelayedType.Magic:
-                    CompleteMagic(action.Params);
+                    CompleteMagic(action.Params, action);
                     break;
                 case DelayedType.Damage:
                     CompleteAttack(action.Params);
@@ -1709,6 +1709,7 @@ namespace Server.MirObjects
             packet.CreatureSummoned = CreatureSummoned;
 
             Enqueue(packet, c);
+            if (c == Connection && SpellPerks.Supports(Class)) Enqueue(SpellPerkState(), c);
         }
         private void GetMapInfo(MirConnection c)
         {
@@ -3170,16 +3171,12 @@ namespace Server.MirObjects
                     case "GIVESKILL":
                         if ((!IsGM && !Settings.TestServer) || parts.Length < 3) return;
 
-                        byte spellLevel = 0;
-
                         player = this;
                         Spell skill;
 
                         if (!Enum.TryParse(parts.Length > 3 ? parts[2] : parts[1], true, out skill) || !Enum.IsDefined(skill)) return;
 
-                        if (skill == Spell.None) return;
-
-                        spellLevel = byte.TryParse(parts.Length > 3 ? parts[3] : parts[2], out spellLevel) ? Math.Min((byte)3, spellLevel) : (byte)0;
+                        if (skill == Spell.None || SpellCurriculum.IsRetired(skill)) return;
 
                         if (parts.Length > 3)
                         {
@@ -3194,36 +3191,11 @@ namespace Server.MirObjects
                             }
                         }
 
-                        var magic = new UserMagic(skill) { Level = spellLevel };
-
-                        if (player.Info.Magics.Any(e => e.Spell == skill))
-                        {
-                            player.Info.Magics.FirstOrDefault(e => e.Spell == skill).Level = spellLevel;
-
-                            Enqueue(new S.MagicLeveled { ObjectID = ObjectID, Spell = magic.Spell, Level = magic.Level, Experience = 0 });
-
-                            string skillChangeMsg = GameLanguage.ServerTextMap.GetLocalization((ServerTextKeys.SpellChangedByGM), player.Name, skill.ToString(), spellLevel, Name);
-
-                            player.ReceiveChat(GameLanguage.ServerTextMap.GetLocalization((ServerTextKeys.SpellChangedLevel), skill.ToString(), spellLevel), ChatType.Hint);
-                            Helpers.ChatSystem.SystemMessage(chatMessage: skillChangeMsg);
-
-                            return;
-                        }
-                        else
-                        {
-                            player.ReceiveChat(GameLanguage.ServerTextMap.GetLocalization((ServerTextKeys.LearnedSkillAtLevel), skill.ToString(), spellLevel), ChatType.Hint);
-
-                            if (player != this)
-                            {
-                                ReceiveChat(GameLanguage.ServerTextMap.GetLocalization((ServerTextKeys.HasLearnedSkillAtLevel), player.Name, skill.ToString(), spellLevel), ChatType.Hint);
-                            }
-
-                            string skillLearnedMg = GameLanguage.ServerTextMap.GetLocalization((ServerTextKeys.SpellLearntSetLevelByGM), player.Name, skill.ToString(), spellLevel, Name);
-                            Helpers.ChatSystem.SystemMessage(chatMessage: skillLearnedMg);
-
-                            player.Info.Magics.Add(magic);
-                        }
-
+                        var magic = new UserMagic(skill);
+                        if (magic.Info == null || player.Info.Magics.Any(known => known.Spell == skill)) return;
+                        if (!player.CanLearnLegacyMagic(magic)) return;
+                        player.Info.Magics.Add(magic);
+                        player.ReceiveChat($"Learned {magic.Info.Name}.", ChatType.Hint);
                         player.SendMagicInfo(magic);
                         player.RefreshStats();
                         break;
@@ -5878,7 +5850,7 @@ namespace Server.MirObjects
                     switch (item.Info.Shape)
                     {
                         case 0: //NormalPotion
-                            PotHealthAmount = (ushort)Math.Min(ushort.MaxValue, PotHealthAmount + item.Info.Stats[Stat.HP]);
+                            PotHealthAmount = (ushort)Math.Min(ushort.MaxValue, PotHealthAmount + TalentPotionHealing(item.Info.Stats[Stat.HP]));
                             PotManaAmount = (ushort)Math.Min(ushort.MaxValue, PotManaAmount + item.Info.Stats[Stat.MP]);
                             break;
                         case 1: //SunPotion
@@ -9689,31 +9661,6 @@ namespace Server.MirObjects
         #endregion
 
         #region Heroes
-        public void SelectSpecialisation(C.SelectSpecialisation request)
-        {
-            HumanObject actor = request.ForHero ? (HeroSpawned ? Hero : null) : this;
-            bool accepted = actor != null && SpellCurriculum.CanSelect(
-                actor.Info.Class, actor.Info.Level, actor.Info.Specialisation, request.Specialisation);
-
-            if (accepted)
-            {
-                actor.Info.Specialisation = request.Specialisation;
-                // Do not leave old saved attack toggles armed after a loadout is chosen.
-                actor.Info.Thrusting = false;
-                actor.Info.HalfMoon = false;
-                actor.Info.CrossHalfMoon = false;
-                actor.Info.DoubleSlash = false;
-                actor.RefreshStats();
-            }
-
-            Enqueue(new S.SpecialisationResult
-            {
-                ForHero = request.ForHero,
-                Accepted = accepted,
-                Specialisation = actor?.Info.Specialisation ?? CombatSpecialisation.Unchosen
-            });
-        }
-
         public void NewHero(C.NewHero p)
         {
             if (!Envir.CanCreateHero(p, Connection, IsGM))
@@ -14826,7 +14773,8 @@ namespace Server.MirObjects
 
         public void SendNPCGoods(List<UserItem> goods, float rate, PanelType panelType, bool hideAddedStats = false)
         {
-            Enqueue(new S.NPCGoods { List = goods, Rate = rate, Type = panelType, HideAddedStats = hideAddedStats });
+            Enqueue(new S.NPCGoods { List = goods.Where(item => item.Info.Type != ItemType.Book).ToList(),
+                Rate = rate, Type = panelType, HideAddedStats = hideAddedStats });
         }
     }
 }

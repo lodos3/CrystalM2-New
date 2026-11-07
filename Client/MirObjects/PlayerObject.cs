@@ -10,7 +10,7 @@ using System.Reflection;
 
 namespace Client.MirObjects
 {
-    public class PlayerObject : MapObject
+    public partial class PlayerObject : MapObject
     {
         public override ObjectType Race
         {
@@ -151,7 +151,7 @@ namespace Client.MirObjects
             SetLibraries();
 
             if (Dead) ActionFeed.Add(new QueuedAction { Action = MirAction.Dead, Direction = Direction, Location = CurrentLocation });
-            if (info.Extra) Effects.Add(new Effect(Libraries.Magic2, 670, 10, 800, this));
+            if (info.Extra) Effects.Add(new Effect(new SpellVisual(Spell.Mirroring), 800, this));
 
             ElementEffect = (int)info.ElementOrbEffect;
             ElementsLevel = (int)info.ElementOrbLvl;
@@ -644,7 +644,7 @@ namespace Client.MirObjects
                 }
 
                 MagicShield = true;
-                Effects.Add(ShieldEffect = new Effect(Libraries.Magic, 3890, 3, 600, this) { Repeat = true });
+                Effects.Add(ShieldEffect = new Effect(new SpellVisual(Spell.MagicShield), 600, this) { Repeat = true });
             }
 
             if (WingEffect >= 100)
@@ -691,47 +691,47 @@ namespace Client.MirObjects
 
             if (LevelEffects.HasFlag(LevelEffects.Rebirth1))
             {
-                Effects.Add(new SpecialEffect(Libraries.Magic3, 6800, 20, 3600, this, true, false, 1) { Repeat = true });
+                Effects.Add(new SpecialEffect(new SpellVisual(ParticleMotif.Radiance), 0, 20, 3600, this, true, false, 1) { Repeat = true });
 
 
             }
 
             if (LevelEffects.HasFlag(LevelEffects.Rebirth2))
             {
-                Effects.Add(new SpecialEffect(Libraries.Magic3, 6870, 19, 3600, this, true, true, 1) { Repeat = true });
-                SpecialEffect effect = new SpecialEffect(Libraries.Magic3, 6840, 22, 3600, this, true, false, 1) { Repeat = true, Delay = delay };
+                Effects.Add(new SpecialEffect(new SpellVisual(ParticleMotif.Radiance), 0, 19, 3600, this, true, true, 1) { Repeat = true });
+                SpecialEffect effect = new SpecialEffect(new SpellVisual(ParticleMotif.Radiance), 0, 22, 3600, this, true, false, 1) { Repeat = true, Delay = delay };
                 effect.SetStart(CMain.Time + delay);
                 Effects.Add(effect);
             }
 
             if (LevelEffects.HasFlag(LevelEffects.Rebirth3))
             {
-                Effects.Add(new SpecialEffect(Libraries.Magic3, 6906, 19, 3600, this, true, false, 1) { Repeat = true, Delay = delay });
-                SpecialEffect effect = new SpecialEffect(Libraries.Magic3, 6930, 29, 3600, this, true, true, 1) { Repeat = true };
+                Effects.Add(new SpecialEffect(new SpellVisual(ParticleMotif.Radiance), 0, 19, 3600, this, true, false, 1) { Repeat = true, Delay = delay });
+                SpecialEffect effect = new SpecialEffect(new SpellVisual(ParticleMotif.Radiance), 0, 29, 3600, this, true, true, 1) { Repeat = true };
 
                 Effects.Add(effect);
             }
 
             if (LevelEffects.HasFlag(LevelEffects.NewBlue))
             {
-                Effects.Add(new SpecialEffect(Libraries.Magic3, 7040, 31, 3600, this, true, false, 1) { Repeat = true, Delay = delay });
-                SpecialEffect effect = new SpecialEffect(Libraries.Magic3,7080, 24, 3600, this, true, true, 1) { Repeat = true };
+                Effects.Add(new SpecialEffect(new SpellVisual(ParticleMotif.Radiance), 0, 31, 3600, this, true, false, 1) { Repeat = true, Delay = delay });
+                SpecialEffect effect = new SpecialEffect(new SpellVisual(ParticleMotif.Radiance), 0, 24, 3600, this, true, true, 1) { Repeat = true };
 
                 Effects.Add(effect);
             }
 
             if (LevelEffects.HasFlag(LevelEffects.YellowDragon))
             {
-                Effects.Add(new SpecialEffect(Libraries.Magic3, 7120, 31, 3600, this, true, false, 1) { Repeat = true, Delay = delay });
-                SpecialEffect effect = new SpecialEffect(Libraries.Magic3, 7160, 24, 3600, this, true, true, 1) { Repeat = true };
+                Effects.Add(new SpecialEffect(new SpellVisual(ParticleMotif.Radiance), 0, 31, 3600, this, true, false, 1) { Repeat = true, Delay = delay });
+                SpecialEffect effect = new SpecialEffect(new SpellVisual(ParticleMotif.Radiance), 0, 24, 3600, this, true, true, 1) { Repeat = true };
 
                 Effects.Add(effect);
             }
 
             if (LevelEffects.HasFlag(LevelEffects.Phoenix))
             {
-                Effects.Add(new SpecialEffect(Libraries.Magic3, 6970, 26, 3600, this, true, false, 1) { Repeat = true, Delay = delay });
-                SpecialEffect effect = new SpecialEffect(Libraries.Magic3, 7000, 21, 3600, this, true, true, 1) { Repeat = true };
+                Effects.Add(new SpecialEffect(new SpellVisual(ParticleMotif.Radiance), 0, 26, 3600, this, true, false, 1) { Repeat = true, Delay = delay });
+                SpecialEffect effect = new SpecialEffect(new SpellVisual(ParticleMotif.Radiance), 0, 21, 3600, this, true, true, 1) { Repeat = true };
 
                 Effects.Add(effect);
             }
@@ -860,8 +860,12 @@ namespace Client.MirObjects
                 DisplayRectangle = new Rectangle(DrawLocation, BodyLibrary.GetTrueSize(DrawFrame));
             }
 
+            ProcessWeaponSpellVisual();
+
             for (int i = 0; i < Effects.Count; i++)
                 Effects[i].Process();
+
+            ProcessSpellCoatings();
 
             Color newColour = Poison switch
             {
@@ -968,6 +972,7 @@ namespace Client.MirObjects
                 ActionFeed.RemoveAt(0);
 
                 CurrentAction = action.Action;
+                bool signaturePlayback = action.SignatureDuration != 0;
 
                 if (RidingMount)
                 {
@@ -991,7 +996,7 @@ namespace Client.MirObjects
                     }
                 }
 
-                CurrentLocation = action.Location;
+                if (!signaturePlayback || this != User) CurrentLocation = action.Location;
                 MirDirection olddirection = Direction;
                 Direction = action.Direction;
 
@@ -1081,6 +1086,12 @@ namespace Client.MirObjects
                         break;
                     case MirAction.Spell:
                         Spell = (Spell)action.Params[0];
+                        if (signaturePlayback)
+                        {
+                            if (Class != MirClass.Warrior || !Frames.TryGetValue(MirAction.Attack1, out Frame))
+                                Frames.TryGetValue(MirAction.Spell, out Frame);
+                            break;
+                        }
                         switch (Spell)
                         {
                             case Spell.ShoulderDash:
@@ -1303,8 +1314,13 @@ namespace Client.MirObjects
 
                 FrameInterval = Frame.Interval;
                 EffectFrameInterval = Frame.EffectInterval;
+                if (signaturePlayback)
+                {
+                    FrameInterval = Math.Max(20, action.SignatureDuration / Math.Max(1, Frame.Count));
+                    Cast = false;
+                }
 
-                if (this == User)
+                if (this == User && !signaturePlayback)
                 {
                     switch (CurrentAction)
                     {
@@ -1362,12 +1378,16 @@ namespace Client.MirObjects
                                 if (GameScene.User.Slaying && (TargetObject != null || GameScene.Observing))
                                     Spell = Spell.Slaying;
 
-                                if (GameScene.User.Thrusting && GameScene.Scene.MapControl.HasTarget(Functions.PointMove(CurrentLocation, Direction, 2)))
+                                if (GameScene.User.Thrusting &&
+                                    (GameScene.Scene.MapControl.HasTarget(Functions.PointMove(CurrentLocation, Direction, 2)) ||
+                                    (User.PerkRank(Spell.Thrusting, SpellPerk.ThrustReach) > 0 &&
+                                    GameScene.Scene.MapControl.HasTarget(Functions.PointMove(CurrentLocation, Direction, 3)))))
                                     Spell = Spell.Thrusting;
 
                                 if (GameScene.User.HalfMoon)
                                 {
-                                    if (TargetObject != null || GameScene.Scene.MapControl.CanHalfMoon(CurrentLocation, Direction))
+                                    if (TargetObject != null || GameScene.Scene.MapControl.CanHalfMoon(CurrentLocation, Direction,
+                                        User.PerkRank(Spell.HalfMoon, SpellPerk.CrescentReach) > 0))
                                     {
                                         magic = User.GetMagic(Spell.HalfMoon);
                                         if (magic != null && magic.BaseCost + magic.LevelCost * magic.Level <= User.MP)
@@ -1377,7 +1397,8 @@ namespace Client.MirObjects
 
                                 if (GameScene.User.CrossHalfMoon)
                                 {
-                                    if (TargetObject != null || GameScene.Scene.MapControl.CanCrossHalfMoon(CurrentLocation))
+                                    if (TargetObject != null || GameScene.Scene.MapControl.CanCrossHalfMoon(CurrentLocation,
+                                        User.PerkRank(Spell.CrossHalfMoon, SpellPerk.CrescentReach) > 0))
                                     {
                                         magic = User.GetMagic(Spell.CrossHalfMoon);
                                         if (magic != null && magic.BaseCost + magic.LevelCost * magic.Level <= User.MP)
@@ -1396,7 +1417,7 @@ namespace Client.MirObjects
                                 if (GameScene.User.TwinDrakeBlade && (TargetObject != null || GameScene.Observing))
                                 {
                                     magic = User.GetMagic(Spell.TwinDrakeBlade);
-                                    if (magic != null && magic.BaseCost + magic.LevelCost * magic.Level <= User.MP)
+                                    if (magic != null)
                                         Spell = Spell.TwinDrakeBlade;
                                 }
 
@@ -1408,7 +1429,6 @@ namespace Client.MirObjects
                                         if (magic != null)
                                         {
                                             Spell = Spell.FlamingSword;
-                                            magic.CastTime = CMain.Time;
                                         }
                                     }
                                 }
@@ -1467,7 +1487,8 @@ namespace Client.MirObjects
                                 }
                                 else
                                 {
-                                    GameScene.SpellTime = Spell == Spell.FlameField ? CMain.Time + 2500 : CMain.Time + 1800;
+                                    int recovery = Spell == Spell.FlameField ? 2500 : 1800 - 180 * User.PerkRank(Spell, SpellPerk.Recharge);
+                                    GameScene.SpellTime = CMain.Time + recovery;
                                     MapControl.NextAction = CMain.Time + 2500;
                                 }
                             }
@@ -1500,11 +1521,16 @@ namespace Client.MirObjects
                     case MirAction.Jump:
                         FrameIndex = 0;
                         EffectFrameIndex = 0;
+                        if (CurrentAction == MirAction.DashL)
+                            GameScene.Scene.MapControl.EmitDashTrail(Functions.PointMove(CurrentLocation, Functions.ReverseDirection(Direction), 1),
+                                CurrentLocation, Direction, Class == MirClass.Warrior);
                         GameScene.Scene.Redraw();
                         break;
                     case MirAction.DashR:
                         FrameIndex = 3;
                         EffectFrameIndex = 3;
+                        GameScene.Scene.MapControl.EmitDashTrail(Functions.PointMove(CurrentLocation, Functions.ReverseDirection(Direction), 1),
+                            CurrentLocation, Direction, Class == MirClass.Warrior);
                         GameScene.Scene.Redraw();
                         break;
                     case MirAction.Walking:
@@ -1531,7 +1557,16 @@ namespace Client.MirObjects
                         {
                             Spell = (Spell)action.Params[0];
                             SpellLevel = (byte)action.Params[1];
+                            if (this is UserObject hero)
+                            {
+                                if (Spell == Spell.FlamingSword) hero.FlamingSword = false;
+                                if (Spell == Spell.TwinDrakeBlade) hero.TwinDrakeBlade = false;
+                            }
                         }
+
+                        if (LegacySpellEffects.UsesWeaponMask(Spell) && !WarriorSpellEffects.UsesWeaponArt(Spell) &&
+                            (WeaponLibrary1 == null || Weapon < 0))
+                            Effects.Add(new Effect(new SpellVisual(Spell, SpellVisualPhase.Swing), Frame.Count * FrameInterval, this));
 
                         switch (Spell)
                         {
@@ -1549,6 +1584,7 @@ namespace Client.MirObjects
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
                             case Spell.Thrusting:
+                                BeginLegacySpellVisual(Spell.Thrusting);
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
                             case Spell.HalfMoon:
@@ -1577,6 +1613,9 @@ namespace Client.MirObjects
                         break;
                     case MirAction.Attack4:
                         Spell = (Spell)action.Params[0];
+                        if (LegacySpellEffects.UsesWeaponMask(Spell) && !WarriorSpellEffects.UsesWeaponArt(Spell) &&
+                            (WeaponLibrary1 == null || Weapon < 0))
+                            Effects.Add(new Effect(new SpellVisual(Spell, SpellVisualPhase.FollowThrough), Frame.Count * FrameInterval, this));
                         switch (Spell)
                         {
                             case Spell.DoubleSlash:
@@ -1629,6 +1668,7 @@ namespace Client.MirObjects
                         break;
                     case MirAction.AttackRange2:
                     case MirAction.Spell:
+                        if (signaturePlayback) break;
                         if (this != User)
                         {
                             Spell = (Spell)action.Params[0];
@@ -1639,12 +1679,12 @@ namespace Client.MirObjects
                             SecondaryTargetIDs = (List<uint>)action.Params[5];
                         }
 
+                        if (this == User || Cast) BeginLegacySpellVisual(Spell);
                         switch (Spell)
                         {
                             #region FireBall
 
                             case Spell.FireBall:
-                                Effects.Add(new Effect(Libraries.Magic, 0, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1653,7 +1693,6 @@ namespace Client.MirObjects
                             #region Healing
 
                             case Spell.Healing:
-                                Effects.Add(new Effect(Libraries.Magic, 200, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1662,7 +1701,6 @@ namespace Client.MirObjects
                             #region Repulsion
 
                             case Spell.Repulsion:
-                                Effects.Add(new Effect(Libraries.Magic, 900, 6, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1671,7 +1709,6 @@ namespace Client.MirObjects
                             #region ElectricShock
 
                             case Spell.ElectricShock:
-                                Effects.Add(new Effect(Libraries.Magic, 1560, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1680,7 +1717,6 @@ namespace Client.MirObjects
                             #region Poisoning
 
                             case Spell.Poisoning:
-                                Effects.Add(new Effect(Libraries.Magic, 600, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1689,7 +1725,6 @@ namespace Client.MirObjects
                             #region GreatFireBall
 
                             case Spell.GreatFireBall:
-                                Effects.Add(new Effect(Libraries.Magic, 400, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1698,7 +1733,6 @@ namespace Client.MirObjects
                             #region HellFire
 
                             case Spell.HellFire:
-                                Effects.Add(new Effect(Libraries.Magic, 920, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1707,7 +1741,6 @@ namespace Client.MirObjects
                             #region ThunderBolt
 
                             case Spell.ThunderBolt:
-                                Effects.Add(new Effect(Libraries.Magic2, 20, 3, 300, this));
                                 break;
 
                             #endregion
@@ -1723,21 +1756,18 @@ namespace Client.MirObjects
                             #region SummonSkeleton
 
                             case Spell.SummonSkeleton:
-                                Effects.Add(new Effect(Libraries.Magic, 1500, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
                             #endregion
                             #region StormEscape
                             case Spell.StormEscape:
-                                Effects.Add(new Effect(Libraries.Magic3, 590, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
                             #endregion
                             #region Teleport
 
                             case Spell.Teleport:
-                                Effects.Add(new Effect(Libraries.Magic, 1590, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1746,7 +1776,6 @@ namespace Client.MirObjects
                             #region Blink
 
                             case Spell.Blink:
-                                Effects.Add(new Effect(Libraries.Magic, 1590, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1755,7 +1784,6 @@ namespace Client.MirObjects
                             #region Hiding
 
                             case Spell.Hiding:
-                                Effects.Add(new Effect(Libraries.Magic, 1520, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1764,7 +1792,6 @@ namespace Client.MirObjects
                             #region Haste
 
                             case Spell.Haste:
-                                Effects.Add(new Effect(Libraries.Magic2, 2140 + (int)Direction * 10, 6, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1773,8 +1800,6 @@ namespace Client.MirObjects
                             #region Fury
 
                             case Spell.Fury:
-                                Effects.Add(new Effect(Libraries.Magic3, 200, 8, 8 * FrameInterval, this));
-                                Effects.Add(new Effect(Libraries.Magic3, 187, 10, 10 * FrameInterval, this));
                                 //i don't know sound
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
@@ -1783,8 +1808,6 @@ namespace Client.MirObjects
 
                             #region ImmortalSkin
                             case Spell.ImmortalSkin:
-                                Effects.Add(new Effect(Libraries.Magic3, 550, 17, Frame.Count * FrameInterval * 4, this));
-                                Effects.Add(new Effect(Libraries.Magic3, 570, 5, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
                             #endregion
@@ -1792,7 +1815,6 @@ namespace Client.MirObjects
                             #region FireBang
 
                             case Spell.FireBang:
-                                Effects.Add(new Effect(Libraries.Magic, 1650, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1801,7 +1823,6 @@ namespace Client.MirObjects
                             #region FireWall
 
                             case Spell.FireWall:
-                                Effects.Add(new Effect(Libraries.Magic, 1620, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1810,7 +1831,6 @@ namespace Client.MirObjects
                             #region HealingCircle
 
                             case Spell.HealingCircle:
-                                Effects.Add(new Effect(Libraries.Magic3, 620, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1819,7 +1839,7 @@ namespace Client.MirObjects
                             #region MoonMist
 
                             case Spell.MoonMist:
-                                MapControl.Effects.Add(new Effect(Libraries.Magic3, 680, 25, 1800, CurrentLocation));
+                                MapControl.Effects.Add(new Effect(new SpellVisual(Spell.MoonMist), 1800, CurrentLocation));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1828,7 +1848,6 @@ namespace Client.MirObjects
                             #region TrapHexagon
 
                             case Spell.TrapHexagon:
-                                Effects.Add(new Effect(Libraries.Magic, 1380, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1837,7 +1856,6 @@ namespace Client.MirObjects
                             #region EnergyRepulsor
 
                             case Spell.EnergyRepulsor:
-                                Effects.Add(new Effect(Libraries.Magic2, 190, 6, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1846,7 +1864,6 @@ namespace Client.MirObjects
                             #region FireBurst
 
                             case Spell.FireBurst:
-                                Effects.Add(new Effect(Libraries.Magic2, 2320, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1855,7 +1872,6 @@ namespace Client.MirObjects
                             #region FlameDisruptor
 
                             case Spell.FlameDisruptor:
-                                Effects.Add(new Effect(Libraries.Magic2, 130, 6, Frame.Count * FrameInterval, this));
                                 break;
 
                             #endregion
@@ -1863,7 +1879,6 @@ namespace Client.MirObjects
                             #region SummonShinsu
 
                             case Spell.SummonShinsu:
-                                Effects.Add(new Effect(Libraries.Magic2, 0, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1872,7 +1887,6 @@ namespace Client.MirObjects
                             #region UltimateEnchancer
 
                             case Spell.UltimateEnhancer:
-                                Effects.Add(new Effect(Libraries.Magic2, 160, 15, 1000, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1881,7 +1895,6 @@ namespace Client.MirObjects
                             #region FrostCrunch
 
                             case Spell.FrostCrunch:
-                                Effects.Add(new Effect(Libraries.Magic2, 400, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1890,7 +1903,6 @@ namespace Client.MirObjects
                             #region Purification
 
                             case Spell.Purification:
-                                Effects.Add(new Effect(Libraries.Magic2, 600, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1899,7 +1911,6 @@ namespace Client.MirObjects
                             #region FlameField
 
                             case Spell.FlameField:
-                                MapControl.Effects.Add(new Effect(Libraries.Magic2, 910, 23, 1800, CurrentLocation));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1908,7 +1919,6 @@ namespace Client.MirObjects
                             #region Trap
 
                             case Spell.Trap:
-                                Effects.Add(new Effect(Libraries.Magic2, 2340, 11, 11 * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1917,7 +1927,6 @@ namespace Client.MirObjects
                             #region MoonLight
 
                             case Spell.MoonLight:
-                                Effects.Add(new Effect(Libraries.Magic2, 2380, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1926,7 +1935,6 @@ namespace Client.MirObjects
                             #region SwiftFeet
 
                             case Spell.SwiftFeet:
-                                Effects.Add(new Effect(Libraries.Magic2, 2440, 16, 16 * EffectFrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1935,7 +1943,6 @@ namespace Client.MirObjects
                             #region LightBody
 
                             case Spell.LightBody:
-                                Effects.Add(new Effect(Libraries.Magic2, 2470, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1945,7 +1952,7 @@ namespace Client.MirObjects
                             #region PoisonSword
 
                             case Spell.PoisonSword:
-                                Effects.Add(new Effect(Libraries.Magic2, 2490 + ((int)Direction * 10), 10, Frame.Count * FrameInterval + 500, this));
+                                Effects.Add(new Effect(new SpellVisual(Spell.PoisonSword), Frame.Count * FrameInterval + 500, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1954,7 +1961,6 @@ namespace Client.MirObjects
                             #region DarkBody
 
                             case Spell.DarkBody:
-                                Effects.Add(new Effect(Libraries.Magic2, 2580, 10, 10 * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1963,7 +1969,6 @@ namespace Client.MirObjects
                             #region ThunderStorm
 
                             case Spell.ThunderStorm:
-                                MapControl.Effects.Add(new Effect(Libraries.Magic, 1680, 10, Frame.Count * FrameInterval, CurrentLocation));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1972,7 +1977,6 @@ namespace Client.MirObjects
                             #region MassHealing
 
                             case Spell.MassHealing:
-                                Effects.Add(new Effect(Libraries.Magic, 1790, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1981,7 +1985,6 @@ namespace Client.MirObjects
                             #region IceStorm
 
                             case Spell.IceStorm:
-                                Effects.Add(new Effect(Libraries.Magic, 3840, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1990,7 +1993,6 @@ namespace Client.MirObjects
                             #region MagicShield
 
                             case Spell.MagicShield:
-                                Effects.Add(new Effect(Libraries.Magic, 3880, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1999,7 +2001,6 @@ namespace Client.MirObjects
                             #region TurnUndead
 
                             case Spell.TurnUndead:
-                                Effects.Add(new Effect(Libraries.Magic, 3920, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -2008,7 +2009,6 @@ namespace Client.MirObjects
                             #region MagicBooster
 
                             case Spell.MagicBooster:
-                                Effects.Add(new Effect(Libraries.Magic3, 80, 9, 9 * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -2017,7 +2017,6 @@ namespace Client.MirObjects
                             #region PetEnhancer
 
                             case Spell.PetEnhancer:
-                                Effects.Add(new Effect(Libraries.Magic3, 200, 8, 8 * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -2026,7 +2025,6 @@ namespace Client.MirObjects
                             #region Revelation
 
                             case Spell.Revelation:
-                                Effects.Add(new Effect(Libraries.Magic, 3960, 20, 1200, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -2035,7 +2033,6 @@ namespace Client.MirObjects
                             #region ProtectionField
 
                             case Spell.ProtectionField:
-                                Effects.Add(new Effect(Libraries.Magic2, 1520, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -2044,7 +2041,6 @@ namespace Client.MirObjects
                             #region Rage
 
                             case Spell.Rage:
-                                Effects.Add(new Effect(Libraries.Magic2, 1510, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -2054,7 +2050,6 @@ namespace Client.MirObjects
                             #region Vampirism
 
                             case Spell.Vampirism:
-                                Effects.Add(new Effect(Libraries.Magic2, 1040, 7, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -2064,7 +2059,6 @@ namespace Client.MirObjects
 
                             case Spell.LionRoar:
                             case Spell.BattleCry:
-                                Effects.Add(new Effect(Libraries.Magic2, 710, 20, 1200, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10 + (Gender == MirGender.Male ? 0 : 1));
                                 break;
 
@@ -2073,7 +2067,6 @@ namespace Client.MirObjects
                             #region TwinDrakeBlade
 
                             case Spell.TwinDrakeBlade:
-                                Effects.Add(new Effect(Libraries.Magic2, 210, 6, 500, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -2082,7 +2075,6 @@ namespace Client.MirObjects
                             #region Entrapment
 
                             case Spell.Entrapment:
-                                Effects.Add(new Effect(Libraries.Magic2, 990, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -2091,7 +2083,6 @@ namespace Client.MirObjects
                             #region BladeAvalanche
 
                             case Spell.BladeAvalanche:
-                                Effects.Add(new Effect(Libraries.Magic2, 740 + (int)Direction * 20, 15, 15 * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -2100,7 +2091,6 @@ namespace Client.MirObjects
                             #region SlashingBurst
 
                             case Spell.SlashingBurst:
-                                MapControl.Effects.Add(new Effect(Libraries.Magic2, 1700 + (int)Direction * 10, 9, 9 * FrameInterval, CurrentLocation, CMain.Time + 300));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 SlashingBurstTime = CMain.Time + 2000;
                                 break;
@@ -2111,8 +2101,6 @@ namespace Client.MirObjects
 
                             case Spell.CounterAttack:
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 5);
-                                Effects.Add(new Effect(Libraries.Magic, 3480 + (int)Direction * 10, 10, 10 * FrameInterval, this));
-                                Effects.Add(new Effect(Libraries.Magic3, 140, 2, 2 * FrameInterval, this));
                                 break;
 
                             #endregion
@@ -2120,7 +2108,7 @@ namespace Client.MirObjects
                             #region CrescentSlash
 
                             case Spell.CrescentSlash:
-                                Effects.Add(new Effect(Libraries.Magic2, 2620 + (int)Direction * 20, 20, 20 * FrameInterval, this));
+                                Effects.Add(new Effect(new SpellVisual(Spell.CrescentSlash), 20 * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10 + (Gender == MirGender.Male ? 0 : 1));
 
                                
@@ -2143,7 +2131,6 @@ namespace Client.MirObjects
                             #region Mirroring
 
                             case Spell.Mirroring:
-                                Effects.Add(new Effect(Libraries.Magic2, 650, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -2152,7 +2139,6 @@ namespace Client.MirObjects
                             #region Blizzard
 
                             case Spell.Blizzard:
-                                Effects.Add(new Effect(Libraries.Magic2, 1540, 8, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 BlizzardStopTime = CMain.Time + 3000;
                                 break;
@@ -2162,7 +2148,6 @@ namespace Client.MirObjects
                             #region MeteorStrike
 
                             case Spell.MeteorStrike:
-                                Effects.Add(new Effect(Libraries.Magic2, 1590, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 BlizzardStopTime = CMain.Time + 3000;
                                 break;
@@ -2180,7 +2165,7 @@ namespace Client.MirObjects
                             #region HeavenlySword
 
                             case Spell.HeavenlySword:
-                                Effects.Add(new Effect(Libraries.Magic2, 2230 + ((int)Direction * 10), 8, 800, this));
+                                Effects.Add(new Effect(new SpellVisual(Spell.HeavenlySword), 800, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -2191,7 +2176,6 @@ namespace Client.MirObjects
                             case Spell.ElementalBarrier:
                                 if (HasElements && !ElementalBarrier)
                                 {
-                                    Effects.Add(new Effect(Libraries.Magic3, 1880, 8, Frame.Count * FrameInterval, this));
                                     SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 }
                                 break;
@@ -2200,13 +2184,12 @@ namespace Client.MirObjects
 
                             #region PoisonShot
                             case Spell.PoisonShot:
-                                Effects.Add(new Effect(Libraries.Magic3, 2300, 8, 1000, this));
                                 break;
                             #endregion
 
                             #region OneWithNature
                             case Spell.OneWithNature:
-                                MapControl.Effects.Add(new Effect(Libraries.Magic3, 2710, 8, 1200, CurrentLocation));
+                                MapControl.Effects.Add(new Effect(new SpellVisual(Spell.OneWithNature), 1200, CurrentLocation));
                                 SoundManager.PlaySound(20000 + 139 * 10);
                                 break;
                             #endregion
@@ -2215,7 +2198,6 @@ namespace Client.MirObjects
                             #region FireBounce
 
                             case Spell.FireBounce:
-                                Effects.Add(new Effect(Libraries.Magic, 400, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell.GreatFireBall * 10);
                                 break;
 
@@ -2224,7 +2206,6 @@ namespace Client.MirObjects
                             #region MeteorShower
 
                             case Spell.MeteorShower:
-                                Effects.Add(new Effect(Libraries.Magic, 400, 10, Frame.Count * FrameInterval, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell.GreatFireBall * 10);
                                 break;
 
@@ -2264,12 +2245,12 @@ namespace Client.MirObjects
                             ElementalBarrierEffect.Remove();
                         }
 
-                        Effects.Add(ElementalBarrierEffect = new Effect(Libraries.Magic3, 1910, 5, 600, this));
-                        ElementalBarrierEffect.Complete += (o, e) => Effects.Add(ElementalBarrierEffect = new Effect(Libraries.Magic3, 1890, 16, 3200, this) { Repeat = true });
+                        Effects.Add(ElementalBarrierEffect = new Effect(new SpellVisual(Spell.ElementalBarrier), 600, this));
+                        ElementalBarrierEffect.Complete += (o, e) => Effects.Add(ElementalBarrierEffect = new Effect(new SpellVisual(Spell.ElementalBarrier), 3200, this) { Repeat = true });
                         break;
                     default:
                         if (ElementalBarrierEffect == null)
-                            Effects.Add(ElementalBarrierEffect = new Effect(Libraries.Magic3, 1890, 16, 3200, this) { Repeat = true });
+                            Effects.Add(ElementalBarrierEffect = new Effect(new SpellVisual(Spell.ElementalBarrier), 3200, this) { Repeat = true });
                         break;
                 }
             }
@@ -2286,12 +2267,12 @@ namespace Client.MirObjects
                             ShieldEffect.Remove();
                         }
 
-                        Effects.Add(ShieldEffect = new Effect(Libraries.Magic, 3900, 3, 600, this));
-                        ShieldEffect.Complete += (o, e) => Effects.Add(ShieldEffect = new Effect(Libraries.Magic, 3890, 3, 600, this) { Repeat = true });
+                        Effects.Add(ShieldEffect = new Effect(new SpellVisual(Spell.MagicShield, SpellVisualPhase.Hit), 600, this));
+                        ShieldEffect.Complete += (o, e) => Effects.Add(ShieldEffect = new Effect(new SpellVisual(Spell.MagicShield), 600, this) { Repeat = true });
                         break;
                     default:
                         if (ShieldEffect == null)
-                            Effects.Add(ShieldEffect = new Effect(Libraries.Magic, 3890, 3, 600, this) { Repeat = true });
+                            Effects.Add(ShieldEffect = new Effect(new SpellVisual(Spell.MagicShield), 600, this) { Repeat = true });
                         break;
                 }
             }
@@ -2539,14 +2520,14 @@ namespace Client.MirObjects
                                     switch (Spell)
                                     {
                                         case Spell.Focus:
-                                            Effects.Add(new Effect(Libraries.Magic3, 2730, 10, Frame.Count * FrameInterval, this));
+                                            Effects.Add(new Effect(new SpellVisual(Spell.Focus), Frame.Count * FrameInterval, this));
                                             SoundManager.PlaySound(20000 + 121 * 10 + 5);
                                             break;
                                     }
 
                                     break;
                                 case 5:
-                                    missile = CreateProjectile(1030, Libraries.Magic3, true, 5, 30, 5);
+                                    missile = CreateProjectile(0, Spell.StraightShot, true, 5, 30, 5);
                                     StanceTime = CMain.Time + StanceDelay;
                                     SoundManager.PlaySound(20000 + 121 * 10);
                                     if (missile.Target != null)
@@ -2584,14 +2565,14 @@ namespace Client.MirObjects
                                 {
                                     case Spell.StraightShot:
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 0);
-                                        missile = CreateProjectile(1210, Libraries.Magic3, true, 5, 30, 5);
+                                        missile = CreateProjectile(0, Spell.StraightShot, true, 5, 30, 5);
 
                                         if (missile.Target != null)
                                         {
                                             missile.Complete += (o, e) =>
                                             {
                                                 if (missile.Target.CurrentAction == MirAction.Dead) return;
-                                                missile.Target.Effects.Add(new Effect(Libraries.Magic3, 1370, 7, 600, missile.Target));
+                                                missile.Target.Effects.Add(new Effect(new SpellVisual(Spell.StraightShot), 600, missile.Target));
                                                 SoundManager.PlaySound(20000 + (ushort)Spell.StraightShot * 10 + 2);
                                             };
                                         }
@@ -2620,7 +2601,7 @@ namespace Client.MirObjects
                                     {
                                         case 7:
                                         case 5:
-                                            missile = CreateProjectile(1030, Libraries.Magic3, true, 5, 30, 5);//normal arrow
+                                            missile = CreateProjectile(0, Spell.DoubleShot, true, 5, 30, 5);//normal arrow
                                             StanceTime = CMain.Time + StanceDelay;
                                             SoundManager.PlaySound(20000 + 121 * 10);
                                             if (missile.Target != null)
@@ -2638,7 +2619,7 @@ namespace Client.MirObjects
                                         switch (FrameIndex)
                                         {
                                             case 7:
-                                                missile = CreateProjectile(1690, Libraries.Magic3, true, 6, 30, 4);//elemental arrow
+                                                missile = CreateProjectile(0, Spell.ElementalShot, true, 6, 30, 4);//elemental arrow
                                                 StanceTime = CMain.Time + StanceDelay;
                                                 if (missile.Target != null)
                                                 {
@@ -2649,7 +2630,7 @@ namespace Client.MirObjects
                                                 }
                                                 break;
                                             case 1:
-                                                Effects.Add(new Effect(Libraries.Magic3, 1681, 5, Frame.Count * FrameInterval, this));
+                                                Effects.Add(new Effect(new SpellVisual(Spell.ElementalShot), Frame.Count * FrameInterval, this));
                                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 0);//sound M128-0
                                                 break;
                                         }
@@ -2662,7 +2643,7 @@ namespace Client.MirObjects
                                     {
                                         case 7:
                                             SoundManager.PlaySound(20000 + 121 * 10);
-                                            missile = CreateProjectile(2750, Libraries.Magic3, true, 5, 10, 5);
+                                            missile = CreateProjectile(0, Spell, true, 5, 10, 5);
                                             StanceTime = CMain.Time + StanceDelay;
                                             if (missile.Target != null)
                                             {
@@ -2679,7 +2660,7 @@ namespace Client.MirObjects
                                     {
                                         case 7:
                                             SoundManager.PlaySound(20000 + 121 * 10);
-                                            missile = CreateProjectile(2750, Libraries.Magic3, true, 5, 20, 5);
+                                            missile = CreateProjectile(0, Spell.Stonetrap, true, 5, 20, 5);
                                             StanceTime = CMain.Time + StanceDelay;
                                             missile.Explode = true;
 
@@ -2695,7 +2676,7 @@ namespace Client.MirObjects
                                     switch (FrameIndex)
                                     {
                                         case 5:
-                                            missile = CreateProjectile(1030, Libraries.Magic3, true, 5, 30, 5);//normal arrow
+                                            missile = CreateProjectile(0, Spell.DelayedExplosion, true, 5, 30, 5);//normal arrow
                                             StanceTime = CMain.Time + StanceDelay;
                                             SoundManager.PlaySound(20000 + 121 * 10);
                                             if (missile.Target != null)
@@ -2720,7 +2701,7 @@ namespace Client.MirObjects
                                     {
                                         case 7:
                                             SoundManager.PlaySound(20000 + ((Spell == Spell.CrippleShot) ? 136 : 121) * 10);//M136-0
-                                            missile = CreateProjectile(1930 + exFrameStart, Libraries.Magic3, true, 5, 10, 5);
+                                            missile = CreateProjectile(0, Spell, true, 5, 10, 5);
                                             StanceTime = CMain.Time + StanceDelay;
                                             if (missile.Target != null)
                                             {
@@ -2742,26 +2723,26 @@ namespace Client.MirObjects
                                                                 if (Buffs.Any(x => x == BuffType.PoisonShot)) exIdx = 10;
                                                             }
 
-                                                            ob.Effects.Add(eff = new Effect(Libraries.Magic3, 2490 + exIdx, 7, 1000, ob));
+                                                            ob.Effects.Add(eff = new Effect(new SpellVisual(exIdx == 20 ? Spell.VampireShot : exIdx == 10 ? Spell.PoisonShot : Spell.CrippleShot), 1000, ob));
                                                             SoundManager.PlaySound(20000 + 136 * 10 + 5 + (exIdx / 10));//sound M136-5/7
 
                                                             if (exIdx == 20)
                                                                 eff.Complete += (o1, e1) =>
                                                                 {
                                                                     SoundManager.PlaySound(20000 + 45 * 10 + 2);//sound M45-2
-                                                                    Effects.Add(new Effect(Libraries.Magic3, 2100, 8, 1000, this));
+                                                                    Effects.Add(new Effect(new SpellVisual(Spell.VampireShot), 1000, this));
                                                                 };
                                                         }
 
                                                         if (Spell == Spell.VampireShot || Spell == Spell.PoisonShot)
                                                         {
-                                                            ob.Effects.Add(eff = new Effect(Libraries.Magic3, 2090 + exFrameStart, 6, 1000, ob));
+                                                            ob.Effects.Add(eff = new Effect(new SpellVisual(Spell), 1000, ob));
                                                             SoundManager.PlaySound(20000 + (133 + (exFrameStart / 100)) * 10 + 2);//sound M133-2 or M135-2
                                                             if (Spell == Spell.VampireShot)
                                                                 eff.Complete += (o1, e1) =>
                                                                 {
                                                                     SoundManager.PlaySound(20000 + 45 * 10 + 2);//sound M45-2
-                                                                    Effects.Add(new Effect(Libraries.Magic3, 2100 + exFrameStart, 8, 1000, this));
+                                                                    Effects.Add(new Effect(new SpellVisual(Spell.VampireShot), 1000, this));
                                                                 };
                                                         }
                                                     }
@@ -2776,14 +2757,14 @@ namespace Client.MirObjects
                                     {
                                         case 7:
                                             SoundManager.PlaySound(20000 + 138 * 10);//M138-0
-                                            missile = CreateProjectile(2530, Libraries.Magic3, true, 6, 50, 4);
+                                            missile = CreateProjectile(0, Spell.NapalmShot, true, 6, 50, 4);
                                             StanceTime = CMain.Time + StanceDelay;
                                             if (missile.Target != null)
                                             {
                                                 missile.Complete += (o, e) =>
                                                 {
                                                     SoundManager.PlaySound(20000 + 138 * 10 + 2);//M138-2
-                                                    MapControl.Effects.Add(new Effect(Libraries.Magic3, 2690, 10, 1000, TargetPoint));
+                                                    MapControl.Effects.Add(new Effect(new SpellVisual(Spell.NapalmShot), 1000, TargetPoint));
                                                 };
                                             }
                                             break;
@@ -2830,7 +2811,7 @@ namespace Client.MirObjects
                             {
 
                                 MapObject ob = MapControl.GetObject(TargetID);
-                                GameScene.Scene.MapControl.EmitDirectSpellEffect(Spell, CurrentLocation, TargetPoint, ob?.CurrentLocation);
+                                PresentLegacyRelease(Spell, ob);
 
                                 Missile missile;
                                 Effect effect;
@@ -2840,14 +2821,14 @@ namespace Client.MirObjects
 
                                     case Spell.FireBall:
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
-                                        missile = CreateProjectile(10, Libraries.Magic, true, 6, 30, 4);
+                                        missile = CreateProjectile(0, Spell.FireBall, true, 6, 30, 4);
 
                                         if (missile.Target != null)
                                         {
                                             missile.Complete += (o, e) =>
                                             {
                                                 if (missile.Target.CurrentAction == MirAction.Dead) return;
-                                                missile.Target.Effects.Add(new Effect(Libraries.Magic, 170, 10, 600, missile.Target));
+                                                missile.Target.Effects.Add(new Effect(new SpellVisual(Spell.FireBall), 600, missile.Target));
                                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 2);
                                             };
                                         }
@@ -2859,14 +2840,14 @@ namespace Client.MirObjects
 
                                     case Spell.GreatFireBall:
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
-                                        missile = CreateProjectile(410, Libraries.Magic, true, 6, 30, 4);
+                                        missile = CreateProjectile(0, Spell.GreatFireBall, true, 6, 30, 4);
 
                                         if (missile.Target != null)
                                         {
                                             missile.Complete += (o, e) =>
                                             {
                                                 if (missile.Target.CurrentAction == MirAction.Dead) return;
-                                                missile.Target.Effects.Add(new Effect(Libraries.Magic, 570, 10, 600, missile.Target));
+                                                missile.Target.Effects.Add(new Effect(new SpellVisual(Spell.GreatFireBall), 600, missile.Target));
                                                 SoundManager.PlaySound(20000 + (ushort)Spell.GreatFireBall * 10 + 2);
                                             };
                                         }
@@ -2879,9 +2860,9 @@ namespace Client.MirObjects
                                     case Spell.Healing:
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
                                         if (ob == null)
-                                            MapControl.Effects.Add(new Effect(Libraries.Magic, 370, 10, 800, TargetPoint));
+                                            MapControl.Effects.Add(new Effect(new SpellVisual(Spell.Healing), 800, TargetPoint));
                                         else
-                                            ob.Effects.Add(new Effect(Libraries.Magic, 370, 10, 800, ob));
+                                            ob.Effects.Add(new Effect(new SpellVisual(Spell.Healing), 800, ob));
                                         break;
 
                                     #endregion
@@ -2891,9 +2872,9 @@ namespace Client.MirObjects
                                     case Spell.ElectricShock:
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
                                         if (ob == null)
-                                            MapControl.Effects.Add(new Effect(Libraries.Magic, 1570, 10, 1000, TargetPoint));
+                                            MapControl.Effects.Add(new Effect(new SpellVisual(Spell.ElectricShock), 1000, TargetPoint));
                                         else
-                                            ob.Effects.Add(new Effect(Libraries.Magic, 1570, 10, 1000, ob));
+                                            ob.Effects.Add(new Effect(new SpellVisual(Spell.ElectricShock), 1000, ob));
                                         break;
                                     #endregion
 
@@ -2902,56 +2883,13 @@ namespace Client.MirObjects
                                     case Spell.Poisoning:
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
                                         if (ob != null)
-                                            ob.Effects.Add(new Effect(Libraries.Magic, 770, 10, 1000, ob));
+                                            ob.Effects.Add(new Effect(new SpellVisual(Spell.Poisoning), 1000, ob));
                                         break;
                                     #endregion
-
-                                    #region HellFire
 
                                     case Spell.HellFire:
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
-
-                                        
-                                        Point dest = CurrentLocation;
-                                        for (int i = 0; i < 4; i++)
-                                        {
-                                            dest = Functions.PointMove(dest, Direction, 1);
-                                            if (!GameScene.Scene.MapControl.ValidPoint(dest)) break;
-                                            effect = new Effect(Libraries.Magic, 930, 6, 500, dest) { Rate = 0.7F };
-
-                                            effect.SetStart(CMain.Time + i * 50);
-                                            MapControl.Effects.Add(effect);
-                                        }
-
-                                        if (SpellLevel == 3)
-                                        {
-                                            MirDirection dir = (MirDirection)(((int)Direction + 1) % 8);
-                                            dest = CurrentLocation;
-                                            for (int r = 0; r < 4; r++)
-                                            {
-                                                dest = Functions.PointMove(dest, dir, 1);
-                                                if (!GameScene.Scene.MapControl.ValidPoint(dest)) break;
-                                                effect = new Effect(Libraries.Magic, 930, 6, 500, dest) { Rate = 0.7F };
-
-                                                effect.SetStart(CMain.Time + r * 50);
-                                                MapControl.Effects.Add(effect);
-                                            }
-
-                                            dir = (MirDirection)(((int)Direction - 1 + 8) % 8);
-                                            dest = CurrentLocation;
-                                            for (int r = 0; r < 4; r++)
-                                            {
-                                                dest = Functions.PointMove(dest, dir, 1);
-                                                if (!GameScene.Scene.MapControl.ValidPoint(dest)) break;
-                                                effect = new Effect(Libraries.Magic, 930, 6, 500, dest) { Rate = 0.7F };
-
-                                                effect.SetStart(CMain.Time + r * 50);
-                                                MapControl.Effects.Add(effect);
-                                            }
-                                        }
                                         break;
-
-                                    #endregion
 
                                     #region ThunderBolt
 
@@ -2960,9 +2898,9 @@ namespace Client.MirObjects
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10);
 
                                         if (ob == null)
-                                            MapControl.Effects.Add(new Effect(Libraries.Magic2, 10, 5, 400, TargetPoint));
+                                            MapControl.Effects.Add(new Effect(new SpellVisual(Spell.ThunderBolt), 400, TargetPoint));
                                         else
-                                            ob.Effects.Add(new Effect(Libraries.Magic2, 10, 5, 400, ob));
+                                            ob.Effects.Add(new Effect(new SpellVisual(Spell.ThunderBolt), 400, ob));
                                         break;
 
                                     #endregion
@@ -2971,14 +2909,14 @@ namespace Client.MirObjects
 
                                     case Spell.SoulFireBall:
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
-                                        missile = CreateProjectile(1160, Libraries.Magic, true, 3, 30, 7);
+                                        missile = CreateProjectile(0, Spell.SoulFireBall, true, 3, 30, 7);
 
                                         if (missile.Target != null)
                                         {
                                             missile.Complete += (o, e) =>
                                             {
                                                 if (missile.Target.CurrentAction == MirAction.Dead) return;
-                                                missile.Target.Effects.Add(new Effect(Libraries.Magic, 1360, 10, 600, missile.Target));
+                                                missile.Target.Effects.Add(new Effect(new SpellVisual(Spell.SoulFireBall), 600, missile.Target));
                                                 SoundManager.PlaySound(20000 + (ushort)Spell.SoulFireBall * 10 + 2);
                                             };
                                         }
@@ -2990,7 +2928,6 @@ namespace Client.MirObjects
 
                                     case Spell.EnergyShield:
 
-                                        //Effects.Add(new Effect(Libraries.Magic2, 1880, 9, Frame.Count * FrameInterval, this));
                                         //SoundManager.PlaySound(20000 + (ushort)Spell * 9);
                                         break;
 
@@ -3001,7 +2938,7 @@ namespace Client.MirObjects
                                     case Spell.FireBang:
 
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
-                                        MapControl.Effects.Add(new Effect(Libraries.Magic, 1660, 10, 1000, TargetPoint));
+                                        MapControl.Effects.Add(new Effect(new SpellVisual(Spell.FireBang), 1000, TargetPoint));
                                         break;
 
                                     #endregion
@@ -3010,47 +2947,35 @@ namespace Client.MirObjects
 
                                     case Spell.MassHiding:
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10);
-                                        missile = CreateProjectile(1160, Libraries.Magic, true, 3, 30, 7);
+                                        missile = CreateProjectile(0, Spell.MassHiding, true, 3, 30, 7);
                                         missile.Explode = true;
 
                                         missile.Complete += (o, e) =>
                                         {
-                                            MapControl.Effects.Add(new Effect(Libraries.Magic, 1540, 10, 800, TargetPoint));
+                                            MapControl.Effects.Add(new Effect(new SpellVisual(Spell.MassHiding), 800, TargetPoint));
                                             SoundManager.PlaySound(20000 + (ushort)Spell.MassHiding * 10 + 1);
                                         };
                                         break;
 
                                     #endregion
 
-                                    #region SoulShield
+                                    #region SoulShield, BlessedArmour
 
                                     case Spell.SoulShield:
-                                        SoundManager.PlaySound(20000 + (ushort)Spell * 10);
-                                        missile = CreateProjectile(1160, Libraries.Magic, true, 3, 30, 7);
-                                        missile.Explode = true;
-
-                                        missile.Complete += (o, e) =>
-                                        {
-                                            MapControl.Effects.Add(new Effect(Libraries.Magic, 1320, 15, 1200, TargetPoint));
-                                            SoundManager.PlaySound(20000 + (ushort)Spell.SoulShield * 10 + 1);
-                                        };
-                                        break;
-
-                                    #endregion
-
-                                    #region BlessedArmour
-
                                     case Spell.BlessedArmour:
-                                        SoundManager.PlaySound(20000 + (ushort)Spell * 10);
-                                        missile = CreateProjectile(1160, Libraries.Magic, true, 3, 30, 7);
-                                        missile.Explode = true;
-
-                                        missile.Complete += (o, e) =>
                                         {
-                                            MapControl.Effects.Add(new Effect(Libraries.Magic, 1340, 15, 1200, TargetPoint));
-                                            SoundManager.PlaySound(20000 + (ushort)Spell.BlessedArmour * 10 + 1);
-                                        };
-                                        break;
+                                            Spell ward = Spell;
+                                            Point centre = TargetPoint;
+                                            SoundManager.PlaySound(20000 + (ushort)ward * 10);
+                                            var talisman = CreateProjectile(0, ward, true, 3, 30, 7);
+                                            talisman.Explode = true;
+                                            talisman.Complete += (o, e) =>
+                                            {
+                                                GameScene.Scene.MapControl.EmitLegacy(new SpellVisual(ward), centre);
+                                                SoundManager.PlaySound(20000 + (ushort)ward * 10 + 1);
+                                            };
+                                            break;
+                                        }
 
                                     #endregion
 
@@ -3067,7 +2992,7 @@ namespace Client.MirObjects
 
                                     case Spell.HealingCircle:
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
-                                        MapControl.Effects.Add(new Effect(Libraries.Magic3, 620, 10, 1200, TargetPoint));
+                                        MapControl.Effects.Add(new Effect(new SpellVisual(Spell.HealingCircle), 1200, TargetPoint));
                                         break;
 
                                     #endregion
@@ -3077,7 +3002,7 @@ namespace Client.MirObjects
                                     case Spell.MassHealing:
 
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
-                                        MapControl.Effects.Add(new Effect(Libraries.Magic, 1800, 10, 1000, TargetPoint));
+                                        MapControl.Effects.Add(new Effect(new SpellVisual(Spell.MassHealing), 1000, TargetPoint));
                                         break;
 
                                     #endregion
@@ -3087,7 +3012,7 @@ namespace Client.MirObjects
                                     case Spell.IceStorm:
 
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
-                                        MapControl.Effects.Add(new Effect(Libraries.Magic, 3850, 20, 1300, TargetPoint));
+                                        MapControl.Effects.Add(new Effect(new SpellVisual(Spell.IceStorm), 1300, TargetPoint));
                                         break;
 
                                     #endregion
@@ -3097,19 +3022,18 @@ namespace Client.MirObjects
                                     case Spell.TurnUndead:
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
                                         if (ob == null)
-                                            MapControl.Effects.Add(new Effect(Libraries.Magic, 3930, 15, 1000, TargetPoint));
+                                            MapControl.Effects.Add(new Effect(new SpellVisual(Spell.TurnUndead), 1000, TargetPoint));
                                         else
-                                            ob.Effects.Add(new Effect(Libraries.Magic, 3930, 15, 1000, ob));
+                                            ob.Effects.Add(new Effect(new SpellVisual(Spell.TurnUndead), 1000, ob));
                                         break;
                                     #endregion
 
                                     #region IceThrust
 
                                     case Spell.IceThrust:
-
-                                        Point location = Functions.PointMove(CurrentLocation, Direction, 1);
-
-                                        MapControl.Effects.Add(new Effect(Libraries.Magic2, 1790 + (int)Direction * 10, 10, 10 * FrameInterval, location));
+                                        int iceReach = (this as UserObject)?.PerkRank(Spell.IceThrust, SpellPerk.Reach) ?? 0;
+                                        GameScene.Scene.MapControl.EmitLegacy(new SpellVisual(Spell.IceThrust, ExtraReach: iceReach),
+                                            CurrentLocation, Direction, duration: 10 * FrameInterval);
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                         break;
 
@@ -3120,9 +3044,9 @@ namespace Client.MirObjects
                                     case Spell.Revelation:
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
                                         if (ob == null)
-                                            MapControl.Effects.Add(new Effect(Libraries.Magic, 3990, 10, 1000, TargetPoint));
+                                            MapControl.Effects.Add(new Effect(new SpellVisual(Spell.Revelation), 1000, TargetPoint));
                                         else
-                                            ob.Effects.Add(new Effect(Libraries.Magic, 3990, 10, 1000, ob));
+                                            ob.Effects.Add(new Effect(new SpellVisual(Spell.Revelation), 1000, ob));
                                         break;
                                     #endregion
 
@@ -3133,9 +3057,9 @@ namespace Client.MirObjects
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10);
 
                                         if (ob == null)
-                                            MapControl.Effects.Add(new Effect(Libraries.Magic2, 140, 10, 600, TargetPoint));
+                                            MapControl.Effects.Add(new Effect(new SpellVisual(Spell.FlameDisruptor), 600, TargetPoint));
                                         else
-                                            ob.Effects.Add(new Effect(Libraries.Magic2, 140, 10, 600, ob));
+                                            ob.Effects.Add(new Effect(new SpellVisual(Spell.FlameDisruptor), 600, ob));
                                         break;
 
                                     #endregion
@@ -3143,14 +3067,14 @@ namespace Client.MirObjects
                                     #region CatTongue
                                     case Spell.CatTongue:
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10);
-                                        missile = CreateProjectile(260, Libraries.Magic3, true, 6, 30, 4);
+                                        missile = CreateProjectile(0, Spell.CatTongue, true, 6, 30, 4);
 
                                         if (missile.Target != null)
                                         {
                                             missile.Complete += (o, e) =>
                                             {
                                                 if (missile.Target.CurrentAction == MirAction.Dead) return;
-                                                missile.Target.Effects.Add(new Effect(Libraries.Magic3, 420, 8, 800, missile.Target));
+                                                missile.Target.Effects.Add(new Effect(new SpellVisual(Spell.CatTongue), 800, missile.Target));
                                                 SoundManager.PlaySound(20000 + (ushort)Spell.CatTongue * 10 + 1);
                                             };
                                         }
@@ -3162,14 +3086,14 @@ namespace Client.MirObjects
 
                                     case Spell.FrostCrunch:
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
-                                        missile = CreateProjectile(410, Libraries.Magic2, true, 4, 30, 6);
+                                        missile = CreateProjectile(0, Spell.FrostCrunch, true, 4, 30, 6);
 
                                         if (missile.Target != null)
                                         {
                                             missile.Complete += (o, e) =>
                                             {
                                                 if (missile.Target.CurrentAction == MirAction.Dead) return;
-                                                missile.Target.Effects.Add(new Effect(Libraries.Magic2, 570, 8, 600, missile.Target));
+                                                missile.Target.Effects.Add(new Effect(new SpellVisual(Spell.FrostCrunch), 600, missile.Target));
                                                 SoundManager.PlaySound(20000 + (ushort)Spell.FrostCrunch * 10 + 2);
                                             };
                                         }
@@ -3181,9 +3105,9 @@ namespace Client.MirObjects
 
                                     case Spell.Purification:
                                         if (ob == null)
-                                            MapControl.Effects.Add(new Effect(Libraries.Magic2, 620, 10, 800, TargetPoint));
+                                            MapControl.Effects.Add(new Effect(new SpellVisual(Spell.Purification), 800, TargetPoint));
                                         else
-                                            ob.Effects.Add(new Effect(Libraries.Magic2, 620, 10, 800, ob));
+                                            ob.Effects.Add(new Effect(new SpellVisual(Spell.Purification), 800, ob));
                                         break;
 
                                     #endregion
@@ -3191,12 +3115,12 @@ namespace Client.MirObjects
                                     #region Curse
 
                                     case Spell.Curse:
-                                        missile = CreateProjectile(1160, Libraries.Magic, true, 3, 30, 7);
+                                        missile = CreateProjectile(0, Spell.Curse, true, 3, 30, 7);
                                         missile.Explode = true;
 
                                         missile.Complete += (o, e) =>
                                         {
-                                            MapControl.Effects.Add(new Effect(Libraries.Magic2, 950, 24, 2000, TargetPoint));
+                                            MapControl.Effects.Add(new Effect(new SpellVisual(Spell.Curse), 2000, TargetPoint));
                                             SoundManager.PlaySound(20000 + (ushort)Spell.Curse * 10);
                                         };
                                         break;
@@ -3206,14 +3130,14 @@ namespace Client.MirObjects
                                     #region Hallucination
 
                                     case Spell.Hallucination:
-                                        missile = CreateProjectile(1160, Libraries.Magic, true, 3, 48, 7);
+                                        missile = CreateProjectile(0, Spell.Hallucination, true, 3, 48, 7);
 
                                         if (missile.Target != null)
                                         {
                                             missile.Complete += (o, e) =>
                                             {
                                                 if (missile.Target.CurrentAction == MirAction.Dead) return;
-                                                missile.Target.Effects.Add(new Effect(Libraries.Magic2, 1110, 10, 1000, missile.Target));
+                                                missile.Target.Effects.Add(new Effect(new SpellVisual(Spell.Hallucination), 1000, missile.Target));
                                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                             };
                                         }
@@ -3224,7 +3148,6 @@ namespace Client.MirObjects
                                     #region Lightning
 
                                     case Spell.Lightning:
-                                        Effects.Add(new Effect(Libraries.Magic, 970 + (int)Direction * 20, 6, Frame.Count * FrameInterval, this));
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                         break;
 
@@ -3237,14 +3160,15 @@ namespace Client.MirObjects
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
 
                                         if (ob == null)
-                                            MapControl.Effects.Add(new Effect(Libraries.Magic2, 1060, 20, 1000, TargetPoint));
+                                            MapControl.Effects.Add(new Effect(new SpellVisual(Spell.Vampirism), 1000, TargetPoint));
                                         else
                                         {
-                                            ob.Effects.Add(effect = new Effect(Libraries.Magic2, 1060, 20, 1000, ob));
+                                            ob.Effects.Add(effect = new Effect(new SpellVisual(Spell.Vampirism), 1000, ob));
                                             effect.Complete += (o, e) =>
                                             {
                                                 SoundManager.PlaySound(20000 + (ushort)Spell.Vampirism * 10 + 2);
-                                                Effects.Add(new Effect(Libraries.Magic2, 1090, 10, 500, this));
+                                                GameScene.Scene.MapControl.EmitRelayArc(Spell.Vampirism, ob.CurrentLocation, CurrentLocation);
+                                                Effects.Add(new Effect(new SpellVisual(Spell.Vampirism, SpellVisualPhase.Return), 500, this));
                                             };
                                         }
                                         break;
@@ -3254,7 +3178,7 @@ namespace Client.MirObjects
                                     #region PoisonCloud
 
                                     case Spell.PoisonCloud:
-                                        missile = CreateProjectile(1160, Libraries.Magic, true, 3, 30, 7);
+                                        missile = CreateProjectile(0, Spell.PoisonCloud, true, 3, 30, 7);
                                         missile.Explode = true;
 
                                         missile.Complete += (o, e) =>
@@ -3280,7 +3204,7 @@ namespace Client.MirObjects
                                     case Spell.MeteorStrike:
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 2);
-                                        //BlizzardFreezeTime = CMain.Time + 3000;
+                                        MapControl.Effects.Add(new Effect(new SpellVisual(Spell.MeteorStrike), 3000, ob?.CurrentLocation ?? TargetPoint));
                                         break;
 
                                     #endregion
@@ -3296,7 +3220,7 @@ namespace Client.MirObjects
                                     #region SummonHolyDeva
 
                                     case Spell.SummonHolyDeva:
-                                        Effects.Add(new Effect(Libraries.Magic, 1500, 10, Frame.Count * FrameInterval, this));
+                                        Effects.Add(new Effect(new SpellVisual(Spell.SummonHolyDeva), Frame.Count * FrameInterval, this));
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                         break;
 
@@ -3306,7 +3230,7 @@ namespace Client.MirObjects
 
                                     case Spell.UltimateEnhancer:
                                         if (ob != null && ob != User)
-                                            ob.Effects.Add(new Effect(Libraries.Magic2, 160, 15, 1000, ob));
+                                            ob.Effects.Add(new Effect(new SpellVisual(Spell.UltimateEnhancer), 1000, ob));
                                         break;
 
                                     #endregion
@@ -3315,12 +3239,12 @@ namespace Client.MirObjects
 
                                     case Spell.Plague:
                                         //SoundManager.PlaySound(20000 + (ushort)Spell.SoulShield * 10);
-                                        missile = CreateProjectile(1160, Libraries.Magic, true, 3, 30, 7);
+                                        missile = CreateProjectile(0, Spell.Plague, true, 3, 30, 7);
                                         missile.Explode = true;
 
                                         missile.Complete += (o, e) =>
                                         {
-                                            MapControl.Effects.Add(new Effect(Libraries.Magic3, 110, 10, 1200, TargetPoint));
+                                            MapControl.Effects.Add(new Effect(new SpellVisual(Spell.Plague), 1200, TargetPoint));
                                             SoundManager.PlaySound(20000 + (ushort)Spell.Plague * 10 + 3);
                                         };
                                         break;
@@ -3358,7 +3282,7 @@ namespace Client.MirObjects
                                     case Spell.NapalmShot:
 
                                         SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
-                                        MapControl.Effects.Add(new Effect(Libraries.Magic3, 1660, 10, 1000, TargetPoint));
+                                        MapControl.Effects.Add(new Effect(new SpellVisual(Spell.NapalmShot), 1000, TargetPoint));
                                         break;
 
                                     #endregion
@@ -3369,14 +3293,14 @@ namespace Client.MirObjects
                                     case Spell.FireBounce:
                                         SoundManager.PlaySound(20000 + (ushort)Spell.GreatFireBall * 10 + 1);
 
-                                        missile = CreateProjectile(410, Libraries.Magic, true, 6, 30, 4);
+                                        missile = CreateProjectile(0, Spell.FireBounce, true, 6, 30, 4);
 
                                         if (missile.Target != null)
                                         {
                                             missile.Complete += (o, e) =>
                                             {
                                                 if (missile.Target.CurrentAction == MirAction.Dead) return;
-                                                missile.Target.Effects.Add(new Effect(Libraries.Magic, 570, 10, 600, missile.Target));
+                                                missile.Target.Effects.Add(new Effect(new SpellVisual(Spell.FireBounce), 600, missile.Target));
                                                 SoundManager.PlaySound(20000 + (ushort)Spell.GreatFireBall * 10 + 2);
                                             };
                                         }
@@ -3387,33 +3311,19 @@ namespace Client.MirObjects
                                     #region MeteorShower
 
                                     case Spell.MeteorShower:
-
                                         SoundManager.PlaySound(20000 + (ushort)Spell.GreatFireBall * 10 + 1);
-
-                                        var targetIDs = new List<uint> { TargetID };
-
-                                        if (SecondaryTargetIDs != null)
+                                        foreach (uint id in (SecondaryTargetIDs ?? []).Prepend(TargetID).Distinct())
                                         {
-                                            targetIDs.AddRange(SecondaryTargetIDs);
-                                        }
-
-                                        foreach (var targetID in targetIDs)
-                                        {
-                                            missile = CreateProjectile(410, Libraries.Magic, true, 6, 30, 4, targetID: targetID);
-
-                                            if (missile.Target != null)
+                                            var enemy = MapControl.GetObject(id);
+                                            if (enemy == null) continue;
+                                            var meteor = CreateProjectile(0, Spell.MeteorShower, true, 6, 30, 4, targetID: id);
+                                            meteor.Complete += (_, _) =>
                                             {
-                                                missile.Complete += (o, e) =>
-                                                {
-                                                    var sender = (Missile)o;
-
-                                                    if (sender.Target.CurrentAction == MirAction.Dead) return;
-                                                    sender.Target.Effects.Add(new Effect(Libraries.Magic, 570, 10, 600, sender.Target));
-                                                    SoundManager.PlaySound(20000 + (ushort)Spell.GreatFireBall * 10 + 2);
-                                                };
-                                            }
+                                                if (enemy.CurrentAction == MirAction.Dead) return;
+                                                enemy.Effects.Add(new Effect(new SpellVisual(Spell.MeteorShower), 600, enemy));
+                                                SoundManager.PlaySound(20000 + (ushort)Spell.GreatFireBall * 10 + 2);
+                                            };
                                         }
-                                        
                                         break;
 
                                     #endregion
@@ -3538,7 +3448,19 @@ namespace Client.MirObjects
         }
 
 
-        public override Missile CreateProjectile(int baseIndex, MLibrary library, bool blend, int count, int interval, int skip, int lightDistance = 6, bool direction16 = true, Color? lightColour = null, uint targetID = 0)
+        private void PresentLegacyRelease(Spell spell, MapObject target)
+        {
+            var map = GameScene.Scene.MapControl;
+            switch (spell)
+            {
+                case Spell.EnergyShield:
+                case Spell.PetEnhancer:
+                    map.EmitLegacy(new SpellVisual(spell), target ?? this);
+                    break;
+            }
+        }
+
+        public override Missile CreateProjectile(int baseIndex, EffectArt library, bool blend, int count, int interval, int skip, int lightDistance = 6, bool direction16 = true, Color? lightColour = null, uint targetID = 0)
         {
             if (targetID == 0)
             {
@@ -3553,7 +3475,7 @@ namespace Client.MirObjects
 
             int duration = Functions.MaxDistance(CurrentLocation, targetPoint) * 50;
 
-            Missile missile = new Missile(library, baseIndex, duration / interval, duration, this, targetPoint)
+            Missile missile = new Missile(library, baseIndex, duration / interval, duration, this, targetPoint, direction16)
             {
                 Target = ob,
                 Interval = interval,
@@ -3563,9 +3485,6 @@ namespace Client.MirObjects
                 Light = lightDistance,
                 LightColour = lightColour == null ? Color.White : (Color)lightColour
             };
-
-            if ((CurrentAction is MirAction.Spell or MirAction.AttackRange2) && MapControl.HasSpellTrail(Spell))
-                missile.TrackSpellParticles(Spell);
 
             Effects.Add(missile);
 
@@ -4952,54 +4871,6 @@ namespace Client.MirObjects
                 Effects[i].Draw();
             }
 
-            if (!effectsEnabled) return;
-
-            switch (CurrentAction)
-            {
-                case MirAction.Attack1:
-                    switch (Spell)
-                    {
-                        case Spell.Slaying:
-                            Libraries.Magic.DrawBlend(1820 + ((int)Direction * 10) + SpellLevel * 90 + FrameIndex, DrawLocation, Color.White, true, 0.7F);
-                            break;
-                        case Spell.DoubleSlash:
-                            Libraries.Magic2.DrawBlend(1960 + ((int)Direction * 10) + FrameIndex, DrawLocation, Color.White, true, 0.7F);
-                            break;
-                        case Spell.Thrusting:
-                            Libraries.Magic.DrawBlend(2190 + ((int)Direction * 10) + SpellLevel * 90 + FrameIndex, DrawLocation, Color.White, true, 0.7F);
-                            break;
-                        case Spell.HalfMoon:
-                            Libraries.Magic.DrawBlend(2560 + ((int)Direction * 10) + SpellLevel * 90 + FrameIndex, DrawLocation, Color.White, true, 0.7F);
-                            break;
-                        case Spell.TwinDrakeBlade:
-                            Libraries.Magic2.DrawBlend(220 + ((int)Direction * 20) + FrameIndex, DrawLocation, Color.White, true, 0.7F);
-                            break;
-                        case Spell.CrossHalfMoon:
-                            Libraries.Magic2.DrawBlend(40 + ((int)Direction * 10) + FrameIndex, DrawLocation, Color.White, true, 0.7F);
-                            break;
-                        case Spell.FlamingSword:
-                            Libraries.Magic.DrawBlend(3480 + ((int)Direction * 10) + FrameIndex, DrawLocation, Color.White, true, 0.7F);
-                            break;
-                    }
-                    break;
-                case MirAction.Attack4:
-
-                    switch (Spell)
-                    {
-                        case Spell.DoubleSlash:
-                            Libraries.Magic2.DrawBlend(2050 + ((int)Direction * 10) + FrameIndex, DrawLocation, Color.White, true, 0.7F);
-                            break;
-                        case Spell.TwinDrakeBlade:
-                            Libraries.Magic2.DrawBlend(226 + ((int)Direction * 20) + FrameIndex, DrawLocation, Color.White, true, 0.7F);
-                            break;
-                        case Spell.FlamingSword:
-                            Libraries.Magic.DrawBlend(3480 + ((int)Direction * 10) + FrameIndex, DrawLocation, Color.White, true, 0.7F);
-                            break;
-                    }
-                    break;
-            }
-
-
         }
 
         public void DrawCurrentEffects()
@@ -5007,14 +4878,14 @@ namespace Client.MirObjects
             if (CurrentEffect == SpellEffect.MagicShieldUp && !MagicShield)
             {
                 MagicShield = true;
-                Effects.Add(ShieldEffect = new Effect(Libraries.Magic, 3890, 3, 600, this) { Repeat = true });
+                Effects.Add(ShieldEffect = new Effect(new SpellVisual(Spell.MagicShield), 600, this) { Repeat = true });
                 CurrentEffect = SpellEffect.None;
             }
 
             if (CurrentEffect == SpellEffect.ElementalBarrierUp && !ElementalBarrier)
             {
                 ElementalBarrier = true;
-                Effects.Add(ElementalBarrierEffect = new Effect(Libraries.Magic3, 1890, 16, 3200, this) { Repeat = true });
+                Effects.Add(ElementalBarrierEffect = new Effect(new SpellVisual(Spell.ElementalBarrier), 3200, this) { Repeat = true });
                 CurrentEffect = SpellEffect.None;
             }
 
@@ -5022,36 +4893,42 @@ namespace Client.MirObjects
             {
                 HasElements = true;
                 if (ElementEffect == 4)
-                    Effects.Add(new ElementsEffect(Libraries.Magic3, 1660, 10, 10 * 100, this, true, 4, ElementOrbMax));
+                    Effects.Add(new ElementsEffect(Spell.ElementalBarrier, 0, 10, 10 * 100, this, true, 4, ElementOrbMax));
                 else
                 {
                     if (ElementEffect >= 1)
-                        Effects.Add(new ElementsEffect(Libraries.Magic3, 1630, 10, 10 * 100, this, true, 1, ElementOrbMax));
+                        Effects.Add(new ElementsEffect(Spell.ElementalBarrier, 0, 10, 10 * 100, this, true, 1, ElementOrbMax));
                     if (ElementEffect >= 2)
-                        Effects.Add(new ElementsEffect(Libraries.Magic3, 1640, 10, 10 * 100, this, true, 2, ElementOrbMax));
+                        Effects.Add(new ElementsEffect(Spell.ElementalBarrier, 0, 10, 10 * 100, this, true, 2, ElementOrbMax));
                     if (ElementEffect == 3)
-                        Effects.Add(new ElementsEffect(Libraries.Magic3, 1650, 10, 10 * 100, this, true, 3, ElementOrbMax));
+                        Effects.Add(new ElementsEffect(Spell.ElementalBarrier, 0, 10, 10 * 100, this, true, 3, ElementOrbMax));
                 }
                 ElementEffect = 0;
             }
         }
 
-        public void DrawBody()
+        public void DrawBody(bool spellMask = true)
         {
             bool oldGrayScale = DXManager.GrayScale;
             Color drawColour = ApplyDrawColour();                     
 
             if (BodyLibrary != null)
+            {
                 BodyLibrary.Draw(DrawFrame + ArmourOffSet, DrawLocation, drawColour, true);
+                if (spellMask) DrawBodySpellVisual(BodyLibrary, DrawFrame + ArmourOffSet);
+            }
 
             DXManager.SetGrayscale(oldGrayScale);
 
             //BodyLibrary.DrawTinted(DrawFrame + ArmourOffSet, DrawLocation, DrawColour, Color.DarkSeaGreen);
         }
-        public void DrawHead()
+        public void DrawHead(bool spellMask = true)
         {
             if (HairLibrary != null)
+            {
                 HairLibrary.Draw(DrawFrame + HairOffSet, DrawLocation, DrawColour, true);
+                if (spellMask) DrawBodySpellVisual(HairLibrary, DrawFrame + HairOffSet);
+            }
         }
 		public void DrawWeapon()
 		{
@@ -5059,10 +4936,12 @@ namespace Client.MirObjects
 
 			if (WeaponLibrary1 != null)
 			{
-				WeaponLibrary1.Draw(DrawFrame + WeaponOffSet, DrawLocation, DrawColour, true); //original
+				int weaponFrame = DrawFrame + WeaponOffSet;
+				WeaponLibrary1.Draw(weaponFrame, DrawLocation, DrawColour, true);
 
 				if (WeaponEffectLibrary1 != null)
-					WeaponEffectLibrary1.DrawBlend(DrawFrame + WeaponOffSet, DrawLocation, DrawColour, true, 0.4F);
+					WeaponEffectLibrary1.DrawBlend(weaponFrame, DrawLocation, DrawColour, true, 0.4F);
+				DrawWeaponSpellVisual(weaponFrame);
 			}
 		}
 		public void DrawWeapon2()
@@ -5089,14 +4968,8 @@ namespace Client.MirObjects
                 MountLibrary.Draw(DrawFrame - 416 + MountOffset, DrawLocation, DrawColour, true);
         }
 
-        private bool IsVitalEffect(Effect effect)
-        {
-            if ((effect.Library == Libraries.Magic) && (effect.BaseIndex == 3890))
-                return true;
-            if ((effect.Library == Libraries.Magic3) && (effect.BaseIndex == 1890))
-                return true;
-            return false;
-        }
+        private static bool IsVitalEffect(Effect effect) => effect.Repeat &&
+            effect.Art.Visual.Spell is Spell.MagicShield or Spell.ElementalBarrier;
 
         public void GetBackStepDistance(int magicLevel)
         {
@@ -5241,6 +5114,7 @@ namespace Client.MirObjects
         public Point Location;
         public MirDirection Direction;
         public List<object> Params;
+        public ushort SignatureDuration;
     }
 
 }

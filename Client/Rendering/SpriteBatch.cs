@@ -30,7 +30,7 @@ public sealed unsafe class SpriteBatch : IDisposable
 
     public void End() => Flush();
 
-    public void Draw(Texture texture, Rectangle source, Rectangle destination, Vector4 colour)
+    public void Draw(Texture texture, Rectangle source, Rectangle destination, Vector4 colour, float depth = 0)
     {
         if (source.Width <= 0 || source.Height <= 0 || destination.Width <= 0 || destination.Height <= 0) return;
         Matrix4x4 old = Transform;
@@ -39,7 +39,21 @@ public sealed unsafe class SpriteBatch : IDisposable
             Transform = Matrix4x4.CreateScale((float)destination.Width / source.Width,
                 (float)destination.Height / source.Height, 1) *
                 Matrix4x4.CreateTranslation(destination.X, destination.Y, 0) * old;
-            Draw(texture, source, Vector3.Zero, colour);
+            Draw(texture, source, new Vector3(0, 0, depth), colour);
+        }
+        finally { Transform = old; }
+    }
+
+    internal void DrawRotated(Texture texture, Rectangle source, Vector2 centre, Vector2 size, float rotation, Vector4 colour, float depth = 0)
+    {
+        if (source.Width <= 0 || source.Height <= 0 || size.X <= 0 || size.Y <= 0) return;
+        Matrix4x4 old = Transform;
+        try
+        {
+            Transform = Matrix4x4.CreateTranslation(-source.Width * .5f, -source.Height * .5f, 0) *
+                Matrix4x4.CreateScale(size.X / source.Width, size.Y / source.Height, 1) *
+                Matrix4x4.CreateRotationZ(rotation) * Matrix4x4.CreateTranslation(centre.X, centre.Y, 0) * old;
+            Draw(texture, source, new Vector3(0, 0, depth), colour);
         }
         finally { Transform = old; }
     }
@@ -54,8 +68,24 @@ public sealed unsafe class SpriteBatch : IDisposable
         colour.W *= _owner.Opacity;
         if (!SpriteGeometry.WriteQuad(quad, source ?? new Rectangle(0, 0, texture.Width, texture.Height),
             texture.Width, texture.Height, new Vector2(p.X, p.Y), Transform, colour,
-            _owner.TargetWidth, _owner.TargetHeight)) return;
+            _owner.TargetWidth, _owner.TargetHeight, p.Z)) return;
+        Submit(texture, quad);
+    }
 
+    internal void DrawQuad(Texture texture, Rectangle source, SpriteQuad corners, Vector2 origin, Vector4 colour, float depth = 0)
+    {
+        if (texture == null || texture.Disposed || colour.W <= 0) return;
+        if (ReferenceEquals(texture, _owner.CurrentSurface?.Texture))
+            throw new InvalidOperationException("Cannot sample the active render target.");
+        Span<SpriteVertex> quad = stackalloc SpriteVertex[6];
+        colour.W *= _owner.Opacity;
+        if (!SpriteGeometry.WriteQuad(quad, source, texture.Width, texture.Height, corners.Transform(origin, Transform),
+            colour, _owner.TargetWidth, _owner.TargetHeight, depth)) return;
+        Submit(texture, quad);
+    }
+
+    private void Submit(Texture texture, ReadOnlySpan<SpriteVertex> quad)
+    {
         // Preserve painter's order. Never sort by texture across actors/layers.
         if (!ReferenceEquals(texture, _texture) || _count == MaxVertices) Flush();
         _texture = texture;

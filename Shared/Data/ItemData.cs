@@ -2,6 +2,11 @@
 
 public class ItemInfo
 {
+    // Each custom schema 1 effect has a string name, 25 bytes of effect fields,
+    // and 17 bytes of visual fields. Preserve these fields without the legacy runtime.
+    private const int LegacyItemEffectPayloadSize = 25 + 17;
+    private readonly (string Name, byte[] Payload)[] _legacyItemEffects = Array.Empty<(string, byte[])>();
+
     public int Index;
     public string Name = string.Empty;
     public ItemType Type;
@@ -66,7 +71,7 @@ public class ItemInfo
         Stats = new Stats();
     }
 
-    public ItemInfo(BinaryReader reader, int version = int.MaxValue, int customVersion = int.MaxValue)
+    public ItemInfo(BinaryReader reader, int version = int.MaxValue, int customVersion = 0)
     {
         Index = reader.ReadInt32();
         Name = reader.ReadString();
@@ -201,11 +206,29 @@ public class ItemInfo
             if ((Type == ItemType.Ring) && (Unique != SpecialItemMode.None))
                 Bind |= BindMode.NoWeddingRing;
         }
+
+        if (customVersion >= 1)
+        {
+            int effectCount = reader.ReadInt32();
+            if (effectCount < 0 || effectCount > 256) throw new InvalidDataException("Invalid item effect count.");
+            if (effectCount == 0) return;
+
+            _legacyItemEffects = new (string, byte[])[effectCount];
+            for (int i = 0; i < effectCount; i++)
+            {
+                string name = reader.ReadString();
+                byte[] payload = reader.ReadBytes(LegacyItemEffectPayloadSize);
+                if (payload.Length != LegacyItemEffectPayloadSize) throw new EndOfStreamException();
+                _legacyItemEffects[i] = (name, payload);
+            }
+        }
     }
 
 
 
-    public void Save(BinaryWriter writer)
+    public void Save(BinaryWriter writer) => Save(writer, 0);
+
+    public void Save(BinaryWriter writer, int customVersion)
     {
         writer.Write(Index);
         writer.Write(Name);
@@ -255,6 +278,15 @@ public class ItemInfo
         if (ToolTip != null)
             writer.Write(ToolTip);
 
+        if (customVersion >= 1)
+        {
+            writer.Write(_legacyItemEffects.Length);
+            foreach (var (name, payload) in _legacyItemEffects)
+            {
+                writer.Write(name);
+                writer.Write(payload);
+            }
+        }
     }
 
     public static ItemInfo FromText(string text)

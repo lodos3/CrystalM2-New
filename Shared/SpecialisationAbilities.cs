@@ -4,9 +4,12 @@ public enum AbilityTheme : byte { Steel, Blood, Ward, Flame, Frost, Storm, Spiri
 
 public sealed record SpecialisationAbility(Spell Spell, MirClass Class, CombatSpecialisation Spec,
     string Name, AbilityTarget Target, AbilityTheme Theme, byte Range, byte Mana, ushort Cooldown,
-    ushort Windup, ushort Power, float Scaling, byte Icon, string Description)
+    ushort Windup, ushort Power, float Scaling, byte Icon, string Description, byte RequiredLevel = 0)
 {
-    public byte UnlockLevel => Spec == CombatSpecialisation.Unchosen ? (byte)1 : (byte)SpellCurriculum.SpecialisationUnlockLevel;
+    public byte UnlockLevel => RequiredLevel != 0 ? RequiredLevel :
+        Spec == CombatSpecialisation.Unchosen ? (byte)1 : (byte)SpellCurriculum.SpecialisationUnlockLevel;
+
+    public int CastRecovery => TalentCatalog.Supports(Class) ? Math.Max(600, Windup + 120) : 1800;
 }
 
 public sealed record SpecialisationTrait(string Name, byte Level, string Description);
@@ -65,7 +68,13 @@ public static class SpecialisationAbilities
         Definitions.ToDictionary(x => x.Spell);
 
     public static IReadOnlyList<SpecialisationAbility> All { get; } = Array.AsReadOnly(Definitions);
-    public static bool TryGet(Spell spell, out SpecialisationAbility ability) => BySpell.TryGetValue(spell, out ability);
+    public static bool TryGet(Spell spell, out SpecialisationAbility ability)
+    {
+        if (BySpell.TryGetValue(spell, out ability)) return true;
+        if (!TalentAbilities.TryGet(spell, out var talent)) return false;
+        ability = talent.Spell;
+        return true;
+    }
 
     public static SpecialisationAbility Signature(MirClass @class, CombatSpecialisation spec) =>
         spec == Core ? null : Array.Find(Definitions, a => a.Class == @class && a.Spec == spec);
@@ -134,7 +143,7 @@ public static class SpecialisationAbilities
 
     public static void ApplyTraitStats(Stats stats, MirClass @class, CombatSpecialisation spec, ushort level)
     {
-        if (level < SpellCurriculum.SpecialisationUnlockLevel) return;
+        if (level < SpellCurriculum.SpecialisationUnlockLevel || TalentCatalog.Supports(@class)) return;
         Spell spell = Signature(@class, spec)?.Spell ?? Spell.None;
         switch (spell)
         {

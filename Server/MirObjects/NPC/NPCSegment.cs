@@ -3646,19 +3646,14 @@ namespace Server.MirObjects
 
                     case ActionType.GiveSkill:
                         {
-                            byte spellLevel = 0;
-
                             Spell skill;
                             if (!Enum.TryParse(param[0], true, out skill)) return;
 
                             if (player.Info.Magics.Any(e => e.Spell == skill)) break;
 
-                            if (param.Count > 1)
-                                spellLevel = byte.TryParse(param[1], out spellLevel) ? Math.Min((byte)3, spellLevel) : (byte)0;
+                            var magic = new UserMagic(skill);
 
-                            var magic = new UserMagic(skill) { Level = spellLevel };
-
-                            if (magic.Info == null) return;
+                            if (!player.CanLearnLegacyMagic(magic)) return;
 
                             player.Info.Magics.Add(magic);
                             player.SendMagicInfo(magic);
@@ -4635,19 +4630,14 @@ namespace Server.MirObjects
                         {
                             if (player.Hero == null || player.Hero.Info == null) return;
 
-                            byte spellLevel = 0;
-
                             Spell skill;
                             if (!Enum.TryParse(param[0], true, out skill)) return;
 
                             if (player.Hero.Info.Magics.Any(e => e.Spell == skill)) break;
 
-                            if (param.Count > 1)
-                                spellLevel = byte.TryParse(param[1], out spellLevel) ? Math.Min((byte)3, spellLevel) : (byte)0;
+                            var magic = new UserMagic(skill);
 
-                            var magic = new UserMagic(skill) { Level = spellLevel };
-
-                            if (magic.Info == null) return;
+                            if (!player.Hero.CanLearnLegacyMagic(magic)) return;
 
                             player.Hero.Info.Magics.Add(magic);
                             player.Hero.SendMagicInfo(magic);

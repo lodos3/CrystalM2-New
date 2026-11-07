@@ -205,9 +205,40 @@ static class Program
         Assertions.True(!pool.Advance(900), "Do not replay expired layers after a frame stall.");
 
         byte[] atlas = SpellParticleAtlas.Generate();
-        Assertions.Equal(SpellParticleAtlas.Width * SpellParticleAtlas.Height * 4, atlas.Length,
-            "All particle masks share one BGRA texture.");
+        Assertions.Equal(SpellParticleAtlas.Width * SpellParticleAtlas.Height, atlas.Length,
+            "All particle masks share one single-channel coverage texture.");
         Assertions.True(atlas.SequenceEqual(SpellParticleAtlas.Generate()), "Particle masks must be deterministic.");
+        foreach (SpellParticleShape ribbon in new[] { SpellParticleShape.BladeRibbon, SpellParticleShape.MoonRibbon, SpellParticleShape.WindRibbon })
+        {
+            Rectangle part = SpellParticleAtlas.Part(ribbon);
+            int row = (part.Top + 3 * part.Height / 4) * SpellParticleAtlas.Width;
+            byte centre = atlas[row + part.Left + part.Width / 2];
+            Assertions.True(centre > 0 && atlas[row + part.Left - 1] == centre && atlas[row + part.Right] == centre,
+                "Ribbon coverage must continue across both joins when the GPU filters it.");
+        }
+        var shapes = Enum.GetValues<SpellParticleShape>().Where(shape => shape != SpellParticleShape.Slash).ToArray();
+        var distinct = new HashSet<Rectangle>();
+        foreach (SpellParticleShape shape in shapes)
+        {
+            bool animated = shape is SpellParticleShape.FlameSequence or SpellParticleShape.FireSequence or SpellParticleShape.SmokeSequence;
+            int count = animated ? SpellParticleAtlas.ClipFrames : 1;
+            for (byte frame = 0; frame < count; frame++)
+            {
+                Rectangle region = SpellParticleAtlas.Part(shape, frame: frame);
+                int minimum = animated ? 128 : 256;
+                Assertions.True(distinct.Add(region) && region.Right <= SpellParticleAtlas.Width && region.Bottom <= SpellParticleAtlas.Height &&
+                    region.Width >= minimum && region.Height >= minimum, $"{shape} frame {frame} needs its own full-resolution atlas cell.");
+                bool hasAlpha = false;
+                for (int y = region.Top; y < region.Bottom; y++)
+                for (int x = region.Left; x < region.Right; x++)
+                    hasAlpha |= atlas[y * SpellParticleAtlas.Width + x] != 0;
+                Assertions.True(hasAlpha, $"{shape} frame {frame} has a visible mask.");
+            }
+        }
+        var projectile = particle with { Linear = true, Layer = SpellParticleLayer.Emissive, Size = 80, Aspect = .25f, Rotation = MathF.PI / 2 };
+        Assertions.Equal(new Vector2(136, 96), projectile.Position(200), "Projectiles arrive on the authored timeline.");
+        Rectangle rotated = projectile.Bounds(projectile.Position(200), projectile.Dimensions(.5f, 1));
+        Assertions.True(rotated.Height >= 80 && rotated.Width <= 22, "Light and viewport bounds cover the rotated projectile.");
         for (byte direction = 0; direction < 8; direction++)
         {
             Rectangle part = SpellParticleAtlas.Part(SpellParticleShape.Slash, direction);
@@ -216,7 +247,7 @@ static class Program
             bool hasAlpha = false;
             for (int y = part.Top; y < part.Bottom; y++)
             for (int x = part.Left; x < part.Right; x++)
-                hasAlpha |= atlas[(y * SpellParticleAtlas.Width + x) * 4 + 3] > 0;
+                hasAlpha |= atlas[y * SpellParticleAtlas.Width + x] > 0;
             Assertions.True(hasAlpha, "Each facing must have a visible slash mask.");
         }
     }

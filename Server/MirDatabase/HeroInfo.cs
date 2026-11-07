@@ -92,12 +92,17 @@ namespace Server.MirDatabase
 
             if (version > 101)
                 SealCount = reader.ReadUInt16();
-            if (version >= 118)
+            if (HasSavedSpecialisation(version, customVersion))
             {
                 Specialisation = (CombatSpecialisation)reader.ReadByte();
                 if (!SpellCurriculum.IsValid(Specialisation))
                     Specialisation = CombatSpecialisation.Unchosen;
             }
+            if (version >= 121)
+            {
+                Talents = TalentProfile.Read(reader);
+            }
+            if (version >= 122) SpellPerks = SpellPerkProfile.Read(reader);
         }
 
         public override void Save(BinaryWriter writer)
@@ -150,6 +155,8 @@ namespace Server.MirDatabase
             writer.Write(AutoMPPercent);
             writer.Write(SealCount);
             writer.Write((byte)Specialisation);
+            Talents.Write(writer);
+            SpellPerks.Write(writer);
         }
 
         public override int ResizeInventory()

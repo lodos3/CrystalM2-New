@@ -1,6 +1,8 @@
 using System;
 using System.Drawing;
+using System.Numerics;
 using Client.MirGraphics;
+using CrystalM2.Rendering.Core;
 
 static void Verify(bool condition, string description)
 {
@@ -26,6 +28,16 @@ Verify(coverage.VisiblePixel(0, 0), "First visible pixel missing.");
 Verify(coverage.VisiblePixel(2, 1), "Last visible pixel missing.");
 Verify(!coverage.VisiblePixel(1, 0), "Transparent pixel detected as visible.");
 Verify(!coverage.VisiblePixel(0, 1), "Row pitch incorrectly interpreted.");
+
+byte[] blade = new byte[24 * 24 * 4];
+for (int i = 4; i < 20; i++)
+    blade[((23 - i) * 24 + i) * 4 + 3] = 255;
+var weapon = AlphaCoverage.Capture(blade, 24, 24, 24 * 4).GetWeaponTrace();
+Verify(weapon is { } && Vector2.DistanceSquared(weapon.Value.Hilt, weapon.Value.Tip) > 350,
+    "A weapon trace must span the actual alpha, including diagonal blade tips.");
+var oriented = weapon!.Value.Orient(new Vector2(4, 20), null);
+Verify(oriented.Hilt.X < oriented.Tip.X && oriented.Hilt.Y > oriented.Tip.Y,
+    "The end nearest the actor's hand must be the ribbon base.");
 Verify(!coverage.VisiblePixel(-1, 0) && !coverage.VisiblePixel(3, 0) &&
        !coverage.VisiblePixel(0, -1) && !coverage.VisiblePixel(0, 2), "Out-of-range hit-test must be false.");
 Verify(coverage.VisibleSize == new Size(3, 2), "Visible bounding dimensions incorrect.");
@@ -80,5 +92,23 @@ Verify(!AlphaCoverage.Capture(solid, 8, 8, 32).HasCheckerboard,
        "Opaque sprites should not allocate a repaired shadow mask.");
 Reject(() => checkerCoverage.WriteShadowMask(new byte[3], 2),
        "Truncated shadow destination must be rejected.");
+
+const int maskWidth = 32, maskHeight = 16;
+byte[] actor = new byte[maskWidth * maskHeight * 4];
+for (int y = 2; y < 12; y++)
+for (int x = 2; x < 9; x++)
+    actor[(y * maskWidth + x) * 4 + 3] = 255;
+for (int y = 6; y < 14; y++)
+for (int x = 16; x < 27; x++)
+    actor[(y * maskWidth + x) * 4 + 3] = (byte)((x + y) % 2 == 0 ? 255 : 0);
+for (int x = 12; x < 16; x++)
+    actor[(13 * maskWidth + x) * 4 + 3] = 74;
+int translucentCloth = (2 * maskWidth + 1) * 4;
+actor[translucentCloth + 1] = 39;
+actor[translucentCloth + 3] = 95;
+Verify(BakedShadowRepair.StripFromMask(actor, maskWidth, maskHeight, maskWidth * 4) &&
+       actor[(8 * maskWidth + 20) * 4 + 3] == 0 && actor[(13 * maskWidth + 13) * 4 + 3] == 0 &&
+       actor[(5 * maskWidth + 5) * 4 + 3] == 255 && actor[translucentCloth + 3] == 95,
+       "Spell coverage must exclude dithered and repaired shadows and retain opaque black and translucent body art.");
 
 Console.WriteLine("Packed BGRA alpha coverage and checkerboard shadow regression checks passed.");

@@ -9,6 +9,7 @@ internal enum GraphicsLayer
 }
 
 internal enum LightSource { Player, Monster, Npc, Torch, Map, MapAnimation, Spell }
+internal enum WeatherEdgeMode { Natural, Soft, Silhouette }
 
 internal static class GraphicsTuning
 {
@@ -63,6 +64,8 @@ internal static class GraphicsTuning
             ? new(source + "LightGlowRadius", source == LightSource.MapAnimation ? 160 : 128, 0, 1024) : null;
         public readonly Value GlowStrength = IsEffectLight(source)
             ? new(source + "LightGlowStrength", 45, 0, 200) : null;
+        public readonly Value GlowBlur = IsEffectLight(source)
+            ? new(source + "LightGlowBlur", 0, 0, 192) : null;
         public readonly Value CustomColour = new(source + "LightCustomColour", 0, 0, 1);
         public readonly Value Red = new(source + "LightRed", 255, 0, 255);
         public readonly Value Green = new(source + "LightGreen", 255, 0, 255);
@@ -123,6 +126,7 @@ internal static class GraphicsTuning
     internal static readonly Value SpellBlackFeather = new("SpellBlackFeather", 15, 1, 50);
     internal static readonly Value SpellExposure = new("SpellExposure", 115, 25, 300);
     internal static readonly Value SpellSaturation = new("SpellSaturation", 120, 0, 220);
+    internal static readonly Value SpellVisualSize = new("SpellVisualSize", 128, 75, 225);
     internal static readonly Value SpellGlowStrength = new("SpellGlowStrength", 70, 0, 200);
     internal static readonly Value SpellGlowCutoff = new("SpellGlowCutoff", 44, 0, 100);
     internal static readonly Value SpellGlowBlend = new("SpellGlowBlend", 0, 0, 1);
@@ -137,6 +141,12 @@ internal static class GraphicsTuning
     internal static readonly Value SurfaceWater = new("WeatherSurfaceWater", 100, 0, 200);
     internal static readonly Value SurfaceSnow = new("WeatherSurfaceSnow", 100, 0, 200);
     internal static readonly Value WeatherWind = new("WeatherWind", 100, 0, 200);
+    internal static readonly Value WeatherEdgeStyle = new("WeatherEdgeStyle", 0, 0, 2);
+    internal static readonly Value WeatherSceneryFade = new("WeatherSceneryFade", 14, 0, 48);
+    internal static readonly Value WeatherTileFade = new("WeatherTileFade", 36, 0, 72);
+    internal static readonly Value WeatherEdgeBreakup = new("WeatherEdgeBreakup", 55, 0, 100);
+    internal static readonly Value WeatherDropFade = new("WeatherDropFade", 100, 0, 100);
+    internal static int WeatherMaskView { get; set; }
 
     internal static WeatherSetting LocalWeather =>
         (WeatherRain.Current != 0 || WeatherStorm.Current != 0 ? WeatherSetting.Rain : WeatherSetting.None) |

@@ -165,6 +165,7 @@ namespace Client.MirObjects
 
             MapControl.Objects.Remove(ObjectID);
             MapControl.ObjectsList.Remove(this);
+            if (this is SpellObject) GameScene.Scene.MapControl.EndGroundSpellParticles(ObjectID);
             GameScene.Scene.MapControl.RemoveObject(this);
 
             if (ObjectID == Hero?.ObjectID)
@@ -224,11 +225,11 @@ namespace Client.MirObjects
 
             switch (type)
             {
-                case BuffType.Fury:
-                    Effects.Add(new BuffEffect(Libraries.Magic3, 190, 7, 1400, this, true, type) { Repeat = true });
+                case BuffType.Fury when this is not PlayerObject { Class: MirClass.Warrior }:
+                    Effects.Add(new BuffEffect(Spell.Fury, 0, 7, 1400, this, true, type) { Repeat = true });
                     break;
-                case BuffType.ImmortalSkin:
-                    Effects.Add(new BuffEffect(Libraries.Magic3, 570, 5, 1400, this, true, type) { Repeat = true });
+                case BuffType.ImmortalSkin when this is not PlayerObject { Class: MirClass.Warrior }:
+                    Effects.Add(new BuffEffect(Spell.ImmortalSkin, 0, 5, 1400, this, true, type) { Repeat = true });
                     break;
                 case BuffType.SwiftFeet:
                     if (ob != null) ob.Sprint = true;
@@ -238,27 +239,27 @@ namespace Client.MirObjects
                     if (ob != null) ob.Sneaking = true;
                     break;
                 case BuffType.VampireShot:
-                    Effects.Add(new BuffEffect(Libraries.Magic3, 2110, 6, 1400, this, true, type) { Repeat = false });
+                    Effects.Add(new BuffEffect(Spell.VampireShot, 0, 6, 1400, this, true, type) { Repeat = false });
                     break;
                 case BuffType.PoisonShot:
-                    Effects.Add(new BuffEffect(Libraries.Magic3, 2310, 7, 1400, this, true, type) { Repeat = false });
+                    Effects.Add(new BuffEffect(Spell.PoisonShot, 0, 7, 1400, this, true, type) { Repeat = false });
                     break;
                 case BuffType.EnergyShield:
                     BuffEffect effect;
 
-                    Effects.Add(effect = new BuffEffect(Libraries.Magic2, 1880, 9, 900, this, true, type) { Repeat = false });
+                    Effects.Add(effect = new BuffEffect(Spell.EnergyShield, 0, 9, 900, this, true, type) { Repeat = false });
                     SoundManager.PlaySound(20000 + (ushort)Spell.EnergyShield * 10 + 0);
 
                     effect.Complete += (o, e) =>
                     {
-                        Effects.Add(new BuffEffect(Libraries.Magic2, 1900, 2, 800, this, true, type) { Repeat = true });
+                        Effects.Add(new BuffEffect(Spell.EnergyShield, 0, 2, 800, this, true, type) { Repeat = true });
                     };
                     break;
                 case BuffType.MagicBooster:
-                    Effects.Add(new BuffEffect(Libraries.Magic3, 90, 6, 1200, this, true, type) { Repeat = true });
+                    Effects.Add(new BuffEffect(Spell.MagicBooster, 0, 6, 1200, this, true, type) { Repeat = true });
                     break;
                 case BuffType.PetEnhancer:
-                    Effects.Add(new BuffEffect(Libraries.Magic3, 230, 6, 1200, this, true, type) { Repeat = true });
+                    Effects.Add(new BuffEffect(Spell.PetEnhancer, 0, 6, 1200, this, true, type) { Repeat = true });
                     break;
                 case BuffType.GameMaster:
                     Effects.Add(new BuffEffect(Libraries.CHumEffect[5], 0, 1, 1200, this, true, type) { Repeat = true });
@@ -335,7 +336,7 @@ namespace Client.MirObjects
             return drawColour;
         }
 
-        public virtual Missile CreateProjectile(int baseIndex, MLibrary library, bool blend, int count, int interval, int skip, int lightDistance = 6, bool direction16 = true, Color? lightColour = null, uint targetID = 0)
+        public virtual Missile CreateProjectile(int baseIndex, EffectArt library, bool blend, int count, int interval, int skip, int lightDistance = 6, bool direction16 = true, Color? lightColour = null, uint targetID = 0)
         {
             return null;
         }
