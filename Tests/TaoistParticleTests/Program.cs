@@ -37,13 +37,17 @@ foreach (Spell ward in new[] { Spell.SoulShield, Spell.BlessedArmour })
     // Authored sprite Size is stored before the renderer's 1.28 scale.
     Check(formed.Where(p => p.Shape == glyph).Any(p => p.Dimensions(0f, 1.28f).X >=
         (ward == Spell.SoulShield ? 360 : 320)), $"Ward glyph is too small for {ward}");
-    Check(formed.Any(p => p.Layer == SpellParticleLayer.Glow && p.CastsLight),
-        $"Ward background needs a soft lit aura for {ward}");
-    Check(formed.Any(p => p.Shape == SpellParticleShape.SmokeSequence),
-        $"Ward lacks background smoke for {ward}");
+    Check(!formed.Any(p => p.Shape is SpellParticleShape.Halo or SpellParticleShape.Orb or
+        SpellParticleShape.SmokeSequence), $"Ward has an unwanted oval/background effect: {ward}");
+    Check(!formed.Any(p => p.Shape == SpellParticleShape.Wisp &&
+        p.Dimensions(0f, 1.28f).X > 70), $"Ward has an oversized backdrop wisp: {ward}");
     Check(formed.Any(p => p.Shape == SpellParticleShape.FlameTongue && p.Emissive) &&
           burning.Any(p => p.Shape == SpellParticleShape.FlameTongue && p.Emissive),
         $"Ward needs animated flames following its strokes for {ward}");
+    Check(formed.Any(p => p.Shape == SpellParticleShape.Spark && p.Emissive),
+        $"Ward needs sparks emitted from its stroke lines: {ward}");
+    Check(formed.Any(p => p.Shape == SpellParticleShape.Flash && p.Emissive),
+        $"Ward needs local flares along its stroke lines: {ward}");
     Check(formed.Any(p => p.Layer == SpellParticleLayer.EmissiveCore), $"Ward lacks light for {ward}");
 }
 
