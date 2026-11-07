@@ -37,6 +37,7 @@ internal static partial class TaoistSpellEffects
         bool aura = visual.Phase == SpellVisualPhase.Aura;
         bool ground = visual.Phase == SpellVisualPhase.Field;
         bool prepare = visual.Phase == SpellVisualPhase.Prepare;
+        bool hit = visual.Phase == SpellVisualPhase.Hit;
         if (aura) progress = now % duration / (float)duration;
         float strength = aura || ground ? 1 : Envelope(progress);
         var frame = new Frame(pool, feet, now, strength, size, seed ^ (uint)visual.Spell * 0x2d5bu, field);
@@ -54,14 +55,17 @@ internal static partial class TaoistSpellEffects
             case Spell.SoulFireBall: PaperBurst(frame, feet, progress); break;
             case Spell.SummonSkeleton: SummonStars(frame, feet, progress, deva: false); break;
             case Spell.Hiding: Veil(frame, feet, progress, elapsed, mass: false); break;
-            case Spell.MassHiding: Veil(frame, feet, progress, elapsed, mass: true); break;
-            case Spell.SoulShield: Rune(frame, feet, progress, Shape.SoulGlyph, 306, 204, InkBlue, Blue, Ice); break;
+            case Spell.MassHiding: Veil(frame, feet, progress, elapsed, mass: !hit); break;
+            case Spell.SoulShield: Rune(frame, feet, progress, Shape.SoulGlyph, hit ? 188 : 306, hit ? 151 : 204, InkBlue, Blue, Ice); break;
             case Spell.Revelation: Reveal(frame, feet, progress, elapsed, prepare); break;
-            case Spell.BlessedArmour: Rune(frame, feet, progress, Shape.ArmourGlyph, 236, 178, Ochre, Amber, Gold); break;
+            case Spell.BlessedArmour: Rune(frame, feet, progress, Shape.ArmourGlyph, hit ? 175 : 236, hit ? 146 : 178, Ochre, Amber, Gold); break;
             case Spell.EnergyRepulsor: Repulse(frame, feet, progress); break;
             case Spell.TrapHexagon: Trap(frame, feet, prepare ? progress : Fract(elapsed), prepare); break;
             case Spell.Purification: Cleanse(frame, feet, progress, prepare); break;
-            case Spell.MassHealing: MassHeal(frame, feet, progress, prepare); break;
+            case Spell.MassHealing:
+                if (hit) Heal(frame, feet, progress, prepare: false);
+                else MassHeal(frame, feet, progress, prepare);
+                break;
             case Spell.Hallucination: Phantom(frame, feet, progress, elapsed); break;
             case Spell.UltimateEnhancer: Enhance(frame, feet, progress); break;
             case Spell.SummonShinsu: Shinsu(frame, feet, progress); break;
