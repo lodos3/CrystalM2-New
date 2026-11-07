@@ -183,8 +183,30 @@ public sealed partial class MapControl
 
     internal void EmitSpellImpact(Spell spell, Point location)
     {
-        // The talisman's arrival draws the ward once at the cast centre.
-        if (spell is Spell.SoulShield or Spell.BlessedArmour) return;
+        // The server sends one impact packet for each recipient actually affected by
+        // these area spells. Render a compact hit on that recipient; do not collapse
+        // all recipients into the talisman's single arrival visual.
+        if (spell is Spell.SoulShield or Spell.BlessedArmour or Spell.MassHealing or Spell.MassHiding)
+        {
+            var hit = new SpellVisual(spell, SpellVisualPhase.Hit);
+            if (!CanEmitSpellParticles(location)) return;
+            MapObject recipient = null;
+            if (M2CellInfo[location.X, location.Y].CellObjects is { } occupants)
+            {
+                foreach (MapObject actor in occupants)
+                {
+                    if (actor.CurrentLocation != location ||
+                        actor.Race is not (ObjectType.Player or ObjectType.Hero or ObjectType.Monster)) continue;
+                    // MapEffect currently identifies the tile, not a unique object ID. If
+                    // multiple occupants share it, avoid attaching the cue to the wrong one.
+                    if (recipient != null) { recipient = null; break; }
+                    recipient = actor;
+                }
+            }
+            if (recipient == null) EmitLegacy(hit, location);
+            else EmitLegacy(hit, recipient);
+            return;
+        }
 
         // These spells already show the complete field at the cast location. The hit packets
         // confirm contacts elsewhere in that field and only need a small accent on each target.
