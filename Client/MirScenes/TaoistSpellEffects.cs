@@ -56,9 +56,9 @@ internal static partial class TaoistSpellEffects
             case Spell.SummonSkeleton: SummonStars(frame, feet, progress, deva: false); break;
             case Spell.Hiding: Veil(frame, feet, progress, elapsed, mass: false); break;
             case Spell.MassHiding: Veil(frame, feet, progress, elapsed, mass: !hit); break;
-            case Spell.SoulShield: Rune(frame, feet, progress, Shape.SoulGlyph, hit ? 188 : 306, hit ? 151 : 204, InkBlue, Blue, Ice); break;
+            case Spell.SoulShield: Rune(frame, feet, progress, Shape.SoulGlyph, 385, 255, InkBlue, Blue, Ice); break;
             case Spell.Revelation: Reveal(frame, feet, progress, elapsed, prepare); break;
-            case Spell.BlessedArmour: Rune(frame, feet, progress, Shape.ArmourGlyph, hit ? 175 : 236, hit ? 146 : 178, Ochre, Amber, Gold); break;
+            case Spell.BlessedArmour: Rune(frame, feet, progress, Shape.ArmourGlyph, 345, 238, Ochre, Amber, Gold); break;
             case Spell.EnergyRepulsor: Repulse(frame, feet, progress); break;
             case Spell.TrapHexagon: Trap(frame, feet, prepare ? progress : Fract(elapsed), prepare); break;
             case Spell.Purification: Cleanse(frame, feet, progress, prepare); break;
