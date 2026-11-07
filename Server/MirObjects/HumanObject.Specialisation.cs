@@ -352,7 +352,9 @@ public partial class HumanObject
                 pet.ChangeHP(mend);
                 if (bond > 0 && mend > baseMend) SpendCombo(spell);
                 BroadcastSignatureEffect(spell, pet.CurrentLocation, SpellEffect.SignatureImpact);
-                landed = true;
+                // A direct mend on a full-health pet is cosmetic, not proficiency.
+                // Enemy focus and recall remain valid commands even without healing.
+                landed = target != pet || mend > 0;
                 break;
             }
             case Spell.VeilStrike:

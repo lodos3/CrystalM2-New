@@ -203,6 +203,18 @@ static void ExerciseSpell(SpecialisationAbility ability, bool exerciseCombo = fa
             $"{ability.Name} must leave the other companion untouched");
         Check(selectedPet.Target == null && selectedPet.CurrentLocation == selectedLocation,
             $"{ability.Name} must not turn a direct mend into a focus or recall order");
+
+        // A cosmetic cast on a healthy pet cannot be farmed for proficiency.
+        selectedPet.HP = selectedPet.MaxHealth;
+        magic.CastTime = 0;
+        int priorExperience = magic.Experience;
+        caster.Magic(ability.Spell, MirDirection.Right, selectedPet.ObjectID, selectedLocation);
+        Check(caster.ActionList.Count == 1, $"{ability.Name} may target a full-health owned pet");
+        var emptyMend = caster.ActionList[0];
+        caster.ActionList.RemoveAt(0);
+        caster.Process(emptyMend);
+        Check(magic.Experience == priorExperience,
+            $"{ability.Name} must not gain proficiency from a direct zero-heal mend");
     }
 }
 
