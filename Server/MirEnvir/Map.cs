@@ -1849,7 +1849,6 @@ namespace Server.MirEnvir
                                             };
 
                                             target.AddBuff(BuffType.Curse, player, Settings.Second * value, stats);
-                                            player.BroadcastLegacyImpact(magic.Spell, target.CurrentLocation);
                                             target.OperateTime = 0;
                                             train = true;
                                         }
@@ -1861,6 +1860,9 @@ namespace Server.MirEnvir
 
                     }
 
+                    // The curse glyph is a single cast-location effect, whether it
+                    // afflicts zero, one or several targets. Keep debuffs per target.
+                    player.BroadcastLegacyImpact(magic.Spell, location);
                     break;
 
                 #endregion
