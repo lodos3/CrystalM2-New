@@ -2968,9 +2968,9 @@ namespace Client.MirObjects
                                             SoundManager.PlaySound(20000 + (ushort)ward * 10);
                                             var talisman = CreateProjectile(0, ward, true, 3, 30, 7);
                                             talisman.Explode = true;
-                                            // The server emits an impact for each buffed target. Only the
-                                            // projectile sound is tied to arrival; do not stamp one ward
-                                            // at the centre on top of all the recipient effects.
+                                            // The server emits one ward visual at the aimed cell.
+                                            // Only the projectile sound is tied to arrival; do not
+                                            // create a second local ward glyph.
                                             talisman.Complete += (o, e) =>
                                             {
                                                 SoundManager.PlaySound(20000 + (ushort)ward * 10 + 1);
