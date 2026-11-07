@@ -34,7 +34,8 @@ foreach (Spell ward in new[] { Spell.SoulShield, Spell.BlessedArmour })
     var formed = Render(ward, SpellVisualPhase.Impact, 700);
     var burning = Render(ward, SpellVisualPhase.Impact, 900);
     Check(opening.Length > 0 && formed.Length > 0, $"Ward particles absent for {ward}");
-    Check(formed.Where(p => p.Shape == glyph).Any(p => p.Size >=
+    // Authored sprite Size is stored before the renderer's 1.28 scale.
+    Check(formed.Where(p => p.Shape == glyph).Any(p => p.Dimensions(0f, 1.28f).X >=
         (ward == Spell.SoulShield ? 360 : 320)), $"Ward glyph is too small for {ward}");
     Check(formed.Any(p => p.Layer == SpellParticleLayer.Glow && p.CastsLight),
         $"Ward background needs a soft lit aura for {ward}");
