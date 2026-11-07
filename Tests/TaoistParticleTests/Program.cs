@@ -73,7 +73,9 @@ foreach (Spell summon in new[] { Spell.SummonSkeleton, Spell.SummonHolyDeva, Spe
     Check(Render(summon, SpellVisualPhase.Impact, 480).Any(p => p.Shape == SpellParticleShape.Spark),
         $"Summoning rite should produce flare particles: {summon}");
 
-Check(Render(Spell.Curse, SpellVisualPhase.Hit, 850, 2000)
-    .Any(p => p.Shape == SpellParticleShape.SmokeSequence),
+var curseAtAim = Render(Spell.Curse, SpellVisualPhase.Impact, 850, 2000);
+Check(curseAtAim.Any(p => p.Shape == SpellParticleShape.CurseGlyph),
+    "Curse must render a complete rune on the aimed map cell.");
+Check(curseAtAim.Any(p => p.Shape == SpellParticleShape.SmokeSequence),
     "Curse glyph should release smoke.");
 Console.WriteLine("Taoist particle composition tests passed.");
