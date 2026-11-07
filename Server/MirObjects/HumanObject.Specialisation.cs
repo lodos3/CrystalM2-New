@@ -56,10 +56,15 @@ public partial class HumanObject
                 location = CurrentLocation;
                 break;
             case AbilityTarget.Companion:
-                companion = Pets.FirstOrDefault(pet => IsSignatureCompanion(pet, ability.Spell) &&
-                    SignatureReach(pet.CurrentLocation, range));
-                if (companion == null || CurrentMap.Info.NoPets ||
-                    (targetId != 0 && (!CanHitSignatureTarget(target) || !SignatureReach(target.CurrentLocation, range))))
+                // A selected owned spirit is a mend-only target, not a hostile focus.
+                // Preserve existing enemy-focus and untargeted recall behaviour.
+                bool selectedOwnedPet = target is MonsterObject requested && Pets.Contains(requested);
+                companion = selectedOwnedPet ? (MonsterObject)target : Pets.FirstOrDefault(pet =>
+                    IsSignatureCompanion(pet, ability.Spell) && SignatureReach(pet.CurrentLocation, range));
+                if (companion == null || !IsSignatureCompanion(companion, ability.Spell) ||
+                    !SignatureReach(companion.CurrentLocation, range) || CurrentMap.Info.NoPets ||
+                    (targetId != 0 && !selectedOwnedPet &&
+                        (!CanHitSignatureTarget(target) || !SignatureReach(target.CurrentLocation, range))))
                 {
                     RejectSignature(ability.Spell);
                     return;
@@ -327,7 +332,7 @@ public partial class HumanObject
                     pet.PetRecall();
                     if (master) ChangeHP(Math.Min(power / 4, Math.Max(0, MaxHealth - HP)));
                 }
-                else
+                else if (target != pet)
                 {
                     if (!CanHitSignatureTarget(target) || !SignatureReach(target.CurrentLocation, magic.Info.Range) ||
                         !pet.CanFly(target.CurrentLocation)) break;

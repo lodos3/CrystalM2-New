@@ -179,6 +179,31 @@ static void ExerciseSpell(SpecialisationAbility ability, bool exerciseCombo = fa
     if (exerciseCombo)
         Check(ReadCombo(caster).Count(Envir.Main.Time, enemy.ObjectID) == 0,
             $"{ability.Name} must consume its eligible combo on resolution");
+
+    if (ability.Target == AbilityTarget.Companion && !exerciseCombo)
+    {
+        // Regression: selecting an owned companion used to fail an enemy-only target check.
+        // A selected pet must receive the mend, without recalling it or changing focus.
+        string petName = ability.Spell == Spell.SpiritCommand ? Settings.ShinsuName : Settings.ToadName;
+        var selectedPet = MakeMonster(petName, map, new Point(4, 6));
+        selectedPet.Master = caster;
+        selectedPet.HP -= 150;
+        caster.Pets.Add(selectedPet);
+        int originalPetHealth = pet.HP;
+        MapObject originalFocus = pet.Target;
+        Point selectedLocation = selectedPet.CurrentLocation;
+        magic.CastTime = 0;
+        caster.Magic(ability.Spell, MirDirection.Right, selectedPet.ObjectID, selectedLocation);
+        Check(caster.ActionList.Count == 1, $"{ability.Name} must accept an explicitly selected owned pet");
+        var selectedCast = caster.ActionList[0];
+        caster.ActionList.RemoveAt(0);
+        caster.Process(selectedCast);
+        Check(selectedPet.HP > selectedPet.MaxHealth - 150, $"{ability.Name} must mend the selected pet");
+        Check(pet.HP == originalPetHealth && pet.Target == originalFocus,
+            $"{ability.Name} must leave the other companion untouched");
+        Check(selectedPet.Target == null && selectedPet.CurrentLocation == selectedLocation,
+            $"{ability.Name} must not turn a direct mend into a focus or recall order");
+    }
 }
 
 static SpellComboProgress ReadCombo(HumanObject caster) => (SpellComboProgress)typeof(HumanObject)
