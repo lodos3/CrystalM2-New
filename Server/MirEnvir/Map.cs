@@ -1038,6 +1038,8 @@ namespace Server.MirEnvir
                                         if (target.IsFriendlyTarget(player))
                                         {
                                             target.AddBuff(BuffType.Hiding, player, magic.EffectDuration(Settings.Second * value), new Stats());
+                                            // Each concealed ally gets a separate falling-veil impact.
+                                            player.BroadcastLegacyImpact(magic.Spell, target.CurrentLocation);
                                             target.OperateTime = 0;
                                             train = true;
                                         }
