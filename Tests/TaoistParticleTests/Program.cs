@@ -26,11 +26,23 @@ static float Reach(SpellParticle[] particles) =>
 
 foreach (Spell ward in new[] { Spell.SoulShield, Spell.BlessedArmour })
 {
-    var opening = Render(ward, SpellVisualPhase.Hit, 250);
-    var formed = Render(ward, SpellVisualPhase.Hit, 700);
+    // Wards now render a single, full-sized impact at the aimed map cell,
+    // not a compact hit on each buff recipient.
+    SpellParticleShape glyph = ward == Spell.SoulShield
+        ? SpellParticleShape.SoulGlyph : SpellParticleShape.ArmourGlyph;
+    var opening = Render(ward, SpellVisualPhase.Impact, 250);
+    var formed = Render(ward, SpellVisualPhase.Impact, 700);
+    var burning = Render(ward, SpellVisualPhase.Impact, 900);
     Check(opening.Length > 0 && formed.Length > 0, $"Ward particles absent for {ward}");
-    Check(formed.Any(p => p.Shape == (ward == Spell.SoulShield ? SpellParticleShape.SoulGlyph :
-        SpellParticleShape.ArmourGlyph)), $"Ward glyph not formed for {ward}");
+    Check(formed.Where(p => p.Shape == glyph).Any(p => p.Size >=
+        (ward == Spell.SoulShield ? 360 : 320)), $"Ward glyph is too small for {ward}");
+    Check(formed.Any(p => p.Layer == SpellParticleLayer.Glow && p.CastsLight),
+        $"Ward background needs a soft lit aura for {ward}");
+    Check(formed.Any(p => p.Shape == SpellParticleShape.SmokeSequence),
+        $"Ward lacks background smoke for {ward}");
+    Check(formed.Any(p => p.Shape == SpellParticleShape.FlameTongue && p.Emissive) &&
+          burning.Any(p => p.Shape == SpellParticleShape.FlameTongue && p.Emissive),
+        $"Ward needs animated flames following its strokes for {ward}");
     Check(formed.Any(p => p.Layer == SpellParticleLayer.EmissiveCore), $"Ward lacks light for {ward}");
 }
 
