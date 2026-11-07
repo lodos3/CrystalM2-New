@@ -47,7 +47,12 @@ internal static partial class TaoistSpellEffects
     {
         int dusk = deva ? 0x426d8c : InkBlue, glow = deva ? Mint : Blue;
         float lift = Ease(progress) * 55;
+        float opening = Ease(progress * 2.4f);
+        frame.Sprite(feet, 96 + 47 * opening, 44 + 23 * opening, Shape.Halo, dusk,
+            .78f * (1 - Ease((progress - .72f) / .28f)), Layer.Ground, light: true);
         frame.Sprite(feet, 74, 38, Shape.Wisp, dusk, .86f, Layer.Ground);
+        frame.Sprite(feet - Vector2.UnitY * (11 + lift * .30f), 64, 74, Shape.Orb, glow,
+            .37f * (1 - Ease((progress - .67f) / .33f)), Layer.Glow, light: true);
         for (int i = 0; i < (deva ? 5 : 3); i++)
         {
             float t = Math.Clamp(progress * 1.35f - i * .105f, 0, 1);
@@ -57,8 +62,18 @@ internal static partial class TaoistSpellEffects
             frame.Sprite(star, 23 * (1 - t * .27f), 29, Shape.Flash, i == 0 ? Ice : glow, .91f, Layer.Emissive, turn, light: i == 0);
             frame.Sprite(star, 11, 11, Shape.Flash, White, .94f, Layer.EmissiveCore, -turn);
         }
-        frame.Sparks(feet - Vector2.UnitY * (20 + lift), 16, 43, 22, progress, deva ? Gold : Mint, 27,
+        frame.Sparks(feet - Vector2.UnitY * (20 + lift), 20, 43, 22, progress, deva ? Gold : Mint, 27,
             deva ? Shape.Feather : Shape.Spark);
+        for (int i = 0; i < 10; i++)
+        {
+            float age = Fract(progress * 1.2f + frame.Unit(i + 173));
+            float turn = i * 2.39996f + progress * 5;
+            Vector2 point = feet + Ellipse(turn, 23 + 13 * age, 12 + 7 * age) -
+                Vector2.UnitY * (age * (34 + lift) + 9);
+            frame.Sprite(point, 3 + frame.Unit(i + 31) * 6, 7 + age * 9,
+                i % 4 == 0 ? Shape.Flash : Shape.Spark, i % 3 == 0 ? Ice : glow,
+                .85f * (1 - age), Layer.EmissiveCore, turn, light: i == 0);
+        }
     }
 
     private static void Veil(Frame frame, Vector2 feet, float progress, float time, bool mass)
@@ -86,66 +101,105 @@ internal static partial class TaoistSpellEffects
             frame.Clip(point + new Vector2(tilt * 22, -9 * (1 - hit)), 31 + hit * 33, 24 - hit * 12,
                 Shape.SmokeSequence, time * .93f + i * .28f, 0xd3d9d5, .56f * opacity, layer, -tilt, sortY: basePoint.Y);
         }
+        // On reaching the ground the concealment breaks into loose floor-hugging
+        // fragments instead of finishing as a spherical cloud.
+        float ground = Ease((progress - .29f) / .44f);
+        float dustFade = 1 - Ease((progress - .70f) / .30f);
+        for (int i = 0; i < (mass ? 11 : 8); i++)
+        {
+            float turn = i * 2.39996f + frame.Unit(i + 205) * .55f;
+            float age = Fract(progress * .91f + frame.Unit(i + 113));
+            Vector2 point = feet + ProjectGround(Ellipse(turn, (18 + i * 3.2f) * width * ground,
+                (14 + i * 2.8f) * width * ground));
+            frame.Sprite(point, (24 + age * 23) * width, 8 + age * 7, Shape.Wisp,
+                i % 3 == 0 ? 0xd8ddd9 : 0x879caa, .36f * ground * dustFade * (1 - age * .45f),
+                Layer.Floor, turn * .23f);
+            if (i % 3 == 0)
+                frame.Sprite(point - Vector2.UnitY * (2 + age * 5), 4 + age * 4, 6,
+                    Shape.Spark, 0xe5e9e6, .47f * dustFade * ground, Layer.Emissive);
+        }
     }
 
     private static void Rune(Frame frame, Vector2 feet, float progress, Shape glyph, float width, float height,
         int dark, int tint, int core)
     {
         bool curse = glyph == Shape.CurseGlyph;
-        float front = curse ? 1.14f : .16f + progress * 1.98f;
-        float settled = Ease((front - .92f) / .20f);
+        float opening = Ease(progress * 2.8f);
+        float reveal = Ease((progress + .05f) / .54f);
+        float formed = Ease((progress - .15f) / .32f);
+        float fade = 1 - Ease((progress - .78f) / .22f);
+        float pulse = .83f + .17f * MathF.Sin(progress * MathF.Tau * 3);
         Vector2 centre = feet - Vector2.UnitY * 26;
-        Vector2 scale = new(width * .5f, height * .5f);
-        frame.Sprite(feet, width * .88f, height * .29f, Shape.Orb, dark, .59f * Ease(front), Layer.Floor);
-        frame.Sprite(centre, width * .88f, height * .88f, Shape.Wisp, dark, .59f * settled, Layer.Glow);
-        frame.Sprite(centre, width, height, glyph, tint, .90f * settled);
-        frame.Sprite(centre, width, height, glyph, core, .32f * settled, Layer.EmissiveCore);
+        // All strokes grow out from their own centres simultaneously. A corner-to-corner
+        // burn order made ward formation look like an image being wiped on screen.
+        Vector2 scale = new(width * (.34f + .16f * opening), height * (.34f + .16f * opening));
+
+        frame.Sprite(feet, width * (.61f + .23f * opening), height * .28f,
+            Shape.Orb, dark, .53f * fade, Layer.Floor);
+        frame.Sprite(centre, width * (.79f + .19f * opening), height * (.75f + .22f * opening),
+            Shape.Wisp, dark, .53f * formed * fade, Layer.Glow, light: true);
+        frame.Sprite(centre, width * (.68f + .32f * opening), height * (.68f + .32f * opening),
+            glyph, tint, .84f * formed * fade);
+        frame.Sprite(centre, width * (.69f + .31f * opening), height * (.69f + .31f * opening),
+            glyph, core, .36f * formed * fade * pulse, Layer.EmissiveCore);
+
         int strokeIndex = 0;
         foreach (Vector4 stroke in SpellParticleAtlas.GlyphStrokes(glyph))
         {
-            int index = strokeIndex++ * 9;
-            Vector2 start = new(stroke.X, stroke.Y), end = new(stroke.Z, stroke.W);
-            float first = BurnOrder(start), last = BurnOrder(end);
-            if (last < first) { (first, last) = (last, first); (start, end) = (end, start); }
-            if (front < first) continue;
-            Vector2 from = start * scale, to = end * scale;
-            float reveal = Math.Clamp((front - first) / MathF.Max(.001f, last - first), 0, 1);
-            Vector2 edge = Vector2.Lerp(from, to, reveal);
-            frame.Thread(centre + from, centre + edge, height * .055f, height * .037f, tint, .91f * (1 - settled));
-            frame.Thread(centre + from, centre + edge, height * .024f, height * .017f, core, .76f * (1 - settled),
+            int index = strokeIndex++ * 17;
+            Vector2 a = new(stroke.X, stroke.Y), b = new(stroke.Z, stroke.W);
+            Vector2 middle = (a + b) * .5f;
+            Vector2 from = centre + Vector2.Lerp(middle, a, reveal) * scale;
+            Vector2 to = centre + Vector2.Lerp(middle, b, reveal) * scale;
+            frame.Thread(from, to, height * .047f, height * .034f, tint, .85f * fade);
+            frame.Thread(from, to, height * .020f, height * .016f, core, .79f * fade * pulse,
                 Layer.EmissiveCore);
-            int flames = Math.Clamp((int)(Vector2.Distance(from, to) / 14), 1, 9);
-            for (int i = 0; i < flames; i++, index++)
-            {
-                float step = (i + .16f + frame.Unit(index) * .68f) / flames;
-                if (step > reveal) break;
-                Vector2 point = centre + Vector2.Lerp(from, to, step);
-                float heat = 1 - Ease((front - (first + (last - first) * step)) / .32f);
-                float age = Fract(progress * 1.87f + frame.Unit(index + 52));
-                float rise = (12 + frame.Unit(index + 13) * 42) * (.56f + age * .57f + heat * .54f);
-                float lean = (frame.Unit(index + 35) - .5f) * .47f;
-                float flare = (.65f + .35f * MathF.Sin(age * MathF.PI)) * (.58f + .42f * heat);
-                frame.Clip(point - Vector2.UnitY * (rise * .34f), 16 + frame.Unit(index + 74) * 13, rise,
-                    Shape.FlameSequence, age + progress, tint, .87f * flare, rotation: lean);
-                frame.Sprite(point - Vector2.UnitY * (rise * .18f), 8 + frame.Unit(index + 3) * 7, rise * .61f,
-                    Shape.FlameTongue, core, .83f * flare, Layer.EmissiveCore, lean, light: index % 8 == 0);
-                if (index % 3 == 0)
-                {
-                    Vector2 ember = point + new Vector2(lean * (22 + 32 * age), -rise * .66f - age * 32);
-                    frame.Sprite(ember, 2 + 4 * frame.Unit(index + 41), 5, Shape.Spark,
-                        core, .92f * MathF.Sin(age * MathF.PI), Layer.EmissiveCore, lean);
-                    frame.Sprite(point, 28, 36 + rise * .5f, Shape.Wisp, tint, .25f + heat * .31f,
-                        Layer.Glow, lean, light: index % 9 == 0);
-                }
-                if (curse && index % 5 == 0)
-                    frame.Clip(point + new Vector2(lean * 38, -rise * .73f - age * 32), 32 + age * 24, 25 + age * 18,
-                        Shape.SmokeSequence, age, index % 2 == 0 ? 0x62727b : dark, .53f * MathF.Sin(age * MathF.PI), Layer.Smoke, lean);
-            }
-            if (reveal < 1)
-                frame.Sprite(centre + edge, 21, 29, Shape.Flash, core, .78f, Layer.EmissiveCore, light: true);
-        }
 
-        static float BurnOrder(Vector2 point) => .5f + (point.X + point.Y) * .25f;
+            // Local wisps follow the newly formed line, with no diagonal wipe.
+            int flames = Math.Clamp((int)(Vector2.Distance(a * scale, b * scale) / 20), 2, 6);
+            for (int i = 0; i < flames; i++)
+            {
+                int seed = index + i;
+                float step = (i + .3f + .4f * frame.Unit(seed)) / flames;
+                Vector2 point = Vector2.Lerp(from, to, step);
+                float age = Fract(progress * 1.24f + frame.Unit(seed + 52));
+                float rise = 12 + age * (19 + 23 * frame.Unit(seed + 13));
+                float shimmer = .58f + .42f * MathF.Sin(age * MathF.PI);
+                float alpha = (.8f - .32f * formed) * shimmer * fade;
+                frame.Clip(point - Vector2.UnitY * (rise * .26f), 11 + frame.Unit(seed + 74) * 11,
+                    21 + rise, Shape.FlameSequence, age + progress, tint, alpha, rotation: (frame.Unit(seed + 35) - .5f) * .45f);
+                if (seed % 2 == 0)
+                    frame.Sprite(point - Vector2.UnitY * (age * 18), 4 + 5 * frame.Unit(seed + 3), 9 + age * 10,
+                        Shape.Flash, core, .74f * shimmer * fade, Layer.EmissiveCore, light: seed % 6 == 0);
+                if (seed % 3 == 0)
+                    frame.Sprite(point - Vector2.UnitY * (age * 27), 2 + frame.Unit(seed + 41) * 4, 6,
+                        Shape.Spark, core, .87f * (1 - age) * fade, Layer.EmissiveCore);
+            }
+            if (progress < .67f)
+            {
+                frame.Sprite(from, 14, 18, Shape.Flash, core, .69f * (1 - formed) * fade, Layer.EmissiveCore);
+                frame.Sprite(to, 14, 18, Shape.Flash, core, .69f * (1 - formed) * fade, Layer.EmissiveCore);
+            }
+        }
+        frame.Sparks(centre, curse ? 23 : 14, width * .39f, height * .31f, progress, core, 30);
+        if (curse)
+        {
+            frame.Sprite(centre, width * .76f, height * .78f, Shape.Wisp, 0x31554c,
+                .38f * fade, Layer.Glow, light: true);
+            for (int i = 0; i < 9; i++)
+            {
+                float age = Fract(progress * .82f + frame.Unit(i + 141));
+                float angle = i * 2.39996f + progress * 3.1f;
+                Vector2 point = centre + Ellipse(angle, width * (.10f + age * .24f),
+                    height * (.15f + age * .18f)) - Vector2.UnitY * (age * 29);
+                frame.Clip(point, 25 + age * 31, 29 + age * 23, Shape.SmokeSequence,
+                    age + progress, i % 2 == 0 ? dark : 0x597d6c,
+                    .65f * (1 - Ease((age - .62f) / .38f)) * fade, Layer.Smoke, angle * .18f);
+                if (i % 3 == 0)
+                    frame.Sprite(point, 17, 24, Shape.Wisp, Mint, .34f * fade * (1 - age),
+                        Layer.Glow, light: true);
+            }
+        }
     }
 
     private static void Reveal(Frame frame, Vector2 feet, float progress, float time, bool prepare)
@@ -218,7 +272,11 @@ internal static partial class TaoistSpellEffects
         float radius = (prepare ? 46 : 77) * bloom;
         Vector2 centre = feet - Vector2.UnitY * (13 + (prepare ? 48 : 15) * Ease(progress));
         frame.Sprite(feet, radius * 2.45f, radius * 1.44f, Shape.Orb, Teal, .51f, Layer.Ground);
-        HealMotes(frame, centre, radius * 1.05f, progress, prepare ? 44 : 76);
+        frame.Sprite(centre, radius * 2.05f, radius * 1.55f, Shape.Wisp, Jade,
+            .27f * (1 - Ease((progress - .72f) / .28f)), Layer.Glow, light: true);
+        frame.Sprite(centre, radius * 1.35f, radius * 1.10f, Shape.Orb, Ice,
+            .20f * (.8f + .2f * MathF.Sin(progress * MathF.Tau * 3)), Layer.Glow, light: true);
+        HealMotes(frame, centre, radius * 1.05f, progress, prepare ? 50 : 84);
         for (int i = 0; i < 4; i++)
         {
             float angle = i * MathF.PI * .5f + progress * 4;
