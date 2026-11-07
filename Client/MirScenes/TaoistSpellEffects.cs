@@ -19,7 +19,8 @@ internal static partial class TaoistSpellEffects
     {
         Spell.SoulFireBall => 600,
         Spell.Healing or Spell.Purification or Spell.MassHiding => 800,
-        Spell.SoulShield or Spell.BlessedArmour or Spell.HealingCircle or Spell.Plague => 1200,
+        Spell.SoulShield or Spell.BlessedArmour => 1600,
+        Spell.HealingCircle or Spell.Plague => 1200,
         Spell.Curse or Spell.Reincarnation => 2000,
         Spell.EnergyShield => visual.Phase == SpellVisualPhase.Aura ? 800 : 900,
         Spell.PetEnhancer => visual.Phase == SpellVisualPhase.Aura ? 1200 : 800,
