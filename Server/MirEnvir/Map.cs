@@ -1099,7 +1099,6 @@ namespace Server.MirEnvir
 
                                             target.AddBuff(type, player, magic.EffectDuration(Settings.Second * value), stats);
                                             player.ApplyLegacyShelter(magic, target);
-                                            player.BroadcastLegacyImpact(magic.Spell, target.CurrentLocation);
                                             target.OperateTime = 0;
                                             train = true;
                                         }
@@ -1111,6 +1110,9 @@ namespace Server.MirEnvir
 
                     }
 
+                    // Emit the complete ward once at the server-validated aimed cell.
+                    // Nearby allies still receive their buffs without individual glyphs.
+                    player.BroadcastLegacyImpact(magic.Spell, location);
                     break;
 
                 #endregion
