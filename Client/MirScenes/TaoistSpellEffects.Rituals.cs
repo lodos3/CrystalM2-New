@@ -143,6 +143,37 @@ internal static partial class TaoistSpellEffects
         frame.Sprite(centre, width * (.69f + .31f * opening), height * (.69f + .31f * opening),
             glyph, core, .36f * formed * fade * pulse, Layer.EmissiveCore);
 
+        if (!curse)
+        {
+            // A single large ward forms at the aimed cell. Separate floor light,
+            // translucent background smoke and soft bloom give the floating
+            // glyph depth without attaching copies to its buff recipients.
+            float breathing = .84f + .16f * MathF.Sin(progress * MathF.Tau * 2.4f);
+            frame.Sprite(feet, width * 1.22f, height * .42f, Shape.Halo,
+                tint, .43f * fade * breathing, Layer.Ground, light: true);
+            frame.Sprite(centre, width * 1.19f, height * 1.17f, Shape.Wisp,
+                dark, .49f * fade, Layer.Smoke);
+            frame.Sprite(centre, width * 1.09f, height * 1.13f, Shape.Wisp,
+                tint, .27f * fade * breathing, Layer.Glow, light: true);
+            frame.Sprite(centre - Vector2.UnitY * 9, width * .76f, height * .82f,
+                Shape.Orb, core, .12f * formed * fade * pulse, Layer.Glow, light: true);
+            for (int i = 0; i < 12; i++)
+            {
+                float age = Fract(progress * .88f + frame.Unit(i + 211));
+                float angle = i * 2.39996f + progress * 1.1f;
+                Vector2 point = centre +
+                    Ellipse(angle, width * (.20f + age * .34f), height * (.17f + age * .30f)) -
+                    Vector2.UnitY * (age * (18 + 17 * frame.Unit(i + 137)));
+                float smokeFade = (1 - Ease((age - .60f) / .40f)) * fade;
+                frame.Clip(point, width * (.12f + .07f * age), height * (.17f + .09f * age),
+                    Shape.SmokeSequence, age + i * .13f, i % 2 == 0 ? dark : tint,
+                    .44f * smokeFade, Layer.Smoke, angle * .14f);
+                if (i % 3 == 0)
+                    frame.Sprite(point - Vector2.UnitY * 6, 31, 39, Shape.Wisp,
+                        core, .27f * smokeFade, Layer.Glow, light: true);
+            }
+        }
+
         int strokeIndex = 0;
         foreach (Vector4 stroke in SpellParticleAtlas.GlyphStrokes(glyph))
         {
@@ -152,8 +183,19 @@ internal static partial class TaoistSpellEffects
             Vector2 from = centre + Vector2.Lerp(middle, a, reveal) * scale;
             Vector2 to = centre + Vector2.Lerp(middle, b, reveal) * scale;
             frame.Thread(from, to, height * .047f, height * .034f, tint, .85f * fade);
-            frame.Thread(from, to, height * .020f, height * .016f, core, .79f * fade * pulse,
+            float lineHeat = .70f + .30f * MathF.Sin(progress * MathF.Tau * 6f + index * .29f);
+            frame.Thread(from, to, height * .020f, height * .016f, core, .79f * fade * lineHeat,
                 Layer.EmissiveCore);
+            if (!curse)
+            {
+                // A hot trace races along every stroke. The glyph remains fixed;
+                // only its illuminated interior and flames move.
+                float tracking = Fract(progress * 3.2f + frame.Unit(index + 127));
+                Vector2 lightFrom = Vector2.Lerp(from, to, tracking);
+                Vector2 lightTo = Vector2.Lerp(from, to, MathF.Min(1, tracking + .18f));
+                frame.Thread(lightFrom, lightTo, height * .026f, height * .013f,
+                    core, .89f * formed * fade, Layer.EmissiveCore, light: index % 4 == 0);
+            }
 
             // Local wisps follow the newly formed line, with no diagonal wipe.
             int flames = Math.Clamp((int)(Vector2.Distance(a * scale, b * scale) / 20), 2, 6);
@@ -168,6 +210,19 @@ internal static partial class TaoistSpellEffects
                 float alpha = (.8f - .32f * formed) * shimmer * fade;
                 frame.Clip(point - Vector2.UnitY * (rise * .26f), 11 + frame.Unit(seed + 74) * 11,
                     21 + rise, Shape.FlameSequence, age + progress, tint, alpha, rotation: (frame.Unit(seed + 35) - .5f) * .45f);
+                if (!curse && (i & 1) == 0)
+                {
+                    float travel = Fract(progress * (2.8f + frame.Unit(seed + 83)) + frame.Unit(seed + 173));
+                    float flicker = MathF.Sin(progress * MathF.Tau * 7 + seed * .8f);
+                    Vector2 flame = Vector2.Lerp(from, to, travel) +
+                        new Vector2(flicker * 2.5f, -5 - age * 9);
+                    frame.Sprite(flame, 7 + frame.Unit(seed + 45) * 6, 15 + frame.Unit(seed + 56) * 18,
+                        Shape.FlameTongue, core, .73f * fade * (.77f + .23f * flicker),
+                        Layer.EmissiveCore, flicker * .12f, light: seed % 11 == 0);
+                    if (seed % 4 == 0)
+                        frame.Sprite(flame - Vector2.UnitY * 5, 27, 33, Shape.Wisp, tint,
+                            .23f * fade, Layer.Glow, light: true);
+                }
                 if (seed % 2 == 0)
                     frame.Sprite(point - Vector2.UnitY * (age * 18), 4 + 5 * frame.Unit(seed + 3), 9 + age * 10,
                         Shape.Flash, core, .74f * shimmer * fade, Layer.EmissiveCore, light: seed % 6 == 0);
@@ -181,7 +236,7 @@ internal static partial class TaoistSpellEffects
                 frame.Sprite(to, 14, 18, Shape.Flash, core, .69f * (1 - formed) * fade, Layer.EmissiveCore);
             }
         }
-        frame.Sparks(centre, curse ? 23 : 14, width * .39f, height * .31f, progress, core, 30);
+        frame.Sparks(centre, curse ? 23 : 25, width * .41f, height * .34f, progress, core, 37);
         if (curse)
         {
             frame.Sprite(centre, width * .76f, height * .78f, Shape.Wisp, 0x31554c,
