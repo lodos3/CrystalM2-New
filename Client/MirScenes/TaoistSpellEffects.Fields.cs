@@ -84,6 +84,9 @@ internal static partial class TaoistSpellEffects
         Vector2 centre = feet - Vector2.UnitY * (31 + progress * 18);
         float open = .60f + .40f * Ease(progress * 3);
         float fade = 1 - Ease((progress - .48f) / .44f);
+        frame.Sprite(feet, 144 * open, 61 * open, Shape.Halo, Amber, .64f * fade,
+            Layer.Ground, light: true);
+        frame.Sprite(centre, 118, 92, Shape.Wisp, Ochre, .46f * fade, Layer.Glow, light: true);
         frame.Sprite(centre, 106, 68, Shape.Orb, Ochre, .54f, light: true);
         for (int i = 0; i < 6; i++)
         {
@@ -100,6 +103,18 @@ internal static partial class TaoistSpellEffects
                     Vector2 debris = point + Ellipse(turn + (j - 1) * .6f, 41 * progress, 31 * progress);
                     frame.Sprite(debris, 6, 8, Shape.Feather, j % 2 == 0 ? Ivory : Amber, .89f - j * .15f, layer, turn * 1.4f);
                 }
+        }
+        frame.Sparks(feet - Vector2.UnitY * 22, 21, 49 * open, 26 * open,
+            progress, Gold, 53, Shape.Spark);
+        for (int i = 0; i < 9; i++)
+        {
+            float age = Fract(progress * 1.45f + frame.Unit(i + 166));
+            float turn = i * 2.39996f + progress * 4;
+            Vector2 point = centre + Ellipse(turn, 25 + age * 34, 19 + age * 18) -
+                Vector2.UnitY * (age * 36);
+            frame.Sprite(point, 5 + 8 * (1 - age), 9 + 12 * (1 - age), Shape.Flash,
+                i % 3 == 0 ? Ivory : Amber, .74f * fade * (1 - age * .45f),
+                Layer.EmissiveCore, turn, light: i % 4 == 0);
         }
     }
 
@@ -166,10 +181,16 @@ internal static partial class TaoistSpellEffects
 
     private static void Shield(Frame frame, Vector2 feet, float progress, bool aura)
     {
-        Vector2 centre = feet - Vector2.UnitY * 35;
+        float bob = aura ? MathF.Sin(progress * MathF.Tau) * 4.6f : 0;
+        float sway = aura ? MathF.Sin(progress * MathF.Tau * 1.2f) * 3.8f : 0;
+        Vector2 centre = feet + new Vector2(sway, -35 + bob);
         float spread = aura ? 0 : 31 * (1 - Ease(progress * 2.6f));
-        float flicker = .85f + .15f * MathF.Sin(progress * MathF.Tau);
-        frame.Sprite(centre, 100, 113, Shape.Wisp, 0x444f9c, .62f, Layer.Ground);
+        float pulse = .83f + .17f * MathF.Sin(progress * MathF.Tau * 2);
+        float flicker = .78f + .22f * MathF.Sin(progress * MathF.Tau);
+        frame.Sprite(centre, 113 + 12 * pulse, 119 + 15 * pulse, Shape.Wisp, 0x444f9c,
+            .59f * flicker, Layer.Glow, light: true);
+        frame.Sprite(centre, 77 + 10 * pulse, 109 + 12 * pulse, Shape.Orb, Blue,
+            .20f * flicker, Layer.Glow, light: true);
         for (int side = -1; side <= 1; side += 2)
         {
             int colour = side < 0 ? Blue : Gold;
@@ -180,19 +201,37 @@ internal static partial class TaoistSpellEffects
             {
                 float t = i / 16f;
                 float taper = MathF.Sin(t * MathF.PI);
-                Vector2 to = offset + Ellipse(-1.27f + t * 2.54f, side * 46, 55);
+                Vector2 to = offset + Ellipse(-1.27f + t * 2.54f, side * (46 + 3 * pulse), 55 + 4 * pulse);
                 Vector2 midpoint = (from + to) * .5f;
-                frame.Sprite(midpoint, 19 + taper * 15, 19 + taper * 9, Shape.Wisp, rim, .69f * flicker,
-                    Layer.Glow, light: i % 5 == 1);
-                frame.Sprite(midpoint + Vector2.UnitX * side * (4 + frame.Unit(i + side * 29) * 6), 17 + taper * 16,
-                    10 + taper * 9, Shape.FlameTongue, rim, .74f * taper, Layer.Emissive, side * 1.35f + (t - .5f));
-                frame.Thread(from, to, 1.4f + 2.6f * taper, 1.1f + 2 * taper, colour, .91f * flicker,
-                    Layer.EmissiveCore);
+                frame.Sprite(midpoint, 19 + taper * 15, 19 + taper * 9, Shape.Wisp, rim,
+                    .69f * flicker, Layer.Glow, light: i % 5 == 1);
+                frame.Sprite(midpoint + Vector2.UnitX * side * (4 + frame.Unit(i + side * 29) * 6),
+                    17 + taper * 16, 10 + taper * 9, Shape.FlameTongue, rim,
+                    .74f * taper * pulse, Layer.Emissive, side * 1.35f + (t - .5f));
+                frame.Thread(from, to, 1.4f + 2.6f * taper, 1.1f + 2 * taper, colour,
+                    .91f * flicker, Layer.EmissiveCore);
                 if (i % 4 == 1)
-                    frame.Sprite(to + Vector2.UnitX * side * 3, 12, 18, Shape.Flash, side < 0 ? Ice : Ivory,
-                        .64f * flicker, Layer.EmissiveCore, t * 1.6f);
+                    frame.Sprite(to + Vector2.UnitX * side * 3, 12, 18, Shape.Flash,
+                        side < 0 ? Ice : Ivory, .64f * flicker, Layer.EmissiveCore, t * 1.6f);
                 from = to;
             }
+        }
+        // The shield stays attached to its owner while motes float upward
+        // independently of the curved shell; phases are deterministic per actor.
+        for (int i = 0; i < 17; i++)
+        {
+            float age = Fract(progress * (aura ? 1.0f : 1.3f) + frame.Unit(i + 179));
+            float turn = i * 2.39996f + progress * 3.8f;
+            float radial = 36 + 19 * frame.Unit(i + 83);
+            Vector2 point = centre + new Vector2(MathF.Cos(turn) * radial + sway * .35f,
+                41 - age * (88 + 20 * frame.Unit(i + 71)));
+            float shimmer = MathF.Sin(age * MathF.PI);
+            frame.Sprite(point, 2 + frame.Unit(i + 29) * 5, 5 + frame.Unit(i + 33) * 10,
+                i % 4 == 0 ? Shape.Flash : Shape.Spark, i % 2 == 0 ? Ice : Gold,
+                .75f * shimmer, Layer.EmissiveCore, turn, light: i % 8 == 0);
+            if (i % 5 == 0)
+                frame.Sprite(point, 22, 27, Shape.Wisp, i % 2 == 0 ? Blue : Amber,
+                    .24f * shimmer, Layer.Glow, light: true);
         }
     }
 
