@@ -3121,7 +3121,9 @@ namespace Client.MirObjects
 
                                         missile.Complete += (o, e) =>
                                         {
-                                            MapControl.Effects.Add(new Effect(new SpellVisual(Spell.Curse), 2000, TargetPoint));
+                                            // The authoritative map-impact packet creates the one
+                                            // curse glyph at the aimed cell. Projectile arrival only
+                                            // supplies its sound; do not spawn a second visual.
                                             SoundManager.PlaySound(20000 + (ushort)Spell.Curse * 10);
                                         };
                                         break;
