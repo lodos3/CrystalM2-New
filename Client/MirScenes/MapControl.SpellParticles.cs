@@ -183,10 +183,16 @@ public sealed partial class MapControl
 
     internal void EmitSpellImpact(Spell spell, Point location)
     {
-        // The server sends one impact packet for each recipient actually affected by
-        // these area spells. Render a compact hit on that recipient; do not collapse
-        // all recipients into the talisman's single arrival visual.
-        if (spell is Spell.SoulShield or Spell.BlessedArmour or Spell.MassHealing or Spell.MassHiding)
+        // Wards are centred at the aimed map cell, like Curse. Server sends
+        // one cue per cast rather than one cue for every buff recipient.
+        if (spell is Spell.SoulShield or Spell.BlessedArmour)
+        {
+            EmitLegacy(new SpellVisual(spell, SpellVisualPhase.Impact), location);
+            return;
+        }
+
+        // Mass Healing and Mass Hiding still have distinct per-recipient impacts.
+        if (spell is Spell.MassHealing or Spell.MassHiding)
         {
             var hit = new SpellVisual(spell, SpellVisualPhase.Hit);
             if (!CanEmitSpellParticles(location)) return;
