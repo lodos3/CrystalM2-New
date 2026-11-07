@@ -183,9 +183,10 @@ public sealed partial class MapControl
 
     internal void EmitSpellImpact(Spell spell, Point location)
     {
-        // Wards are centred at the aimed map cell, like Curse. Server sends
-        // one cue per cast rather than one cue for every buff recipient.
-        if (spell is Spell.SoulShield or Spell.BlessedArmour)
+        // Protective wards and Curse share the same single, aim-anchored
+        // impact path. Buffs/debuffs are applied individually server-side,
+        // but their rune animations must never attach to each recipient.
+        if (spell is Spell.SoulShield or Spell.BlessedArmour or Spell.Curse)
         {
             EmitLegacy(new SpellVisual(spell, SpellVisualPhase.Impact), location);
             return;
