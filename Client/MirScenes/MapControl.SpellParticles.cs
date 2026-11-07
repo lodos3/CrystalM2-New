@@ -191,9 +191,9 @@ public sealed partial class MapControl
             var hit = new SpellVisual(spell, SpellVisualPhase.Hit);
             if (!CanEmitSpellParticles(location)) return;
             MapObject recipient = null;
-            if (M2CellInfo[location.X, location.Y].CellObjects is { } occupants)
+            if (M2CellInfo[location.X, location.Y].CellObjects is { } wardOccupants)
             {
-                foreach (MapObject actor in occupants)
+                foreach (MapObject actor in wardOccupants)
                 {
                     if (actor.CurrentLocation != location ||
                         actor.Race is not (ObjectType.Player or ObjectType.Hero or ObjectType.Monster)) continue;
