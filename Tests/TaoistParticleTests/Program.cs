@@ -62,6 +62,33 @@ foreach (Spell ward in new[] { Spell.SoulShield, Spell.BlessedArmour })
     Check(formed.Any(p => p.Layer == SpellParticleLayer.EmissiveCore), $"Ward lacks light for {ward}");
 }
 
+// These three rune spells are always visible above players and monsters,
+// regardless of the scenery depth/occlusion mask. Nearby casts still show.
+foreach (Spell aimedRune in new[] { Spell.SoulShield, Spell.BlessedArmour, Spell.Curse })
+{
+    var visible = Render(aimedRune, SpellVisualPhase.Impact, 680,
+        aimedRune == Spell.Curse ? 2000 : 1600);
+    Check(visible.Length > 0 && visible.All(p => p.AlwaysOnTop),
+        $"Aimed rune {aimedRune} must draw above actor/scenery occlusion.");
+}
+Check(!Render(Spell.Healing, SpellVisualPhase.Impact, 400, 800).Any(p => p.AlwaysOnTop),
+    "Normal spells must continue respecting scenery depth.");
+
+foreach (Spell ward in new[] { Spell.SoulShield, Spell.BlessedArmour })
+{
+    // Between neighbouring frames the flame roots keep their horizontal
+    // positions. The tongues rise and fade vertically instead of sliding
+    // sideways along the rune strokes.
+    var earlier = Render(ward, SpellVisualPhase.Impact, 600, 1600)
+        .Where(p => p.Shape == SpellParticleShape.FlameTongue).ToArray();
+    var later = Render(ward, SpellVisualPhase.Impact, 630, 1600)
+        .Where(p => p.Shape == SpellParticleShape.FlameTongue).ToArray();
+    Check(earlier.Length >= 8 && earlier.Length == later.Length,
+        $"Protective rune {ward} needs several independent upward flames.");
+    Check(earlier.Zip(later).All(pair => MathF.Abs(pair.First.Origin.X - pair.Second.Origin.X) < 8),
+        $"Protective rune {ward} flames must not travel horizontally along glyph strokes.");
+}
+
 var massHealCast = Render(Spell.MassHealing, SpellVisualPhase.Impact, 450, 1000);
 var massHealRecipient = Render(Spell.MassHealing, SpellVisualPhase.Hit, 450, 1000);
 Check(massHealCast.Length > 0 && massHealRecipient.Length > 0 &&
