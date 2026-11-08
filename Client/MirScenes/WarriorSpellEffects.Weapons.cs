@@ -66,22 +66,35 @@ internal static partial class WarriorSpellEffects
                     Layer.Emissive, aspect: .86f, rotation: angle, core: true, alpha: 157);
                 break;
             case Spell.TwinDrakeBlade when cut:
-                // Two cuts leave quick, overlapping blue edges in the swing direction.
-                // The electric arcs continue to follow the actual blade in the enchant pass.
-                ProjectCrescent(pool, look, feet, facing, -.39f, 43, 68, 8, now, life, sweep: 2.4f);
-                ProjectCrescent(pool, look, feet, facing, .59f, 29, 82, 7, now, life, sweep: 2.02f);
+                // The old double crescent read as expanding rings. The hit is
+                // now a jagged electric discharge anchored to the real blade.
+                var strike = new Frame(pool, feet, now, 1, Frame.ReferenceSize, (uint)now,
+                    scalePositions: false, depthY: feet.Y);
+                WizardSpellEffects.Channel(strike, pose.Hilt + blade * .16f,
+                    forwardTip + facing * 27 - Vector2.UnitY * 10,
+                    21, 3.0f, .96f, now / 1000f, 4, 113,
+                    colours: WizardSpellEffects.DrakeColours);
+                WizardSpellEffects.Channel(strike, pose.Tip,
+                    pose.Tip + facing * 43 - Vector2.UnitY * 20,
+                    17, 2.4f, .87f, now / 1000f + .05f, 3, 239,
+                    colours: WizardSpellEffects.DrakeColours);
                 effect.Add(pose.Hilt - Vector2.UnitY * 9, Vector2.Zero, Shape.Flash, 32, life,
                     Layer.EmissiveCore, aspect: 1.21f, rotation: angle, core: true, alpha: 213);
                 break;
             case Spell.FlamingSword:
                 AddBladeFire(pool, pose, look, now, life, progress, feet.Y);
-                effect.Add(forwardTip + facing * 24, facing * 15 - Vector2.UnitY * 10, Shape.WarriorImpact, 65, life,
-                    Layer.Emissive, aspect: .76f, rotation: angle - .47f, alpha: 105);
+                // Follow the cut with tongues and smoke rather than a circular impact.
+                effect.Add(forwardTip + facing * 22, facing * 12 - Vector2.UnitY * 13,
+                    Shape.FlameTongue, 63, life, Layer.Emissive,
+                    aspect: 1.34f, rotation: angle - .30f, alpha: 194);
                 if (cut)
                 {
-                    ProjectCrescent(pool, look, feet, facing, .12f, 32, 89, 20, now, life);
-                    effect.Add(feet + facing * 39 - Vector2.UnitY * 34, facing * 19, Shape.FireSequence, 161, life,
-                        Layer.Emissive, aspect: .47f, rotation: angle, alpha: 183);
+                    effect.Add(feet + facing * 39 - Vector2.UnitY * 34, facing * 19,
+                        Shape.FireSequence, 128, life, Layer.Emissive,
+                        aspect: .53f, rotation: angle, alpha: 201);
+                    effect.Add(forwardTip - Vector2.UnitY * 24,
+                        facing * 7 - Vector2.UnitY * 18, Shape.SmokeSequence, 69,
+                        life, Layer.Smoke, aspect: 1.10f, rotation: angle * .23f, alpha: 140);
                 }
                 effect.Scatter(forwardTip, 7, Shape.WarriorSpark, 58, life, rise: true);
                 break;
@@ -197,11 +210,18 @@ internal static partial class WarriorSpellEffects
 
         Vector2 bladeRoot = pose.Hilt + blade * .23f;
         var colours = WizardSpellEffects.DrakeColours;
-        frame.Sprite((bladeRoot + pose.Tip) * .5f, blade.Length() * .96f, striking ? 31 : 21, Shape.Orb,
-            0x233997, striking ? .77f : .49f, Layer.Glow, MathF.Atan2(blade.Y, blade.X), light: true);
+        // Electricity is shaped by the blade, without a large oval behind it.
         WizardSpellEffects.Channel(frame, bladeRoot, pose.Tip, striking ? 13 : 7, striking ? 3.2f : 1.85f,
             striking ? .98f : .73f, time, striking ? 3 : 1, 17, colours: colours);
-        frame.Sparks(pose.Tip, striking ? 11 : 5, striking ? 32 : 15, striking ? 23 : 9, Fract(time * 1.7f), Ice, 11);
+        for (int i = 0; i < (striking ? 11 : 5); i++)
+        {
+            float age = Fract(time * 1.7f + frame.Unit(i + 107));
+            Vector2 point = pose.Hilt + blade * (.28f + frame.Unit(i + 33) * .69f) +
+                new Vector2((frame.Unit(i + 41) - .5f) * 8, -age * (8 + frame.Unit(i + 57) * 22));
+            frame.Sprite(point, 3 + frame.Unit(i + 71) * 4, 7 + frame.Unit(i + 79) * 8,
+                Shape.WarriorSpark, i % 3 == 0 ? White : Ice, .79f * (1 - age * .57f),
+                Layer.EmissiveCore, light: i % 5 == 0);
+        }
         if (!striking) return;
         Vector2 edge = Vector2.Dot(blade, facing) >= 0 ? pose.Tip : pose.Hilt;
         Vector2 end = edge + facing * 49 - Vector2.UnitY * 28;
@@ -210,7 +230,15 @@ internal static partial class WarriorSpellEffects
             17, 2.15f, .84f, time + .07f, 2, 181, colours: colours);
         Vector2 ground = pose.Hilt + facing * 18 + Vector2.UnitY * (feetY.GetValueOrDefault(pose.Hilt.Y + 36) - pose.Hilt.Y);
         WizardSpellEffects.Channel(frame, pose.Hilt, ground, 10, 2.5f, .93f, time, 2, 238, colours: colours);
-        frame.Sparks(ground, 9, 24, 13, Fract(time * 2.9f), White, 12, shape: Shape.WarriorSpark);
+        for (int i = 0; i < 9; i++)
+        {
+            float age = Fract(time * 2.9f + frame.Unit(i + 271));
+            Vector2 point = Vector2.Lerp(pose.Hilt, ground, frame.Unit(i + 304)) +
+                new Vector2((frame.Unit(i + 319) - .5f) * 11, -age * 16);
+            frame.Sprite(point, 4 + frame.Unit(i + 336) * 4, 9,
+                Shape.WarriorSpark, White, .77f * (1 - age * .64f),
+                Layer.EmissiveCore);
+        }
         frame.Sprite(end - facing * 12, 23, 32, Shape.Flash, White, .83f, Layer.EmissiveCore, time * .7f);
     }
 
