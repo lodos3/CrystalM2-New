@@ -26,11 +26,12 @@ internal sealed class SpellParticleRenderer
     public void Draw(ReadOnlySpan<SpellParticle> particles, Vector2 camera, long now, bool ground,
                      float intensity = 1f, bool emission = false, float sizeScale = 1f, float warmth = 0f,
                      Rectangle? clipping = null, Vector3? colour = null, bool emissiveOverlay = false,
-                     float exposure = 1f, float saturation = 1f, float glow = 1f, bool screenGlow = false,
+                     float exposure = 1f, float saturation = 1f, SpellParticleGlowPolicy glowPolicy = default,
                      Texture occlusion = null, int depthOrigin = 0, int cellHeight = 32, float lightRadius = 1f)
     {
         if (intensity <= 0) return;
         SpriteBlendMode previous = _device.Blend;
+        SpriteBlendMode? previousArtworkBlend = _device.ArtworkBlend;
         ShaderEffect shader = _device.PixelShader;
         Texture previousAuxiliary = _device.AuxiliaryTexture;
         Rectangle clip = clipping ?? new Rectangle(0, 0, _device.TargetWidth, _device.TargetHeight);
@@ -38,21 +39,36 @@ internal sealed class SpellParticleRenderer
         {
             _device.PixelShader = ShaderEffect.ParticleCoverage;
             if (occlusion != null) _device.AuxiliaryTexture = occlusion;
-            if (emission || ground)
+            if (emission)
             {
-                _device.Blend = emission ? SpriteBlendMode.Additive : SpriteBlendMode.Alpha;
+                // Spell lighting uses the authored light mask, not the visual
+                // compositing/glow controls. Avoid dimming the world's light.
+                _device.Blend = SpriteBlendMode.Additive;
                 DrawLayer(particles);
+            }
+            else if (ground)
+            {
+                if (glowPolicy.ShowAuthored)
+                {
+                    _device.Blend = SpriteBlendMode.Alpha;
+                    DrawLayer(particles);
+                }
+                if (glowPolicy.ShowGlow) DrawGlowLayers(groundParticles: true);
             }
             else if (emissiveOverlay)
             {
-                _device.Blend = SpriteBlendMode.Screen;
-                DrawLayer(particles, SpellParticleLayer.Glow);
-                _device.Blend = SpriteBlendMode.Alpha;
-                DrawLayer(particles, SpellParticleLayer.Emissive);
-                _device.Blend = screenGlow ? SpriteBlendMode.Screen : SpriteBlendMode.Additive;
-                DrawLayer(particles, SpellParticleLayer.EmissiveCore);
+                if (glowPolicy.ShowAuthored)
+                {
+                    _device.Blend = SpriteBlendMode.Screen;
+                    DrawLayer(particles, SpellParticleLayer.Glow);
+                    _device.Blend = SpriteBlendMode.Alpha;
+                    DrawLayer(particles, SpellParticleLayer.Emissive);
+                    _device.Blend = SpriteBlendMode.Additive;
+                    DrawLayer(particles, SpellParticleLayer.EmissiveCore);
+                }
+                if (glowPolicy.ShowGlow) DrawGlowLayers(groundParticles: false);
             }
-            else
+            else if (glowPolicy.ShowAuthored)
             {
                 _device.Blend = SpriteBlendMode.Alpha;
                 DrawLayer(particles, SpellParticleLayer.Smoke);
@@ -63,12 +79,30 @@ internal sealed class SpellParticleRenderer
         }
         finally
         {
+            _device.ArtworkBlend = previousArtworkBlend;
             _device.Blend = previous;
             _device.PixelShader = shader;
             _device.AuxiliaryTexture = previousAuxiliary;
         }
 
-        void DrawLayer(ReadOnlySpan<SpellParticle> layer, SpellParticleLayer? filter = null)
+        void DrawGlowLayers(bool groundParticles)
+        {
+            // F12 Glow blend takes precedence over the general Particles blend
+            // for this specific pass, then the caller's artwork state is restored.
+            _device.ArtworkBlend = null;
+            _device.Blend = glowPolicy.ScreenBlend ? SpriteBlendMode.Screen : SpriteBlendMode.Additive;
+            if (groundParticles)
+                DrawLayer(particles, glowPass: true);
+            else
+            {
+                DrawLayer(particles, SpellParticleLayer.Glow, glowPass: true);
+                DrawLayer(particles, SpellParticleLayer.Emissive, glowPass: true);
+                DrawLayer(particles, SpellParticleLayer.EmissiveCore, glowPass: true);
+            }
+            _device.ArtworkBlend = previousArtworkBlend;
+        }
+
+        void DrawLayer(ReadOnlySpan<SpellParticle> layer, SpellParticleLayer? filter = null, bool glowPass = false)
         {
             foreach (ref readonly SpellParticle particle in layer)
             {
@@ -85,6 +119,8 @@ internal sealed class SpellParticleRenderer
                 if (colour is { } rgb) tint = new Vector4(rgb, tint.W);
                 tint.X = Math.Clamp(tint.X * (1 + warmth), 0, 1);
                 tint.Z = Math.Clamp(tint.Z * (1 - warmth), 0, 1);
+                float glowAmount = glowPass ? glowPolicy.GlowAmount(new Vector3(tint.X, tint.Y, tint.Z)) : 1f;
+                if (glowAmount <= 0f) continue;
                 float alpha = particle.Layer == SpellParticleLayer.Legacy ? (1 - age) * (1 - age) : Math.Clamp((1 - age) / .76f, 0, 1);
                 tint.W *= Math.Clamp(alpha * (emission ? 1 : intensity), 0, 1);
                 if (emission)
@@ -99,7 +135,7 @@ internal sealed class SpellParticleRenderer
                     Vector3 visible = new(tint.X, tint.Y, tint.Z);
                     float luma = Vector3.Dot(visible, new Vector3(.2126f, .7152f, .0722f));
                     visible = Vector3.Max(new Vector3(luma) + (visible - new Vector3(luma)) * saturation, Vector3.Zero);
-                    visible *= exposure * (particle.Layer == SpellParticleLayer.EmissiveCore ? glow * Math.Max(1f, intensity) : 1f);
+                    visible *= exposure * glowAmount;
                     tint = new Vector4(visible, tint.W);
                 }
                 var source = SpellParticleAtlas.Part(particle.Shape, particle.Direction, particle.Frame);
