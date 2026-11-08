@@ -217,29 +217,56 @@ internal static partial class WarriorSpellEffects
 
     private static void Strike(Frame frame, Spell spell, Vector2 feet, Vector2 facing, float progress)
     {
+        // The shared physical strike has a blade-shaped silhouette, not a round
+        // explosion. Variant styling follows the hit mechanism: steel slash,
+        // hot riposte, or a dusty shoulder collision.
         bool hot = spell is Spell.SlashingBurst or Spell.CounterAttack;
         bool heavy = spell is Spell.TwinDrakeBlade or Spell.BladeAvalanche or Spell.CrossHalfMoon or Spell.SlashingBurst;
         bool dash = spell == Spell.ShoulderDash;
         bool fencing = spell == Spell.Fencing;
-        int colour = hot ? Flame : dash ? Gold : fencing ? 0xa9bfce : Steel;
+        int colour = hot ? Flame : dash ? 0xbba68d : fencing ? 0xa9bfce : Steel;
         int core = hot || dash ? Heat : White;
         float radius = fencing ? 21 : heavy ? 75 : 43;
         float angle = MathF.Atan2(facing.Y, facing.X);
         Vector2 centre = feet - Vector2.UnitY * (dash ? 15 : 36);
-        float bloom = .70f + .32f * Ease(progress * 4.5f);
-        frame.Sprite(centre, radius * bloom, radius * bloom * .82f, Shape.WarriorImpact, colour, .83f,
-            rotation: angle - .46f, light: true);
-        frame.Sprite(centre, radius * .59f, radius * .77f, Shape.WarriorSpark, core, 1 - Ease(progress * 2.5f),
-            Layer.EmissiveCore, angle + .33f, light: true);
-        if (!fencing)
-            frame.Sprite(centre, radius * 1.46f, radius * .97f, Shape.Orb, hot ? 0x933623 : dash ? 0x826c55 : 0x2849a2,
-                .50f * bloom, Layer.Glow, angle, light: true);
-        if (heavy)
-            frame.Sprite(centre, radius * 1.2f, radius * .75f, Shape.Flash, colour, .45f * (1 - progress), light: true);
-        if (dash || spell == Spell.BladeAvalanche)
-            frame.Sprite(feet, 65 * bloom, 29 * bloom, Shape.WarriorDust, Smoke, .59f, Layer.Ground, angle);
-        frame.Sparks(centre, fencing ? 3 : heavy ? 10 : 5, radius * .67f, radius * .43f,
-            progress, hot ? Heat : White, rise: 17, shape: Shape.WarriorSpark);
+        float spread = .70f + .32f * Ease(progress * 4.5f);
+        float fade = 1f - Ease((progress - .58f) / .42f);
+        var side = new Vector2(-facing.Y, facing.X);
+
+        frame.Sprite(centre + facing * (radius * .22f), radius * 1.42f * spread,
+            radius * .64f, Shape.UserSlash, colour, .89f * fade,
+            Layer.Emissive, angle - .43f, light: heavy);
+        frame.Sprite(centre + facing * (radius * .34f) - side * 3,
+            radius * 1.07f * spread, radius * .32f,
+            Shape.UserSlash, core, .74f * fade,
+            Layer.EmissiveCore, angle - .40f, light: true);
+
+        if (hot)
+            frame.Sprite(centre + facing * 12, radius * .79f, radius * .96f,
+                Shape.UserFlame, Ember, .72f * fade,
+                Layer.EmissiveCore, angle * .35f);
+        if (dash)
+            frame.Sprite(feet + facing * 18, radius * .91f, radius * .57f,
+                Shape.UserRock, 0xa99b82, .69f * fade,
+                Layer.Ground, angle);
+
+        int fragments = fencing ? 4 : heavy ? 12 : 7;
+        for (int i = 0; i < fragments; i++)
+        {
+            int seed = i * 19 + 83;
+            float age = Fract(progress * 1.9f + frame.Unit(seed));
+            float along = frame.Unit(seed + 2);
+            float scatter = (frame.Unit(seed + 5) - .5f) * radius * .60f;
+            Vector2 point = centre + facing * (along * radius * .75f + age * 18f) +
+                side * scatter - Vector2.UnitY * (age * (9f + frame.Unit(seed + 7) * 17f));
+            frame.Sprite(point, 5 + frame.Unit(seed + 11) * 9,
+                9 + frame.Unit(seed + 13) * 12,
+                hot ? Shape.UserEmber : dash ? Shape.UserRock : Shape.UserSlash,
+                i % 3 == 0 ? core : colour, .68f * fade * (1f - age * .52f),
+                i % 3 == 0 ? Layer.EmissiveCore : Layer.Emissive,
+                angle + (frame.Unit(seed + 21) - .5f) * .40f,
+                light: i % 5 == 0);
+        }
     }
 
     internal static void Dash(SpellParticlePool pool, Vector2 from, Vector2 to, long now)
