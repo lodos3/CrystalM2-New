@@ -183,20 +183,20 @@ internal static partial class TaoistSpellEffects
                 float rise = age * (23 + 19 * frame.Unit(seed + 13));
                 float opacity = MathF.Sin(MathF.PI * age) * fade;
                 Vector2 flame = root + new Vector2(sway, -rise);
-                float height = 23 + 21 * frame.Unit(seed + 74);
-                float width = 10 + 8 * frame.Unit(seed + 37);
+                float tongueHeight = 23 + 21 * frame.Unit(seed + 74);
+                float tongueWidth = 10 + 8 * frame.Unit(seed + 37);
 
                 // A textured flame folds and evaporates upward from each line.
-                frame.Clip(flame - Vector2.UnitY * height * .20f, width, height,
+                frame.Clip(flame - Vector2.UnitY * tongueHeight * .20f, tongueWidth, tongueHeight,
                     Shape.FlameSequence, progress * 1.3f + age * .63f + frame.Unit(seed + 89),
                     tint, .64f * opacity, Layer.Emissive, sway * .023f);
                 if (!curse)
-                    frame.Sprite(flame - Vector2.UnitY * height * .27f,
-                        width * 1.4f, height * 1.10f,
+                    frame.Sprite(flame - Vector2.UnitY * tongueHeight * .27f,
+                        tongueWidth * 1.4f, tongueHeight * 1.10f,
                         Shape.UserFlame, index % 3 == 0 ? core : tint,
                         .61f * opacity, Layer.Emissive, sway * .018f);
-                frame.Sprite(flame - Vector2.UnitY * height * .18f,
-                    width * .55f, height * .83f, Shape.FlameTongue, core,
+                frame.Sprite(flame - Vector2.UnitY * tongueHeight * .18f,
+                    tongueWidth * .55f, tongueHeight * .83f, Shape.FlameTongue, core,
                     .73f * opacity, Layer.EmissiveCore, sway * .015f, light: seed % 11 == 0);
 
                 if (!curse)
@@ -211,7 +211,7 @@ internal static partial class TaoistSpellEffects
                         frame.Sprite(root - Vector2.UnitY * (rise + 8), 9, 12,
                             Shape.Flash, tint, .32f * opacity,
                             Layer.EmissiveCore, light: true);
-                        frame.Clip(flame - Vector2.UnitY * (height * .78f + age * 13),
+                        frame.Clip(flame - Vector2.UnitY * (tongueHeight * .78f + age * 13),
                             16 + age * 11, 17 + age * 11, Shape.SmokeSequence,
                             progress * .7f + age, dark, .19f * opacity, Layer.Smoke);
                     }
