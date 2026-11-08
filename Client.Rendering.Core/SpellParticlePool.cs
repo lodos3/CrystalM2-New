@@ -12,7 +12,8 @@ public enum SpellParticleShape
     WardBack, WardFront, FlameTongue, IceSpire, SigilEye, Filament, SigilDisc,
     FlameSequence, FireSequence, SmokeSequence, BladeRibbon,
     WarriorCrescent, WarriorTripleCut, WarriorSpark, WarriorDust, WarriorRing, WarriorImpact, MoonRibbon, WindRibbon,
-    SoulGlyph, ArmourGlyph, CurseGlyph, Trigrams, YinYang, SpiritFigure
+    SoulGlyph, ArmourGlyph, CurseGlyph, Trigrams, YinYang, SpiritFigure,
+    UserFlame, UserLightning, UserEmber, UserSlash, UserRock
 }
 
 public enum SpellParticleLayer : byte { Legacy, Ground, World, Emissive, EmissiveCore, Smoke, Glow, Floor }
@@ -185,12 +186,15 @@ public static class SpellParticleAtlas
     private const int SmokeTop = FireTop + ClipRows * (ClipWidth + 2 * Padding);
     private const int WarriorTop = SmokeTop + ClipRows * (ClipWidth + 2 * Padding);
     private const int TaoistTop = WarriorTop + Cell;
-    public const int Height = TaoistTop + Cell;
+    private const int UserTop = TaoistTop + Cell;
+    public const int Height = UserTop + Cell;
 
     public static Rectangle Part(SpellParticleShape shape, byte direction = 0, byte frame = 0)
     {
         if (shape == SpellParticleShape.BladeRibbon)
             return new Rectangle((int)SpellParticleShape.Slash * Cell + Padding, Padding, Resolution, Resolution);
+        if (shape >= SpellParticleShape.UserFlame)
+            return new Rectangle((shape - SpellParticleShape.UserFlame) * Cell + Padding, UserTop + Padding, Resolution, Resolution);
         if (shape >= SpellParticleShape.SoulGlyph)
             return new Rectangle((shape - SpellParticleShape.SoulGlyph) * Cell + Padding, TaoistTop + Padding, Resolution, Resolution);
         if (shape >= SpellParticleShape.WarriorCrescent)
@@ -215,13 +219,26 @@ public static class SpellParticleAtlas
         foreach (SpellParticleShape shape in Enum.GetValues<SpellParticleShape>())
             if ((shape < SpellParticleShape.FlameSequence && shape != SpellParticleShape.Slash) ||
                 shape is SpellParticleShape.BladeRibbon or SpellParticleShape.MoonRibbon or SpellParticleShape.WindRibbon ||
-                shape >= SpellParticleShape.SoulGlyph) Paint(shape);
+                shape is >= SpellParticleShape.SoulGlyph and < SpellParticleShape.UserFlame) Paint(shape);
         for (byte direction = 0; direction < 8; direction++) Paint(SpellParticleShape.Slash, direction);
         ReadClips(coverage);
         using var warrior = ReadPack("CrystalM2.WarriorMasks");
         for (SpellParticleShape shape = SpellParticleShape.WarriorCrescent; shape <= SpellParticleShape.WarriorImpact; shape++)
             ReadMask(warrior, coverage, Part(shape));
         if (warrior.ReadByte() != -1) throw new InvalidDataException("Unexpected data after the Warrior particle masks.");
+        using (var fireElectric = ReadPack("CrystalM2.UserVfxFireElectric"))
+        {
+            ReadSmallMask(fireElectric, coverage, Part(SpellParticleShape.UserFlame));
+            ReadSmallMask(fireElectric, coverage, Part(SpellParticleShape.UserLightning));
+            if (fireElectric.ReadByte() != -1) throw new InvalidDataException("Unexpected data after Fire/Electricity masks.");
+        }
+        using (var emberSlashRock = ReadPack("CrystalM2.UserVfxEmberSlashRock"))
+        {
+            ReadSmallMask(emberSlashRock, coverage, Part(SpellParticleShape.UserEmber));
+            ReadSmallMask(emberSlashRock, coverage, Part(SpellParticleShape.UserSlash));
+            ReadSmallMask(emberSlashRock, coverage, Part(SpellParticleShape.UserRock));
+            if (emberSlashRock.ReadByte() != -1) throw new InvalidDataException("Unexpected data after Ember/Slash/Rock masks.");
+        }
         return coverage;
 
         void Paint(SpellParticleShape shape, byte direction = 0)
@@ -405,6 +422,34 @@ public static class SpellParticleAtlas
 
     private static GZipStream ReadPack(string name) => new(typeof(SpellParticleAtlas).Assembly.GetManifestResourceStream(name)
         ?? throw new InvalidDataException($"Missing particle coverage resource {name}."), CompressionMode.Decompress);
+
+    // User-supplied textures are prepacked as 64 x 64 grayscale coverage.
+    // Upscale once when the shared atlas is generated, with bilinear sampling;
+    // no WebP decoder, GDShader runtime or per-frame CPU texture upload needed.
+    private static void ReadSmallMask(Stream stream, byte[] coverage, Rectangle part)
+    {
+        const int sample = 64;
+        Span<byte> mask = stackalloc byte[sample * sample];
+        stream.ReadExactly(mask);
+        for (int y = 0; y < part.Height; y++)
+        {
+            float srcY = (y + .5f) * sample / part.Height - .5f;
+            int y0 = Math.Clamp((int)MathF.Floor(srcY), 0, sample - 1);
+            int y1 = Math.Clamp(y0 + 1, 0, sample - 1);
+            float ty = Math.Clamp(srcY - y0, 0, 1);
+            for (int x = 0; x < part.Width; x++)
+            {
+                float srcX = (x + .5f) * sample / part.Width - .5f;
+                int x0 = Math.Clamp((int)MathF.Floor(srcX), 0, sample - 1);
+                int x1 = Math.Clamp(x0 + 1, 0, sample - 1);
+                float tx = Math.Clamp(srcX - x0, 0, 1);
+                float top = mask[y0 * sample + x0] * (1 - tx) + mask[y0 * sample + x1] * tx;
+                float bottom = mask[y1 * sample + x0] * (1 - tx) + mask[y1 * sample + x1] * tx;
+                coverage[(part.Y + y) * Width + part.X + x] =
+                    (byte)Math.Clamp((int)MathF.Round(top * (1 - ty) + bottom * ty), 0, 255);
+            }
+        }
+    }
 
     private static void ReadMask(Stream stream, byte[] coverage, Rectangle part)
     {
