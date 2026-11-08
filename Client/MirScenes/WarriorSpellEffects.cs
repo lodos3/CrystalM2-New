@@ -71,7 +71,7 @@ internal static partial class WarriorSpellEffects
                 break;
             case Spell.TwinDrakeBlade when visual.Phase == SpellVisualPhase.Prepare:
                 Vector2 crest = feet - Vector2.UnitY * (77 + 9 * Ease(progress * 2));
-                frame.Sprite(crest, 108, 79, Shape.Orb, 0x2939a4, .67f, light: true);
+                // Charge gathers as electrical filaments, never a large oval glow.
                 frame.Sprite(crest, 43, 47, Shape.Flash, Ice, .89f, Layer.EmissiveCore);
                 for (int i = -1; i <= 1; i++)
                 {
@@ -118,35 +118,91 @@ internal static partial class WarriorSpellEffects
 
     private static void Engulf(Frame frame, Vector2 feet, float progress, float time)
     {
-        float ignition = .60f + .40f * Ease(progress * 5);
-        for (int i = 0; i < 5; i++)
+        // No radial floor disc or elliptical explosion: the burning hit grows
+        // upward in staggered tongues, smoke plumes and flying embers.
+        float ignition = .66f + .34f * Ease(progress * 5f);
+        for (int i = 0; i < 7; i++)
         {
-            float angle = (i + frame.Unit(i + 13) * .37f) * MathF.Tau / 5;
-            Vector2 root = feet + Ellipse(angle, 26, 15);
-            float height = (74 + frame.Unit(i + 6) * 49) * ignition;
-            WizardSpellEffects.Flames(frame, root, 22 + frame.Unit(i) * 11, height, time, .94f, i, Depth(angle));
+            int seed = 71 + i * 29;
+            float x = (i - 3) * 13f + (frame.Unit(seed) - .5f) * 9f;
+            Vector2 root = feet + new Vector2(x, -2 - frame.Unit(seed + 3) * 12);
+            float height = (66 + frame.Unit(seed + 7) * 64) * ignition;
+            float phase = time * (.80f + frame.Unit(seed + 17) * .29f) + frame.Unit(seed + 25);
+            float lean = (frame.Unit(seed + 33) - .5f) * 13;
+            Vector2 flame = root + new Vector2(lean * .45f, -height * .45f);
+
+            frame.Clip(flame, 21 + frame.Unit(seed + 35) * 15, height,
+                Shape.FlameSequence, phase, i % 3 == 0 ? Heat : i % 2 == 0 ? Flame : Ember,
+                .92f, i % 3 == 0 ? Layer.EmissiveCore : Layer.Emissive,
+                rotation: lean / MathF.Max(50, height), light: i % 3 == 0);
+            frame.Sprite(root + new Vector2(lean * .65f, -height * .48f), 10 + frame.Unit(seed + 42) * 9,
+                height * .75f, Shape.FlameTongue, i % 2 == 0 ? Heat : Flame,
+                .70f, Layer.EmissiveCore, lean / MathF.Max(50, height));
+            frame.Thread(root - Vector2.UnitY * 9,
+                root + new Vector2(lean * .43f, -height * .74f),
+                2.2f, .6f, Heat, .56f, Layer.EmissiveCore);
+
+            // Dark smoke rises from the same burning line, not a circular ring.
+            if (i % 2 == 0)
+            {
+                float age = Fract(time * .42f + frame.Unit(seed + 61));
+                Vector2 plume = root + new Vector2(lean * age,
+                    -height * (.78f + .17f * age) - age * 34);
+                frame.Clip(plume, 33 + age * 24, 46 + age * 31,
+                    Shape.SmokeSequence, age + i * .17f, Smoke,
+                    .46f * (1 - age * .75f), Layer.Smoke);
+            }
+
+            for (int j = 0; j < 2; j++)
+            {
+                int index = seed + j * 13;
+                float age = Fract(progress * (2.1f + frame.Unit(index + 81)) + frame.Unit(index + 92));
+                Vector2 spark = root + new Vector2((frame.Unit(index + 111) - .5f) * 28,
+                    -height * (.14f + age * .67f));
+                frame.Sprite(spark, 4 + frame.Unit(index + 121) * 5,
+                    8 + frame.Unit(index + 132) * 8,
+                    Shape.WarriorSpark, Heat, .90f * (1 - age * .65f),
+                    Layer.EmissiveCore, light: j == 0 && i % 3 == 0);
+            }
         }
-        frame.Clip(feet - Vector2.UnitY * 68, 87, 116, Shape.SmokeSequence, .15f + time * .48f,
-            0x5d3126, .48f, Layer.Smoke);
-        frame.Sparks(feet - Vector2.UnitY * 22, 17, 51, 30, progress, Heat, rise: 84, shape: Shape.WarriorSpark);
     }
 
     private static void DrakeContact(Frame frame, Vector2 feet, float progress, float time)
     {
+        // Pure electrical impact: branching, strobing arcs and needle-like
+        // flashes. No orb, halo, circular ground pulse or flame component.
         Vector2 body = feet - Vector2.UnitY * 38;
-        frame.Sprite(body, 109, 118, Shape.Orb, 0x1b307e, .72f, light: true);
-        frame.Sprite(feet, 73, 47, Shape.Orb, 0x425fdc, .53f, Layer.Ground, light: true);
-        for (int i = -1; i <= 1; i += 2)
+        frame.Sprite(body, 32, 49, Shape.Flash, White,
+            .90f * (1 - Ease(progress * .65f)), Layer.EmissiveCore, light: true);
+
+        for (int side = -1; side <= 1; side += 2)
         {
-            Vector2 end = body + new Vector2(i * (24 + progress * 29), -35 - progress * 18);
-            WizardSpellEffects.Channel(frame, body + new Vector2(i * 4, 8), end, 19, 2.65f, .84f, time,
-                3, i + 5, colours: WizardSpellEffects.DrakeColours);
-            Vector2 ground = feet + new Vector2(i * (14 + progress * 10), i * 4);
-            WizardSpellEffects.Channel(frame, body + new Vector2(i * 12, -16), ground, 11, 1.55f, .71f,
-                time + .07f, 1, i + 38, colours: WizardSpellEffects.DrakeColours);
+            Vector2 root = body + new Vector2(side * 7, 9);
+            Vector2 overhead = body + new Vector2(side * (40 + progress * 47), -39 - progress * 26);
+            Vector2 ground = feet + new Vector2(side * (21 + progress * 24), 1);
+            WizardSpellEffects.Channel(frame, root, overhead, 27, 3.2f, .96f,
+                time, 4, 123 + side * 71, colours: WizardSpellEffects.DrakeColours);
+            WizardSpellEffects.Channel(frame, root, ground, 19, 2.45f, .86f,
+                time + .08f, 3, 421 + side * 67, colours: WizardSpellEffects.DrakeColours);
+            WizardSpellEffects.Channel(frame, overhead, ground + new Vector2(-side * 9, -18),
+                15, 1.8f, .71f, time + .16f, 2, 639 + side * 41,
+                colours: WizardSpellEffects.DrakeColours);
+
+            for (int i = 0; i < 12; i++)
+            {
+                int seed = 712 + i * 31 + (side + 1) * 89;
+                float age = Fract(progress * 2.9f + frame.Unit(seed));
+                float along = frame.Unit(seed + 7);
+                Vector2 point = Vector2.Lerp(root, i % 2 == 0 ? overhead : ground, along) +
+                    new Vector2(side * (age * 17 + frame.Unit(seed + 11) * 8),
+                        -age * (12 + frame.Unit(seed + 13) * 16));
+                frame.Sprite(point, 3 + frame.Unit(seed + 19) * 5,
+                    7 + frame.Unit(seed + 23) * 13,
+                    i % 4 == 0 ? Shape.Flash : Shape.WarriorSpark,
+                    i % 3 == 0 ? White : Ice, .90f * (1 - age * .72f),
+                    Layer.EmissiveCore, side * .17f, light: i % 5 == 0);
+            }
         }
-        frame.Sprite(body, 34, 39, Shape.WarriorSpark, White, .86f * (1 - Ease(progress)), Layer.EmissiveCore, light: true);
-        frame.Sparks(body, 21, 57, 46, progress, Ice, 14);
     }
 
     private static void Strike(Frame frame, Spell spell, Vector2 feet, Vector2 facing, float progress)
