@@ -252,7 +252,7 @@ internal static partial class TaoistSpellEffects
 
     private static void Pet(Frame frame, Vector2 feet, float progress, float time, bool aura)
     {
-        Vector2 centre = feet - Vector2.UnitY * (aura ? 91 : 48);
+        Vector2 centre = feet - Vector2.UnitY * (aura ? 78 : 48);
         if (!aura)
         {
             float open = .57f + .43f * Ease(progress * 2.7f);
@@ -261,11 +261,14 @@ internal static partial class TaoistSpellEffects
             frame.Sparks(centre, 17, 43 * open, 52 * open, progress, Gold, 38);
             return;
         }
-        float flicker = .79f + .21f * MathF.Sin(progress * MathF.Tau);
-        frame.Sprite(centre, 77, 82, Shape.Orb, 0xf44b18, .84f * flicker, light: true);
-        frame.Sprite(centre, 60, 81, Shape.ArmourGlyph, Amber, .88f);
-        frame.Sprite(centre, 48, 67, Shape.Claw, Gold, .69f, Layer.EmissiveCore, .14f * MathF.Sin(time));
-        frame.Sparks(centre, 7, 31, 39, progress, Ivory, 20);
+        // A small, shallow rune above the head: no giant vertical banner.
+        float flicker = .84f + .16f * MathF.Sin(progress * MathF.Tau * 2f);
+        frame.Sprite(centre, 35, 37, Shape.ArmourGlyph, Amber, .90f * flicker);
+        frame.Sprite(centre, 23, 27, Shape.Claw, Gold, .73f * flicker,
+            Layer.EmissiveCore, .06f * MathF.Sin(time * 3f));
+        frame.Sprite(centre, 19, 22, Shape.Flash, Ivory, .31f * flicker,
+            Layer.EmissiveCore, light: true);
+        frame.Sparks(centre, 4, 13, 14, progress, Ivory, 10);
     }
 
     private static void HealingCircle(Frame frame, Vector2 feet, float progress, float time, bool field, float fieldSize)
