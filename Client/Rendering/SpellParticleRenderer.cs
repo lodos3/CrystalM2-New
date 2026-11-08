@@ -53,7 +53,7 @@ internal sealed class SpellParticleRenderer
                     _device.Blend = SpriteBlendMode.Alpha;
                     DrawLayer(particles);
                 }
-                if (glowPolicy.ShowGlow) DrawGlowLayers(groundParticles: true);
+                if (glowPolicy.ShowGlow) DrawGlowLayers(particles, groundParticles: true);
             }
             else if (emissiveOverlay)
             {
@@ -66,7 +66,7 @@ internal sealed class SpellParticleRenderer
                     _device.Blend = SpriteBlendMode.Additive;
                     DrawLayer(particles, SpellParticleLayer.EmissiveCore);
                 }
-                if (glowPolicy.ShowGlow) DrawGlowLayers(groundParticles: false);
+                if (glowPolicy.ShowGlow) DrawGlowLayers(particles, groundParticles: false);
             }
             else if (glowPolicy.ShowAuthored)
             {
@@ -85,19 +85,19 @@ internal sealed class SpellParticleRenderer
             _device.AuxiliaryTexture = previousAuxiliary;
         }
 
-        void DrawGlowLayers(bool groundParticles)
+        void DrawGlowLayers(ReadOnlySpan<SpellParticle> source, bool groundParticles)
         {
             // F12 Glow blend takes precedence over the general Particles blend
             // for this specific pass, then the caller's artwork state is restored.
             _device.ArtworkBlend = null;
             _device.Blend = glowPolicy.ScreenBlend ? SpriteBlendMode.Screen : SpriteBlendMode.Additive;
             if (groundParticles)
-                DrawLayer(particles, glowPass: true);
+                DrawLayer(source, glowPass: true);
             else
             {
-                DrawLayer(particles, SpellParticleLayer.Glow, glowPass: true);
-                DrawLayer(particles, SpellParticleLayer.Emissive, glowPass: true);
-                DrawLayer(particles, SpellParticleLayer.EmissiveCore, glowPass: true);
+                DrawLayer(source, SpellParticleLayer.Glow, glowPass: true);
+                DrawLayer(source, SpellParticleLayer.Emissive, glowPass: true);
+                DrawLayer(source, SpellParticleLayer.EmissiveCore, glowPass: true);
             }
             _device.ArtworkBlend = previousArtworkBlend;
         }
