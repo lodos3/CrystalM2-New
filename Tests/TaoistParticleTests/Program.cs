@@ -192,6 +192,17 @@ Check(RenderWizard(Spell.ThunderBolt, SpellVisualPhase.Impact, 340)
 Check(RenderWizard(Spell.MeteorStrike, SpellVisualPhase.Field, 660, 1200)
     .Any(p => p.Shape == SpellParticleShape.UserRock),
     "Meteor Strike should carry textured debris, not only glowing orbs.");
+// Weapon contacts and fireball impacts use the imported detailed silhouettes,
+// avoiding the previous large round orb/billboard effects.
+var halfMoonImpact = RenderWarrior(Spell.HalfMoon, SpellVisualPhase.Contact, 230, 390);
+Check(halfMoonImpact.Any(p => p.Shape == SpellParticleShape.UserSlash) &&
+      !halfMoonImpact.Any(p => p.Shape == SpellParticleShape.Orb),
+    "Physical warrior contact needs textured blade detail without a round backdrop.");
+var fireballImpact = RenderWizard(Spell.FireBall, SpellVisualPhase.Impact, 270, 600);
+Check(fireballImpact.Any(p => p.Shape == SpellParticleShape.UserFlame &&
+      p.Emissive) && !fireballImpact.Any(p => p.Shape == SpellParticleShape.Orb),
+    "Wizard Fire Ball should burst as layered textured fire instead of a glowing orb.");
+
 var curseAtAim = Render(Spell.Curse, SpellVisualPhase.Impact, 850, 2000);
 Check(curseAtAim.Any(p => p.Shape == SpellParticleShape.CurseGlyph),
     "Curse must render a complete rune on the aimed map cell.");
