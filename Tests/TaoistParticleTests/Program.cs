@@ -17,6 +17,17 @@ static SpellParticle[] Render(Spell spell, SpellVisualPhase phase, long elapsed,
         elapsed, 0L, duration, 1.28f, 42u, 0u, 354f]);
     return pool.Active.ToArray();
 }
+static SpellParticle[] RenderWarrior(Spell spell, SpellVisualPhase phase, long elapsed, int duration = 800)
+{
+    var type = typeof(SpellVisual).Assembly.GetType("Client.MirScenes.WarriorSpellEffects")
+        ?? throw new InvalidOperationException("Warrior renderer missing.");
+    var draw = type.GetMethod("DrawFrame", BindingFlags.Static | BindingFlags.NonPublic)
+        ?? throw new InvalidOperationException("Warrior draw method missing.");
+    var pool = new SpellParticlePool(8192);
+    draw.Invoke(null, [pool, new SpellVisual(spell, phase), new Vector2(400, 400), Vector2.UnitX,
+        elapsed, 0L, duration, 1.28f, 42u, null]);
+    return pool.Active.ToArray();
+}
 static void Check(bool condition, string message)
 {
     if (!condition) throw new InvalidOperationException(message);
@@ -65,9 +76,54 @@ Check(hideRecipient.Any(p => p.Shape == SpellParticleShape.SmokeSequence) &&
 
 var shieldA = Render(Spell.EnergyShield, SpellVisualPhase.Aura, 160, 800);
 var shieldB = Render(Spell.EnergyShield, SpellVisualPhase.Aura, 470, 800);
-Check(shieldA.Length > 0 && shieldB.Length > 0 &&
-    !shieldA.Select(p => p.Origin).SequenceEqual(shieldB.Select(p => p.Origin)),
-    "Energy Shield aura must drift/pulse over time.");
+// The exterior shell is immobile relative to the actor; only electricity moves.
+var shellA = shieldA.Where(p => p.Shape == SpellParticleShape.Filament &&
+    p.Layer == SpellParticleLayer.Emissive).Select(p => (p.Origin, p.Ribbon)).ToArray();
+var shellB = shieldB.Where(p => p.Shape == SpellParticleShape.Filament &&
+    p.Layer == SpellParticleLayer.Emissive).Select(p => (p.Origin, p.Ribbon)).ToArray();
+var electricA = shieldA.Where(p => p.Shape == SpellParticleShape.Filament &&
+    p.Layer == SpellParticleLayer.EmissiveCore).Select(p => p.Origin).ToArray();
+var electricB = shieldB.Where(p => p.Shape == SpellParticleShape.Filament &&
+    p.Layer == SpellParticleLayer.EmissiveCore).Select(p => p.Origin).ToArray();
+Check(shellA.Length >= 24 && shellA.SequenceEqual(shellB),
+    "Energy Shield shell must remain stationary across the aura cycle.");
+Check(electricA.Length >= 24 && !electricA.SequenceEqual(electricB),
+    "Energy Shield electricity must animate along its fixed shell.");
+Check(shieldA.Any(p => p.Shape == SpellParticleShape.Spark),
+    "Energy Shield must shed electric sparks from its side lines.");
+
+var petAura = Render(Spell.PetEnhancer, SpellVisualPhase.Aura, 400);
+var petRune = petAura.Where(p => p.Shape == SpellParticleShape.ArmourGlyph).ToArray();
+Check(petRune.Length == 1 && petRune[0].Dimensions(0, 1.28f).X <= 42 &&
+    petRune[0].Dimensions(0, 1.28f).Y <= 44 &&
+    petRune[0].Origin.Y < 400 - 65,
+    "Pet Enhancer overhead glyph must be compact, short and above the head.");
+
+foreach (Spell spell in new[] { Spell.FlamingSword, Spell.TwinDrakeBlade })
+{
+    var contact = RenderWarrior(spell, SpellVisualPhase.Contact, 270);
+    Check(contact.Length > 0, $"Missing warrior hit visuals for {spell}");
+    Check(!contact.Any(p => p.Shape is SpellParticleShape.Orb or SpellParticleShape.Halo or
+        SpellParticleShape.WarriorRing or SpellParticleShape.WarriorImpact),
+        $"Warrior hit {spell} must not draw circular or oval background effects.");
+    if (spell == Spell.FlamingSword)
+        Check(contact.Any(p => p.Shape == SpellParticleShape.SmokeSequence) &&
+              contact.Any(p => p.Shape == SpellParticleShape.FlameSequence) &&
+              contact.Any(p => p.Shape == SpellParticleShape.FlameTongue) &&
+              contact.Any(p => p.Shape == SpellParticleShape.WarriorSpark),
+            "Flaming Sword impact must use smoke, fire, burning tongues and embers.");
+    else
+        Check(contact.Any(p => p.Shape == SpellParticleShape.Filament &&
+              p.Layer == SpellParticleLayer.EmissiveCore) &&
+              contact.Any(p => p.Shape == SpellParticleShape.Spark ||
+                  p.Shape == SpellParticleShape.WarriorSpark) &&
+              !contact.Any(p => p.Shape is SpellParticleShape.FlameSequence or
+                  SpellParticleShape.FlameTongue or SpellParticleShape.SmokeSequence),
+            "Twin Drake Blade impact must be electric arcs and sparks without flames.");
+}
+Check(!RenderWarrior(Spell.TwinDrakeBlade, SpellVisualPhase.Prepare, 270, 500)
+    .Any(p => p.Shape is SpellParticleShape.Orb or SpellParticleShape.Halo),
+    "Twin Drake Blade preparation must have no floating oval backdrop.");
 
 foreach (Spell summon in new[] { Spell.SummonSkeleton, Spell.SummonHolyDeva, Spell.SummonShinsu })
     Check(Render(summon, SpellVisualPhase.Impact, 480).Any(p => p.Shape == SpellParticleShape.Spark),
