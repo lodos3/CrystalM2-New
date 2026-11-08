@@ -241,6 +241,31 @@ static class Program
             Assertions.True(centre > 0 && atlas[row + part.Left - 1] == centre && atlas[row + part.Right] == centre,
                 "Ribbon coverage must continue across both joins when the GPU filters it.");
         }
+        // Five source masks are packed into the Core assembly, not generated from
+        // primitive geometry or loaded from missing runtime texture folders.
+        foreach (var textured in new[]
+            {
+                SpellParticleShape.UserFlame, SpellParticleShape.UserLightning,
+                SpellParticleShape.UserEmber, SpellParticleShape.UserSlash,
+                SpellParticleShape.UserRock
+            })
+        {
+            Rectangle part = SpellParticleAtlas.Part(textured);
+            Assertions.True(part.Width == SpellParticleAtlas.Resolution &&
+                part.Height == SpellParticleAtlas.Resolution,
+                $"Packed texture {textured} must have a full atlas cell.");
+            int covered = 0, transitions = 0;
+            for (int y = part.Top; y < part.Bottom; y++)
+            for (int x = part.Left; x < part.Right; x++)
+            {
+                byte a = atlas[y * SpellParticleAtlas.Width + x];
+                if (a != 0) covered++;
+                if (x > part.Left && a != atlas[y * SpellParticleAtlas.Width + x - 1])
+                    transitions++;
+            }
+            Assertions.True(covered > 120 && transitions > 100,
+                $"Packed user texture {textured} must contain detailed coverage rather than a blank primitive.");
+        }
         var shapes = Enum.GetValues<SpellParticleShape>().Where(shape => shape != SpellParticleShape.Slash).ToArray();
         var distinct = new HashSet<Rectangle>();
         foreach (SpellParticleShape shape in shapes)
