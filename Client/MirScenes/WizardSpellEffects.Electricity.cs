@@ -93,6 +93,12 @@ internal static partial class WizardSpellEffects
             float thickness = thread * (.34f + decay * .78f);
             frame.Thread(points[i - 1], points[i], thickness, thickness * (.78f + .20f * decay),
                 i % 4 == 0 ? palette.Filament : palette.Core, alpha * (.63f + .37f * decay), core, sortY: sortY);
+            if (i % 3 == 0)
+                // Fine raster lightning detail rides each jagged section.
+                // The bright authored core stays readable at low F12 glow.
+                frame.Sprite(centre, segment.Length() + 9, 8 + width * 1.9f,
+                    Shape.UserLightning, i % 2 == 0 ? palette.Core : palette.Filament,
+                    alpha * .53f * decay, core, angle, sortY: sortY);
             if (i % 3 == 1)
             {
                 float shift = (frame.Unit(i + offset + flash * 51) - .5f) * 22;
