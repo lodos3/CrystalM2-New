@@ -133,8 +133,11 @@ internal static partial class WarriorSpellEffects
 
             frame.Clip(flame, 21 + frame.Unit(seed + 35) * 15, height,
                 Shape.FlameSequence, phase, i % 3 == 0 ? Heat : i % 2 == 0 ? Flame : Ember,
-                .92f, i % 3 == 0 ? Layer.EmissiveCore : Layer.Emissive,
+                .80f, i % 3 == 0 ? Layer.EmissiveCore : Layer.Emissive,
                 rotation: lean / MathF.Max(50, height), light: i % 3 == 0);
+            frame.Sprite(flame, 23 + frame.Unit(seed + 35) * 13, height * .87f,
+                Shape.UserFlame, i % 2 == 0 ? Flame : Heat, .71f,
+                Layer.Emissive, rotation: lean / MathF.Max(50, height));
             frame.Sprite(root + new Vector2(lean * .65f, -height * .48f), 10 + frame.Unit(seed + 42) * 9,
                 height * .75f, Shape.FlameTongue, i % 2 == 0 ? Heat : Flame,
                 .70f, Layer.EmissiveCore, lean / MathF.Max(50, height));
@@ -161,7 +164,8 @@ internal static partial class WarriorSpellEffects
                     -height * (.14f + age * .67f));
                 frame.Sprite(spark, 4 + frame.Unit(index + 121) * 5,
                     8 + frame.Unit(index + 132) * 8,
-                    Shape.WarriorSpark, Heat, .90f * (1 - age * .65f),
+                    j % 2 == 0 ? Shape.UserEmber : Shape.WarriorSpark, Heat,
+                    .90f * (1 - age * .65f),
                     Layer.EmissiveCore, light: j == 0 && i % 3 == 0);
             }
         }
@@ -182,6 +186,12 @@ internal static partial class WarriorSpellEffects
             Vector2 ground = feet + new Vector2(side * (21 + progress * 24), 1);
             WizardSpellEffects.Channel(frame, root, overhead, 27, 3.2f, .96f,
                 time, 4, 123 + side * 71, colours: WizardSpellEffects.DrakeColours);
+            Vector2 streak = Vector2.Lerp(root, overhead, .58f);
+            float angle = MathF.Atan2(overhead.Y - root.Y, overhead.X - root.X);
+            frame.Sprite(streak, Vector2.Distance(root, overhead) * .79f, 20,
+                Shape.UserLightning, side < 0 ? Ice : Steel,
+                .58f * (.75f + .25f * MathF.Sin(time * 24 + side)),
+                Layer.EmissiveCore, angle);
             WizardSpellEffects.Channel(frame, root, ground, 19, 2.45f, .86f,
                 time + .08f, 3, 421 + side * 67, colours: WizardSpellEffects.DrakeColours);
             WizardSpellEffects.Channel(frame, overhead, ground + new Vector2(-side * 9, -18),
@@ -198,7 +208,7 @@ internal static partial class WarriorSpellEffects
                         -age * (12 + frame.Unit(seed + 13) * 16));
                 frame.Sprite(point, 3 + frame.Unit(seed + 19) * 5,
                     7 + frame.Unit(seed + 23) * 13,
-                    i % 4 == 0 ? Shape.Flash : Shape.WarriorSpark,
+                    i % 4 == 0 ? Shape.UserEmber : Shape.WarriorSpark,
                     i % 3 == 0 ? White : Ice, .90f * (1 - age * .72f),
                     Layer.EmissiveCore, side * .17f, light: i % 5 == 0);
             }
