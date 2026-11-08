@@ -139,7 +139,8 @@ internal sealed class SpellParticleRenderer
                     tint = new Vector4(visible, tint.W);
                 }
                 var source = SpellParticleAtlas.Part(particle.Shape, particle.Direction, particle.Frame);
-                float depth = occlusion != null && !ground && !emission && particle.DepthY is { } sortY
+                float depth = occlusion != null && !ground && !emission && !particle.AlwaysOnTop &&
+                    particle.DepthY is { } sortY
                     ? Math.Max(1, MathF.Floor(sortY / cellHeight) - depthOrigin)
                     : 0;
                 if (particle.Ribbon is { } ribbon)
