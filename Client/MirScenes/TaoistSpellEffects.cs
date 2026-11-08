@@ -41,7 +41,8 @@ internal static partial class TaoistSpellEffects
         bool hit = visual.Phase == SpellVisualPhase.Hit;
         if (aura) progress = now % duration / (float)duration;
         float strength = aura || ground ? 1 : Envelope(progress);
-        var frame = new Frame(pool, feet, now, strength, size, seed ^ (uint)visual.Spell * 0x2d5bu, field);
+        var frame = new Frame(pool, feet, now, strength, size, seed ^ (uint)visual.Spell * 0x2d5bu, field,
+            alwaysOnTop: visual.Spell is Spell.SoulShield or Spell.BlessedArmour or Spell.Curse);
         if (visual.Phase == SpellVisualPhase.Expire)
         {
             frame.Sparks(feet, 8, 25, 13, progress, Ice, 23);
