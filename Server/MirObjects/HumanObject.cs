@@ -4957,11 +4957,14 @@ namespace Server.MirObjects
 
             ConsumeItem(item, 1);
 
-            if (Envir.Random.Next(10 - ((magic.Level + 1) * 2)) > 2) return;
-
+            // The cast animation is independent from the debuff roll. A failed
+            // curse still produces one rune at the aimed cell, even on empty ground.
+            bool canAfflict = Envir.Random.Next(10 - ((magic.Level + 1) * 2)) <= 2;
+            int curseStrength = canAfflict ? 1 + ((magic.Level + 1) * 2) : 0;
             int delay = Functions.MaxDistance(CurrentLocation, location) * 50 + 500; //50 MS per Step
 
-            DelayedAction action = new DelayedAction(DelayedType.Magic, Envir.Time + delay, this, magic, magic.GetDamage(GetAttackPower(Stats[Stat.MinSC], Stats[Stat.MaxSC])), location, 1 + ((magic.Level + 1) * 2));
+            DelayedAction action = new DelayedAction(DelayedType.Magic, Envir.Time + delay, this, magic,
+                magic.GetDamage(GetAttackPower(Stats[Stat.MinSC], Stats[Stat.MaxSC])), location, curseStrength);
             CurrentMap.ActionList.Add(action);
 
         }
