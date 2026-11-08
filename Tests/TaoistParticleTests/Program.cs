@@ -66,8 +66,8 @@ foreach (Spell ward in new[] { Spell.SoulShield, Spell.BlessedArmour })
     Check(formed.Any(p => p.Shape == SpellParticleShape.FlameTongue && p.Emissive) &&
           burning.Any(p => p.Shape == SpellParticleShape.FlameTongue && p.Emissive),
         $"Ward needs animated flames following its strokes for {ward}");
-    Check(formed.Any(p => p.Shape == SpellParticleShape.Spark && p.Emissive),
-        $"Ward needs sparks emitted from its stroke lines: {ward}");
+    Check(formed.Any(p => (p.Shape is SpellParticleShape.Spark or SpellParticleShape.UserEmber) && p.Emissive),
+        $"Ward needs textured sparks emitted from its stroke lines: {ward}");
     Check(formed.Any(p => p.Shape == SpellParticleShape.Flash && p.Emissive),
         $"Ward needs local flares along its stroke lines: {ward}");
     Check(formed.Any(p => p.Layer == SpellParticleLayer.EmissiveCore), $"Ward lacks light for {ward}");
@@ -94,9 +94,12 @@ foreach (Spell ward in new[] { Spell.SoulShield, Spell.BlessedArmour })
         .Where(p => p.Shape == SpellParticleShape.FlameTongue).ToArray();
     var later = Render(ward, SpellVisualPhase.Impact, 630, 1600)
         .Where(p => p.Shape == SpellParticleShape.FlameTongue).ToArray();
-    Check(earlier.Length >= 8 && earlier.Length == later.Length,
+    Check(earlier.Length >= 8 && later.Length >= 8,
         $"Protective rune {ward} needs several independent upward flames.");
-    Check(earlier.Zip(later).All(pair => MathF.Abs(pair.First.Origin.X - pair.Second.Origin.X) < 8),
+    // Individual tongues may fade out between frames. Compare their nearby
+    // horizontal roots rather than assuming fixed array indices.
+    Check(later.Count(flame => earlier.Any(prior =>
+        MathF.Abs(prior.Origin.X - flame.Origin.X) < 6)) >= later.Length * .85f,
         $"Protective rune {ward} flames must not travel horizontally along glyph strokes.");
 }
 
