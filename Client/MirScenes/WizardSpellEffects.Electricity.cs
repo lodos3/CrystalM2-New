@@ -226,7 +226,8 @@ internal static partial class WizardSpellEffects
         {
             Vector2 bottom = feet - Vector2.UnitY * 86;
             Channel(frame, bottom + new Vector2(-7, -68), bottom, 10, 2.6f, .83f, time, 2, 12);
-            frame.Sprite(bottom - Vector2.UnitY * 15, 40, 57, Shape.Orb, Blue, .58f, light: true);
+            frame.Sprite(bottom - Vector2.UnitY * 15, 31, 71,
+                Shape.UserLightning, Blue, .76f, Layer.EmissiveCore, light: true);
             return;
         }
 
@@ -237,10 +238,12 @@ internal static partial class WizardSpellEffects
             Channel(frame, feet - Vector2.UnitY * 6, head, 42, 6.1f, power, time, 9, 22);
             Channel(frame, feet + new Vector2(-5, -15), head + new Vector2(17, 0), 55, 3.6f, power * .87f, time + .035f, 6, 417);
             Channel(frame, feet + new Vector2(4, -14), head - new Vector2(18, 0), 31, 3.3f, power * .94f, time, 4, 22);
-            frame.Sprite(feet - Vector2.UnitY * 28, 84, 109, Shape.Wisp, Blue, power * .92f, light: true);
+            frame.Sprite(feet - Vector2.UnitY * 28, 34, 118,
+                Shape.UserLightning, Blue, power * .79f, Layer.EmissiveCore, light: true);
             frame.Sprite(feet - Vector2.UnitY * 31, 46, 91, Shape.Flash, White, power * .90f, Layer.EmissiveCore, light: true);
         }
-        frame.Sprite(feet, 145, 82, Shape.Orb, Blue, .82f, Layer.Ground, light: true);
+        frame.Sprite(feet - Vector2.UnitY * 7, 117, 36,
+            Shape.UserLightning, Blue, .56f, Layer.Ground, light: true);
         for (int i = 0; i < 8; i++)
         {
             float angle = (i + frame.Unit(i)) * MathF.Tau / 8;
@@ -253,7 +256,8 @@ internal static partial class WizardSpellEffects
     private static void ThunderStorm(Frame frame, Vector2 feet, float progress, float time)
     {
         float radius = 129 * (.49f + .51f * Ease(progress * 3.4f));
-        frame.Sprite(feet, radius * 2.5f, radius * 1.47f, Shape.Orb, Blue, .42f, Layer.Ground, light: true);
+        // Grounded strikes are made of independent bolts; never fill the
+        // entire radius with an opaque blue disc.
         for (int i = 0; i < 13; i++)
         {
             float angle = (i + frame.Unit(i)) * MathF.Tau / 13 + progress * .71f;
@@ -265,8 +269,10 @@ internal static partial class WizardSpellEffects
             Channel(frame, root, flare, 14, 2.0f, .75f, time, 1, 153 + i * 31, Depth(angle));
         }
         Vector2 body = feet - Vector2.UnitY * 34;
-        frame.Sprite(body, 76, 91, Shape.Flame, PaleBlue, .71f, light: true);
-        frame.Sprite(body, 47, 63, Shape.Orb, White, .88f * (1 - progress * .68f), Layer.EmissiveCore);
+        frame.Sprite(body, 62, 91, Shape.UserLightning, PaleBlue,
+            .69f, Layer.EmissiveCore, rotation: progress * .2f, light: true);
+        frame.Sprite(body + new Vector2(3, -15), 25, 68,
+            Shape.UserLightning, White, .88f * (1 - progress * .68f), Layer.EmissiveCore);
         frame.Sparks(feet - Vector2.UnitY * 13, 18, radius, radius * FloorAspect, progress, PaleBlue, rise: 21);
     }
 
@@ -281,11 +287,12 @@ internal static partial class WizardSpellEffects
             Vector2 to = centre + Ellipse(angle + .55f, radius, radius * .77f);
             Layer layer = Depth(angle + .26f);
             Channel(frame, from, to, 24, 5.3f, .92f, time, 1, i * 117, layer);
-            frame.Sprite(from, 78, 63, Shape.Orb, Blue, .41f, layer, light: i % 2 == 0);
+            frame.Sprite(from, 40, 76, Shape.UserLightning, i % 2 == 0 ? PaleBlue : Blue,
+                .47f, layer, angle, light: i % 2 == 0);
             Vector2 edge = Ellipse(angle + frame.Unit(i) * .36f, 20 + 29 * frame.Unit(i + 19), 28);
             Channel(frame, from, from + edge, 14, 2.9f, .78f, time, 1, 291 + i * 57, layer);
         }
-        frame.Orbit(centre, radius - 13, (radius - 13) * .77f, .13f, MathF.Tau, Blue, 17, .53f);
+        // No orbit/ring billboard; moving arcs already define the storm. 
         frame.Sparks(centre, 16, radius * 1.07f, radius * .89f, progress, PaleBlue, rise: 17);
     }
 
@@ -293,8 +300,10 @@ internal static partial class WizardSpellEffects
     {
         Vector2 centre = feet - Vector2.UnitY * 41;
         float radius = 13 + 26 * Ease(progress * 2.4f);
-        frame.Sprite(centre, 81, 72, Shape.Orb, Blue, .80f, light: true);
-        frame.Sprite(centre, 57, 65, Shape.Flame, PaleBlue, .79f, rotation: progress * 1.6f);
+        frame.Sprite(centre, 67, 86, Shape.UserLightning, Blue, .80f,
+            Layer.Emissive, rotation: progress * .24f, light: true);
+        frame.Sprite(centre, 39, 73, Shape.UserLightning, PaleBlue, .79f,
+            Layer.EmissiveCore, rotation: -.18f + progress * .34f);
         frame.Sprite(centre, 41, 47, Shape.Flash, White, .86f * (1 - progress), Layer.EmissiveCore, light: true);
         for (int i = 0; i < 6; i++)
         {
