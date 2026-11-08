@@ -1807,6 +1807,14 @@ namespace Server.MirEnvir
                     location = (Point)data[3];
                     value2 = (int)data[4];
 
+                    // A zero strength indicates a valid cast whose debuff
+                    // roll failed. Emit the rune, but never apply a poison.
+                    if (value2 == 0)
+                    {
+                        player.BroadcastLegacyImpact(magic.Spell, location);
+                        break;
+                    }
+
                     int curseRadius = magic.Area(3);
                     for (int y = location.Y - curseRadius; y <= location.Y + curseRadius; y++)
                     {
