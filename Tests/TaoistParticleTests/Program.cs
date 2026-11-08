@@ -17,6 +17,17 @@ static SpellParticle[] Render(Spell spell, SpellVisualPhase phase, long elapsed,
         elapsed, 0L, duration, 1.28f, 42u, 0u, 354f]);
     return pool.Active.ToArray();
 }
+static SpellParticle[] RenderWizard(Spell spell, SpellVisualPhase phase, long elapsed, int duration = 800)
+{
+    var type = typeof(SpellVisual).Assembly.GetType("Client.MirScenes.WizardSpellEffects")
+        ?? throw new InvalidOperationException("Wizard renderer missing.");
+    var draw = type.GetMethod("DrawFrame", BindingFlags.Static | BindingFlags.NonPublic)
+        ?? throw new InvalidOperationException("Wizard draw method missing.");
+    var pool = new SpellParticlePool(8192);
+    draw.Invoke(null, [pool, new SpellVisual(spell, phase), new Vector2(400, 400), Vector2.UnitX,
+        elapsed, 0L, duration, 1.28f, 42u, 0u]);
+    return pool.Active.ToArray();
+}
 static SpellParticle[] RenderWarrior(Spell spell, SpellVisualPhase phase, long elapsed, int duration = 800)
 {
     var type = typeof(SpellVisual).Assembly.GetType("Client.MirScenes.WarriorSpellEffects")
@@ -156,6 +167,28 @@ foreach (Spell summon in new[] { Spell.SummonSkeleton, Spell.SummonHolyDeva, Spe
     Check(Render(summon, SpellVisualPhase.Impact, 480).Any(p => p.Shape == SpellParticleShape.Spark),
         $"Summoning rite should produce flare particles: {summon}");
 
+foreach (Spell ward in new[] { Spell.SoulShield, Spell.BlessedArmour })
+{
+    var textured = Render(ward, SpellVisualPhase.Impact, 680, 1600);
+    Check(textured.Any(p => p.Shape == SpellParticleShape.UserFlame) &&
+          textured.Any(p => p.Shape == SpellParticleShape.UserEmber),
+        $"Protective rune {ward} must use uploaded flame and ember coverage.");
+}
+Check(RenderWarrior(Spell.FlamingSword, SpellVisualPhase.Contact, 280)
+    .Any(p => p.Shape == SpellParticleShape.UserFlame),
+    "Flaming Sword hit should use imported directional flame artwork.");
+Check(RenderWarrior(Spell.TwinDrakeBlade, SpellVisualPhase.Contact, 280)
+    .Any(p => p.Shape == SpellParticleShape.UserLightning),
+    "Twin Drake impact should use imported lightning artwork.");
+Check(RenderWizard(Spell.FireWall, SpellVisualPhase.Field, 340)
+    .Any(p => p.Shape == SpellParticleShape.UserFlame),
+    "Fire Wall flames should use imported flame artwork.");
+Check(RenderWizard(Spell.ThunderBolt, SpellVisualPhase.Impact, 340)
+    .Any(p => p.Shape == SpellParticleShape.UserLightning),
+    "Thunder Bolt should use imported lightning artwork.");
+Check(RenderWizard(Spell.MeteorStrike, SpellVisualPhase.Field, 660, 1200)
+    .Any(p => p.Shape == SpellParticleShape.UserRock),
+    "Meteor Strike should carry textured debris, not only glowing orbs.");
 var curseAtAim = Render(Spell.Curse, SpellVisualPhase.Impact, 850, 2000);
 Check(curseAtAim.Any(p => p.Shape == SpellParticleShape.CurseGlyph),
     "Curse must render a complete rune on the aimed map cell.");
