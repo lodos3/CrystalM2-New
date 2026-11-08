@@ -109,7 +109,11 @@ internal static partial class WizardSpellEffects
         // Pivot the flame at the lower edge of the clip to keep it on the floor.
         float column = height * 1.15f;
         Vector2 centre = root + new Vector2(MathF.Sin(sway), -MathF.Cos(sway)) * (column * .48f);
-        frame.Clip(centre, width * 1.42f, column, Shape.FlameSequence, phase, Fire, alpha,
+        frame.Clip(centre, width * 1.42f, column, Shape.FlameSequence, phase, Fire, alpha * .79f,
+            layer, sway, light: true, sortY: sortY);
+        frame.Sprite(centre - Vector2.UnitY * (height * .04f),
+            width * 1.12f, column * .91f, Shape.UserFlame, Fire,
+            alpha * (.77f + .12f * MathF.Sin(time * 8f + index)),
             layer, sway, light: true, sortY: sortY);
         frame.Clip(root + new Vector2(-width * .07f, -height * .63f), width * .61f, height * .80f,
             Shape.FlameSequence, phase + .49f, Ember, alpha * .81f, layer, sway * .65f, sortY: sortY);
@@ -449,7 +453,10 @@ internal static partial class WizardSpellEffects
             frame.Clip(head - tail * .51f, 76, tail.Length(), Shape.SmokeSequence, phase * .89f,
                 0x79331c, .74f, Layer.Smoke, -.29f);
             frame.Clip(head, 59, 76, Shape.FireSequence, phase * 1.52f, 0xef6026, .91f);
-            frame.Sprite(head, 47, 56, Shape.Flame, Gold, .91f, Layer.EmissiveCore, light: true);
+            frame.Sprite(head, 58, 67, Shape.UserRock, 0xdfb59a, .96f,
+                Layer.Emissive, rotation: -.28f + MathF.Sin(time * 9f) * .17f);
+            frame.Sprite(head + new Vector2(-4, 9), 47, 56, Shape.UserFlame,
+                Gold, .91f, Layer.EmissiveCore, light: true);
         }
         else
         {
@@ -457,6 +464,17 @@ internal static partial class WizardSpellEffects
             frame.Sprite(feet, 65, 37, Shape.Flame, Gold, .76f * flash, Layer.Ground, light: true);
             Flames(frame, feet, 47, 71 * (1.4f - phase), time, .88f * flash);
             frame.Sparks(feet, 9, 45, 22, phase, Gold, rise: 61);
+            for (int fragment = 0; fragment < 5; fragment++)
+            {
+                float age = Fract(phase * 1.7f + frame.Unit(fragment + 190));
+                Vector2 debris = feet + new Vector2(
+                    (frame.Unit(fragment + 200) - .5f) * (40 + 34 * age),
+                    -9 - (1 - age) * (18 + frame.Unit(fragment + 205) * 30));
+                frame.Sprite(debris, 11 + frame.Unit(fragment + 210) * 13,
+                    13 + frame.Unit(fragment + 215) * 14,
+                    Shape.UserRock, 0xad8c74, .78f * (1 - age * .57f),
+                    Layer.Emissive, age * (fragment % 2 == 0 ? 1.5f : -1.5f));
+            }
         }
     }
 
