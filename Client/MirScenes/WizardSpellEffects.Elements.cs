@@ -54,30 +54,66 @@ internal static partial class WizardSpellEffects
 
     private static void FireBurst(Frame frame, Vector2 centre, float progress, float diameter, bool fierce = false)
     {
-        float width = diameter * (.62f + .48f * Ease(progress * 2.7f));
-        float turn = progress * 3.7f;
-        frame.Clip(centre - Vector2.UnitY * (5 + 14 * progress), width * 1.28f, width * 1.20f, Shape.SmokeSequence,
-            progress * .78f, fierce ? 0x461e15 : 0x534037, progress * .57f, Layer.Smoke, turn * .35f);
-        frame.Clip(centre, width * 1.19f, width * 1.16f, Shape.FireSequence, progress * .82f,
-            fierce ? Ember : Fire, .94f, rotation: turn, light: true);
-        frame.Clip(centre, width * .82f, width * .85f, Shape.FireSequence, progress * .82f, Gold, .91f,
-            Layer.EmissiveCore, turn + .29f);
-        frame.Sprite(centre, width * .54f, width * .49f, Shape.Orb, Hot, .96f - .70f * progress, Layer.EmissiveCore, light: true);
-        frame.Sprite(centre, width * 1.56f, width * 1.34f, Shape.Wisp, fierce ? 0x9a2513 : Ember, .59f, Layer.Glow);
-        frame.Sparks(centre, fierce ? 24 : 18, width * .65f, width * .52f, progress, Gold, rise: fierce ? 22 : 11);
+        // A layered combustion front replaces the former round glow billboard.
+        // Smoke rises separately; sharp directional fire and embers follow.
+        float spread = diameter * (.57f + .41f * Ease(progress * 2.7f));
+        float burn = 1f - Ease((progress - .59f) / .41f);
+        float time = progress * (fierce ? 1.48f : 1.06f);
+
+        frame.Clip(centre - Vector2.UnitY * (19 + 39 * progress),
+            spread * 1.24f, spread * 1.18f, Shape.SmokeSequence,
+            time * .61f, fierce ? 0x461e15 : 0x534037,
+            .52f * (1 - burn * .28f), Layer.Smoke);
+        for (int i = 0; i < (fierce ? 9 : 7); i++)
+        {
+            int seed = i * 31 + 27;
+            float age = Fract(progress * (1.03f + frame.Unit(seed + 2) * .32f) + frame.Unit(seed + 7));
+            float x = (frame.Unit(seed + 13) - .5f) * spread * 1.11f;
+            float rise = age * (29 + frame.Unit(seed + 21) * 44);
+            Vector2 source = centre + new Vector2(x, -rise);
+            float lean = (frame.Unit(seed + 35) - .5f) * .33f;
+            int tint = i % 3 == 0 ? Hot : i % 3 == 1 ? Gold : (fierce ? Ember : Fire);
+            frame.Sprite(source - Vector2.UnitY * 19, 23 + spread * .18f,
+                62 + frame.Unit(seed + 39) * 54, Shape.UserFlame,
+                tint, .88f * burn * (1f - age * .46f),
+                i % 3 == 0 ? Layer.EmissiveCore : Layer.Emissive,
+                lean, light: i % 4 == 0);
+            frame.Clip(source - Vector2.UnitY * 7,
+                25 + spread * .14f, 54 + frame.Unit(seed + 41) * 36,
+                Shape.FlameSequence, time * 1.22f + frame.Unit(seed + 43),
+                tint, .63f * burn, Layer.Emissive, lean);
+            frame.Sprite(source + new Vector2(lean * 13, -9 - age * 29),
+                5 + frame.Unit(seed + 45) * 8, 8 + frame.Unit(seed + 47) * 10,
+                Shape.UserEmber, Hot, .82f * burn * (1 - age * .58f),
+                Layer.EmissiveCore, lean, light: i % 5 == 0);
+        }
     }
 
     private static void SearingImpact(Frame frame, Vector2 centre, float progress, int accent)
     {
-        float open = .56f + .44f * Ease(progress * 3);
-        float heat = 1 - Ease((progress - .39f) * 2.6f);
-        frame.Sprite(centre, 104 * open, 100 * open, Shape.Orb, Fire, .81f, light: true);
-        frame.Clip(centre, 91 * open, 86 * open, Shape.FireSequence, progress * .84f, accent, .87f * heat, rotation: progress * 1.8f);
-        frame.Clip(centre - Vector2.UnitY * (8 + progress * 21), 118 * open, 104 * open, Shape.SmokeSequence,
-            progress * .77f, 0x694032, .55f * progress, Layer.Smoke);
-        frame.Clip(centre, 57 * open, 64 * open, Shape.FireSequence, progress * .84f, 0xffffe9, .98f * heat, Layer.EmissiveCore, light: true);
-        frame.Sprite(centre, 53 * open, 59 * open, Shape.Flash, White, heat, Layer.EmissiveCore, .37f);
-        frame.Sparks(centre, 21, 43, 47, progress, accent, rise: 24);
+        // Great Fire Ball / Fire Bounce / Meteor Shower are impact events:
+        // fast ignition, textured inner combustion, smoky aftermath.
+        float open = .56f + .44f * Ease(progress * 3f);
+        float heat = 1f - Ease((progress - .39f) * 2.6f);
+        float width = 94 * open;
+        frame.Clip(centre - Vector2.UnitY * (13 + progress * 27),
+            117 * open, 108 * open, Shape.SmokeSequence, progress * .77f,
+            0x694032, .58f * progress, Layer.Smoke);
+        for (int i = 0; i < 5; i++)
+        {
+            int seed = i * 41 + 107;
+            float angle = (frame.Unit(seed) - .5f) * .83f;
+            Vector2 point = centre + new Vector2((i - 2) * 17 * open, -progress * (8 + i * 6));
+            frame.Sprite(point - Vector2.UnitY * 11, width * .55f,
+                72 * open + frame.Unit(seed + 9) * 29,
+                Shape.UserFlame, i % 2 == 0 ? accent : Hot,
+                .82f * heat, i % 3 == 0 ? Layer.EmissiveCore : Layer.Emissive,
+                angle, light: i == 2);
+            frame.Sprite(point + new Vector2((frame.Unit(seed + 15) - .5f) * 23, -progress * 30),
+                6 + frame.Unit(seed + 17) * 7, 10 + frame.Unit(seed + 21) * 13,
+                Shape.UserEmber, Gold, .73f * (1 - progress * .65f),
+                Layer.EmissiveCore, angle);
+        }
     }
 
     private static void Repel(Frame frame, Vector2 feet, float progress)
