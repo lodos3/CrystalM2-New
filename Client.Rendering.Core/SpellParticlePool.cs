@@ -20,7 +20,8 @@ public enum SpellParticleLayer : byte { Legacy, Ground, World, Emissive, Emissiv
 public readonly record struct SpellParticle(Vector2 Origin, Vector2 Velocity, long Start, int Duration,
     int Size, Color Colour, SpellParticleShape Shape, byte Direction, float Aspect = 0, float Rotation = 0,
     float Growth = 0, SpellParticleLayer Layer = SpellParticleLayer.Legacy, bool Linear = false, bool CastsLight = true,
-    bool FrameOnly = false, uint FieldObjectID = 0, byte Frame = 0, SpriteQuad? Ribbon = null, float? DepthY = null)
+    bool FrameOnly = false, uint FieldObjectID = 0, byte Frame = 0, SpriteQuad? Ribbon = null, float? DepthY = null,
+    bool AlwaysOnTop = false)
 {
     public bool Ground => Layer is SpellParticleLayer.Ground or SpellParticleLayer.Floor ||
         (Layer == SpellParticleLayer.Legacy && Shape == SpellParticleShape.Halo);
