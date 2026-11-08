@@ -430,7 +430,11 @@ public sealed partial class MapControl
             ground ? 1f : Settings.SpellBlendIntensityPercent / 100f,
             sizeScale: ground ? 1f : SpellParticleSize, emissiveOverlay: emissiveOverlay,
             exposure: GraphicsTuning.SpellExposure.Current / 100f, saturation: GraphicsTuning.SpellSaturation.Current / 100f,
-            glow: 1f + GraphicsTuning.SpellGlowStrength.Current / 300f, screenGlow: GraphicsTuning.SpellGlowBlend.Current != 0,
+            glowPolicy: new SpellParticleGlowPolicy(
+                GraphicsTuning.SpellComposite.Current,
+                GraphicsTuning.SpellGlowCutoff.Current / 100f,
+                GraphicsTuning.SpellGlowStrength.Current / 100f,
+                GraphicsTuning.SpellGlowBlend.Current != 0),
             occlusion: occlusion, depthOrigin: depthOrigin, cellHeight: CellHeight);
     }
 
