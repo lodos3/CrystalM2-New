@@ -162,61 +162,62 @@ internal static partial class TaoistSpellEffects
                 Layer.EmissiveCore);
             if (!curse)
             {
-                // A hot trace races along every stroke. The glyph remains fixed;
-                // only its illuminated interior and flames move.
-                float tracking = Fract(progress * 3.2f + frame.Unit(index + 127));
-                Vector2 lightFrom = Vector2.Lerp(from, to, tracking);
-                Vector2 lightTo = Vector2.Lerp(from, to, MathF.Min(1, tracking + .18f));
-                frame.Thread(lightFrom, lightTo, height * .026f, height * .013f,
-                    core, .89f * formed * fade, Layer.EmissiveCore, light: index % 4 == 0);
+                // Stationary glowing filaments breathe in brightness, rather
+                // than sweeping sideways along each letter of the rune.
+                float heat = .56f + .44f * MathF.Sin(progress * MathF.Tau * 5f + index * .27f);
+                frame.Thread(from, to, height * .013f, height * .010f,
+                    core, (.45f + .35f * heat) * formed * fade, Layer.EmissiveCore,
+                    light: index % 4 == 0);
             }
 
-            // Local wisps follow the newly formed line, with no diagonal wipe.
+            // Vertical combustion is attached to fixed points on each stroke.
+            // Each spark is born at a line segment, rises, then disappears.
             int flames = Math.Clamp((int)(Vector2.Distance(a * scale, b * scale) / 20), 2, 6);
             for (int i = 0; i < flames; i++)
             {
                 int seed = index + i;
                 float step = (i + .3f + .4f * frame.Unit(seed)) / flames;
-                Vector2 point = Vector2.Lerp(from, to, step);
-                float age = Fract(progress * 1.24f + frame.Unit(seed + 52));
-                float rise = 12 + age * (19 + 23 * frame.Unit(seed + 13));
-                float shimmer = .58f + .42f * MathF.Sin(age * MathF.PI);
-                float alpha = (.8f - .32f * formed) * shimmer * fade;
-                frame.Clip(point - Vector2.UnitY * (rise * .26f), 11 + frame.Unit(seed + 74) * 11,
-                    21 + rise, Shape.FlameSequence, age + progress, tint, alpha, rotation: (frame.Unit(seed + 35) - .5f) * .45f);
-                if (!curse && (i & 1) == 0)
-                {
-                    // Sparks and fire originate on the actual glyph line segments.
-                    // Nothing is distributed in an ellipse behind the rune.
-                    float travel = Fract(progress * (3.1f + frame.Unit(seed + 83)) +
-                        frame.Unit(seed + 173));
-                    float flicker = MathF.Sin(progress * MathF.Tau * 8 + seed * .8f);
-                    Vector2 linePoint = Vector2.Lerp(from, to, travel);
-                    Vector2 flame = linePoint + new Vector2(flicker * 1.6f, -3 - age * 8);
+                Vector2 root = Vector2.Lerp(from, to, step);
+                float age = Fract(progress * (1.04f + frame.Unit(seed + 9) * .26f) + frame.Unit(seed + 52));
+                float sway = MathF.Sin(progress * MathF.Tau * 6f + seed * .67f) * 1.7f;
+                float rise = age * (23 + 19 * frame.Unit(seed + 13));
+                float opacity = MathF.Sin(MathF.PI * age) * fade;
+                Vector2 flame = root + new Vector2(sway, -rise);
+                float height = 23 + 21 * frame.Unit(seed + 74);
+                float width = 10 + 8 * frame.Unit(seed + 37);
 
-                    frame.Sprite(flame, 6 + frame.Unit(seed + 45) * 5,
-                        13 + frame.Unit(seed + 56) * 16, Shape.FlameTongue,
-                        core, .78f * fade * (.80f + .20f * flicker),
-                        Layer.EmissiveCore, flicker * .10f, light: seed % 10 == 0);
-                    frame.Sprite(linePoint - Vector2.UnitY * (age * 8),
-                        3 + frame.Unit(seed + 11) * 3, 6 + frame.Unit(seed + 27) * 6,
-                        Shape.Spark, core, .72f * fade * (1 - age * .25f),
+                // A textured flame folds and evaporates upward from each line.
+                frame.Clip(flame - Vector2.UnitY * height * .20f, width, height,
+                    Shape.FlameSequence, progress * 1.3f + age * .63f + frame.Unit(seed + 89),
+                    tint, .76f * opacity, Layer.Emissive, sway * .023f);
+                frame.Sprite(flame - Vector2.UnitY * height * .18f,
+                    width * .55f, height * .83f, Shape.FlameTongue, core,
+                    .73f * opacity, Layer.EmissiveCore, sway * .015f, light: seed % 11 == 0);
+
+                if (!curse)
+                {
+                    frame.Sprite(root + new Vector2(sway * .38f, -rise * 1.07f),
+                        2.5f + frame.Unit(seed + 41) * 3f, 6 + frame.Unit(seed + 43) * 7,
+                        Shape.Spark, core, .88f * opacity,
                         Layer.EmissiveCore, light: seed % 7 == 0);
 
                     if (seed % 3 == 0)
-                        frame.Sprite(linePoint, 10 + frame.Unit(seed + 61) * 8,
-                            14 + frame.Unit(seed + 73) * 10, Shape.Flash,
-                            core, .34f * fade, Layer.EmissiveCore, flicker * .08f, light: true);
-                    if (seed % 4 == 0)
-                        frame.Sprite(flame - Vector2.UnitY * 5, 27, 33, Shape.Wisp,
-                            tint, .23f * fade, Layer.Glow, light: true);
+                    {
+                        frame.Sprite(root - Vector2.UnitY * (rise + 8), 9, 12,
+                            Shape.Flash, tint, .32f * opacity,
+                            Layer.EmissiveCore, light: true);
+                        frame.Clip(flame - Vector2.UnitY * (height * .78f + age * 13),
+                            16 + age * 11, 17 + age * 11, Shape.SmokeSequence,
+                            progress * .7f + age, dark, .19f * opacity, Layer.Smoke);
+                    }
                 }
-                if (seed % 2 == 0)
-                    frame.Sprite(point - Vector2.UnitY * (age * 18), 4 + 5 * frame.Unit(seed + 3), 9 + age * 10,
-                        Shape.Flash, core, .74f * shimmer * fade, Layer.EmissiveCore, light: seed % 6 == 0);
-                if (seed % 3 == 0)
-                    frame.Sprite(point - Vector2.UnitY * (age * 27), 2 + frame.Unit(seed + 41) * 4, 6,
-                        Shape.Spark, core, .87f * (1 - age) * fade, Layer.EmissiveCore);
+                else
+                {
+                    if (seed % 2 == 0)
+                        frame.Sprite(flame - Vector2.UnitY * 4, 4 + frame.Unit(seed + 3) * 4,
+                            9 + age * 12, Shape.Flash, core, .75f * opacity,
+                            Layer.EmissiveCore, light: seed % 6 == 0);
+                }
             }
             if (progress < .67f)
             {
