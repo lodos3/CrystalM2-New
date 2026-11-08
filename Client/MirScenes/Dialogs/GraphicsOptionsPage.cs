@@ -301,15 +301,18 @@ internal sealed class GraphicsOptionsPage : MirControl
         AddValue("Spell VFX size", 0, 213, GraphicsTuning.SpellVisualSize, "%", hint:
             "Scale projectile bodies, impacts and airborne particles. Ground coverage and weapon masks keep their anchors.");
         AddChoice("Glow blend", Right, 213, GraphicsTuning.SpellGlowBlend, ["Additive", "Screen"]);
-        AddChoice("Spell passes", 0, 235, GraphicsTuning.SpellComposite, ["Authored", "Black key", "Black key + glow", "Glow only"]);
+        AddChoice("Spell passes", 0, 235, GraphicsTuning.SpellComposite, ["Authored", "Black key", "Black key + glow", "Glow only"],
+            hint: "Also controls particle spells. The particle atlas has real alpha, so black-keying does not change it; glow modes add filtered highlights.");
         AddSlider("Spell opacity", 0, 257, 0, 200, "%", () => Settings.SpellBlendIntensityPercent,
             value => Settings.SpellBlendIntensityPercent = value, 100);
         AddValue("Black cutoff", 0, 279, GraphicsTuning.SpellBlackCutoff);
         AddValue("Black feather", 0, 301, GraphicsTuning.SpellBlackFeather);
         AddValue("Spell exposure", Right, 235, GraphicsTuning.SpellExposure);
         AddValue("Spell colours", Right, 257, GraphicsTuning.SpellSaturation);
-        AddValue("Glow cutoff", Right, 279, GraphicsTuning.SpellGlowCutoff);
-        AddValue("Glow power", Right, 301, GraphicsTuning.SpellGlowStrength);
+        AddValue("Glow cutoff", Right, 279, GraphicsTuning.SpellGlowCutoff,
+            hint: "Only the brighter portions of a spell or particle contribute to the extra glow pass.");
+        AddValue("Glow power", Right, 301, GraphicsTuning.SpellGlowStrength,
+            hint: "Strength of the extra glow pass for legacy and particle spells in a glow-enabled Spell passes mode.");
     }
 
     private void BuildShadows()
