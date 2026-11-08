@@ -172,6 +172,31 @@ static class Program
 
     private static void CheckSpellParticles()
     {
+        // F12 spell compositing must behave consistently for authored coverage
+        // particles and for legacy spell textures. Keying is unnecessary for an
+        // alpha coverage atlas, but glow-only and cutoff still matter.
+        var authoredParticles = new SpellParticleGlowPolicy(0, .44f, .7f, false);
+        var keyedParticles = new SpellParticleGlowPolicy(1, .44f, .7f, false);
+        var enhancedParticles = new SpellParticleGlowPolicy(2, .44f, .7f, false);
+        var glowOnlyParticles = new SpellParticleGlowPolicy(3, .44f, .7f, true);
+        Assertions.True(authoredParticles.ShowAuthored && !authoredParticles.ShowGlow &&
+                        keyedParticles.ShowAuthored && !keyedParticles.ShowGlow,
+            "Authored and black-key particle modes must not add a glow pass.");
+        Assertions.True(enhancedParticles.ShowAuthored && enhancedParticles.ShowGlow &&
+                        !glowOnlyParticles.ShowAuthored && glowOnlyParticles.ShowGlow &&
+                        glowOnlyParticles.ScreenBlend,
+            "Glow-plus-base and glow-only must select the correct passes and blend mode.");
+        Assertions.True(enhancedParticles.GlowAmount(new Vector3(.2f, .1f, .08f)) == 0f &&
+                        enhancedParticles.GlowAmount(Vector3.One) > .69f,
+            "The F12 glow cutoff should reject dark particles and retain bright sparks.");
+        Assertions.True(new SpellParticleGlowPolicy(2, 1f, 2f, false).GlowAmount(Vector3.One) == 0f,
+            "A maximum cutoff must suppress glow, even for the brightest particle.");
+        Assertions.True(new SpellParticleGlowPolicy(2, 0f, 0f, false).GlowAmount(Vector3.One) == 0f &&
+                        !new SpellParticleGlowPolicy(3, 0f, 0f, true).ShowGlow,
+            "Zero glow power must disable the glow layer, including glow-only mode.");
+        Assertions.True(new SpellParticleGlowPolicy(2, 0f, 2f, true).GlowAmount(Vector3.One) > 1.9f,
+            "Glow power up to 200 percent must scale particle highlights.");
+
         var pool = new SpellParticlePool(512);
         Vector2 origin = new(120, 96);
         var particle = new SpellParticle(origin, new Vector2(32, 0), 100, 200, 12,
