@@ -219,7 +219,7 @@ public static class SpellParticleAtlas
         foreach (SpellParticleShape shape in Enum.GetValues<SpellParticleShape>())
             if ((shape < SpellParticleShape.FlameSequence && shape != SpellParticleShape.Slash) ||
                 shape is SpellParticleShape.BladeRibbon or SpellParticleShape.MoonRibbon or SpellParticleShape.WindRibbon ||
-                shape is >= SpellParticleShape.SoulGlyph and < SpellParticleShape.UserFlame) Paint(shape);
+                (shape >= SpellParticleShape.SoulGlyph && shape < SpellParticleShape.UserFlame)) Paint(shape);
         for (byte direction = 0; direction < 8; direction++) Paint(SpellParticleShape.Slash, direction);
         ReadClips(coverage);
         using var warrior = ReadPack("CrystalM2.WarriorMasks");
