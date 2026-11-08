@@ -189,7 +189,12 @@ internal static partial class TaoistSpellEffects
                 // A textured flame folds and evaporates upward from each line.
                 frame.Clip(flame - Vector2.UnitY * height * .20f, width, height,
                     Shape.FlameSequence, progress * 1.3f + age * .63f + frame.Unit(seed + 89),
-                    tint, .76f * opacity, Layer.Emissive, sway * .023f);
+                    tint, .64f * opacity, Layer.Emissive, sway * .023f);
+                if (!curse)
+                    frame.Sprite(flame - Vector2.UnitY * height * .27f,
+                        width * 1.4f, height * 1.10f,
+                        Shape.UserFlame, index % 3 == 0 ? core : tint,
+                        .61f * opacity, Layer.Emissive, sway * .018f);
                 frame.Sprite(flame - Vector2.UnitY * height * .18f,
                     width * .55f, height * .83f, Shape.FlameTongue, core,
                     .73f * opacity, Layer.EmissiveCore, sway * .015f, light: seed % 11 == 0);
@@ -198,7 +203,7 @@ internal static partial class TaoistSpellEffects
                 {
                     frame.Sprite(root + new Vector2(sway * .38f, -rise * 1.07f),
                         2.5f + frame.Unit(seed + 41) * 3f, 6 + frame.Unit(seed + 43) * 7,
-                        Shape.Spark, core, .88f * opacity,
+                        Shape.UserEmber, core, .88f * opacity,
                         Layer.EmissiveCore, light: seed % 7 == 0);
 
                     if (seed % 3 == 0)
