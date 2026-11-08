@@ -203,6 +203,23 @@ Check(fireballImpact.Any(p => p.Shape == SpellParticleShape.UserFlame &&
       p.Emissive) && !fireballImpact.Any(p => p.Shape == SpellParticleShape.Orb),
     "Wizard Fire Ball should burst as layered textured fire instead of a glowing orb.");
 
+// Electrical effects should rely on branching paths rather than bright
+// circular backdrops. Spell-specific field/movement phases are preserved.
+foreach (var phaseTest in new[]
+    {
+        (Spell.ThunderBolt, SpellVisualPhase.Impact),
+        (Spell.ThunderStorm, SpellVisualPhase.Impact),
+        (Spell.StormEscape, SpellVisualPhase.Prepare),
+        (Spell.StormEscape, SpellVisualPhase.Impact)
+    })
+{
+    var particles = RenderWizard(phaseTest.Item1, phaseTest.Item2, 270);
+    Check(particles.Any(p => p.Shape == SpellParticleShape.UserLightning),
+        $"{phaseTest.Item1}/{phaseTest.Item2} must use uploaded electric textures.");
+    Check(!particles.Any(p => p.Shape == SpellParticleShape.Orb),
+        $"{phaseTest.Item1}/{phaseTest.Item2} should not use large round glow billboards.");
+}
+
 var curseAtAim = Render(Spell.Curse, SpellVisualPhase.Impact, 850, 2000);
 Check(curseAtAim.Any(p => p.Shape == SpellParticleShape.CurseGlyph),
     "Curse must render a complete rune on the aimed map cell.");
