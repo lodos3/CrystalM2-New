@@ -181,57 +181,72 @@ internal static partial class TaoistSpellEffects
 
     private static void Shield(Frame frame, Vector2 feet, float progress, bool aura)
     {
-        float bob = aura ? MathF.Sin(progress * MathF.Tau) * 4.6f : 0;
-        float sway = aura ? MathF.Sin(progress * MathF.Tau * 1.2f) * 3.8f : 0;
-        Vector2 centre = feet + new Vector2(sway, -35 + bob);
+        // Anchor the shield to the player's feet. In the maintained aura the
+        // geometry never bobs, sways, changes width or rotates as time advances.
+        Vector2 centre = feet - Vector2.UnitY * 35;
         float spread = aura ? 0 : 31 * (1 - Ease(progress * 2.6f));
-        float pulse = .83f + .17f * MathF.Sin(progress * MathF.Tau * 2);
-        float flicker = .78f + .22f * MathF.Sin(progress * MathF.Tau);
-        frame.Sprite(centre, 113 + 12 * pulse, 119 + 15 * pulse, Shape.Wisp, 0x444f9c,
-            .59f * flicker, Layer.Glow, light: true);
-        frame.Sprite(centre, 77 + 10 * pulse, 109 + 12 * pulse, Shape.Orb, Blue,
-            .20f * flicker, Layer.Glow, light: true);
+        frame.Sprite(centre, 96, 110, Shape.Wisp, 0x303d82, .18f, Layer.Glow);
+
         for (int side = -1; side <= 1; side += 2)
         {
             int colour = side < 0 ? Blue : Gold;
-            int rim = side < 0 ? 0x4357d0 : Amber;
+            int rim = side < 0 ? Ice : Ivory;
             Vector2 offset = centre + new Vector2(side * spread, 0);
-            Vector2 from = offset + Ellipse(-1.27f, side * 46, 55);
-            for (int i = 1; i <= 16; i++)
+
+            Vector2 ShellPoint(float t) =>
+                offset + Ellipse(-1.27f + t * 2.54f, side * 46f, 55f);
+
+            Vector2 ElectricPoint(float t)
             {
-                float t = i / 16f;
-                float taper = MathF.Sin(t * MathF.PI);
-                Vector2 to = offset + Ellipse(-1.27f + t * 2.54f, side * (46 + 3 * pulse), 55 + 4 * pulse);
-                Vector2 midpoint = (from + to) * .5f;
-                frame.Sprite(midpoint, 19 + taper * 15, 19 + taper * 9, Shape.Wisp, rim,
-                    .69f * flicker, Layer.Glow, light: i % 5 == 1);
-                frame.Sprite(midpoint + Vector2.UnitX * side * (4 + frame.Unit(i + side * 29) * 6),
-                    17 + taper * 16, 10 + taper * 9, Shape.FlameTongue, rim,
-                    .74f * taper * pulse, Layer.Emissive, side * 1.35f + (t - .5f));
-                frame.Thread(from, to, 1.4f + 2.6f * taper, 1.1f + 2 * taper, colour,
-                    .91f * flicker, Layer.EmissiveCore);
-                if (i % 4 == 1)
-                    frame.Sprite(to + Vector2.UnitX * side * 3, 12, 18, Shape.Flash,
-                        side < 0 ? Ice : Ivory, .64f * flicker, Layer.EmissiveCore, t * 1.6f);
-                from = to;
+                float angle = -1.27f + t * 2.54f;
+                Vector2 tangent = new(-side * 46f * MathF.Sin(angle), 55f * MathF.Cos(angle));
+                Vector2 normal = Vector2.Normalize(new Vector2(-tangent.Y, tangent.X));
+                float noise = MathF.Sin(progress * MathF.Tau * 8f + t * 29f + side) * 2.5f +
+                    MathF.Sin(progress * MathF.Tau * 13f - t * 51f + side * 1.7f) * 1.3f;
+                // Fixed endpoints keep the bolt physically attached to the shell.
+                return ShellPoint(t) + normal * (noise * MathF.Sin(t * MathF.PI));
             }
-        }
-        // The shield stays attached to its owner while motes float upward
-        // independently of the curved shell; phases are deterministic per actor.
-        for (int i = 0; i < 17; i++)
-        {
-            float age = Fract(progress * (aura ? 1.0f : 1.3f) + frame.Unit(i + 179));
-            float turn = i * 2.39996f + progress * 3.8f;
-            float radial = 36 + 19 * frame.Unit(i + 83);
-            Vector2 point = centre + new Vector2(MathF.Cos(turn) * radial + sway * .35f,
-                41 - age * (88 + 20 * frame.Unit(i + 71)));
-            float shimmer = MathF.Sin(age * MathF.PI);
-            frame.Sprite(point, 2 + frame.Unit(i + 29) * 5, 5 + frame.Unit(i + 33) * 10,
-                i % 4 == 0 ? Shape.Flash : Shape.Spark, i % 2 == 0 ? Ice : Gold,
-                .75f * shimmer, Layer.EmissiveCore, turn, light: i % 8 == 0);
-            if (i % 5 == 0)
-                frame.Sprite(point, 22, 27, Shape.Wisp, i % 2 == 0 ? Blue : Amber,
-                    .24f * shimmer, Layer.Glow, light: true);
+
+            const int segments = 24;
+            for (int i = 1; i <= segments; i++)
+            {
+                float t0 = (i - 1) / (float)segments;
+                float t1 = i / (float)segments;
+                float taper = MathF.Sin(t1 * MathF.PI);
+                Vector2 from = ShellPoint(t0), to = ShellPoint(t1);
+                Vector2 arcFrom = ElectricPoint(t0), arcTo = ElectricPoint(t1);
+
+                // Unchanging outline, with a separate high-frequency noisy core.
+                frame.Thread(from, to, 1.7f + taper * 1.4f, 1.5f + taper * 1.4f,
+                    colour, .76f, Layer.Emissive);
+                frame.Thread(arcFrom, arcTo, 1.3f + taper * 1.4f, 1.0f + taper * 1.2f,
+                    rim, .91f, Layer.EmissiveCore, light: i % 6 == 1);
+
+                if (i % 4 == 1)
+                {
+                    Vector2 midpoint = (arcFrom + arcTo) * .5f;
+                    frame.Sprite(midpoint, 11 + taper * 8, 7 + taper * 5,
+                        Shape.Wisp, colour, .38f, Layer.Glow,
+                        MathF.Atan2(arcTo.Y - arcFrom.Y, arcTo.X - arcFrom.X),
+                        light: i % 8 == 1);
+                }
+            }
+
+            // Sparks originate along the outline, not from an orbit around the
+            // character. They eject a few pixels before fading away.
+            for (int i = 0; i < 12; i++)
+            {
+                int seed = i + (side + 1) * 31;
+                float age = Fract(progress * 2.1f + frame.Unit(seed + 179));
+                float t = (.08f + frame.Unit(seed + 23) * .84f);
+                Vector2 anchor = ElectricPoint(t);
+                Vector2 point = anchor + new Vector2(side * (4 + age * 8), -age * (9 + 18 * frame.Unit(seed + 71)));
+                float alpha = .77f * (1 - age);
+                frame.Sprite(point, 3 + frame.Unit(seed + 29) * 4,
+                    7 + frame.Unit(seed + 33) * 8,
+                    i % 4 == 0 ? Shape.Flash : Shape.Spark, i % 2 == 0 ? rim : colour,
+                    alpha, Layer.EmissiveCore, side * .19f, light: i % 6 == 0);
+            }
         }
     }
 
