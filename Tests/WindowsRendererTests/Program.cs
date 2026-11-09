@@ -539,7 +539,7 @@ internal static class Program
 
     private static void TestWarriorProjection()
     {
-        var pool = new SpellParticlePool(256);
+        var pool = new SpellParticlePool(512); // Allow both 32-segment crescents and three tiers of slash overlays.
         Vector2 feet = new(200, 200);
         const long cast = 1000;
         var burst = LegacySpellEffects.Windup(Spell.SlashingBurst, 6, 100);
