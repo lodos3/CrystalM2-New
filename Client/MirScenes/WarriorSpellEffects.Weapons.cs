@@ -128,32 +128,40 @@ internal static partial class WarriorSpellEffects
                 Vector2.Lerp(nextOuter, nextInner, 1.48f), Vector2.Lerp(nextInner, nextOuter, 1.18f),
                 layer, shadow, 177);
             AddRibbon(inner, outer, nextInner, nextOuter, layer, look.Colour, 235);
-            if (i % 3 == 1 && i < segments - 2)
-            {
-                Vector2 tangent = (nextOuter + nextInner) * .5f - (outer + inner) * .5f;
-                Vector2 accent = (nextInner + nextOuter + inner + outer) * .25f;
-                float length = 13 + 14 * MathF.Sin(i * MathF.PI / segments);
-                pool.TryAdd(new SpellParticle(accent, Vector2.Zero, now, Math.Min(life, 120),
-                    Math.Max(1, (int)length), Color.FromArgb(144, i % 4 == 1 ? look.Core : look.Colour),
-                    Shape.UserSlash, 0, Aspect: .50f,
-                    Rotation: MathF.Atan2(tangent.Y, tangent.X),
-                    Layer: layer == Layer.Ground ? Layer.Ground : Layer.EmissiveCore,
-                    CastsLight: false, DepthY: feet.Y));
-            }
             if (i > 2 && i < segments - 1)
-            {
                 AddRibbon(Vector2.Lerp(inner, outer, .73f), Vector2.Lerp(inner, outer, .98f),
                     Vector2.Lerp(nextInner, nextOuter, .73f), Vector2.Lerp(nextInner, nextOuter, .98f),
                     layer == Layer.Ground ? layer : Layer.EmissiveCore, look.Core, 197);
-                if (i % 3 == 0)
-                {
-                    Vector2 edge = (outer + nextOuter) * .5f;
-                    Vector2 drift = (outer - nextOuter) * .85f;
-                    pool.TryAdd(new SpellParticle(edge, drift, now, life, 22, Color.FromArgb(158, look.Core),
-                        Shape.WarriorSpark, 0, .61f, heading, Layer: layer, CastsLight: false, DepthY: feet.Y));
-                }
-            }
             (inner, outer) = (nextInner, nextOuter);
+        }
+
+        // Group the shader-driven MoonRibbon quads together before the
+        // transient accents. Interleaving a different atlas shape every three
+        // segments would force dozens of expensive D3D constant-buffer flushes.
+        for (int i = 1; i < segments - 2; i += 3)
+        {
+            var (a, b) = Edge(i / (float)segments);
+            var (c, d) = Edge((i + 1f) / segments);
+            Vector2 tangent = (c + d) * .5f - (a + b) * .5f;
+            Vector2 accent = (a + b + c + d) * .25f;
+            float length = 13 + 14 * MathF.Sin(i * MathF.PI / segments);
+            Layer layer = (b.Y + d.Y) * .5f < centre.Y ? Layer.Ground : Layer.EmissiveCore;
+            pool.TryAdd(new SpellParticle(accent, Vector2.Zero, now, Math.Min(life, 120),
+                Math.Max(1, (int)length), Color.FromArgb(144, i % 4 == 1 ? look.Core : look.Colour),
+                Shape.UserSlash, 0, Aspect: .50f,
+                Rotation: MathF.Atan2(tangent.Y, tangent.X), Layer: layer,
+                CastsLight: false, DepthY: feet.Y));
+        }
+        for (int i = 3; i < segments - 1; i += 3)
+        {
+            var (_, outerA) = Edge(i / (float)segments);
+            var (_, outerB) = Edge((i + 1f) / segments);
+            Vector2 edge = (outerA + outerB) * .5f;
+            Vector2 drift = (outerA - outerB) * .85f;
+            Layer layer = edge.Y < centre.Y ? Layer.Ground : Layer.Emissive;
+            pool.TryAdd(new SpellParticle(edge, drift, now, life, 22,
+                Color.FromArgb(158, look.Core), Shape.WarriorSpark, 0,
+                .61f, heading, Layer: layer, CastsLight: false, DepthY: feet.Y));
         }
 
         (Vector2 Inner, Vector2 Outer) Edge(float t)
