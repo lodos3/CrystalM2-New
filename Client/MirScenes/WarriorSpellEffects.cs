@@ -72,16 +72,8 @@ internal static partial class WarriorSpellEffects
                 Engulf(frame, feet, progress, (now - start) / 1000f);
                 break;
             case Spell.TwinDrakeBlade when visual.Phase == SpellVisualPhase.Prepare:
-                Vector2 crest = feet - Vector2.UnitY * (77 + 9 * Ease(progress * 2));
-                // Charge gathers as electrical filaments, never a large oval glow.
-                frame.Sprite(crest, 43, 47, Shape.Flash, Ice, .89f, Layer.EmissiveCore);
-                for (int i = -1; i <= 1; i++)
-                {
-                    Vector2 edge = feet + new Vector2(i * 33, -22 - Math.Abs(i) * 19);
-                    WizardSpellEffects.Channel(frame, crest, edge, 13, 2, .73f, (now - start) / 1000f,
-                        1, 317 + i * 67, colours: WizardSpellEffects.DrakeColours);
-                }
-                frame.Sparks(crest, 12, 45, 41, progress, Ice, 14);
+                DrakeCharge(frame, feet, weaponTip ?? feet + facing * 22 - Vector2.UnitY * 37,
+                    progress, (now - start) / 1000f);
                 break;
             case Spell.TwinDrakeBlade:
                 DrakeContact(frame, feet, progress, (now - start) / 1000f);
@@ -118,106 +110,149 @@ internal static partial class WarriorSpellEffects
         }
     }
 
+    private static void DrakeCharge(Frame frame, Vector2 feet, Vector2 hand, float progress, float time)
+    {
+        // The owner-attached Effect updates the pivot and weapon tip every frame.
+        // Electricity grows from the hand, winds around the torso, crests
+        // above the head and finally discharges back into the weapon.
+        Vector2 body = feet - Vector2.UnitY * 43;
+        Vector2 overhead = feet - Vector2.UnitY * 112;
+        for (int strand = 0; strand < 4; strand++)
+        {
+            float phase = progress * MathF.Tau * 2.3f + strand * 1.57f;
+            float radius = (14 + 16 * MathF.Sin(progress * MathF.PI)) *
+                (.77f + frame.Unit(strand + 18) * .35f);
+            Vector2 target = body + Ellipse(phase, radius, radius * .51f) -
+                Vector2.UnitY * (progress * 45);
+            float entry = Ease(progress * 5.8f);
+            target = Vector2.Lerp(hand, target, entry);
+            float departure = Ease((progress - .70f) / .30f);
+            Vector2 finalPoint = Vector2.Lerp(overhead, hand, Ease((progress - .90f) / .10f));
+            target = Vector2.Lerp(target, finalPoint, departure);
+            Vector2 previous = hand;
+            for (int j = 1; j <= 8; j++)
+            {
+                float t = j / 8f;
+                float angle = phase - t * 1.6f;
+                Vector2 trail = Vector2.Lerp(hand, target, t);
+                trail += new Vector2(MathF.Cos(angle), MathF.Sin(angle) * .65f) *
+                    (radius * .24f * MathF.Sin(t * MathF.PI));
+                // One segmented authored circuit is far cheaper than
+                // spawning an entire Channel graph for every tiny segment.
+                float flicker = .68f + .32f * MathF.Sin(time * 31 + j * 2.7f + strand);
+                frame.Thread(previous, trail, 1.6f, 1.0f,
+                    j % 3 == 0 ? White : Ice, flicker, Layer.EmissiveCore,
+                    light: j == 4);
+                if (j == 1 || j % 2 == 0)
+                {
+                    Vector2 delta = trail - previous;
+                    float theta = MathF.Atan2(delta.Y, delta.X);
+                    frame.Sprite((previous + trail) * .5f, 13 + delta.Length(),
+                        5.5f, Shape.UserLightning, j % 4 == 0 ? White : Ice,
+                        .67f, Layer.EmissiveCore, theta, light: j == 4);
+                }
+                previous = trail;
+            }
+        }
+        for (int i = 0; i < 24; i++)
+        {
+            float age = Fract(progress * 3.1f + frame.Unit(i + 173));
+            float travel = frame.Unit(i + 71);
+            float phase = progress * MathF.Tau * 2.2f + travel * MathF.Tau;
+            Vector2 point = body + new Vector2(MathF.Cos(phase) * 22, MathF.Sin(phase) * 11) -
+                Vector2.UnitY * (progress * 44 + age * 12);
+            frame.Sprite(point, 3 + frame.Unit(i + 13) * 3, 4 + frame.Unit(i + 14) * 6,
+                i % 5 == 0 ? Shape.Flash : Shape.Spark, i % 3 == 0 ? White : Ice,
+                .80f * (1 - age * .7f), Layer.EmissiveCore, phase * .22f);
+        }
+    }
+
     private static void Engulf(Frame frame, Vector2 feet, float progress, float time)
     {
-        // No radial floor disc or elliptical explosion: the burning hit grows
-        // upward in staggered tongues, smoke plumes and flying embers.
-        float ignition = .66f + .34f * Ease(progress * 5f);
-        for (int i = 0; i < 7; i++)
+        // Small individual tongues form a hot wound-shaped contact zone.
+        // No vertical pillars, static opaque fire blobs or floor discs.
+        float durationFade = 1f - Ease((progress - .70f) / .30f);
+        for (int i = 0; i < 116; i++)
         {
-            int seed = 71 + i * 29;
-            float x = (i - 3) * 13f + (frame.Unit(seed) - .5f) * 9f;
-            bool behind = i % 2 == 0;
-            float row = (4 + frame.Unit(seed + 3) * 9) * (behind ? -1 : 1);
-            Vector2 root = feet + new Vector2(x, row);
-            Layer flameLayer = behind ? Layer.Ground : Layer.Emissive;
-            Layer coreLayer = behind ? Layer.Ground : Layer.EmissiveCore;
-            float height = (66 + frame.Unit(seed + 7) * 64) * ignition;
-            float phase = time * (.80f + frame.Unit(seed + 17) * .29f) + frame.Unit(seed + 25);
-            float lean = (frame.Unit(seed + 33) - .5f) * 13;
-            Vector2 flame = root + new Vector2(lean * .45f, -height * .45f);
-
-            frame.Clip(flame, 21 + frame.Unit(seed + 35) * 15, height,
-                Shape.FlameSequence, phase, i % 3 == 0 ? Heat : i % 2 == 0 ? Flame : Ember,
-                .80f, i % 3 == 0 ? coreLayer : flameLayer,
-                rotation: lean / MathF.Max(50, height), light: i % 3 == 0, sortY: root.Y);
-            frame.Sprite(flame, 23 + frame.Unit(seed + 35) * 13, height * .87f,
-                Shape.UserFlame, i % 2 == 0 ? Flame : Heat, .71f,
-                flameLayer, rotation: lean / MathF.Max(50, height), sortY: root.Y);
-            frame.Sprite(root + new Vector2(lean * .65f, -height * .48f), 10 + frame.Unit(seed + 42) * 9,
-                height * .75f, Shape.FlameTongue, i % 2 == 0 ? Heat : Flame,
-                .70f, coreLayer, lean / MathF.Max(50, height), sortY: root.Y);
-            frame.Thread(root - Vector2.UnitY * 9,
-                root + new Vector2(lean * .43f, -height * .74f),
-                2.2f, .6f, Heat, .56f, coreLayer, sortY: root.Y);
-
-            // Dark smoke rises from the same burning line, not a circular ring.
-            if (i % 2 == 0)
+            int seed = i * 29 + 71;
+            float age = Fract(progress * (1.24f + frame.Unit(seed + 17) * .75f) +
+                frame.Unit(seed + 25));
+            float lateral = (frame.Unit(seed) - .5f) * (54 + progress * 33);
+            float depth = frame.Unit(seed + 3);
+            float rise = age * (23 + 42 * frame.Unit(seed + 7));
+            float flicker = .62f + .38f * MathF.Sin(time * 22 + seed * .27f);
+            float fade = durationFade * MathF.Sin(age * MathF.PI) * flicker;
+            Vector2 root = feet + new Vector2(lateral, -7 - depth * 19);
+            Vector2 tongue = root + new Vector2((frame.Unit(seed + 33) - .5f) * age * 8,
+                -rise);
+            float smallWidth = 5 + frame.Unit(seed + 35) * 10;
+            float smallHeight = 10 + frame.Unit(seed + 42) * 20;
+            int colour = i % 6 == 0 ? Heat : i % 3 == 0 ? Ember : Flame;
+            frame.Sprite(tongue - Vector2.UnitY * smallHeight * .21f,
+                smallWidth, smallHeight, Shape.UserFlame, colour, fade,
+                i % 5 == 0 ? Layer.EmissiveCore : Layer.Emissive,
+                (frame.Unit(seed + 49) - .5f) * .22f, light: i % 17 == 0);
+            if (i % 7 == 0)
+                frame.Clip(tongue, smallWidth, smallHeight,
+                    Shape.FlameSequence, time * 1.7f + age * .39f,
+                    colour, fade * .74f, Layer.Emissive);
+            if (i % 8 == 0)
+                frame.Sprite(tongue, smallWidth * .62f, smallHeight * .83f,
+                    Shape.FlameTongue, Heat, fade * .82f,
+                    Layer.EmissiveCore);
+            if (i % 4 == 0)
+                frame.Sprite(root + new Vector2(lateral * .06f, -rise * 1.14f),
+                    3 + frame.Unit(seed + 90) * 5,
+                    5 + frame.Unit(seed + 91) * 8,
+                    i % 8 == 0 ? Shape.WarriorSpark : Shape.UserEmber, Heat,
+                    fade * .90f, Layer.EmissiveCore);
+            if (i % 5 == 0)
             {
-                float age = Fract(time * .42f + frame.Unit(seed + 61));
-                Vector2 plume = root + new Vector2(lean * age,
-                    -height * (.78f + .17f * age) - age * 34);
-                frame.Clip(plume, 33 + age * 24, 46 + age * 31,
-                    Shape.SmokeSequence, age + i * .17f, Smoke,
-                    .46f * (1 - age * .75f), behind ? Layer.Ground : Layer.Smoke, sortY: root.Y);
-            }
-
-            for (int j = 0; j < 2; j++)
-            {
-                int index = seed + j * 13;
-                float age = Fract(progress * (2.1f + frame.Unit(index + 81)) + frame.Unit(index + 92));
-                Vector2 spark = root + new Vector2((frame.Unit(index + 111) - .5f) * 28,
-                    -height * (.14f + age * .67f));
-                frame.Sprite(spark, 4 + frame.Unit(index + 121) * 5,
-                    8 + frame.Unit(index + 132) * 8,
-                    j % 2 == 0 ? Shape.UserEmber : Shape.WarriorSpark, Heat,
-                    .90f * (1 - age * .65f),
-                    coreLayer, light: j == 0 && i % 3 == 0, sortY: root.Y);
+                float smokeAge = Fract(progress * .83f + frame.Unit(seed + 61));
+                Vector2 plume = root + new Vector2(
+                    (frame.Unit(seed + 65) - .5f) * smokeAge * 12,
+                    -16 - 46 * smokeAge);
+                frame.Clip(plume, 12 + smokeAge * 15, 18 + smokeAge * 21,
+                    Shape.SmokeSequence, time * .5f + smokeAge,
+                    i % 2 == 0 ? 0x655348 : Smoke,
+                    .43f * (1 - smokeAge) * durationFade, Layer.Smoke);
             }
         }
     }
 
     private static void DrakeContact(Frame frame, Vector2 feet, float progress, float time)
     {
-        // Pure electrical impact: branching, strobing arcs and needle-like
-        // flashes. No orb, halo, circular ground pulse or flame component.
-        Vector2 body = feet - Vector2.UnitY * 38;
-        frame.Sprite(body, 32, 49, Shape.Flash, White,
-            .90f * (1 - Ease(progress * .65f)), Layer.EmissiveCore, light: true);
-
-        for (int side = -1; side <= 1; side += 2)
+        // Coiling electrical contact around the struck actor, not a mirrored X.
+        Vector2 centre = feet - Vector2.UnitY * 37;
+        float dissipate = 1f - Ease((progress - .73f) / .27f);
+        for (int i = 0; i < 11; i++)
         {
-            Vector2 root = body + new Vector2(side * 7, 9);
-            Vector2 overhead = body + new Vector2(side * (40 + progress * 47), -39 - progress * 26);
-            Vector2 ground = feet + new Vector2(side * (21 + progress * 24), 1);
-            WizardSpellEffects.Channel(frame, root, overhead, 27, 3.2f, .96f,
-                time, 4, 123 + side * 71, colours: WizardSpellEffects.DrakeColours);
-            Vector2 streak = Vector2.Lerp(root, overhead, .58f);
-            float angle = MathF.Atan2(overhead.Y - root.Y, overhead.X - root.X);
-            frame.Sprite(streak, Vector2.Distance(root, overhead) * .79f, 20,
-                Shape.UserLightning, side < 0 ? Ice : Steel,
-                .58f * (.75f + .25f * MathF.Sin(time * 24 + side)),
-                Layer.EmissiveCore, angle);
-            WizardSpellEffects.Channel(frame, root, ground, 19, 2.45f, .86f,
-                time + .08f, 3, 421 + side * 67, colours: WizardSpellEffects.DrakeColours);
-            WizardSpellEffects.Channel(frame, overhead, ground + new Vector2(-side * 9, -18),
-                15, 1.8f, .71f, time + .16f, 2, 639 + side * 41,
+            float offset = frame.Unit(233 + i * 17) * MathF.Tau;
+            float startAngle = offset + time * (2.7f + frame.Unit(i + 32) * 2.4f);
+            float endAngle = startAngle + .37f + frame.Unit(i + 13) * .77f;
+            float radiusX = 17 + 14 * frame.Unit(i + 25);
+            float radiusY = 26 + 25 * frame.Unit(i + 29);
+            Vector2 from = centre + Ellipse(startAngle, radiusX, radiusY);
+            Vector2 to = centre + Ellipse(endAngle, radiusX, radiusY);
+            float z = .65f + .35f * MathF.Sin(time * 22 + i);
+            WizardSpellEffects.Channel(frame, from, to, 6.5f, 1.5f,
+                dissipate * z, time, 1, i * 71 + 389,
                 colours: WizardSpellEffects.DrakeColours);
-
-            for (int i = 0; i < 12; i++)
+            Vector2 between = Vector2.Lerp(from, to, .56f);
+            float direction = MathF.Atan2(to.Y - from.Y, to.X - from.X);
+            for (int j = 0; j < 4; j++)
             {
-                int seed = 712 + i * 31 + (side + 1) * 89;
-                float age = Fract(progress * 2.9f + frame.Unit(seed));
-                float along = frame.Unit(seed + 7);
-                Vector2 point = Vector2.Lerp(root, i % 2 == 0 ? overhead : ground, along) +
-                    new Vector2(side * (age * 17 + frame.Unit(seed + 11) * 8),
-                        -age * (12 + frame.Unit(seed + 13) * 16));
-                frame.Sprite(point, 3 + frame.Unit(seed + 19) * 5,
-                    7 + frame.Unit(seed + 23) * 13,
-                    i % 4 == 0 ? Shape.UserEmber : Shape.WarriorSpark,
-                    i % 3 == 0 ? White : Ice, .90f * (1 - age * .72f),
-                    Layer.EmissiveCore, side * .17f, light: i % 5 == 0);
+                float t = (j + .28f) / 4f;
+                Vector2 local = Vector2.Lerp(from, to, t);
+                frame.Sprite(local, 10 + frame.Unit(i * 13 + j + 3) * 15,
+                    5 + frame.Unit(i * 19 + j + 9) * 5,
+                    Shape.UserLightning, j == 1 ? White : Ice,
+                    dissipate * (.5f + .4f * z), Layer.EmissiveCore,
+                    direction, light: i % 5 == 0 && j == 0);
             }
+            frame.Sprite(between, 4.4f, 8.1f,
+                i % 3 == 0 ? Shape.Flash : Shape.WarriorSpark, White,
+                dissipate * z, Layer.EmissiveCore);
         }
     }
 

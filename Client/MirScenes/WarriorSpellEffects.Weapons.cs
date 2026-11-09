@@ -73,8 +73,8 @@ internal static partial class WarriorSpellEffects
                     Layer.Glow, aspect: .83f, alpha: 141);
                 break;
             case Spell.CrossHalfMoon when cut:
-                ProjectCrescent(pool, look, feet, facing, -.34f, 23, 88, 22, now, life, sweep: 3.68f);
-                ProjectCrescent(pool, look, feet, facing, MathF.PI - .22f, 36, 79, 22, now, life, sweep: 3.78f);
+                ProjectCrescent(pool, look, feet, facing, -.28f, 24, 119, 42, now, life, sweep: 3.25f);
+                ProjectCrescent(pool, look, feet, facing, MathF.PI - .17f, 32, 111, 38, now, life, sweep: 3.32f);
                 effect.Add(feet + facing * 73 - Vector2.UnitY * 33, facing * 12, Shape.WarriorSpark, 33, life,
                     Layer.Emissive, aspect: .86f, rotation: angle, core: true, alpha: 157);
                 break;
@@ -96,20 +96,8 @@ internal static partial class WarriorSpellEffects
                 break;
             case Spell.FlamingSword:
                 AddBladeFire(pool, pose, look, now, life, progress, feet.Y);
-                // Follow the cut with tongues and smoke rather than a circular impact.
-                effect.Add(forwardTip + facing * 22, facing * 12 - Vector2.UnitY * 13,
-                    Shape.FlameTongue, 63, life, Layer.Emissive,
-                    aspect: 1.34f, rotation: angle - .30f, alpha: 194);
-                if (cut)
-                {
-                    effect.Add(feet + facing * 39 - Vector2.UnitY * 34, facing * 19,
-                        Shape.FireSequence, 128, life, Layer.Emissive,
-                        aspect: .53f, rotation: angle, alpha: 201);
-                    effect.Add(forwardTip - Vector2.UnitY * 24,
-                        facing * 7 - Vector2.UnitY * 18, Shape.SmokeSequence, 69,
-                        life, Layer.Smoke, aspect: 1.10f, rotation: angle * .23f, alpha: 140);
-                }
-                effect.Scatter(forwardTip, 7, Shape.WarriorSpark, 58, life, rise: true);
+                // The cut is now drawn by numerous narrow weapon-tracking
+                // tongues and smoke fragments. Do not add a second 128px blob.
                 break;
             case Spell.CounterAttack:
                 effect.Add(pose.Tip, facing * 8, Shape.WarriorCrescent, 96, life,
@@ -128,7 +116,8 @@ internal static partial class WarriorSpellEffects
         Vector2 forward = GroundHeading(facing);
         float heading = MathF.Atan2(forward.Y, forward.X);
         Vector2 centre = feet - Vector2.UnitY * lift;
-        const int segments = 14;
+        // Smooth the perspective-correct ribbon to avoid straight-line joints.
+        const int segments = 32;
         var (inner, outer) = Edge(0);
         for (int i = 1; i <= segments; i++)
         {
@@ -139,6 +128,18 @@ internal static partial class WarriorSpellEffects
                 Vector2.Lerp(nextOuter, nextInner, 1.48f), Vector2.Lerp(nextInner, nextOuter, 1.18f),
                 layer, shadow, 177);
             AddRibbon(inner, outer, nextInner, nextOuter, layer, look.Colour, 235);
+            if (i % 3 == 1 && i < segments - 2)
+            {
+                Vector2 tangent = (nextOuter + nextInner) * .5f - (outer + inner) * .5f;
+                Vector2 accent = (nextInner + nextOuter + inner + outer) * .25f;
+                float length = 13 + 14 * MathF.Sin(i * MathF.PI / segments);
+                pool.TryAdd(new SpellParticle(accent, Vector2.Zero, now, Math.Min(life, 120),
+                    Math.Max(1, (int)length), Color.FromArgb(144, i % 4 == 1 ? look.Core : look.Colour),
+                    Shape.UserSlash, 0, Aspect: .50f,
+                    Rotation: MathF.Atan2(tangent.Y, tangent.X),
+                    Layer: layer == Layer.Ground ? Layer.Ground : Layer.EmissiveCore,
+                    CastsLight: false, DepthY: feet.Y));
+            }
             if (i > 2 && i < segments - 1)
             {
                 AddRibbon(Vector2.Lerp(inner, outer, .73f), Vector2.Lerp(inner, outer, .98f),
@@ -159,7 +160,9 @@ internal static partial class WarriorSpellEffects
         {
             float turn = (t - .5f) * sweep;
             Vector2 ray = Ellipse(heading + yaw + turn, 1, 1);
-            float taper = .5f + width * MathF.Pow(MathF.Max(0, MathF.Sin(t * MathF.PI)), 1.28f);
+            // Broad weapon-side body, falling into a very narrow trailing tip.
+            float profile = MathF.Pow(MathF.Max(0, MathF.Sin(t * MathF.PI)), .65f);
+            float taper = .4f + width * profile * (1.30f - .77f * t);
             return (centre + ProjectGround(ray * (radius - taper * .83f)),
                 centre + ProjectGround(ray * (radius + taper * .25f)));
         }
@@ -209,14 +212,29 @@ internal static partial class WarriorSpellEffects
         var frame = new Frame(pool, pose.Hilt, now, 1, size, seed, scalePositions: false, depthY: feetY ?? pose.Hilt.Y + 36);
         if (spell == Spell.FlamingSword)
         {
-            for (int i = 0; i < 4; i++)
+            // Position samples along the real weapon trace, not four large blobs.
+            for (int i = 0; i < 64; i++)
             {
-                float lift = Fract(time * (.61f + i * .08f) + frame.Unit(i));
-                Vector2 point = pose.Hilt + blade * (.39f + .19f * i) - Vector2.UnitY * (3 + 9 * lift);
-                frame.Clip(point, 23 + i * 4, 31 + i * 3, Shape.FlameSequence, time * .84f + i * .23f,
-                    i == 1 ? Heat : i == 2 ? Ember : Flame, .67f, rotation: (frame.Unit(i + 13) - .5f) * .72f, light: i == 3);
-                frame.Sprite(point - Vector2.UnitY * (5 + lift * 15), 4, 7, Shape.WarriorSpark, Heat, .83f * (1 - lift),
-                    Layer.EmissiveCore);
+                int sample = 101 + i * 23;
+                float age = Fract(time * (.69f + frame.Unit(sample + 7) * .59f) +
+                    frame.Unit(sample + 13));
+                float along = .19f + frame.Unit(sample + 19) * .78f;
+                Vector2 root = pose.Hilt + blade * along;
+                Vector2 point = root + new Vector2(
+                    (frame.Unit(sample + 31) - .5f) * 7,
+                    -age * (9 + frame.Unit(sample + 41) * 21));
+                float alpha = .79f * (1 - age * .68f);
+                frame.Sprite(point, 3 + frame.Unit(sample + 47) * 8,
+                    6 + frame.Unit(sample + 51) * 16,
+                    i % 4 == 0 ? Shape.UserEmber : Shape.UserFlame,
+                    i % 5 == 0 ? Heat : i % 2 == 0 ? Flame : Ember,
+                    alpha, i % 7 == 0 ? Layer.EmissiveCore : Layer.Emissive,
+                    (frame.Unit(sample + 57) - .5f) * .31f,
+                    light: i % 19 == 0);
+                if (i % 8 == 0)
+                    frame.Clip(point - Vector2.UnitY * 9, 13, 18,
+                        Shape.SmokeSequence, age + time * .24f, Smoke,
+                        .28f * (1 - age), Layer.Smoke);
             }
             return;
         }
@@ -255,19 +273,35 @@ internal static partial class WarriorSpellEffects
         frame.Sprite(end - facing * 12, 23, 32, Shape.Flash, White, .83f, Layer.EmissiveCore, time * .7f);
     }
 
-    private static void AddBladeFire(SpellParticlePool pool, WeaponMaskTrace pose, Look look, long now, int life, float progress,
-        float feetY)
+    private static void AddBladeFire(SpellParticlePool pool, WeaponMaskTrace pose, Look look,
+        long now, int life, float progress, float feetY)
     {
         Vector2 blade = pose.Tip - pose.Hilt;
-        byte first = (byte)((int)(progress * SpellParticleAtlas.ClipFrames) % SpellParticleAtlas.ClipFrames);
-        for (int i = 0; i < 3; i++)
+        float angle = MathF.Atan2(blade.Y, blade.X);
+        var stroke = new Frame(pool, pose.Hilt, now, 1, Frame.ReferenceSize,
+            (uint)(now / 53), scalePositions: false, depthY: feetY);
+        for (int i = 0; i < 58; i++)
         {
-            Vector2 point = pose.Hilt + blade * (.49f + .24f * i);
-            byte frame = (byte)((first + i * 6) % SpellParticleAtlas.ClipFrames);
-            pool.TryAdd(new SpellParticle(point, new Vector2(2, -12 - i * 5), now, life, 36 + i * 6,
-                Color.FromArgb(205 - i * 13, i == 0 ? look.Core : look.Colour), Shape.FlameSequence, 0, Aspect: 1.27f,
-                Rotation: MathF.Atan2(blade.Y, blade.X) * .34f, Growth: .28f, Layer: i == 0 ? Layer.EmissiveCore : Layer.Emissive,
-                Frame: frame, DepthY: feetY));
+            int seed = i * 31 + 211;
+            float age = Fract(progress * (1.4f + stroke.Unit(seed + 5)) +
+                stroke.Unit(seed + 7));
+            float along = .25f + stroke.Unit(seed + 9) * .76f;
+            Vector2 source = pose.Hilt + blade * along;
+            Vector2 point = source + new Vector2(
+                (stroke.Unit(seed + 13) - .5f) * age * 9,
+                -age * (9 + stroke.Unit(seed + 17) * 22));
+            int tint = i % 5 == 0 ? Heat : i % 2 == 0 ? Flame : Ember;
+            float alpha = .78f * (1 - age * .76f);
+            stroke.Sprite(point, 4 + stroke.Unit(seed + 19) * 8,
+                9 + stroke.Unit(seed + 23) * 17,
+                i % 4 == 0 ? Shape.UserEmber : Shape.UserFlame,
+                tint, alpha, i % 6 == 0 ? Layer.EmissiveCore : Layer.Emissive,
+                angle * .17f, light: i % 16 == 0);
+            if (i % 6 == 0)
+                stroke.Clip(point - Vector2.UnitY * 8,
+                    12 + stroke.Unit(seed + 27) * 9, 16 + stroke.Unit(seed + 29) * 15,
+                    Shape.SmokeSequence, progress + stroke.Unit(seed + 33),
+                    Smoke, .32f * (1 - age), Layer.Smoke);
         }
     }
 }

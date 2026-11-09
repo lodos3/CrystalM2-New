@@ -159,7 +159,7 @@ public sealed partial class MapControl
         if (WarriorSpellEffects.HasArt(visual.Spell))
         {
             Vector2? tip = null;
-            if (visual is { Spell: Spell.FlamingSword, Phase: SpellVisualPhase.Prepare } &&
+            if (visual is { Phase: SpellVisualPhase.Prepare, Spell: Spell.FlamingSword or Spell.TwinDrakeBlade } &&
                 actor is PlayerObject player && player.EquippedWeaponTrace() is { } trace)
             {
                 Point camera = SpellParticleOrigin();
