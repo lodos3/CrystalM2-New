@@ -112,9 +112,9 @@ internal static partial class WarriorSpellEffects
 
     private static void DrakeCharge(Frame frame, Vector2 feet, Vector2 hand, float progress, float time)
     {
-        // The owner-attached Effect updates the pivot and weapon tip every frame.
-        // Electricity grows from the hand, winds around the torso, crests
-        // above the head and finally discharges back into the weapon.
+        // Actor-following four-strand spiral, rising from the weapon around
+        // the torso before returning to the blade. Root Y is ground depth;
+        // screen-space lift never changes which side of the actor owns a mote.
         Vector2 body = feet - Vector2.UnitY * 43;
         Vector2 overhead = feet - Vector2.UnitY * 112;
         for (int strand = 0; strand < 4; strand++)
@@ -122,10 +122,9 @@ internal static partial class WarriorSpellEffects
             float phase = progress * MathF.Tau * 2.3f + strand * 1.57f;
             float radius = (14 + 16 * MathF.Sin(progress * MathF.PI)) *
                 (.77f + frame.Unit(strand + 18) * .35f);
-            Vector2 target = body + Ellipse(phase, radius, radius * .51f) -
+            Vector2 target = body + ProjectGround(Ellipse(phase, radius, radius)) -
                 Vector2.UnitY * (progress * 45);
-            float entry = Ease(progress * 5.8f);
-            target = Vector2.Lerp(hand, target, entry);
+            target = Vector2.Lerp(hand, target, Ease(progress * 5.8f));
             float departure = Ease((progress - .70f) / .30f);
             Vector2 finalPoint = Vector2.Lerp(overhead, hand, Ease((progress - .90f) / .10f));
             target = Vector2.Lerp(target, finalPoint, departure);
@@ -134,36 +133,46 @@ internal static partial class WarriorSpellEffects
             {
                 float t = j / 8f;
                 float angle = phase - t * 1.6f;
-                Vector2 trail = Vector2.Lerp(hand, target, t);
-                trail += new Vector2(MathF.Cos(angle), MathF.Sin(angle) * .65f) *
-                    (radius * .24f * MathF.Sin(t * MathF.PI));
-                // One segmented authored circuit is far cheaper than
-                // spawning an entire Channel graph for every tiny segment.
+                Vector2 trail = Vector2.Lerp(hand, target, t) +
+                    ProjectGround(Ellipse(angle, radius * .24f, radius * .24f)) *
+                    MathF.Sin(t * MathF.PI);
+                float groundY = feet.Y + ProjectGround(Ellipse(angle, radius, radius)).Y;
+                bool behind = groundY < feet.Y;
+                Layer layer = behind ? Layer.Ground : Layer.EmissiveCore;
                 float flicker = .68f + .32f * MathF.Sin(time * 31 + j * 2.7f + strand);
-                frame.Thread(previous, trail, 1.6f, 1.0f,
-                    j % 3 == 0 ? White : Ice, flicker, Layer.EmissiveCore,
-                    light: j == 4);
+                // Fine arcs stay below a few pixels wide: no solid streak slabs.
+                frame.Thread(previous, trail, .85f, .54f, j % 3 == 0 ? White : Ice,
+                    flicker * .90f, layer, light: j == 4 && strand == 0, sortY: groundY);
                 if (j == 1 || j % 2 == 0)
                 {
                     Vector2 delta = trail - previous;
-                    float theta = MathF.Atan2(delta.Y, delta.X);
-                    frame.Sprite((previous + trail) * .5f, 13 + delta.Length(),
-                        5.5f, Shape.UserLightning, j % 4 == 0 ? White : Ice,
-                        .67f, Layer.EmissiveCore, theta, light: j == 4);
+                    float direction = MathF.Atan2(delta.Y, delta.X);
+                    frame.Sprite((previous + trail) * .5f, 8 + delta.Length() * .66f,
+                        3.5f, Shape.UserLightning, j % 4 == 0 ? White : Ice,
+                        .52f * flicker, layer, direction, sortY: groundY);
                 }
+                if (j == 5 && strand % 2 == 0)
+                    frame.Sprite(trail, 13, 8, Shape.Wisp, 0x477fdb,
+                        .18f * flicker, Layer.Glow, sortY: groundY);
                 previous = trail;
             }
         }
-        for (int i = 0; i < 24; i++)
+
+        for (int i = 0; i < 28; i++)
         {
             float age = Fract(progress * 3.1f + frame.Unit(i + 173));
-            float travel = frame.Unit(i + 71);
-            float phase = progress * MathF.Tau * 2.2f + travel * MathF.Tau;
-            Vector2 point = body + new Vector2(MathF.Cos(phase) * 22, MathF.Sin(phase) * 11) -
-                Vector2.UnitY * (progress * 44 + age * 12);
-            frame.Sprite(point, 3 + frame.Unit(i + 13) * 3, 4 + frame.Unit(i + 14) * 6,
-                i % 5 == 0 ? Shape.Flash : Shape.Spark, i % 3 == 0 ? White : Ice,
-                .80f * (1 - age * .7f), Layer.EmissiveCore, phase * .22f);
+            float phase = progress * MathF.Tau * 2.2f +
+                frame.Unit(i + 71) * MathF.Tau;
+            Vector2 ground = feet + ProjectGround(Ellipse(phase, 22, 22));
+            Vector2 point = ground - Vector2.UnitY *
+                (43 + progress * 44 + age * 12);
+            float fade = (.80f - age * .51f) *
+                (.65f + .35f * MathF.Sin(age * MathF.PI));
+            Layer layer = ground.Y < feet.Y ? Layer.Ground : Layer.EmissiveCore;
+            frame.Sprite(point, 2.8f + frame.Unit(i + 13) * 2.9f,
+                3.2f + frame.Unit(i + 14) * 4.1f,
+                Shape.Spark, i % 3 == 0 ? White : Ice,
+                fade, layer, phase * .22f, sortY: ground.Y);
         }
     }
 
@@ -222,9 +231,12 @@ internal static partial class WarriorSpellEffects
 
     private static void DrakeContact(Frame frame, Vector2 feet, float progress, float time)
     {
-        // Coiling electrical contact around the struck actor, not a mirrored X.
+        // The impact originates on the struck actor's actual map cell. The
+        // electrical silhouette winds around the target, but the burst and
+        // rising lightning spikes root in the ground BELOW that actor.
         Vector2 centre = feet - Vector2.UnitY * 37;
         float dissipate = 1f - Ease((progress - .73f) / .27f);
+        float impact = dissipate * (.78f + .22f * MathF.Sin(MathF.Min(1, progress * 5) * MathF.PI));
         for (int i = 0; i < 11; i++)
         {
             float offset = frame.Unit(233 + i * 17) * MathF.Tau;
@@ -234,25 +246,98 @@ internal static partial class WarriorSpellEffects
             float radiusY = 26 + 25 * frame.Unit(i + 29);
             Vector2 from = centre + Ellipse(startAngle, radiusX, radiusY);
             Vector2 to = centre + Ellipse(endAngle, radiusX, radiusY);
-            float z = .65f + .35f * MathF.Sin(time * 22 + i);
-            WizardSpellEffects.Channel(frame, from, to, 6.5f, 1.5f,
-                dissipate * z, time, 1, i * 71 + 389,
-                colours: WizardSpellEffects.DrakeColours);
-            Vector2 between = Vector2.Lerp(from, to, .56f);
+            float groundY = feet.Y + ProjectGround(Ellipse(startAngle, radiusX, radiusX)).Y;
+            Layer layer = groundY < feet.Y ? Layer.Ground : Layer.EmissiveCore;
+            float flicker = .65f + .35f * MathF.Sin(time * 22 + i);
+            WizardSpellEffects.Channel(frame, from, to, 5.1f, 1.05f,
+                impact * flicker * .85f, time, 1, i * 71 + 389,
+                layer: layer, colours: WizardSpellEffects.DrakeColours,
+                depths: new Vector2(groundY, groundY));
             float direction = MathF.Atan2(to.Y - from.Y, to.X - from.X);
             for (int j = 0; j < 4; j++)
             {
-                float t = (j + .28f) / 4f;
-                Vector2 local = Vector2.Lerp(from, to, t);
-                frame.Sprite(local, 10 + frame.Unit(i * 13 + j + 3) * 15,
-                    5 + frame.Unit(i * 19 + j + 9) * 5,
+                Vector2 point = Vector2.Lerp(from, to, (j + .28f) / 4f);
+                frame.Sprite(point, 8 + frame.Unit(i * 13 + j + 3) * 9,
+                    2.7f + frame.Unit(i * 19 + j + 9) * 2,
                     Shape.UserLightning, j == 1 ? White : Ice,
-                    dissipate * (.5f + .4f * z), Layer.EmissiveCore,
-                    direction, light: i % 5 == 0 && j == 0);
+                    impact * (.49f + .29f * flicker), layer, direction,
+                    light: i % 6 == 0 && j == 0, sortY: groundY);
             }
-            frame.Sprite(between, 4.4f, 8.1f,
-                i % 3 == 0 ? Shape.Flash : Shape.WarriorSpark, White,
-                dissipate * z, Layer.EmissiveCore);
+        }
+
+        // Ground spikes are branching, short electric cuts, not solid ice
+        // meshes or opaque pillar sprites. Their root controls world-row depth.
+        for (int i = 0; i < 16; i++)
+        {
+            int seed = 821 + i * 29;
+            float angle = (i + frame.Unit(seed + 3) * .62f) *
+                MathF.Tau / 16;
+            float radius = 9 + frame.Unit(seed + 5) * 26;
+            Vector2 root = feet + ProjectGround(Ellipse(angle, radius, radius));
+            float height = (17 + frame.Unit(seed + 7) * 25) *
+                (.71f + .29f * impact);
+            Vector2 middle = root + new Vector2(
+                (frame.Unit(seed + 9) - .5f) * 11, -height * .52f);
+            Vector2 tip = root + new Vector2(
+                (frame.Unit(seed + 11) - .5f) * 19, -height);
+            bool rear = root.Y < feet.Y;
+            Layer layer = rear ? Layer.Ground : Layer.EmissiveCore;
+            int tint = i % 3 == 0 ? White : Ice;
+            frame.Thread(root, middle, 1.14f, .85f, tint,
+                impact * .77f, layer, sortY: root.Y);
+            frame.Thread(middle, tip, .81f, .24f, i % 4 == 0 ? White : Steel,
+                impact * .89f, layer, sortY: root.Y);
+            if (i % 2 == 0)
+            {
+                Vector2 fork = Vector2.Lerp(middle, tip, .30f) +
+                    new Vector2((frame.Unit(seed + 17) - .5f) * 16, -6);
+                frame.Thread(middle, fork, .57f, .20f, Ice,
+                    impact * .55f, layer, sortY: root.Y);
+                frame.Sprite(fork, 6, 2.8f, Shape.UserLightning,
+                    White, impact * .55f, layer, sortY: root.Y);
+            }
+        }
+
+        // Micro-embers eject laterally from the ground contact. Only a few
+        // receive scene light; the F12 glow pass remains independent.
+        for (int i = 0; i < 38; i++)
+        {
+            int seed = 1747 + i * 23;
+            float angle = (i + frame.Unit(seed + 3)) * MathF.Tau / 38;
+            float age = Fract(progress * (1.12f + frame.Unit(seed + 5)) +
+                frame.Unit(seed + 7));
+            float range = (5 + frame.Unit(seed + 11) * 40) *
+                (.25f + .75f * Ease(progress * 3));
+            Vector2 root = feet + ProjectGround(Ellipse(angle, range, range));
+            Vector2 point = root - Vector2.UnitY *
+                (4 + age * (7 + frame.Unit(seed + 13) * 23));
+            Layer layer = root.Y < feet.Y ? Layer.Ground : Layer.EmissiveCore;
+            frame.Sprite(point, 2.5f + frame.Unit(seed + 17) * 3.2f,
+                3 + frame.Unit(seed + 19) * 3.8f,
+                i % 5 == 0 ? Shape.WarriorSpark : Shape.Spark,
+                i % 4 == 0 ? White : Ice,
+                impact * (.42f + .49f * (1 - age)), layer,
+                angle, light: i % 17 == 0, sortY: root.Y);
+        }
+
+        // Thin cold-blue smoke appears just after contact and expands across
+        // the floor. The opacity stays modest so characters remain legible.
+        for (int i = 0; i < 20; i++)
+        {
+            int seed = 2251 + i * 19;
+            float angle = frame.Unit(seed + 3) * MathF.Tau;
+            float age = Fract(progress * .78f + frame.Unit(seed + 5) * .39f);
+            float radius = 6 + progress * 17 + frame.Unit(seed + 7) * 15;
+            Vector2 root = feet + ProjectGround(Ellipse(angle, radius, radius));
+            Vector2 plume = root - Vector2.UnitY *
+                (6 + age * (15 + frame.Unit(seed + 11) * 21));
+            Layer layer = i % 4 == 0 ? Layer.Ground : Layer.Smoke;
+            frame.Clip(plume, 11 + age * 12, 9 + age * 17,
+                Shape.SmokeSequence, time * .52f + frame.Unit(seed + 13),
+                i % 3 == 0 ? 0x7289ac : 0x3e587b,
+                impact * .27f * (1 - age * .48f),
+                layer, rotation: (frame.Unit(seed + 17) - .5f) * .20f,
+                sortY: root.Y);
         }
     }
 
