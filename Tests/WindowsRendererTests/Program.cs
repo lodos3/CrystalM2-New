@@ -663,6 +663,38 @@ internal static class Program
         Check(pool.Active.ToArray().Where(p => p.Shape == SpellParticleShape.Filament)
             .Select(p => MathF.Round(p.Rotation, 2)).Distinct().Count() > 18,
             "Twin Drake Blade has varied angular channels and forks.");
+        SpellParticle[] enchanted = pool.Active.ToArray();
+        Vector2 fullBlade = blade.Tip - blade.Hilt;
+        float Fraction(Vector2 point) =>
+            Vector2.Dot(point - blade.Hilt, fullBlade) / fullBlade.LengthSquared();
+        Check(enchanted.Count(p => p.Shape == SpellParticleShape.Filament &&
+                  p.Ground && p.DepthY.HasValue && p.DepthY.Value < feet.Y) >= 6 &&
+              enchanted.Count(p => p.Shape == SpellParticleShape.Filament &&
+                  !p.Ground && p.DepthY.HasValue && p.DepthY.Value >= feet.Y) >= 6 &&
+              enchanted.Any(p => p.Shape == SpellParticleShape.Filament &&
+                  Fraction(p.Origin) is >= .10f and <= .31f) &&
+              enchanted.Any(p => p.Shape == SpellParticleShape.Filament &&
+                  Fraction(p.Origin) is >= .79f and <= 1.04f) &&
+              enchanted.Any(p => p.Shape == SpellParticleShape.Spark && p.Size <= 8) &&
+              !enchanted.Any(p => p.Shape is SpellParticleShape.Orb or SpellParticleShape.Halo),
+            "Twin Drake enchant covers the hilt-to-tip blade with front and rear blue-white arcs, not a glowing tip or circular plate.");
+
+        pool.Clear();
+        var drakePrevious = new WeaponMaskTrace(blade.Hilt - new Vector2(3, 2),
+            blade.Hilt + new Vector2(11, -48));
+        LegacySpellEffects.WeaponSweep(pool, Spell.TwinDrakeBlade, blade, drakePrevious,
+            cast, 190, 100, Vector2.UnitX, .58f, feet, .20f);
+        SpellParticle[] drakeSweep = pool.Active.ToArray();
+        Check(drakeSweep.Count(p => p.Shape == SpellParticleShape.Filament) >= 12 &&
+              drakeSweep.Any(p => p.Shape == SpellParticleShape.Filament &&
+                  Fraction(p.Origin) is >= .12f and <= .34f) &&
+              drakeSweep.Any(p => p.Shape == SpellParticleShape.Filament &&
+                  Fraction(p.Origin) is >= .70f and <= 1.07f) &&
+              drakeSweep.Any(p => p.Shape == SpellParticleShape.Filament && p.Ground) &&
+              drakeSweep.Any(p => p.Shape == SpellParticleShape.Filament && !p.Ground) &&
+              !drakeSweep.Any(p => p.Shape == SpellParticleShape.BladeRibbon && p.Colour.A > 115),
+            "Twin Drake weapon sweep must trace the full blade edge through both scene depths with thin segmented electricity.");
+
 
         SpellParticle[] initial = Sample(Spell.BladeAvalanche, SpellVisualPhase.Swing, 280, 1500);
         SpellParticle[] advancing = Sample(Spell.BladeAvalanche, SpellVisualPhase.Swing, 1160, 1500);
