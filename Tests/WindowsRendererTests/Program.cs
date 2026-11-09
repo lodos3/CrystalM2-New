@@ -555,11 +555,13 @@ internal static class Program
         var blade = new WeaponMaskTrace(feet + new Vector2(4, -36), feet + new Vector2(46, -37));
         SpellParticle[] moon = Sweep(Spell.HalfMoon, Vector2.UnitX);
         SpellParticle[] edges = moon.Where(p => p.Ribbon.HasValue && p.Colour.A == 235).ToArray();
-        Check(edges.Length == 14 && edges.All(p => p.Origin.X + p.Ribbon.Value.BottomRight.X > feet.X + 15) &&
-            Thickness(edges[6]) > 8 * Thickness(edges[0]) &&
-            Thickness(edges[6]) > 8 * Vector2.Distance(edges[^1].Ribbon.Value.TopRight, edges[^1].Ribbon.Value.BottomRight),
+        Check(edges.Length == 32 && edges.All(p => p.Origin.X + p.Ribbon.Value.BottomRight.X > feet.X + 15) &&
+            Thickness(edges[16]) > 8 * Thickness(edges[0]) &&
+            Thickness(edges[16]) > 8 * Vector2.Distance(edges[^1].Ribbon.Value.TopRight, edges[^1].Ribbon.Value.BottomRight),
             "Half Moon opens toward the target direction with tapered tips and a thick middle.");
         SpellParticle[] cross = Sweep(Spell.CrossHalfMoon, Vector2.UnitX);
+        Check(cross.Count(p => p.Shape == SpellParticleShape.MoonRibbon && p.Colour.A == 235) == 64,
+            "Cross Half Moon needs two high-resolution curved ribbons with no faceted joins.");
         Check(cross.Any(p => p.Ribbon.HasValue && p.Ground && p.Ribbon.Value.TopLeft.X < -62) &&
             cross.Any(p => p.Ribbon.HasValue && p.Emissive && p.Ribbon.Value.TopLeft.X > 62),
             "Cross Half Moon wraps behind and in front of the warrior.");

@@ -28,14 +28,15 @@ static SpellParticle[] RenderWizard(Spell spell, SpellVisualPhase phase, long el
         elapsed, 0L, duration, 1.28f, 42u, 0u]);
     return pool.Active.ToArray();
 }
-static SpellParticle[] RenderWarrior(Spell spell, SpellVisualPhase phase, long elapsed, int duration = 800)
+static SpellParticle[] RenderWarrior(Spell spell, SpellVisualPhase phase, long elapsed, int duration = 800,
+    Vector2? origin = null)
 {
     var type = typeof(SpellVisual).Assembly.GetType("Client.MirScenes.WarriorSpellEffects")
         ?? throw new InvalidOperationException("Warrior renderer missing.");
     var draw = type.GetMethod("DrawFrame", BindingFlags.Static | BindingFlags.NonPublic)
         ?? throw new InvalidOperationException("Warrior draw method missing.");
     var pool = new SpellParticlePool(8192);
-    draw.Invoke(null, [pool, new SpellVisual(spell, phase), new Vector2(400, 400), Vector2.UnitX,
+    draw.Invoke(null, [pool, new SpellVisual(spell, phase), origin ?? new Vector2(400, 400), Vector2.UnitX,
         elapsed, 0L, duration, 1.28f, 42u, null]);
     return pool.Active.ToArray();
 }
@@ -172,6 +173,32 @@ foreach (Spell spell in new[] { Spell.FlamingSword, Spell.TwinDrakeBlade })
 Check(!RenderWarrior(Spell.TwinDrakeBlade, SpellVisualPhase.Prepare, 270, 500)
     .Any(p => p.Shape is SpellParticleShape.Orb or SpellParticleShape.Halo),
     "Twin Drake Blade preparation must have no floating oval backdrop.");
+
+// Warrior VFX density/attachment regressions: these failed on the old
+// graphics-settings snapshot after the 116-element combustion was replaced.
+var remasteredFire = RenderWarrior(Spell.FlamingSword, SpellVisualPhase.Contact, 280);
+var fireTongues = remasteredFire.Where(p => p.Shape == SpellParticleShape.UserFlame).ToArray();
+Check(fireTongues.Length >= 90 &&
+      fireTongues.All(p => p.Dimensions(0f, 1.28f).X <= 22 && p.Dimensions(0f, 1.28f).Y <= 42) &&
+      remasteredFire.Count(p => p.Shape == SpellParticleShape.SmokeSequence) >= 20 &&
+      remasteredFire.Count(p => p.Shape is SpellParticleShape.UserEmber or SpellParticleShape.WarriorSpark) >= 20,
+    "Flaming Sword contact needs dense small fire, embers and separate smoke instead of giant tongues.");
+var drakeCharge = RenderWarrior(Spell.TwinDrakeBlade, SpellVisualPhase.Prepare, 260, 500);
+Check(drakeCharge.Count(p => p.Shape == SpellParticleShape.Filament) >= 28 &&
+      drakeCharge.Count(p => p.Shape == SpellParticleShape.UserLightning) >= 8 &&
+      drakeCharge.Count(p => p.Shape == SpellParticleShape.Spark) >= 14,
+    "Twin Drake charge must contain multiple fine coiling filaments and small electrical sparks.");
+var movedDrake = RenderWarrior(Spell.TwinDrakeBlade, SpellVisualPhase.Prepare, 260, 500,
+    new Vector2(443, 427));
+Check(drakeCharge.Length == movedDrake.Length &&
+      drakeCharge.Zip(movedDrake).All(pair =>
+          Vector2.Distance(pair.Second.Origin - pair.First.Origin, new Vector2(43, 27)) < .025f),
+    "Twin Drake's charge must stay attached to a moving caster.");
+var remasteredDrakeHit = RenderWarrior(Spell.TwinDrakeBlade, SpellVisualPhase.Contact, 280);
+Check(remasteredDrakeHit.Count(p => p.Shape == SpellParticleShape.UserLightning) >= 30 &&
+      remasteredDrakeHit.Count(p => p.Shape == SpellParticleShape.Filament) >= 8 &&
+      !remasteredDrakeHit.Any(p => p.Shape is SpellParticleShape.Orb or SpellParticleShape.Halo),
+    "Twin Drake impact needs target-wrapping discharge, not a mirrored X or circular plate.");
 
 foreach (Spell summon in new[] { Spell.SummonSkeleton, Spell.SummonHolyDeva, Spell.SummonShinsu })
     Check(Render(summon, SpellVisualPhase.Impact, 480).Any(p => p.Shape == SpellParticleShape.Spark),
