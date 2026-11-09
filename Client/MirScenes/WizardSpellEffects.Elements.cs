@@ -390,14 +390,18 @@ internal static partial class WizardSpellEffects
     private static void FrostCharge(Frame frame, Vector2 feet, float progress)
     {
         // Cold flame climbs like a blue torch, with shard flecks and vapour.
-        Vector2 centre = feet - Vector2.UnitY * (34 + 19 * Ease(progress * 2));
+        Vector2 centre = feet - Vector2.UnitY * (43 + 9 * Ease(progress * 1.6f));
         for (int i = 0; i < 32; i++)
         {
             int seed = 53 + i * 29;
             float age = Fract(progress * (1.13f + frame.Unit(seed + 3) * .63f) +
                 frame.Unit(seed + 7));
-            Vector2 point = centre + new Vector2((frame.Unit(seed + 11) - .5f) * 35,
-                17 - age * (37 + frame.Unit(seed + 17) * 30));
+            float angle = frame.Unit(seed + 11) * MathF.Tau +
+                progress * (1.4f + frame.Unit(seed + 13) * 1.7f);
+            float radius = (9 + 17 * frame.Unit(seed + 17)) *
+                (.78f + .22f * Ease(progress * 4));
+            Vector2 point = centre + Ellipse(angle, radius, radius * .82f) -
+                Vector2.UnitY * (age * (4 + frame.Unit(seed + 19) * 9));
             float alive = MathF.Sin(age * MathF.PI);
             int tint = i % 5 == 0 ? IceWhite : i % 2 == 0 ? PaleBlue : Ice;
             frame.Sprite(point, 5 + frame.Unit(seed + 19) * 10,
@@ -414,6 +418,24 @@ internal static partial class WizardSpellEffects
                     Shape.SmokeSequence, progress + frame.Unit(seed + 47),
                     0x5c7894, .29f * alive, Layer.Smoke);
         }
+        // Bright overlapping cold-blue shell / white frostfire core. The
+        // highlights occupy a sphere; none is a flat opaque orb backdrop.
+        frame.Sprite(centre, 35, 31, Shape.FrostCore, Ice, .76f, Layer.Emissive);
+        frame.Sprite(centre, 24, 24, Shape.FrostCore, PaleBlue, .94f,
+            Layer.EmissiveCore, light: true);
+        frame.Sprite(centre - Vector2.UnitY * 3, 17, 20,
+            Shape.Flash, IceWhite, .96f, Layer.EmissiveCore, light: true);
+        for (int i = 0; i < 16; i++)
+        {
+            int seed = 1109 + i * 17;
+            float angle = frame.Unit(seed) * MathF.Tau + progress * 1.17f;
+            Vector2 point = centre + Ellipse(angle,
+                6 + frame.Unit(seed + 3) * 12, 5 + frame.Unit(seed + 5) * 11);
+            frame.Sprite(point, 5 + frame.Unit(seed + 7) * 6,
+                7 + frame.Unit(seed + 9) * 7, Shape.FrostCore,
+                IceWhite, .84f + .11f * frame.Unit(seed + 11),
+                Layer.EmissiveCore, light: i % 7 == 0);
+        }
     }
 
     private static void FrostFireImpact(Frame frame, Vector2 centre, float progress)
@@ -425,9 +447,12 @@ internal static partial class WizardSpellEffects
             int seed = i * 43 + 119;
             float age = Fract(progress * (1.02f + frame.Unit(seed + 5) * .75f) +
                 frame.Unit(seed + 7));
-            float range = 10 + 36 * Ease(progress * 2.1f);
-            Vector2 point = centre + new Vector2((frame.Unit(seed + 9) - .5f) * range * 2,
-                (frame.Unit(seed + 13) - .5f) * 24 - age * (11 + frame.Unit(seed + 15) * 38));
+            float angle = frame.Unit(seed + 9) * MathF.Tau +
+                progress * (.45f + frame.Unit(seed + 11) * .8f);
+            float radius = (9 + 27 * Ease(progress * 2.1f)) *
+                (.42f + .58f * frame.Unit(seed + 13));
+            Vector2 point = centre + Ellipse(angle, radius, radius * .83f) -
+                Vector2.UnitY * (age * (7 + frame.Unit(seed + 15) * 18));
             float strength = MathF.Sin(age * MathF.PI) * fade;
             frame.Sprite(point, 5 + frame.Unit(seed + 19) * 10,
                 12 + frame.Unit(seed + 21) * 20,
@@ -442,6 +467,27 @@ internal static partial class WizardSpellEffects
                 frame.Clip(point, 17 + age * 7, 19 + age * 10,
                     Shape.SmokeSequence, progress * .71f + frame.Unit(seed + 41),
                     0x587ba5, .29f * strength, Layer.Smoke);
+        }
+        // Frostfire impact retains a bright blue-white centre while the
+        // textured outer shell disperses into shards and vapour.
+        frame.Sprite(centre, 35, 32, Shape.FrostCore, Ice,
+            .73f * fade, Layer.Emissive);
+        frame.Sprite(centre, 25, 25, Shape.FrostCore, PaleBlue,
+            .94f * fade, Layer.EmissiveCore, light: true);
+        frame.Sprite(centre - Vector2.UnitY * 3, 19, 22,
+            Shape.Flash, IceWhite, .96f * fade,
+            Layer.EmissiveCore, light: true);
+        for (int i = 0; i < 16; i++)
+        {
+            int seed = 1601 + i * 19;
+            float angle = frame.Unit(seed) * MathF.Tau + progress * 1.6f;
+            Vector2 point = centre + Ellipse(angle,
+                7 + frame.Unit(seed + 3) * (12 + progress * 9),
+                6 + frame.Unit(seed + 5) * (10 + progress * 7));
+            frame.Sprite(point, 5 + frame.Unit(seed + 7) * 7,
+                7 + frame.Unit(seed + 9) * 8, Shape.FrostCore,
+                IceWhite, fade * (.84f + .1f * frame.Unit(seed + 11)),
+                Layer.EmissiveCore, light: i % 7 == 0);
         }
     }
 
