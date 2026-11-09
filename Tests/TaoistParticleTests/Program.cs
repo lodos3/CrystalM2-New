@@ -238,4 +238,34 @@ var curseAfterglow = Render(Spell.Curse, SpellVisualPhase.Impact, 1999, 2000);
 Check(curseAfterglow.Any(p => p.Shape == SpellParticleShape.SmokeSequence) &&
       curseAfterglow.All(p => p.Shape != SpellParticleShape.CurseGlyph),
     "The late curse should break up into residue once the glyph has disappeared.");
+// Protective ward release smoke must come from the brush, rise and drift instead
+// of materialising as an oval backdrop or appearing before the first strokes.
+foreach (Spell ward in new[] { Spell.SoulShield, Spell.BlessedArmour })
+{
+    var opening = Render(ward, SpellVisualPhase.Impact, 250, 1600);
+    var released = Render(ward, SpellVisualPhase.Impact, 1370, 1600);
+    var drifted = Render(ward, SpellVisualPhase.Impact, 1410, 1600);
+    var earlySmoke = opening.Where(p => p.Shape == SpellParticleShape.SmokeSequence).ToArray();
+    var releasedSmoke = released.Where(p => p.Shape == SpellParticleShape.SmokeSequence).ToArray();
+    var driftedSmoke = drifted.Where(p => p.Shape == SpellParticleShape.SmokeSequence).ToArray();
+    Check(earlySmoke.Length == 0, $"Ward {ward} should not smoke before its stroke lines ignite.");
+    Check(releasedSmoke.Length >= 4 && releasedSmoke.All(p => p.Layer == SpellParticleLayer.Smoke &&
+        p.Dimensions(0f, 1.28f).X <= 32),
+        $"Protective ward release smoke must be multiple small textured stroke plumes: {ward}");
+    Check(releasedSmoke.Length == driftedSmoke.Length &&
+        releasedSmoke.Zip(driftedSmoke).Any(pair =>
+            Vector2.Distance(pair.First.Origin, pair.Second.Origin) > .8f &&
+            pair.Second.Origin.Y < pair.First.Origin.Y),
+        $"Protective ward release smoke must continue drifting upward: {ward}");
+
+    var firstFlames = Render(ward, SpellVisualPhase.Impact, 1000, 1600)
+        .Where(p => p.Shape == SpellParticleShape.FlameTongue).ToArray();
+    var nextFlames = Render(ward, SpellVisualPhase.Impact, 1040, 1600)
+        .Where(p => p.Shape == SpellParticleShape.FlameTongue).ToArray();
+    Check(firstFlames.Length > 8 && firstFlames.Length == nextFlames.Length &&
+        firstFlames.Zip(nextFlames).Count(pair =>
+            pair.Second.Origin.Y < pair.First.Origin.Y - .4f) > firstFlames.Length * .55f,
+        $"Ward flames should rise off the fixed stroke roots instead of remaining static: {ward}");
+}
+
 Console.WriteLine("Taoist particle composition tests passed.");
