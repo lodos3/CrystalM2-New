@@ -245,6 +245,12 @@ foreach (Spell ward in new[] { Spell.SoulShield, Spell.BlessedArmour })
     var opening = Render(ward, SpellVisualPhase.Impact, 250, 1600);
     var released = Render(ward, SpellVisualPhase.Impact, 1370, 1600);
     var drifted = Render(ward, SpellVisualPhase.Impact, 1410, 1600);
+    SpellParticleShape glyph = ward == Spell.SoulShield
+        ? SpellParticleShape.SoulGlyph : SpellParticleShape.ArmourGlyph;
+    var fullyFormed = Render(ward, SpellVisualPhase.Impact, 700, 1600);
+    Check(released.Where(p => p.Shape == glyph).Sum(p => p.Colour.A) <
+          fullyFormed.Where(p => p.Shape == glyph).Sum(p => p.Colour.A) * .65f,
+        $"Protective ward glyph must dissipate behind its release smoke: {ward}");
     var earlySmoke = opening.Where(p => p.Shape == SpellParticleShape.SmokeSequence).ToArray();
     var releasedSmoke = released.Where(p => p.Shape == SpellParticleShape.SmokeSequence).ToArray();
     var driftedSmoke = drifted.Where(p => p.Shape == SpellParticleShape.SmokeSequence).ToArray();
