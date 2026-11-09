@@ -47,12 +47,14 @@ internal sealed class SpellParticleRenderer
         float sin = MathF.Sin(look.Hue), cos = MathF.Cos(look.Hue);
         Vector3 greyAxis = new(.57735027f);
         Rectangle clip = clipping ?? new Rectangle(0, 0, _device.TargetWidth, _device.TargetHeight);
+        // DrawLayer is a local function after try/finally, so its shared
+        // animation and shader-mode state belongs in the enclosing Draw scope.
+        float phase = now % 8000 * (MathF.Tau / 8000);
+        int ribbonMode = 0; // 0 coverage, 1 blade cut, 2 crescent
         try
         {
             _device.PixelShader = ShaderEffect.ParticleCoverage;
             Matrix4x4.Invert(_device.Sprite.Transform, out Matrix4x4 inverse);
-            float phase = now % 8000 * (MathF.Tau / 8000);
-            int ribbonMode = 0; // 0 ordinary coverage, 1 blade cut, 2 crescent cut
             _device.SetPixelShaderConstant(5,
             [
                 new(inverse.M11, inverse.M21, inverse.M41 - camera.X, 4 * MathF.Sin(phase)),
