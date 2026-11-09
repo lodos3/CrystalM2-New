@@ -52,11 +52,12 @@ internal sealed class SpellParticleRenderer
             _device.PixelShader = ShaderEffect.ParticleCoverage;
             Matrix4x4.Invert(_device.Sprite.Transform, out Matrix4x4 inverse);
             float phase = now % 8000 * (MathF.Tau / 8000);
+            int ribbonMode = 0; // 0 ordinary coverage, 1 blade cut, 2 crescent cut
             _device.SetPixelShaderConstant(5,
             [
                 new(inverse.M11, inverse.M21, inverse.M41 - camera.X, 4 * MathF.Sin(phase)),
                 new(inverse.M12, inverse.M22, inverse.M42 - camera.Y, 3 * MathF.Cos(phase)),
-                new(look.EdgeSoftness, look.Detail, 0, 0)
+                new(look.EdgeSoftness, look.Detail, 0, phase)
             ]);
             if (occlusion != null) _device.AuxiliaryTexture = occlusion;
             if (emission)
@@ -164,6 +165,21 @@ internal sealed class SpellParticleRenderer
                     visible = Vector3.Max(new Vector3(luma) + (visible - new Vector3(luma)) * chroma, Vector3.Zero);
                     visible *= exposure * glowAmount;
                     tint = new Vector4(visible, tint.W);
+                }
+                // The normal particle shader remains in place. Only actual
+                // curved slash ribbon geometry opts into moving edge/sheen
+                // shading, keeping sparks, smoke, runes and particle lights untouched.
+                int desiredRibbonMode = !emission && particle.Ribbon.HasValue ? particle.Shape switch
+                {
+                    SpellParticleShape.BladeRibbon => 1,
+                    SpellParticleShape.MoonRibbon => 2,
+                    _ => 0
+                } : 0;
+                if (desiredRibbonMode != ribbonMode)
+                {
+                    _device.SetPixelShaderConstant(7,
+                        [new Vector4(look.EdgeSoftness, look.Detail, desiredRibbonMode, phase)]);
+                    ribbonMode = desiredRibbonMode;
                 }
                 var source = SpellParticleAtlas.Part(particle.Shape, particle.Direction, particle.Frame);
                 float depth = occlusion != null && !ground && !emission && !particle.AlwaysOnTop &&

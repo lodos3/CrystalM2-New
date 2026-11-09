@@ -195,6 +195,30 @@ float4 PSParticleCoverage(Output input) : SV_TARGET
         if (floor(occluder) > input.Depth) alpha *= 1 - saturate(frac(occluder) * 2);
     }
     float3 colour = input.Tint.rgb;
+    if (C[7].z > 0.5)
+    {
+        // Blade and crescent ribbons share a smoothly interpolated coverage
+        // atlas; the animated highlight uses world coordinates so it cannot
+        // restart at every quad join or read as straight linked line pieces.
+        // C[7].z: blade=1, crescent=2; C[7].w: animation phase.
+        float2 world = float2(dot(C[5].xyz, float3(input.Position.xy, 1)),
+                              dot(C[6].xyz, float3(input.Position.xy, 1)));
+        float2 uv = saturate((input.Uv - input.Bounds.xy) /
+                             max(input.Bounds.zw - input.Bounds.xy, float2(0.0001, 0.0001)));
+        float advance = C[7].w * (C[7].z > 1.5 ? 3.1 : 4.4);
+        float flow = world.x * 0.087 + world.y * 0.049 - advance;
+        float ribbonSheen = pow(saturate(0.5 + 0.5 * sin(flow)), 9);
+        float filament = pow(saturate(0.5 + 0.5 * sin(flow * 2.2 + world.y * 0.11)), 6);
+        float innerEdge = 1 - smoothstep(0.44, 0.91, uv.y);
+        float etched = 0.5 + 0.5 * sin(world.x * 0.23 - world.y * 0.18 + advance * 0.6);
+        float glint = saturate(ribbonSheen * 0.69 + filament * 0.13 +
+                               innerEdge * 0.14 + etched * 0.04);
+        // Preserve the authored taper and alpha coverage; brighten only the
+        // interior of the stroke. Distinct ribbon tints remain distinguishable.
+        colour = lerp(colour, min(colour * 1.37 + 0.13, float3(1, 1, 1)),
+                      glint * 0.65);
+        alpha *= 0.88 + 0.12 * ribbonSheen;
+    }
     if ((int)RenderStyle % 16 == 4) colour /= max(1, max(colour.r, max(colour.g, colour.b)));
     return PrepareBlend(float4(colour, input.Tint.a * alpha));
 }
