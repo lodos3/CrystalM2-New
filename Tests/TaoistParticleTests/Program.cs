@@ -326,9 +326,12 @@ bool projectileDrawn = (bool)(projectileMethod.Invoke(null,
         1000L, 5, 250, true, 1.28f]) ?? false);
 var frostTravel = projectilePool.Active.ToArray();
 Check(projectileDrawn && frostTravel.Count(p => p.Shape == SpellParticleShape.UserFlame) >= 18 &&
+      frostTravel.Count(p => p.Shape == SpellParticleShape.FrostCore &&
+          p.Layer == SpellParticleLayer.EmissiveCore) >= 6 &&
+      frostTravel.Any(p => p.Shape == SpellParticleShape.Flash && p.Colour.B >= 220) &&
       !frostTravel.Any(p => p.Shape == SpellParticleShape.Orb) &&
       frostTravel.Any(p => p.Shape == SpellParticleShape.SmokeSequence),
-    "Frost Crunch must remain textured blue frostfire in flight rather than a giant glowing orb.");
+    "Frost Crunch projectile needs a bright layered blue-white head, textured cold-fire trail and snow, not a giant orb.");
 
 var wallMid = RenderWizard(Spell.FireWall, SpellVisualPhase.Prepare, 600, 1000);
 var wallRelease = RenderWizard(Spell.FireWall, SpellVisualPhase.Prepare, 950, 1000);
