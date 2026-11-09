@@ -258,10 +258,12 @@ foreach (Spell ward in new[] { Spell.SoulShield, Spell.BlessedArmour })
     Check(releasedSmoke.Length >= 4 && releasedSmoke.All(p => p.Layer == SpellParticleLayer.Smoke &&
         p.Dimensions(0f, 1.28f).X <= 32),
         $"Protective ward release smoke must be multiple small textured stroke plumes: {ward}");
-    Check(releasedSmoke.Length == driftedSmoke.Length &&
-        releasedSmoke.Zip(driftedSmoke).Any(pair =>
-            Vector2.Distance(pair.First.Origin, pair.Second.Origin) > .8f &&
-            pair.Second.Origin.Y < pair.First.Origin.Y),
+    // Animated clip crossfades can produce one or two sprite frames per plume.
+    // Compare origins, not clip-frame counts or rendering order.
+    Check(driftedSmoke.Length >= 4 && releasedSmoke.Any(before =>
+        driftedSmoke.Any(after => MathF.Abs(after.Origin.X - before.Origin.X) < 3f &&
+            before.Origin.Y - after.Origin.Y > .8f &&
+            before.Origin.Y - after.Origin.Y < 8f)),
         $"Protective ward release smoke must continue drifting upward: {ward}");
 
     var firstFlames = Render(ward, SpellVisualPhase.Impact, 1000, 1600)
