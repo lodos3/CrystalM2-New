@@ -473,9 +473,11 @@ internal static partial class WizardSpellEffects
         float spread = prepare ? .62f : .90f;
         float wind = progress * (prepare ? 7.1f : 11.4f);
         float runeFade = prepare ? .74f : .57f * (1f - Ease((progress - .67f) / .33f));
-        frame.Sprite(feet, 208 * spread, 133 * spread,
-            Shape.SigilDisc, IceWhite, runeFade, Layer.Ground,
-            rotation: progress * .31f, light: true, sortY: feet.Y);
+        // Keep an already projected rune at a fixed screen-space orientation.
+        // Rotating this flattened ellipse skews its silhouette.
+        frame.Sprite(feet, 208, 133,
+            Shape.SigilDisc, IceWhite, runeFade * (.94f + .06f * MathF.Sin(progress * 9)),
+            Layer.Ground, rotation: 0, light: true, sortY: feet.Y);
 
         int ribbons = prepare ? 16 : 23;
         for (int i = 0; i < ribbons; i++)
@@ -487,20 +489,42 @@ internal static partial class WizardSpellEffects
             if (lifeCurve < .02f) continue;
             float angle = frame.Unit(seed + 11) * MathF.Tau +
                 wind * (.66f + frame.Unit(seed + 13) * .74f);
-            float radius = (36 + 78 * frame.Unit(seed + 17)) * spread;
+            float radius = (36 + 78 * frame.Unit(seed + 17)) * spread +
+                MathF.Sin(progress * (7 + frame.Unit(seed + 55) * 5) +
+                    frame.Unit(seed + 57) * MathF.Tau) * (1.8f + frame.Unit(seed + 59) * 3);
             Vector2 root = feet + ProjectGround(Ellipse(angle, radius, radius));
             float height = (20 + 55 * frame.Unit(seed + 19)) * spread;
             Vector2 centre = root - Vector2.UnitY * (height + age * 17);
-            Vector2 tangent = ProjectGround(Ellipse(angle + MathF.PI / 2, 1, 1));
-            float orientation = MathF.Atan2(tangent.Y, tangent.X) +
-                progress * (i % 2 == 0 ? 2.7f : -2.2f);
-            float width = (6 + 42 * lifeCurve) * spread;
-            float thickness = (3 + 14 * lifeCurve) * spread;
+            Vector2 tangent = Vector2.Normalize(ProjectGround(Ellipse(angle + MathF.PI / 2, 1, 1)));
+            // Face tangential travel, never radially outward.
+            float orientation = MathF.Atan2(tangent.Y, tangent.X);
+            float breathe = .88f + .12f * MathF.Sin(progress * 13 + frame.Unit(seed + 61) * MathF.Tau);
+            float width = (5 + (34 + frame.Unit(seed + 63) * 19) * lifeCurve) * spread * breathe;
+            float thickness = (2.5f + (10 + frame.Unit(seed + 65) * 6) * lifeCurve) * spread;
             float alpha = .78f * lifeCurve;
             frame.Sprite(centre, width, thickness,
                 Shape.UserSlash, i % 5 == 0 ? IceWhite : i % 2 == 0 ? PaleBlue : Ice,
                 alpha, Depth(angle), orientation, light: i % 9 == 0, sortY: root.Y);
-            frame.Clip(centre - tangent * 5, width * .89f, thickness * 1.35f,
+            // Backtrace three earlier points on the same projected orbit.
+            // Narrow connected filaments and translucent wisps form a tail,
+            // rather than detached spokes or oversized billboard cards.
+            Vector2 previous = centre;
+            for (int tail = 1; tail <= 3; tail++)
+            {
+                float backAngle = angle - tail * (.105f + frame.Unit(seed + 67) * .031f);
+                Vector2 backRoot = feet + ProjectGround(Ellipse(backAngle, radius, radius));
+                Vector2 back = backRoot - Vector2.UnitY * (height + age * 17 + tail * 1.7f);
+                float tailFade = alpha * (1 - tail * .20f);
+                frame.Thread(back, previous, 1.8f + 2.1f * lifeCurve * (1 - tail * .17f),
+                    .7f + .9f * lifeCurve, i % 5 == 0 ? IceWhite : PaleBlue,
+                    tailFade * .68f, Depth(angle), sortY: backRoot.Y);
+                frame.Sprite((back + previous) * .5f, (back - previous).Length() + 5,
+                    2.5f + 4 * lifeCurve, Shape.Wisp, PaleBlue, tailFade * .30f,
+                    Depth(angle), MathF.Atan2(previous.Y - back.Y, previous.X - back.X),
+                    sortY: backRoot.Y);
+                previous = back;
+            }
+            frame.Clip(centre - tangent * 5, width * .73f, thickness * 1.17f,
                 Shape.SmokeSequence, progress * 1.47f + frame.Unit(seed + 27),
                 0x82aabd, .39f * lifeCurve,
                 Depth(angle), orientation + .17f, sortY: root.Y);
