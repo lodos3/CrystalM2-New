@@ -187,10 +187,15 @@ internal static partial class TaoistSpellEffects
         float front = armour ? .16f + progress * 1.88f : .25f + progress * 1.65f;
         float formed = Ease((front - .86f) / .15f);
         float settling = Ease((progress - .59f) / .40f);
-        frame.Sprite(centre, width * 1.025f, height * 1.03f, glyph, armour ? 0xdd591f : 0x4c89ef, formed * .65f, Layer.Glow);
-        frame.Sprite(centre, width, height, glyph, armour ? 0xf97026 : 0x4ea9ff, formed * (.56f + .36f * settling));
+        // The rune forms behind its fire, then burns away while the remaining
+        // smoke continues rising off the same fixed brush-stroke positions.
+        float dissipation = 1 - Ease((progress - .71f) / .28f);
+        frame.Sprite(centre, width * 1.025f, height * 1.03f, glyph, armour ? 0xdd591f : 0x4c89ef,
+            formed * dissipation * .65f, Layer.Glow);
+        frame.Sprite(centre, width, height, glyph, armour ? 0xf97026 : 0x4ea9ff,
+            formed * dissipation * (.56f + .36f * settling));
         frame.Sprite(centre, width, height, glyph, armour ? 0xff982f : 0xa9e2ff,
-            formed * (.33f + .30f * settling), Layer.EmissiveCore);
+            formed * dissipation * (.33f + .30f * settling), Layer.EmissiveCore);
         if (armour)
         {
             float spark = 1 - Ease(progress / .27f);
@@ -214,19 +219,36 @@ internal static partial class TaoistSpellEffects
                 float press = Math.Clamp(knot.Z / 5, 0, armour ? 1.35f : 1);
                 float size = 9 + (armour ? 25 : 20) * press;
                 float lift = (17 + (armour ? 43 : 38) * press) * (1 - settling * .55f);
+                float rise = (8 + (armour ? 38 : 34) * press) * age;
                 float tilt = .23f * MathF.Sin(age * MathF.Tau + salt);
-                float alpha = (.69f + .31f * MathF.Sin(age * MathF.PI)) * (1 - settling * (armour ? .81f : .61f));
-                frame.Clip(root - Vector2.UnitY * lift * .23f, size, lift, Shape.FlameSequence, age,
+                float alpha = (.69f + .31f * MathF.Sin(age * MathF.PI)) *
+                    (1 - settling * (armour ? .81f : .61f)) * (.48f + .52f * dissipation);
+                frame.Clip(root - Vector2.UnitY * (lift * .23f + rise * .25f), size, lift, Shape.FlameSequence, age,
                     flame.Sample(.33f + age * .50f), .85f * alpha, Layer.Emissive, tilt);
-                frame.Sprite(root - Vector2.UnitY * lift * .12f, size * .8f, lift * .91f, Shape.UserFlame,
+                frame.Sprite(root - Vector2.UnitY * (lift * .12f + rise * .62f), size * .8f, lift * .91f, Shape.UserFlame,
                     flame.Sample(age * .55f), alpha, Layer.EmissiveCore, -tilt, light: i % 6 == 0);
-                frame.Sprite(root - Vector2.UnitY * lift * .30f, size * .56f, lift, Shape.FlameTongue,
+                frame.Sprite(root - Vector2.UnitY * (lift * .30f + rise), size * .56f, lift, Shape.FlameTongue,
                     flame.Sample(age * .48f), .74f * alpha, Layer.EmissiveCore, tilt);
                 if (armour && i % 4 == 0)
                     frame.Clip(root + new Vector2(tilt * 21, -lift * .34f), size * 1.18f, lift * 1.19f,
                         Shape.FlameSequence, age + .36f, flame.Sample(age * .29f), .90f * alpha, Layer.EmissiveCore, tilt);
                 if (i % 4 == 0)
                 {
+                    // Thin, independently phased smoke plumes peel upwards and
+                    // drift sideways. Keep these attached to actual glyph knots,
+                    // rather than introducing a backdrop billboard or ellipse.
+                    float release = Ease((progress - .31f) / .48f);
+                    if (release > .014f)
+                    {
+                        float smokeAge = Fract(progress * (1.13f + frame.Unit(salt + 75) * .45f) +
+                            frame.Unit(salt + 76));
+                        float sideways = (frame.Unit(salt + 78) * 2 - 1) * (6 + 13 * smokeAge);
+                        Vector2 plume = root + new Vector2(sideways, -9 - (25 + 20 * press) * smokeAge);
+                        float opacity = (.17f + .45f * release) * (1 - .62f * smokeAge) *
+                            (.7f + .3f * settling);
+                        frame.Clip(plume, 10 + 11 * smokeAge, 19 + 17 * smokeAge, Shape.SmokeSequence,
+                            smokeAge + .12f, armour ? 0x675249 : 0x526875, opacity, Layer.Smoke, tilt * .38f);
+                    }
                     frame.Sprite(root, Math.Min(65, size * (armour ? 1.8f : 1.33f)), lift * .69f,
                         Shape.Wisp, glow, .65f * alpha, Layer.Glow);
                     frame.Sprite(root - Vector2.UnitY * (6 + lift * age), 4, 7, Shape.UserEmber,
