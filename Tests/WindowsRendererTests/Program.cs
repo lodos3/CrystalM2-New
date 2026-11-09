@@ -773,8 +773,8 @@ internal static class Program
         {
             foreach (var shape in new[] { SpellParticleShape.MoonRibbon, SpellParticleShape.BladeRibbon })
             {
-                using Bitmap early = Render(1100);
-                using Bitmap late = Render(1380);
+                using Bitmap early = Render(shape, 1100);
+                using Bitmap late = Render(shape, 1380);
                 int visible = 0, animated = 0;
                 for (int y = 65; y < 91; y++)
                 for (int x = 35; x < 155; x++)
@@ -788,7 +788,7 @@ internal static class Program
                     $\"{shape} should have moving internal sheen across a persistent slash silhouette. Changed: {animated}.\");
             }
 
-            Bitmap Render(long now)
+            Bitmap Render(SpellParticleShape shape, long now)
             {
                 var quad = new SpriteQuad(new(-60, -14), new(60, -14), new(-60, 15), new(60, 15));
                 var ribbon = new SpellParticle(new Vector2(95, 77), Vector2.Zero,
