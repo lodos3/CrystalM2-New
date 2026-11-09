@@ -69,8 +69,6 @@ internal static partial class WarriorSpellEffects
                 break;
             case Spell.HalfMoon when cut:
                 ProjectCrescent(pool, look, feet, facing, 0, 30, 97, 29, now, life);
-                effect.Add(feet + facing * 83 - Vector2.UnitY * 25, facing * 7, Shape.Wisp, 71, life,
-                    Layer.Glow, aspect: .83f, alpha: 141);
                 break;
             case Spell.CrossHalfMoon when cut:
                 ProjectCrescent(pool, look, feet, facing, -.28f, 24, 119, 42, now, life, sweep: 3.25f);
@@ -116,70 +114,127 @@ internal static partial class WarriorSpellEffects
         Vector2 forward = GroundHeading(facing);
         float heading = MathF.Atan2(forward.Y, forward.X);
         Vector2 centre = feet - Vector2.UnitY * lift;
-        // Smooth the perspective-correct ribbon to avoid straight-line joints.
         const int segments = 32;
-        var (inner, outer) = Edge(0);
+
+        // World depth follows the point on the angled ground plane. The visible
+        // crescent is independently raised and rolled in height: using its
+        // screen-space Y as its ground depth would make front/back occlusion
+        // jump as the slash lifts off the floor.
+        var (inner, outer, previousDepth) = Edge(0);
         for (int i = 1; i <= segments; i++)
         {
-            var (nextInner, nextOuter) = Edge(i / (float)segments);
-            Layer layer = (outer.Y + nextOuter.Y) * .5f < centre.Y ? Layer.Ground : Layer.Emissive;
-            Color shadow = Color.FromArgb(look.Colour.R / 2, look.Colour.G / 2, look.Colour.B * 3 / 4);
+            var (nextInner, nextOuter, nextDepth) = Edge(i / (float)segments);
+            float segmentDepth = (previousDepth + nextDepth) * .5f;
+            bool rear = segmentDepth < feet.Y;
+            Layer layer = rear ? Layer.Ground : Layer.Emissive;
+
+            // Receding, darker rear edge and forward luminous face make the
+            // swing wrap around the actor instead of reading as one flat ring.
+            Color body = rear
+                ? Color.FromArgb(look.Colour.R * 3 / 5, look.Colour.G * 2 / 3, look.Colour.B * 3 / 4)
+                : look.Colour;
+            Color shadow = rear
+                ? Color.FromArgb(look.Colour.R / 3, look.Colour.G / 3, look.Colour.B / 2)
+                : Color.FromArgb(look.Colour.R / 2, look.Colour.G / 2, look.Colour.B * 3 / 4);
+            Color core = rear
+                ? Color.FromArgb(look.Core.R * 2 / 3, look.Core.G * 3 / 4, look.Core.B * 4 / 5)
+                : look.Core;
+
             AddRibbon(Vector2.Lerp(outer, inner, 1.48f), Vector2.Lerp(inner, outer, 1.18f),
                 Vector2.Lerp(nextOuter, nextInner, 1.48f), Vector2.Lerp(nextInner, nextOuter, 1.18f),
-                layer, shadow, 177);
-            AddRibbon(inner, outer, nextInner, nextOuter, layer, look.Colour, 235);
+                layer, shadow, rear ? 127 : 172, segmentDepth);
+            AddRibbon(inner, outer, nextInner, nextOuter, layer, body, 235, segmentDepth);
             if (i > 2 && i < segments - 1)
                 AddRibbon(Vector2.Lerp(inner, outer, .73f), Vector2.Lerp(inner, outer, .98f),
                     Vector2.Lerp(nextInner, nextOuter, .73f), Vector2.Lerp(nextInner, nextOuter, .98f),
-                    layer == Layer.Ground ? layer : Layer.EmissiveCore, look.Core, 197);
-            (inner, outer) = (nextInner, nextOuter);
+                    rear ? Layer.Ground : Layer.EmissiveCore, core, rear ? 139 : 201, segmentDepth);
+
+            (inner, outer, previousDepth) = (nextInner, nextOuter, nextDepth);
         }
 
-        // Group the shader-driven MoonRibbon quads together before the
-        // transient accents. Interleaving a different atlas shape every three
-        // segments would force dozens of expensive D3D constant-buffer flushes.
+        // Emit small texture accents only after the ribbons so that the GPU
+        // can batch the shader-driven MoonRibbon geometry without repeatedly
+        // switching coverage modes.
         for (int i = 1; i < segments - 2; i += 3)
         {
-            var (a, b) = Edge(i / (float)segments);
-            var (c, d) = Edge((i + 1f) / segments);
+            var (a, b, aDepth) = Edge(i / (float)segments);
+            var (c, d, bDepth) = Edge((i + 1f) / segments);
             Vector2 tangent = (c + d) * .5f - (a + b) * .5f;
             Vector2 accent = (a + b + c + d) * .25f;
-            float length = 13 + 14 * MathF.Sin(i * MathF.PI / segments);
-            Layer layer = (b.Y + d.Y) * .5f < centre.Y ? Layer.Ground : Layer.EmissiveCore;
-            pool.TryAdd(new SpellParticle(accent, Vector2.Zero, now, Math.Min(life, 120),
-                Math.Max(1, (int)length), Color.FromArgb(144, i % 4 == 1 ? look.Core : look.Colour),
-                Shape.UserSlash, 0, Aspect: .50f,
+            float depth = (aDepth + bDepth) * .5f;
+            float length = 9 + 10 * MathF.Sin(i * MathF.PI / segments);
+            Layer layer = depth < feet.Y ? Layer.Ground : Layer.EmissiveCore;
+            pool.TryAdd(new SpellParticle(accent, Vector2.Zero, now, Math.Min(life, 115),
+                Math.Max(1, (int)length), Color.FromArgb(depth < feet.Y ? 100 : 157,
+                    i % 4 == 1 ? look.Core : look.Colour),
+                Shape.UserSlash, 0, Aspect: .42f,
                 Rotation: MathF.Atan2(tangent.Y, tangent.X), Layer: layer,
-                CastsLight: false, DepthY: feet.Y));
+                CastsLight: false, DepthY: depth));
         }
+
+        // The detached glints remain small and follow each fragment's
+        // ground depth. Avoid returning to oversized flat arc sprites.
         for (int i = 3; i < segments - 1; i += 3)
         {
-            var (_, outerA) = Edge(i / (float)segments);
-            var (_, outerB) = Edge((i + 1f) / segments);
+            var (_, outerA, depthA) = Edge(i / (float)segments);
+            var (_, outerB, depthB) = Edge((i + 1f) / segments);
             Vector2 edge = (outerA + outerB) * .5f;
-            Vector2 drift = (outerA - outerB) * .85f;
-            Layer layer = edge.Y < centre.Y ? Layer.Ground : Layer.Emissive;
-            pool.TryAdd(new SpellParticle(edge, drift, now, life, 22,
-                Color.FromArgb(158, look.Core), Shape.WarriorSpark, 0,
-                .61f, heading, Layer: layer, CastsLight: false, DepthY: feet.Y));
+            Vector2 drift = (outerB - outerA) * .66f - Vector2.UnitY * 3;
+            float depth = (depthA + depthB) * .5f;
+            Layer layer = depth < feet.Y ? Layer.Ground : Layer.EmissiveCore;
+            pool.TryAdd(new SpellParticle(edge, drift, now, Math.Min(life, 125),
+                5 + i % 4, Color.FromArgb(depth < feet.Y ? 112 : 189, look.Core),
+                Shape.WarriorSpark, 0, Aspect: .68f,
+                Rotation: MathF.Atan2(drift.Y, drift.X), Layer: layer,
+                CastsLight: false, DepthY: depth));
         }
 
-        (Vector2 Inner, Vector2 Outer) Edge(float t)
+        // A few thin trailing flecks extend in the tangent direction and
+        // dissipate without adding another circular billboard behind the arc.
+        for (int i = 2; i < segments - 2; i += 5)
         {
-            float turn = (t - .5f) * sweep;
-            Vector2 ray = Ellipse(heading + yaw + turn, 1, 1);
-            // Broad weapon-side body, falling into a very narrow trailing tip.
-            float profile = MathF.Pow(MathF.Max(0, MathF.Sin(t * MathF.PI)), .65f);
-            float taper = .4f + width * profile * (1.30f - .77f * t);
-            return (centre + ProjectGround(ray * (radius - taper * .83f)),
-                centre + ProjectGround(ray * (radius + taper * .25f)));
+            float sample = (i + .38f) / segments;
+            var (innerEdge, outerEdge, depth) = Edge(sample);
+            var (nextInner, nextOuter, _) = Edge((i + 1.3f) / segments);
+            Vector2 point = Vector2.Lerp(innerEdge, outerEdge, .79f);
+            Vector2 tangent = (nextInner + nextOuter - innerEdge - outerEdge) * .5f;
+            Layer layer = depth < feet.Y ? Layer.Ground : Layer.EmissiveCore;
+            pool.TryAdd(new SpellParticle(point, tangent * .52f - Vector2.UnitY * 2,
+                now, Math.Min(life, 110), 6 + i % 3,
+                Color.FromArgb(depth < feet.Y ? 83 : 140, look.Core),
+                Shape.Wisp, 0, Aspect: 1.9f,
+                Rotation: MathF.Atan2(tangent.Y, tangent.X), Layer: layer,
+                CastsLight: false, DepthY: depth));
         }
 
-        void AddRibbon(Vector2 fromInner, Vector2 fromOuter, Vector2 toInner, Vector2 toOuter, Layer layer, Color tint, int alpha)
+        (Vector2 Inner, Vector2 Outer, float GroundDepth) Edge(float t)
+        {
+            float angle = heading + yaw + (t - .5f) * sweep;
+            Vector2 ray = Ellipse(angle, 1, 1);
+            float crest = MathF.Sin(t * MathF.PI);
+            float profile = MathF.Pow(MathF.Max(0, crest), .65f);
+            float taper = .4f + width * profile * (1.30f - .77f * t);
+
+            // The original angled ground projection remains authoritative for
+            // sorting. Rear surfaces are higher; the near surface drops into
+            // the foreground, with a rolled cross-section instead of a plane.
+            float groundDepth = feet.Y + ProjectGround(ray * radius).Y;
+            float rise = lift + 11 * crest * crest + 8 * (1 - ray.Y);
+            float bevel = (1.6f + 3.8f * crest) * (.6f + .4f * MathF.Abs(ray.Y));
+            Vector2 inside = feet + ProjectGround(ray * (radius - taper * .83f))
+                - Vector2.UnitY * (rise + bevel);
+            Vector2 outside = feet + ProjectGround(ray * (radius + taper * .25f))
+                - Vector2.UnitY * (rise - bevel);
+            return (inside, outside, groundDepth);
+        }
+
+        void AddRibbon(Vector2 fromInner, Vector2 fromOuter, Vector2 toInner, Vector2 toOuter,
+            Layer layer, Color tint, int alpha, float groundDepth)
         {
             var shape = new SpriteQuad(fromInner - centre, toInner - centre, fromOuter - centre, toOuter - centre);
             pool.TryAdd(new SpellParticle(centre, Vector2.Zero, now, life, 1, Color.FromArgb(alpha, tint),
-                Shape.MoonRibbon, 0, Layer: layer, CastsLight: false, Ribbon: shape, DepthY: feet.Y));
+                Shape.MoonRibbon, 0, Layer: layer, CastsLight: false,
+                Ribbon: shape, DepthY: groundDepth));
         }
     }
 
