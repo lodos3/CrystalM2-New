@@ -16,6 +16,7 @@ internal static class ShapedLightPass
     private static ParticleLight _particles;
     private readonly record struct Shape(Texture Texture, Rectangle Bounds, Vector4 Tint, ShaderEffect Shader, Vector4 Cone);
     private readonly record struct Halo(Rectangle Bounds, Vector4 Tint);
+    private readonly record struct ParticleHalo(Vector2 Position, int Tint, float Energy);
     private readonly record struct ParticleLight(SpellParticlePool Pool, Vector2 Camera, long Time,
         float Intensity, float Radius, float VisualSize, float Warmth, Vector3? Colour, Rectangle Bounds);
     private readonly record struct Filter(Scratch Scratch, Rectangle Region, int Divisor, int Padding, int Blur);
@@ -78,36 +79,48 @@ internal static class ShapedLightPass
     internal static void AddParticles(SpellParticlePool pool, Vector2 camera, long now, float intensity,
         float radius, float visualSize, float warmth, Vector3? colour)
     {
+        if (intensity <= 0) return;
         Rectangle bounds = Rectangle.Empty;
         var emitter = GraphicsTuning.Light(LightSource.Spell);
         int margin = Math.Max(emitter.Blur.Current, emitter.GlowRadius.Current + emitter.GlowBlur.Current);
         var screen = new Rectangle(-margin, -margin, Settings.ScreenWidth + margin * 2, Settings.ScreenHeight + margin * 2);
-        Span<Vector2> glowCentres = stackalloc Vector2[12];
+        Span<ParticleHalo> glowCentres = stackalloc ParticleHalo[12];
         int glowCount = 0;
         foreach (ref readonly SpellParticle particle in pool.Active)
         {
-            if (!particle.CastsLight) continue;
+            if (!particle.CastsLight || particle.LightEnergy <= 0) continue;
             float age = particle.Age(now);
             Vector2 point = particle.Position(now) + camera;
-            var light = particle.Bounds(point, particle.Dimensions(age, radius * (particle.Ground ? 1f : visualSize)), radius);
+            var light = particle.Bounds(point, particle.Dimensions(age, radius * (particle.Ground ? 1f : visualSize)), radius,
+                particle.Angle(now));
             if (!light.IntersectsWith(screen)) continue;
             bounds = bounds.IsEmpty ? light : Rectangle.Union(bounds, light);
 
             // Sample one soft halo per nearby group of larger emitters. Their exact silhouettes
             // still contribute to the shaped pass, including all the smaller sparks.
-            if (glowCount >= glowCentres.Length || age >= .85f || particle.Size < 34 ||
-                particle.Layer != SpellParticleLayer.EmissiveCore && particle.Shape != SpellParticleShape.Halo) continue;
-            bool overlaps = false;
+            float energy = intensity * particle.LightEnergy * particle.Fade(age) * particle.Colour.A / 255f;
+            if (energy <= .025f || particle.Size < 18) continue;
+            int index = -1, weakest = 0;
             for (int i = 0; i < glowCount; i++)
-                if (Vector2.DistanceSquared(point, glowCentres[i]) < 64 * 64) { overlaps = true; break; }
-            if (overlaps) continue;
-            Vector3 rgb = colour ?? new Vector3(particle.Colour.R, particle.Colour.G, particle.Colour.B) / 255f;
+            {
+                if (Vector2.DistanceSquared(point, glowCentres[i].Position) < 64 * 64) { index = i; break; }
+                if (glowCentres[i].Energy < glowCentres[weakest].Energy) weakest = i;
+            }
+            if (index < 0 && glowCount < glowCentres.Length)
+                index = glowCount++;
+            else
+            {
+                if (index < 0) index = weakest;
+                if (energy <= glowCentres[index].Energy) continue;
+            }
+            Color tintAtAge = particle.ColourAt(age);
+            Vector3 rgb = colour ?? new Vector3(tintAtAge.R, tintAtAge.G, tintAtAge.B) / 255f;
             rgb = Vector3.Clamp(rgb * new Vector3(1 + warmth, 1, 1 - warmth), Vector3.Zero, Vector3.One);
             Color tint = Color.FromArgb((int)(rgb.X * 255), (int)(rgb.Y * 255), (int)(rgb.Z * 255));
-            if (AddHalo(new Point((int)point.X, (int)point.Y), tint,
-                    intensity * (1 - age) * particle.Colour.A / 255f, emitter, LightSource.Spell))
-                glowCentres[glowCount++] = point;
+            glowCentres[index] = new ParticleHalo(point, tint.ToArgb(), energy);
         }
+        foreach (ParticleHalo halo in glowCentres[..glowCount])
+            AddHalo(new Point((int)halo.Position.X, (int)halo.Position.Y), Color.FromArgb(halo.Tint), halo.Energy, emitter, LightSource.Spell);
         if (emitter.Shape.Current != 1 && !bounds.IsEmpty) _particles = new(pool, camera, now, intensity, radius, visualSize, warmth, colour, bounds);
     }
 
@@ -137,7 +150,9 @@ internal static class ShapedLightPass
             RenderHalos(MapHalos, map.GlowBlur.Current);
             RenderHalos(SpellHalos, spell.GlowBlur.Current);
             RenderGroup(MapShapes, map, false);
-            RenderGroup(SpellShapes, spell, _particles.Pool != null);
+            RenderGroup(SpellShapes, spell, false);
+            if (_particles.Pool != null)
+                RenderGroup(Array.Empty<Shape>(), spell, true, GraphicsTuning.ParticleLightCeiling.Current / 100f);
         }
         finally
         {
@@ -184,18 +199,18 @@ internal static class ShapedLightPass
             DXManager.SetSurface(target);
             device.Sprite.Transform = Matrix.Identity;
             device.PixelShader = ShaderEffect.GaussianLight;
-            device.SetPixelShaderConstant(0, [Vector4.Zero]);
+            device.SetPixelShaderConstant(0, [Vector4.Zero, Vector4.Zero]);
             device.Sprite.Draw(_haloTexture, new Rectangle(0, 0, width, height),
                 new Rectangle(0, 0, target.Texture.Width, target.Texture.Height), Vector4.One);
         }
 
-        void RenderGroup(List<Shape> shapes, GraphicsTuning.Emitter emitter, bool includeParticles)
+        void RenderGroup(IReadOnlyList<Shape> shapes, GraphicsTuning.Emitter emitter, bool includeParticles, float ceiling = 0)
         {
             if (shapes.Count == 0 && !includeParticles) return;
             int blur = emitter.Blur.Current;
             device.Blend = SpriteBlendMode.Additive;
             device.Sprite.Transform = Matrix.Identity;
-            if (blur == 0)
+            if (blur == 0 && ceiling <= 0)
             {
                 DrawShapes(shapes, emitter, 0, includeParticles);
                 return;
@@ -205,7 +220,7 @@ internal static class ShapedLightPass
             Filter filter = PrepareFilter(region, blur);
             if (filter.Region.IsEmpty) return;
             DrawShapes(shapes, emitter, filter.Divisor, includeParticles);
-            FinishFilter(filter);
+            FinishFilter(filter, ceiling);
         }
 
         Filter PrepareFilter(Rectangle region, int blur)
@@ -230,29 +245,32 @@ internal static class ShapedLightPass
             return new Filter(scratch, region, divisor, padding, blur);
         }
 
-        void FinishFilter(Filter filter)
+        void FinishFilter(Filter filter, float ceiling = 0)
         {
             var (scratch, region, divisor, padding, blur) = filter;
             float radius = blur / (float)divisor;
             float sigma = Math.Max(0.55f, radius * 0.45f);
             float gaussian = 0.5f / (sigma * sigma);
-            DXManager.SetSurface(scratch.HorizontalSurface);
-            device.Clear(Color.Black);
             device.Sprite.Transform = Matrix.Identity;
             device.PixelShader = ShaderEffect.GaussianLight;
-            device.Blend = SpriteBlendMode.Alpha;
-            device.SetPixelShaderConstant(0, [new(1f / scratch.Colour.Width, 0, MathF.Ceiling(radius), gaussian)]);
-            device.Sprite.Draw(scratch.Colour, region, region, Vector4.One);
+            if (blur > 0)
+            {
+                DXManager.SetSurface(scratch.HorizontalSurface);
+                device.Clear(Color.Black);
+                device.Blend = SpriteBlendMode.Alpha;
+                device.SetPixelShaderConstant(0, [new(1f / scratch.Colour.Width, 0, MathF.Ceiling(radius), gaussian), Vector4.Zero]);
+                device.Sprite.Draw(scratch.Colour, region, region, Vector4.One);
+            }
 
             DXManager.SetSurface(target);
             device.Blend = SpriteBlendMode.Additive;
-            device.SetPixelShaderConstant(0, [new(0, 1f / scratch.Colour.Height, MathF.Ceiling(radius), gaussian)]);
+            device.SetPixelShaderConstant(0, [new(0, 1f / scratch.Colour.Height, MathF.Ceiling(radius), gaussian), new(ceiling, 0, 0, 0)]);
             var destination = new Rectangle(region.X * divisor - padding, region.Y * divisor - padding,
                 region.Width * divisor, region.Height * divisor);
-            device.Sprite.Draw(scratch.Horizontal, region, destination, Vector4.One);
+            device.Sprite.Draw(blur > 0 ? scratch.Horizontal : scratch.Colour, region, destination, Vector4.One);
         }
 
-        void DrawShapes(List<Shape> shapes, GraphicsTuning.Emitter emitter, int divisor, bool includeParticles)
+        void DrawShapes(IReadOnlyList<Shape> shapes, GraphicsTuning.Emitter emitter, int divisor, bool includeParticles)
         {
             foreach (var shape in shapes)
             {

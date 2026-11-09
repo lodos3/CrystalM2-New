@@ -38,6 +38,9 @@ internal static partial class WizardSpellEffects
         {
             SpellVisualPhase.Aura or SpellVisualPhase.Field or SpellVisualPhase.Hit => 1,
             SpellVisualPhase.Prepare => .67f + .33f * Ease(progress * 5.2f),
+            _ when visual.Spell == Spell.ThunderBolt => Envelope(progress, .79f, .34f),
+            _ when visual.Spell is Spell.FireBall or Spell.GreatFireBall or Spell.FireBounce or Spell.MeteorShower or
+                Spell.ElectricShock or Spell.FlameField => Envelope(progress, .78f, .08f),
             _ => Envelope(progress)
         };
         var frame = new Frame(pool, feet, now, strength, size, seed ^ (uint)visual.Spell * 17191, field);

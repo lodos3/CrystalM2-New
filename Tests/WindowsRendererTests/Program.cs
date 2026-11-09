@@ -186,6 +186,8 @@ internal static class Program
         device.Sprite.End();
         Check(device.TextureCount == textures + 1, "Subsequent particle draws must reuse the atlas.");
         TestSpellDepth(device, backBuffer, red);
+        TestParticleGrade(device, backBuffer);
+        TestRuneOpacity(device, backBuffer);
         device.Resize(80, 60);
         using Surface resized = device.GetBackBuffer();
         device.Clear(Color.Black);
@@ -341,7 +343,12 @@ internal static class Program
             Check(LegacySpellEffects.HasProfile(spell), $"Author a particle profile for {spell}.");
             bool field = spell is Spell.FireWall or Spell.Blizzard or Spell.MeteorStrike;
             var phase = field ? SpellVisualPhase.Field : SpellVisualPhase.Impact;
-            long sampleTime = spell == Spell.Blizzard ? 1810 : 1050;
+            long sampleTime = spell switch
+            {
+                Spell.Blizzard => 1810,
+                Spell.Hiding or Spell.MassHiding or Spell.SoulShield or Spell.BlessedArmour => 1250,
+                _ => 1050
+            };
             Render(spell, phase, sampleTime, emission: false);
             Render(spell, phase, sampleTime, emission: true);
         }
@@ -657,7 +664,7 @@ internal static class Program
             var ward = new SpellVisual(spell);
             TaoistSpellEffects.DrawFrame(pool, ward, feet, Vector2.UnitX, 1180, start, 1200);
             var ignition = pool.Active.ToArray();
-            Check(ignition.Any(p => p.Shape == SpellParticleShape.Filament && p.Origin.Y < feet.Y - 26) &&
+            Check(ignition.Any(p => p.Shape == SpellParticleShape.UserFlame && p.Origin.Y < feet.Y - 26) &&
                 ignition.All(p => p.Shape != glyph), "The ward reveals only the ignited strokes at first.");
             pool.Clear();
             TaoistSpellEffects.DrawFrame(pool, ward, feet, Vector2.UnitX, 1720, start, 1200);
@@ -988,6 +995,57 @@ internal static class Program
             SpellParticleShape.Orb, 0, Layer: SpellParticleLayer.EmissiveCore, DepthY: 64);
     }
 
+    private static void TestParticleGrade(RendererDevice device, Surface target)
+    {
+        SpellParticle[] particles = [new(new Vector2(32, 32), Vector2.Zero, 1000, 250, 18, Color.Red,
+            SpellParticleShape.Orb, 0, Layer: SpellParticleLayer.EmissiveCore)];
+        SpellParticleGrade grade = new(2 * MathF.PI / 3, .25f, .5f, .75f, .8f);
+
+        device.Clear(Color.Black);
+        device.SpellParticles.Draw(particles, Vector2.Zero, 1000, ground: false, emissiveOverlay: true, grade: grade);
+        using (var image = device.Capture(target))
+        {
+            Color centre = image.GetPixel(32, 32);
+            Check(centre.G > 150 && centre.R < 20, "Visual particle grading must rotate the authored red to green.");
+        }
+
+        device.Clear(Color.Black);
+        device.SpellParticles.Draw(particles, Vector2.Zero, 1000, ground: false, emission: true, grade: grade);
+        using (var image = device.Capture(target))
+        {
+            Color centre = image.GetPixel(32, 32);
+            Check(centre.R > 150 && centre.G < 20, "Visual particle grading must leave the authored light colour intact.");
+        }
+    }
+
+    private static void TestRuneOpacity(RendererDevice device, Surface target)
+    {
+        var rune = new SpellParticle(new Vector2(27, 29), Vector2.Zero, 1000, 250, 54, Color.White,
+            SpellParticleShape.Orb, 0, Layer: SpellParticleLayer.EmissiveCore, AlwaysOnTop: true, OpacityNoiseSeed: 731);
+        using var plain = Draw(rune with { OpacityNoiseSeed = 0 }, Vector2.Zero);
+        using var mottled = Draw(rune, Vector2.Zero);
+        using var shifted = Draw(rune, new Vector2(6, 4));
+        float weakest = 1, strongest = 0;
+        for (int y = 22; y <= 36; y++)
+        for (int x = 20; x <= 34; x++)
+        {
+            Color pixel = mottled.GetPixel(x, y);
+            Near(pixel, shifted.GetPixel(x + 6, y + 4), "Rune transparency follows the world through camera movement.");
+            float opacity = pixel.R / (float)Math.Max(1, (int)plain.GetPixel(x, y).R);
+            weakest = Math.Min(weakest, opacity);
+            strongest = Math.Max(strongest, opacity);
+        }
+        Check(strongest > .48f && weakest < .58f && strongest - weakest > .18f,
+            "Rune coverage should contain both bright strokes and softly translucent gaps.");
+
+        Bitmap Draw(SpellParticle particle, Vector2 camera)
+        {
+            device.Clear(Color.Black);
+            device.SpellParticles.Draw([particle], camera, 1000, ground: false, emissiveOverlay: true);
+            return device.Capture(target);
+        }
+    }
+
     private static void TestShapedLight(RendererDevice device, Surface target, Texture red)
     {
         using var shape = new Texture(device, 32, 32, true);
@@ -1025,6 +1083,20 @@ internal static class Program
                 "The Gaussian must extend smoothly along both axes around the scaled shape.");
             Near(Color.Black, image.GetPixel(5, 5), "The Gaussian must leave unrelated pixels dark.");
         }
+
+        device.SetRenderTarget(shapeSurface);
+        device.Clear(Color.FromArgb(255, 127, 0));
+        device.SetRenderTarget(target);
+        device.Clear(Color.Black);
+        device.SetPixelShaderConstant(0, [Vector4.Zero, new(.5f, 0, 0, 0)]);
+        device.Sprite.Draw(shape, rect, rect, Vector4.One);
+        using (var image = device.Capture(target))
+        {
+            Color centre = image.GetPixel(16, 16);
+            Check(centre.R is > 70 and < 128 && Math.Abs(centre.R - centre.G * 2) <= 2 && centre.B == 0,
+                "The particle light ceiling must compress highlights without shifting their colour.");
+        }
+        device.SetPixelShaderConstant(1, [Vector4.Zero]);
         device.PixelShader = ShaderEffect.Artwork;
     }
 

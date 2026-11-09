@@ -64,7 +64,8 @@ internal static partial class WizardSpellEffects
     // The 2D path, tapered branches and filtered halo adapt ARCFLUX Lite by gennai (MIT).
     // See Data/ParticleCredits.txt. Coarse points survive each flicker, with new fine detail.
     internal static void Channel(Frame frame, Vector2 source, Vector2 end, float spread, float width, float alpha,
-        float time, int forks, int offset, Layer layer = Layer.Emissive, ArcColours? colours = null, Vector2? depths = null)
+        float time, int forks, int offset, Layer layer = Layer.Emissive, ArcColours? colours = null, Vector2? depths = null,
+        float corona = 0)
     {
         Vector2 delta = end - source;
         float length = delta.Length();
@@ -86,6 +87,13 @@ internal static partial class WizardSpellEffects
             Vector2 centre = (points[i - 1] + points[i]) * .5f;
             float angle = MathF.Atan2(segment.Y, segment.X);
             float glowSize = (8 + width * 3.7f) * decay;
+            if (corona > 0)
+            {
+                frame.Sprite(centre, segment.Length() + 48, 58 + 40 * corona, Shape.Wisp,
+                    0x4b75ec, corona * .82f, Layer.Glow, angle, sortY: sortY);
+                frame.Sprite(centre, segment.Length() + 18, 14 + 19 * corona, Shape.Wisp,
+                    palette.Filament, corona * .91f, Layer.EmissiveCore, angle, sortY: sortY);
+            }
             frame.Sprite(centre, segment.Length() + glowSize * .82f, glowSize * 1.38f,
                 Shape.Wisp, palette.Shadow, alpha * .67f, layer == Layer.Ground ? layer : Layer.Glow, angle, sortY: sortY);
             frame.Sprite(centre, segment.Length() + glowSize * .59f, glowSize,
@@ -228,6 +236,8 @@ internal static partial class WizardSpellEffects
             Channel(frame, bottom + new Vector2(-7, -68), bottom, 10, 2.6f, .83f, time, 2, 12);
             frame.Sprite(bottom - Vector2.UnitY * 15, 31, 71,
                 Shape.UserLightning, Blue, .76f, Layer.EmissiveCore, light: true);
+            frame.Sprite(bottom - Vector2.UnitY * 18, 47, 85, Shape.Wisp, 0x6888ed,
+                .53f, Layer.Glow, -.14f);
             return;
         }
 
@@ -235,9 +245,19 @@ internal static partial class WizardSpellEffects
         if (power > .015f)
         {
             Vector2 head = feet + new Vector2(15, -931);
-            Channel(frame, feet - Vector2.UnitY * 6, head, 42, 6.1f, power, time, 9, 22);
+            float peak = power * (.24f + .76f * MathF.Sin(MathF.PI * progress));
+            Channel(frame, feet - Vector2.UnitY * 6, head, 42, 6.1f, power, time, 9, 22, corona: peak);
             Channel(frame, feet + new Vector2(-5, -15), head + new Vector2(17, 0), 55, 3.6f, power * .87f, time + .035f, 6, 417);
             Channel(frame, feet + new Vector2(4, -14), head - new Vector2(18, 0), 31, 3.3f, power * .94f, time, 4, 22);
+            for (int i = 0; i < 5; i++)
+            {
+                float height = 25 + i * 38;
+                Vector2 corona = feet + new Vector2((frame.Unit(i + 26) - .5f) * 24, -height);
+                frame.Sprite(corona, 46 - i * 4, 91 + i * 7, Shape.IonCorona, i % 2 == 0 ? 0x5f80ff : 0x4058b4,
+                    peak * (.59f - i * .059f), Layer.Glow, -.11f + i * .025f, light: i < 2);
+                frame.Sprite(corona + new Vector2(8 - i * 2, 0), 14 + i * 2, 68, Shape.UserLightning, PaleBlue,
+                    peak * (.77f - i * .08f), Layer.Emissive, -.16f + i * .044f);
+            }
             frame.Sprite(feet - Vector2.UnitY * 28, 34, 118,
                 Shape.UserLightning, Blue, power * .79f, Layer.EmissiveCore, light: true);
             frame.Sprite(feet - Vector2.UnitY * 31, 46, 91, Shape.Flash, White, power * .90f, Layer.EmissiveCore, light: true);
@@ -247,8 +267,10 @@ internal static partial class WizardSpellEffects
         for (int i = 0; i < 8; i++)
         {
             float angle = (i + frame.Unit(i)) * MathF.Tau / 8;
-            Vector2 target = feet + Ellipse(angle, 61, 37) * (.42f + progress * .57f);
+            Vector2 target = feet + Ellipse(angle, 86, 47) * (.42f + progress * .57f);
             Channel(frame, feet, target, 9, 2.4f, .8f, time, 1, 53 * i, Layer.Ground);
+            frame.Sprite(Vector2.Lerp(feet, target, .71f), 65, 27, Shape.Wisp, 0x4b75ec,
+                .18f + .5f * Ease(progress * 2.1f), Layer.Ground, angle);
         }
         frame.Sparks(feet, 12, 74, 44, progress, PaleBlue, rise: 26);
     }

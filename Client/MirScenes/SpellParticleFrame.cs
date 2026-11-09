@@ -6,7 +6,7 @@ using Shape = CrystalM2.Rendering.Core.SpellParticleShape;
 namespace Client.MirScenes;
 
 internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivot, long now, float strength, float size, uint seed,
-    uint field = 0, bool scalePositions = true, float? depthY = null, bool alwaysOnTop = false)
+    uint field = 0, bool scalePositions = true, float? depthY = null, bool alwaysOnTop = false, ushort opacityNoiseSeed = 0)
 {
     internal const float ReferenceSize = 1.28f;
     internal const float GroundAspect = 2f / 3f;
@@ -22,7 +22,8 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
         return value * value * (3 - 2 * value);
     }
 
-    internal static float Envelope(float progress) => (.61f + .39f * Ease(progress * 8)) * (1 - Ease((progress - .65f) / .35f));
+    internal static float Envelope(float progress, float fadeStart = .65f, float tail = 0) =>
+        (.61f + .39f * Ease(progress * 8)) * (1 - (1 - tail) * Ease((progress - fadeStart) / (1 - fadeStart)));
     internal static Color Tint(int rgb, float opacity) => Color.FromArgb((int)(255 * Math.Clamp(opacity, 0, 1)) << 24 | rgb);
 
     internal float Scale => size / ReferenceSize;
@@ -65,7 +66,8 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
         var quad = new SpriteQuad(ProjectGround(-right - down), ProjectGround(right - down),
             ProjectGround(-right + down), ProjectGround(right + down));
         pool.TryAdd(new SpellParticle(Place(centre), Vector2.Zero, now, 50, 1, Tint(colour, alpha), shape, 0,
-            Layer: Layer.Floor, CastsLight: light, FrameOnly: true, FieldObjectID: field, Ribbon: quad, AlwaysOnTop: alwaysOnTop));
+            Layer: Layer.Floor, CastsLight: light, FrameOnly: true, FieldObjectID: field, Ribbon: quad, AlwaysOnTop: alwaysOnTop,
+            OpacityNoiseSeed: opacityNoiseSeed));
     }
 
     internal void Line(Vector2 start, Vector2 end, float width, int colour, float alpha,
@@ -98,7 +100,7 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
             a + normal * startWidth, b + normal * endWidth);
         pool.TryAdd(new SpellParticle(centre, Vector2.Zero, now, 50, 1, Tint(colour, alpha), Shape.Filament, 0,
             Rotation: MathF.Atan2(delta.Y, delta.X), Layer: layer, CastsLight: light, FrameOnly: true, FieldObjectID: field,
-            Ribbon: ribbon, DepthY: sortY ?? depthY ?? pivot.Y, AlwaysOnTop: alwaysOnTop));
+            Ribbon: ribbon, DepthY: sortY ?? depthY ?? pivot.Y, AlwaysOnTop: alwaysOnTop, OpacityNoiseSeed: opacityNoiseSeed));
     }
 
     internal void WindRibbon(SpriteQuad edges, int colour, float alpha)
@@ -111,7 +113,7 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
         pool.TryAdd(new SpellParticle(centre, Vector2.Zero, now, 50, 1, Tint(colour, alpha),
             Shape.WindRibbon, 0, Layer: Layer.Emissive, CastsLight: false, FrameOnly: true, FieldObjectID: field,
             Ribbon: new SpriteQuad(a - centre, b - centre, c - centre, d - centre), DepthY: depthY ?? pivot.Y,
-            AlwaysOnTop: alwaysOnTop));
+            AlwaysOnTop: alwaysOnTop, OpacityNoiseSeed: opacityNoiseSeed));
     }
 
     internal void Orbit(Vector2 centre, float x, float y, float angle, float sweep, int colour, float width, float alpha)
@@ -162,6 +164,6 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
         int pixels = Math.Max(1, (int)MathF.Round(width / renderScale));
         pool.TryAdd(new SpellParticle(centre, Vector2.Zero, now, 50, pixels, Tint(colour, alpha), shape, 0,
             height / (pixels * renderScale), rotation, Layer: layer, CastsLight: light, FrameOnly: true, FieldObjectID: field,
-            Frame: animationFrame, DepthY: sortY ?? depthY ?? pivot.Y, AlwaysOnTop: alwaysOnTop));
+            Frame: animationFrame, DepthY: sortY ?? depthY ?? pivot.Y, AlwaysOnTop: alwaysOnTop, OpacityNoiseSeed: opacityNoiseSeed));
     }
 }

@@ -28,6 +28,7 @@ internal sealed class GraphicsOptionsPage : MirControl
         AddPage("Shadows", 4, BuildShadows);
         AddPage("Textures", 5, BuildTextures);
         AddPage("Weather", 6, BuildWeather);
+        AddPage("Particles", 7, BuildParticles);
 
         MirPanel.AddCaption(this, "Drag, scroll, or use +/−. Click a value to reset it.", new Rectangle(0, 366, 488, 20));
     }
@@ -35,7 +36,7 @@ internal sealed class GraphicsOptionsPage : MirControl
     private void AddPage(string title, int index, Action build)
     {
         var page = new MirControl { Parent = this, Location = new Point(0, 32), Size = new Size(488, 328), Visible = false };
-        var tab = AddButton(this, title, new Rectangle(index * 70, 0, 66, 24), () => { });
+        var tab = AddButton(this, title, new Rectangle(index * 61, 0, 59, 24), () => { });
         tab.Click += (_, _) => SelectPage();
         _content = page;
         build();
@@ -50,6 +51,22 @@ internal sealed class GraphicsOptionsPage : MirControl
             page.Visible = true;
             tab.Selected = true;
         }
+    }
+
+    private void BuildParticles()
+    {
+        Caption("Colour and texture", 0, 0);
+        AddValue("Hue shift", 0, 27, GraphicsTuning.ParticleHue, "°");
+        AddValue("Core saturation", 0, 53, GraphicsTuning.ParticleCoreColour, hint: "Adjust the colour range of hot cores separately from the rest of the spell.");
+        AddValue("Smoke opacity", 0, 79, GraphicsTuning.ParticleSmokeOpacity);
+        AddValue("Edge softness", 0, 105, GraphicsTuning.ParticleEdgeSoftness, hint: "Softens coverage edges in the particle atlas.");
+        AddValue("Mask detail", 0, 131, GraphicsTuning.ParticleMaskDetail, hint: "Restores local contrast in sparks, ribbons and flipbook masks.");
+        Caption("Scene light and motion", Right, 0);
+        AddValue("Light gain", Right, 27, GraphicsTuning.ParticleLightGain, hint: "Strength of the light cast by particles onto the map.");
+        AddValue("Light ceiling", Right, 53, GraphicsTuning.ParticleLightCeiling, hint: "Softly compresses overlapping particle lights. Zero disables compression.");
+        AddValue("Impact debris", Right, 79, GraphicsTuning.ParticleDebris, hint: "Density of secondary sparks, snow and embers spawned by impacts.");
+        AddValue("Debris gravity", Right, 105, GraphicsTuning.ParticleGravity, hint: "Changes how quickly airborne debris settles.");
+        AddValue("Debris drift", Right, 131, GraphicsTuning.ParticleDrift, hint: "Changes how far airborne debris travels across the ground plane.");
     }
 
     private void BuildOffsets()

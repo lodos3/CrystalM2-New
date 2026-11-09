@@ -154,14 +154,42 @@ float4 PrepareBlend(float4 pixel)
 }
 
 float4 PSArtwork(Output input) : SV_TARGET { return PrepareBlend(SampleArtwork(input) * input.Tint); }
+float WeatherNoise(float2 p);
+
 float4 PSParticleCoverage(Output input) : SV_TARGET
 {
     // Limit the footprint of subpixel strips to the atlas gutter (32 of 256 texels).
     float2 limit = (input.Bounds.zw - input.Bounds.xy) * 0.125;
-    float2 dx = clamp(ddx(input.Uv), -limit, limit);
-    float2 dy = clamp(ddy(input.Uv), -limit, limit);
+    float footprint = 1 + C[7].x * 1.5;
+    float2 dx = clamp(ddx(input.Uv) * footprint, -limit, limit);
+    float2 dy = clamp(ddy(input.Uv) * footprint, -limit, limit);
     float alpha = SpriteTexture.SampleGrad(SpriteSampler, input.Uv, dx, dy).r;
-    if (input.Depth > 0)
+    if (C[7].x > 0.25 || C[7].y > 0)
+    {
+        uint width, height;
+        SpriteTexture.GetDimensions(width, height);
+        float2 stepUv = (1 + C[7].x * 2) / float2(width, height);
+        float neighbourhood = (
+            SpriteTexture.SampleGrad(SpriteSampler, input.Uv + float2(stepUv.x, 0), dx, dy).r +
+            SpriteTexture.SampleGrad(SpriteSampler, input.Uv - float2(stepUv.x, 0), dx, dy).r +
+            SpriteTexture.SampleGrad(SpriteSampler, input.Uv + float2(0, stepUv.y), dx, dy).r +
+            SpriteTexture.SampleGrad(SpriteSampler, input.Uv - float2(0, stepUv.y), dx, dy).r) * 0.25;
+        alpha = saturate(alpha + (alpha - neighbourhood) * (C[7].y * 0.8 - C[7].x * 0.65));
+    }
+    if (input.Depth < 0)
+    {
+        // Use one world-space field for the stroke, flames and glow. Independent
+        // noise in each sprite would fill the translucent gaps when they overlap.
+        float3 screen = float3(input.Position.xy, 1);
+        float2 world = float2(dot(C[5].xyz, screen), dot(C[6].xyz, screen));
+        float2 salt = -input.Depth * float2(17.17, 31.73);
+        float2 drift = float2(C[5].w, C[6].w);
+        float broad = WeatherNoise((world + drift) / float2(19, 13) + salt);
+        float fine = WeatherNoise((world - drift * 0.5) / float2(6, 5) - salt);
+        float opacity = smoothstep(0.19, 0.78, 0.68 * broad + 0.32 * fine);
+        alpha = pow(saturate(alpha), 1.22) * lerp(0.19, 0.96, opacity);
+    }
+    else if (input.Depth > 0)
     {
         float occluder = AuxiliaryTexture.Load(int3(int2(input.Position.xy), 0)).r;
         if (floor(occluder) > input.Depth) alpha *= 1 - saturate(frac(occluder) * 2);
@@ -356,7 +384,16 @@ float4 PSGaussianLight(Output input) : SV_TARGET
             SpriteTexture.SampleLevel(SpriteSampler, input.Uv + stepUv, 0).rgb);
         weights += 2 * w;
     }
-    return float4(value / weights, 1);
+    value /= weights;
+    if (C[1].x > 0)
+    {
+        float peak = max(value.r, max(value.g, value.b));
+        float knee = C[1].x * 0.55;
+        float excess = max(0, peak - knee);
+        if (excess > 0)
+            value *= (knee + excess / (1 + excess / (C[1].x - knee))) / peak;
+    }
+    return float4(value, 1);
 }
 
 float4 PSConeLight(Output input) : SV_TARGET

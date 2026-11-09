@@ -40,9 +40,21 @@ internal static partial class TaoistSpellEffects
         bool prepare = visual.Phase == SpellVisualPhase.Prepare;
         bool hit = visual.Phase == SpellVisualPhase.Hit;
         if (aura) progress = now % duration / (float)duration;
-        float strength = aura || ground ? 1 : Envelope(progress);
-        var frame = new Frame(pool, feet, now, strength, size, seed ^ (uint)visual.Spell * 0x2d5bu, field,
-            alwaysOnTop: visual.Spell is Spell.SoulShield or Spell.BlessedArmour or Spell.Curse);
+        bool sustained = visual.Spell is Spell.Healing or Spell.MassHealing or
+            Spell.Hiding or Spell.MassHiding or Spell.SummonHolyDeva or Spell.SummonSkeleton or Spell.SummonShinsu;
+        float strength = aura || ground ? 1 : visual.Spell switch
+        {
+            Spell.SoulShield => Envelope(progress, .83f, .65f),
+            Spell.BlessedArmour => Envelope(progress, .83f, .53f),
+            Spell.Curse => Envelope(progress, .78f, .52f),
+            Spell.SoulFireBall => Envelope(progress, .76f, .46f),
+            _ => sustained ? Envelope(progress, .81f, .11f) : Envelope(progress)
+        };
+        uint artSeed = seed ^ (uint)visual.Spell * 0x2d5bu;
+        bool isRune = visual.Spell is Spell.SoulShield or Spell.BlessedArmour or Spell.Curse;
+        ushort opacityNoiseSeed = isRune ? (ushort)(1 + ((artSeed ^ (uint)start * 0x9e3779b9u) & 1023)) : (ushort)0;
+        var frame = new Frame(pool, feet, now, strength, size, artSeed, field,
+            alwaysOnTop: isRune, opacityNoiseSeed: opacityNoiseSeed);
         if (visual.Phase == SpellVisualPhase.Expire)
         {
             frame.Sparks(feet, 8, 25, 13, progress, Ice, 23);
@@ -58,9 +70,9 @@ internal static partial class TaoistSpellEffects
             case Spell.SummonSkeleton: SummonStars(frame, feet, progress, deva: false); break;
             case Spell.Hiding: Veil(frame, feet, progress, elapsed, mass: false); break;
             case Spell.MassHiding: Veil(frame, feet, progress, elapsed, mass: !hit); break;
-            case Spell.SoulShield: Rune(frame, feet, progress, Shape.SoulGlyph, 385, 255, InkBlue, Blue, Ice); break;
+            case Spell.SoulShield: BurningWard(frame, feet, progress, Shape.SoulGlyph); break;
             case Spell.Revelation: Reveal(frame, feet, progress, elapsed, prepare); break;
-            case Spell.BlessedArmour: Rune(frame, feet, progress, Shape.ArmourGlyph, 345, 238, Ochre, Amber, Gold); break;
+            case Spell.BlessedArmour: BurningWard(frame, feet, progress, Shape.ArmourGlyph); break;
             case Spell.EnergyRepulsor: Repulse(frame, feet, progress); break;
             case Spell.TrapHexagon: Trap(frame, feet, prepare ? progress : Fract(elapsed), prepare); break;
             case Spell.Purification: Cleanse(frame, feet, progress, prepare); break;
@@ -73,7 +85,7 @@ internal static partial class TaoistSpellEffects
             case Spell.SummonShinsu: Shinsu(frame, feet, progress); break;
             case Spell.Reincarnation: Revive(frame, feet, ground ? Fract(elapsed) : progress); break;
             case Spell.SummonHolyDeva: SummonStars(frame, feet, progress, deva: true); break;
-            case Spell.Curse: Rune(frame, feet, progress, Shape.CurseGlyph, 352, 228, 0x426958, Mint, White); break;
+            case Spell.Curse: CurseRune(frame, feet, progress); break;
             case Spell.Plague: Plague(frame, feet, progress, elapsed); break;
             case Spell.PoisonCloud: Cloud(frame, feet, ground ? elapsed : progress * 2.4f); break;
             case Spell.EnergyShield: Shield(frame, feet, progress, aura); break;
@@ -98,14 +110,15 @@ internal static partial class TaoistSpellEffects
             Spell.Hallucination or Spell.MassHiding => Violet,
             _ => Amber
         };
-        frame.Sprite(head - heading * 6, 58, 36, Shape.Orb, accent, .49f, light: true);
-        frame.Sprite(head, 37, 24, Shape.Talisman, Amber, .94f, rotation: angle);
-        frame.Sprite(head + heading * 5, 13, 11, Shape.Flash, Ivory, .91f, Layer.EmissiveCore, angle);
+        frame.Sprite(head - heading * 5, 39, 23, Shape.MistFilament, accent, .61f, Layer.Glow, angle, light: true);
+        frame.Sprite(head, 32, 20, Shape.Talisman, Amber, .98f, rotation: angle);
+        frame.Sprite(head + heading * 5, 9, 9, Shape.Flash, Ivory, .88f, Layer.EmissiveCore, angle);
         for (int i = 0; i < 5; i++)
         {
             float drift = MathF.Sin(frameIndex * .67f - i * .8f);
             Vector2 point = head - heading * (13 + i * 7) + side * drift * (3 + i);
-            frame.Sprite(point, 26 - i * 3, 18 - i * 2, Shape.Wisp, i % 2 == 0 ? accent : Amber, .86f - i * .13f);
+            frame.Sprite(point, 22 - i * 3, 14 - i * 2, Shape.MistFilament, i % 2 == 0 ? accent : Amber,
+                .77f - i * .12f, rotation: angle + drift * .3f);
             frame.Sprite(point + side * (i % 2 == 0 ? -5 : 5), 4 + i % 3, 4, Shape.Spark,
                 i % 2 == 0 ? Gold : Ice, .94f - i * .09f, Layer.EmissiveCore, angle);
         }
@@ -129,9 +142,9 @@ internal static partial class TaoistSpellEffects
         frame.Sprite(feet, 83, 43, Shape.Wisp, Teal, .84f, Layer.Ground);
         frame.Sprite(body, 105, 104, Shape.Wisp, Jade, .35f, Layer.Glow, light: true);
         HealMotes(frame, body, 33, progress, 56);
-        frame.Sprite(head, 102, 95, Shape.Wisp, prepare ? InkBlue : Jade, .39f, Layer.Glow, light: true);
-        frame.Sprite(head, 86, 79, Shape.Wisp, prepare ? InkBlue : Teal, .55f, Layer.Glow, light: true);
-        frame.Sprite(head, 52, 56, Shape.Orb, prepare ? Blue : Jade, .72f, light: true);
+        float trailAngle = prepare ? MathF.PI * .5f : phase + MathF.PI * .5f;
+        frame.Sprite(head, 78, 48, Shape.Wisp, prepare ? Blue : Jade, .57f, Layer.Glow, trailAngle, light: true);
+        frame.Sprite(head, 38, 24, Shape.Wisp, prepare ? Ice : Mint, .77f, Layer.Glow, trailAngle, light: true);
         frame.Sprite(head, 16, 20, Shape.Flash, White, .98f, Layer.EmissiveCore, phase * .37f);
         for (int i = 0; i < 28; i++)
         {

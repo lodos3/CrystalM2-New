@@ -449,25 +449,31 @@ internal static partial class WizardSpellEffects
         Vector2 root = feet + new Vector2((frame.Unit(20) - .5f) * 45, (frame.Unit(3) - .5f) * 29);
         float fall = 1 - Ease(cycle * 1.39f);
         float density = frame.Unit(31);
-        if (fall > .004f && density > .26f)
+        float lull = 1 - Ease((time % 3 - 2.59f) / .37f);
+        float warning = 1 - Ease(time / .44f);
+        frame.Clip(root + new Vector2(-11, -22), 53, 25, Shape.SmokeSequence, time * .92f + density,
+            0x8cb7eb, .74f * warning, Layer.Smoke, -.22f, sortY: root.Y);
+        frame.Sprite(root + new Vector2(3, -16), 11, 17, Shape.Spark, IceWhite, .76f * warning,
+            Layer.EmissiveCore, rotation: .31f, sortY: root.Y);
+        if (fall > .004f && density > .26f && lull > .015f)
         {
             Vector2 head = root - new Vector2(58 + frame.Unit(7) * 89, 450 + frame.Unit(9) * 130) * fall;
             Vector2 tail = new Vector2(11 + frame.Unit(10) * 28, 62 + frame.Unit(17) * 113);
-            float opacity = .54f + density * .38f;
+            float opacity = (.54f + density * .38f) * lull;
             frame.Line(head - tail, head, 24, Blue, opacity, light: true);
             frame.Line(head - tail * .71f, head, 9, IceWhite, opacity, Layer.EmissiveCore);
             frame.Clip(head - tail * .53f, 57, tail.Length() * .86f, Shape.SmokeSequence, cycle * .91f,
-                0x6686cc, .66f, Layer.Smoke, -.22f);
+                0x6686cc, .66f * lull, Layer.Smoke, -.22f);
             frame.Sprite(head, 39, 53, Shape.Flame, Blue, opacity, rotation: -.27f);
             frame.Sprite(head, 24, 31, Shape.FrostCore, IceWhite, opacity, Layer.EmissiveCore, -.24f);
         }
         float land = Ease((time - .67f) / .13f);
-        frame.Sprite(root - Vector2.UnitY * 6, 60, 40, Shape.Smoke, Ice, .53f * land, Layer.Ground, light: true);
+        frame.Sprite(root - Vector2.UnitY * 6, 60, 40, Shape.Smoke, Ice, .53f * land * (.24f + .76f * lull), Layer.Ground, light: true);
         if (land > .8f && cycle > .63f)
         {
             float spread = Ease((cycle - .63f) / .34f);
-            frame.Sprite(root - Vector2.UnitY * 13, 52, 33, Shape.Flash, IceWhite, .66f * (1 - spread), Layer.EmissiveCore);
-            frame.Sparks(root, 7, 28, 18, cycle, IceWhite, rise: 30, shape: Shape.Shard);
+            frame.Sprite(root - Vector2.UnitY * 13, 52, 33, Shape.Flash, IceWhite, .66f * (1 - spread) * lull, Layer.EmissiveCore);
+            if (lull > .3f) frame.Sparks(root, 7, 28, 18, cycle, IceWhite, rise: 30, shape: Shape.Shard);
         }
     }
 

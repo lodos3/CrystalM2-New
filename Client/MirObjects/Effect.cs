@@ -17,6 +17,7 @@ namespace Client.MirObjects
     {
         public EffectArt Art { get; }
         private long _nextParticleTime;
+        internal bool ImpactDebrisStarted;
         protected readonly int? ParticleMapGeneration;
 
         public int BaseIndex, Count, Duration;

@@ -148,6 +148,14 @@ public sealed partial class MapControl
             feet -= new Vector2(linked.X, linked.Y);
         }
         uint seed = actor?.ObjectID ?? CellSeed(cell);
+        if (!effect.Repeat && !effect.ImpactDebrisStarted && CMain.Time >= start)
+        {
+            effect.ImpactDebrisStarted = true;
+            if (CMain.Time - start <= 150)
+                SpellImpactDebris.Emit(_spellParticles, visual, feet, Facing(effect.ParticleDirection), start,
+                    GraphicsTuning.ParticleDebris.Current, GraphicsTuning.ParticleGravity.Current / 100f,
+                    GraphicsTuning.ParticleDrift.Current / 100f, seed ^ (uint)start);
+        }
         if (WarriorSpellEffects.HasArt(visual.Spell))
         {
             Vector2? tip = null;
@@ -263,14 +271,14 @@ public sealed partial class MapControl
 
     internal void EmitWeaponSweep(Spell spell, WeaponMaskTrace screenPose, WeaponMaskTrace? previousWorld,
         Point screenFeet, MirDirection direction, float progress, float previousProgress, int remaining, int frameInterval,
-        out WeaponMaskTrace worldPose)
+        out WeaponMaskTrace worldPose, bool followThrough = false)
     {
         Point camera = SpellParticleOrigin();
         Vector2 offset = new(camera.X, camera.Y);
         worldPose = new WeaponMaskTrace(screenPose.Hilt - offset, screenPose.Tip - offset);
         Vector2 feet = new Vector2(screenFeet.X, screenFeet.Y) - offset;
         LegacySpellEffects.WeaponSweep(_spellParticles, spell, worldPose, previousWorld, CMain.Time, remaining, frameInterval,
-            Facing(direction), progress, feet, previousProgress);
+            Facing(direction), progress, feet, previousProgress, followThrough);
         TextureValid = false;
     }
 
@@ -325,7 +333,16 @@ public sealed partial class MapControl
         if (_spellParticles.Active.Length >= SpellParticleCapacity * 5 / 8 || !CanEmitSpellParticles(field.CurrentLocation)) return;
         var visual = new SpellVisual(field.Spell, SpellVisualPhase.Field);
         Vector2 feet = SpellWorldPoint(field.CurrentLocation);
-        if (WizardSpellEffects.HasArt(field.Spell))
+        if (field.Spell == Spell.PoisonCloud)
+        {
+            Point cell = field.CurrentLocation;
+            int west = HasCloud(cell.X - 1, cell.Y), east = HasCloud(cell.X + 1, cell.Y);
+            int north = HasCloud(cell.X, cell.Y - 1), south = HasCloud(cell.X, cell.Y + 1);
+            Vector2 inward = new((east - west) * 10, (south - north) * 7);
+            TaoistSpellEffects.DrawPoisonField(_spellParticles, feet, CMain.Time, field.ParticleStart,
+                SpellParticleSize, CellSeed(cell), field.ObjectID, inward, west + east + north + south);
+        }
+        else if (WizardSpellEffects.HasArt(field.Spell))
             WizardSpellEffects.DrawFrame(_spellParticles, visual, feet, Facing(field.Direction), CMain.Time,
                 field.ParticleStart, int.MaxValue, SpellParticleSize, CellSeed(field.CurrentLocation), field.ObjectID);
         else if (TaoistSpellEffects.HasArt(field.Spell))
@@ -334,6 +351,15 @@ public sealed partial class MapControl
         else
             LegacySpellEffects.Emit(_spellParticles, visual, feet, Facing(field.Direction), CMain.Time, fieldObjectID: field.ObjectID);
         TextureValid = false;
+
+        int HasCloud(int x, int y)
+        {
+            if ((uint)x >= (uint)Width || (uint)y >= (uint)Height || M2CellInfo[x, y].CellObjects is not { } objects)
+                return 0;
+            foreach (MapObject occupant in objects)
+                if (occupant is SpellObject { Spell: Spell.PoisonCloud, Ended: false }) return 1;
+            return 0;
+        }
     }
 
     private void ProcessHealingCircles()
@@ -403,7 +429,7 @@ public sealed partial class MapControl
         float end = y == lastRow ? float.PositiveInfinity : (y + 1) * CellHeight;
         int count = 0;
         foreach (ref readonly SpellParticle particle in _spellParticles.Active)
-            if (particle.Ground && particle.Layer != SpellParticleLayer.Floor && particle.GroundDepth >= start && particle.GroundDepth < end)
+            if (particle.Ground && particle.Layer != SpellParticleLayer.Floor && particle.DepthAt(CMain.Time) >= start && particle.DepthAt(CMain.Time) < end)
                 _groundSpellRow[count++] = particle;
 
         DrawSpellParticles(_groundSpellRow.AsSpan(0, count), ground: true);
@@ -435,7 +461,10 @@ public sealed partial class MapControl
                 GraphicsTuning.SpellGlowCutoff.Current / 100f,
                 GraphicsTuning.SpellGlowStrength.Current / 100f,
                 GraphicsTuning.SpellGlowBlend.Current != 0),
-            occlusion: occlusion, depthOrigin: depthOrigin, cellHeight: CellHeight);
+            occlusion: occlusion, depthOrigin: depthOrigin, cellHeight: CellHeight,
+            grade: new SpellParticleGrade(GraphicsTuning.ParticleHue.Current * (MathF.PI / 180f),
+                GraphicsTuning.ParticleCoreColour.Current / 100f, GraphicsTuning.ParticleSmokeOpacity.Current / 100f,
+                GraphicsTuning.ParticleEdgeSoftness.Current / 100f, GraphicsTuning.ParticleMaskDetail.Current / 100f));
     }
 
     private void DrawSpellParticleLights(float intensity)
@@ -446,7 +475,7 @@ public sealed partial class MapControl
         var light = GraphicsTuning.Light(LightSource.Spell);
         float radius = light.Radius.Current / 100f, warmth = light.Warmth.Current * 0.003f;
         Vector4 tint = RendererDevice.ToVector(light.Colour);
-        ShapedLightPass.AddParticles(_spellParticles, camera, CMain.Time, intensity, radius,
+        ShapedLightPass.AddParticles(_spellParticles, camera, CMain.Time, intensity * GraphicsTuning.ParticleLightGain.Current / 100f, radius,
             SpellParticleSize, warmth,
             light.CustomColour.Current == 0 ? null : new Vector3(tint.X, tint.Y, tint.Z));
     }

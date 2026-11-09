@@ -130,6 +130,16 @@ internal static class GraphicsTuning
     internal static readonly Value SpellGlowStrength = new("SpellGlowStrength", 70, 0, 200);
     internal static readonly Value SpellGlowCutoff = new("SpellGlowCutoff", 44, 0, 100);
     internal static readonly Value SpellGlowBlend = new("SpellGlowBlend", 0, 0, 1);
+    internal static readonly Value ParticleHue = new("ParticleHue", 0, -180, 180);
+    internal static readonly Value ParticleCoreColour = new("ParticleCoreColour", 0, -100, 100);
+    internal static readonly Value ParticleSmokeOpacity = new("ParticleSmokeOpacity", 100, 0, 150);
+    internal static readonly Value ParticleEdgeSoftness = new("ParticleEdgeSoftness", 12, 0, 100);
+    internal static readonly Value ParticleMaskDetail = new("ParticleMaskDetail", 0, 0, 100);
+    internal static readonly Value ParticleDebris = new("ParticleDebris", 100, 0, 150);
+    internal static readonly Value ParticleGravity = new("ParticleGravity", 100, 50, 200);
+    internal static readonly Value ParticleDrift = new("ParticleDrift", 100, 25, 175);
+    internal static readonly Value ParticleLightGain = new("ParticleLightGain", 100, 0, 200);
+    internal static readonly Value ParticleLightCeiling = new("ParticleLightCeiling", 125, 0, 300);
     internal static readonly Value DeathLook = new("DeathLook", 0, 0, 2);
     internal static readonly Value FogDensity = new("PostFogDensity", 100, 0, 200);
     internal static readonly Value WeatherSource = new("WeatherSource", 0, 0, 1);

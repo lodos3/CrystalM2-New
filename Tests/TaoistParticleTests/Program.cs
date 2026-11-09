@@ -56,11 +56,18 @@ foreach (Spell ward in new[] { Spell.SoulShield, Spell.BlessedArmour })
     var formed = Render(ward, SpellVisualPhase.Impact, 700);
     var burning = Render(ward, SpellVisualPhase.Impact, 900);
     Check(opening.Length > 0 && formed.Length > 0, $"Ward particles absent for {ward}");
+    var earlyFire = opening.Where(p => p.Shape == SpellParticleShape.FlameTongue).ToArray();
+    var fullFire = formed.Where(p => p.Shape == SpellParticleShape.FlameTongue).ToArray();
+    Check(opening.All(p => p.Shape != glyph) && earlyFire.Length > 0 && earlyFire.Length < fullFire.Length &&
+        earlyFire.Average(p => p.Origin.X + p.Origin.Y) < fullFire.Average(p => p.Origin.X + p.Origin.Y) - 18,
+        $"The fire must trace {ward} from the upper corner before revealing the complete glyph.");
     // Authored sprite Size is stored before the renderer's 1.28 scale.
-    Check(formed.Where(p => p.Shape == glyph).Any(p => p.Dimensions(0f, 1.28f).X >=
-        (ward == Spell.SoulShield ? 360 : 320)), $"Ward glyph is too small for {ward}");
-    Check(!formed.Any(p => p.Shape is SpellParticleShape.Halo or SpellParticleShape.Orb or
-        SpellParticleShape.SmokeSequence), $"Ward has an unwanted oval/background effect: {ward}");
+    Check(formed.Where(p => p.Shape == glyph).Any(p => ward == Spell.SoulShield
+        ? p.Dimensions(0f, 1.28f).X is >= 320 and <= 340 : p.Dimensions(0f, 1.28f).X is >= 285 and <= 307),
+        $"Ward glyph must stay within the aimed cast's footprint for {ward}");
+    Check(!formed.Any(p => p.Shape is SpellParticleShape.Halo or SpellParticleShape.Orb ||
+        p.Shape == SpellParticleShape.SmokeSequence && p.Dimensions(0f, 1.28f).X > 32),
+        $"Ward has an unwanted oval/background effect: {ward}");
     Check(!formed.Any(p => p.Shape == SpellParticleShape.Wisp &&
         p.Dimensions(0f, 1.28f).X > 70), $"Ward has an oversized backdrop wisp: {ward}");
     Check(formed.Any(p => p.Shape == SpellParticleShape.FlameTongue && p.Emissive) &&
@@ -225,4 +232,10 @@ Check(curseAtAim.Any(p => p.Shape == SpellParticleShape.CurseGlyph),
     "Curse must render a complete rune on the aimed map cell.");
 Check(curseAtAim.Any(p => p.Shape == SpellParticleShape.SmokeSequence),
     "Curse glyph should release smoke.");
+Check(curseAtAim.Any(p => p.Shape == SpellParticleShape.MistFilament && p.Size > 70),
+    "Curse must fan spectral rays above the brush strokes at its peak.");
+var curseAfterglow = Render(Spell.Curse, SpellVisualPhase.Impact, 1999, 2000);
+Check(curseAfterglow.Any(p => p.Shape == SpellParticleShape.SmokeSequence) &&
+      curseAfterglow.All(p => p.Shape != SpellParticleShape.CurseGlyph),
+    "The late curse should break up into residue once the glyph has disappeared.");
 Console.WriteLine("Taoist particle composition tests passed.");

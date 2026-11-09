@@ -69,7 +69,7 @@ public partial class PlayerObject
         int remaining = (int)Math.Max(1, NextMotion - CMain.Time + Math.Max(0, Frame.Count - FrameIndex - 1) * FrameInterval);
         Point feet = new(DrawLocation.X + MapControl.CellWidth / 2, DrawLocation.Y + MapControl.CellHeight / 2);
         map.EmitWeaponSweep(spell, trace.Value.Orient(hand, prior), _lastWeaponPose, feet, Direction, progress,
-            previousProgress, remaining, FrameInterval, out var pose);
+            previousProgress, remaining, FrameInterval, out var pose, CurrentAction == MirAction.Attack4);
         _lastWeaponPose = pose;
     }
 

@@ -5,6 +5,12 @@ namespace Client.Rendering;
 
 internal enum SpellMaskStyle { Sweep, Fire, Frost, Ward, Storm }
 
+internal readonly record struct SpellParticleGrade(float Hue, float HighlightColour, float SmokeOpacity,
+    float EdgeSoftness, float Detail)
+{
+    internal static SpellParticleGrade Neutral => new(0, 0, 1, 0, 0);
+}
+
 internal sealed class SpellParticleRenderer
 {
     private readonly RendererDevice _device;
@@ -27,17 +33,31 @@ internal sealed class SpellParticleRenderer
                      float intensity = 1f, bool emission = false, float sizeScale = 1f, float warmth = 0f,
                      Rectangle? clipping = null, Vector3? colour = null, bool emissiveOverlay = false,
                      float exposure = 1f, float saturation = 1f, SpellParticleGlowPolicy glowPolicy = default,
-                     Texture occlusion = null, int depthOrigin = 0, int cellHeight = 32, float lightRadius = 1f)
+                     Texture occlusion = null, int depthOrigin = 0, int cellHeight = 32, float lightRadius = 1f,
+                     SpellParticleGrade? grade = null)
     {
         if (intensity <= 0) return;
         SpriteBlendMode previous = _device.Blend;
         SpriteBlendMode? previousArtworkBlend = _device.ArtworkBlend;
         ShaderEffect shader = _device.PixelShader;
         Texture previousAuxiliary = _device.AuxiliaryTexture;
+        Span<Vector4> constants = stackalloc Vector4[RendererDevice.EffectConstantCount];
+        _device.CopyPixelShaderConstants(constants);
+        var look = emission ? SpellParticleGrade.Neutral : grade ?? SpellParticleGrade.Neutral;
+        float sin = MathF.Sin(look.Hue), cos = MathF.Cos(look.Hue);
+        Vector3 greyAxis = new(.57735027f);
         Rectangle clip = clipping ?? new Rectangle(0, 0, _device.TargetWidth, _device.TargetHeight);
         try
         {
             _device.PixelShader = ShaderEffect.ParticleCoverage;
+            Matrix4x4.Invert(_device.Sprite.Transform, out Matrix4x4 inverse);
+            float phase = now % 8000 * (MathF.Tau / 8000);
+            _device.SetPixelShaderConstant(5,
+            [
+                new(inverse.M11, inverse.M21, inverse.M41 - camera.X, 4 * MathF.Sin(phase)),
+                new(inverse.M12, inverse.M22, inverse.M42 - camera.Y, 3 * MathF.Cos(phase)),
+                new(look.EdgeSoftness, look.Detail, 0, 0)
+            ]);
             if (occlusion != null) _device.AuxiliaryTexture = occlusion;
             if (emission)
             {
@@ -83,6 +103,7 @@ internal sealed class SpellParticleRenderer
             _device.Blend = previous;
             _device.PixelShader = shader;
             _device.AuxiliaryTexture = previousAuxiliary;
+            _device.SetPixelShaderConstant(5, constants[5..]);
         }
 
         void DrawGlowLayers(ReadOnlySpan<SpellParticle> source, bool groundParticles)
@@ -112,20 +133,22 @@ internal sealed class SpellParticleRenderer
                 Vector2 point = particle.Position(now) + camera;
                 Vector2 size = particle.Dimensions(age, sizeScale);
                 float ribbonScale = emission ? lightRadius : 1f;
-                Rectangle bounds = particle.Bounds(point, size, ribbonScale);
+                float angle = particle.Angle(now);
+                Rectangle bounds = particle.Bounds(point, size, ribbonScale, angle);
                 if (!bounds.IntersectsWith(clip)) continue;
 
-                Vector4 tint = RendererDevice.ToVector(particle.Colour);
+                Vector4 tint = RendererDevice.ToVector(particle.ColourAt(age));
                 if (colour is { } rgb) tint = new Vector4(rgb, tint.W);
                 tint.X = Math.Clamp(tint.X * (1 + warmth), 0, 1);
                 tint.Z = Math.Clamp(tint.Z * (1 - warmth), 0, 1);
                 float glowAmount = glowPass ? glowPolicy.GlowAmount(new Vector3(tint.X, tint.Y, tint.Z)) : 1f;
                 if (glowAmount <= 0f) continue;
-                float alpha = particle.Layer == SpellParticleLayer.Legacy ? (1 - age) * (1 - age) : Math.Clamp((1 - age) / .76f, 0, 1);
+                float alpha = particle.Fade(age);
+                if (!emission && particle.Layer == SpellParticleLayer.Smoke) alpha *= look.SmokeOpacity;
                 tint.W *= Math.Clamp(alpha * (emission ? 1 : intensity), 0, 1);
                 if (emission)
                 {
-                    float strength = intensity * (particle.Emissive ? .65f : 1f);
+                    float strength = intensity * particle.LightEnergy * (particle.Emissive ? .65f : 1f);
                     tint.X *= strength;
                     tint.Y *= strength;
                     tint.Z *= strength;
@@ -133,20 +156,26 @@ internal sealed class SpellParticleRenderer
                 else
                 {
                     Vector3 visible = new(tint.X, tint.Y, tint.Z);
+                    if (look.Hue != 0)
+                        visible = visible * cos + Vector3.Cross(greyAxis, visible) * sin +
+                            greyAxis * (Vector3.Dot(greyAxis, visible) * (1 - cos));
                     float luma = Vector3.Dot(visible, new Vector3(.2126f, .7152f, .0722f));
-                    visible = Vector3.Max(new Vector3(luma) + (visible - new Vector3(luma)) * saturation, Vector3.Zero);
+                    float chroma = saturation * (particle.Layer == SpellParticleLayer.EmissiveCore ? 1 + look.HighlightColour : 1);
+                    visible = Vector3.Max(new Vector3(luma) + (visible - new Vector3(luma)) * chroma, Vector3.Zero);
                     visible *= exposure * glowAmount;
                     tint = new Vector4(visible, tint.W);
                 }
                 var source = SpellParticleAtlas.Part(particle.Shape, particle.Direction, particle.Frame);
                 float depth = occlusion != null && !ground && !emission && !particle.AlwaysOnTop &&
-                    particle.DepthY is { } sortY
-                    ? Math.Max(1, MathF.Floor(sortY / cellHeight) - depthOrigin)
+                    (particle.DepthY.HasValue || particle.Motion.HasValue)
+                    ? Math.Max(1, MathF.Floor(particle.DepthAt(now) / cellHeight) - depthOrigin)
                     : 0;
+                // Negative depth carries the seed for overlay runes, which have no occlusion row.
+                if (particle.AlwaysOnTop && particle.OpacityNoiseSeed != 0) depth = -particle.OpacityNoiseSeed;
                 if (particle.Ribbon is { } ribbon)
                     _device.Sprite.DrawQuad(_atlas, source, ribbon.Scaled(ribbonScale), point, tint, depth);
                 else
-                    _device.Sprite.DrawRotated(_atlas, source, point, size, particle.Rotation, tint, depth);
+                    _device.Sprite.DrawRotated(_atlas, source, point, size, angle, tint, depth);
             }
         }
     }

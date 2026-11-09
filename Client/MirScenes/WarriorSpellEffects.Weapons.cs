@@ -15,7 +15,8 @@ internal static partial class WarriorSpellEffects
         Spell.TwinDrakeBlade or Spell.CrossHalfMoon or Spell.FlamingSword or Spell.BladeAvalanche or Spell.CounterAttack or Spell.SlashingBurst;
 
     internal static void WeaponSweep(SpellParticlePool pool, Spell spell, Look look, WeaponMaskTrace pose, WeaponMaskTrace? previous,
-        Vector2 facing, Vector2 feet, long now, int remaining, int interval, float progress, float previousProgress)
+        Vector2 facing, Vector2 feet, long now, int remaining, int interval, float progress, float previousProgress,
+        bool followThrough)
     {
         int life = Math.Min(remaining, Math.Clamp(interval * 2, 55, 190));
         if (life <= 0) return;
@@ -24,6 +25,18 @@ internal static partial class WarriorSpellEffects
         if (facing == Vector2.Zero) facing = Vector2.Normalize(blade);
         float angle = MathF.Atan2(facing.Y, facing.X);
         var effect = new Effect(pool, look, now, window: life, referenceDuration: life, depthY: feet.Y);
+        if (spell == Spell.TwinDrakeBlade && followThrough && previousProgress == 0)
+        {
+            Vector2 contact = pose.Hilt + blade * .78f;
+            var returnCut = new Frame(pool, feet, now, 1, Frame.ReferenceSize, (uint)now,
+                scalePositions: false, depthY: feet.Y);
+            WizardSpellEffects.Channel(returnCut, contact, contact + facing * 29 - Vector2.UnitY * 62,
+                22, 2.8f, .92f, now / 1000f, 4, 211, colours: WizardSpellEffects.DrakeColours);
+            effect.Add(contact, -Vector2.UnitY * 10, Shape.UserLightning, 67, life, Layer.Emissive,
+                aspect: 1.3f, rotation: angle + .27f, alpha: 188);
+            effect.Add(contact, Vector2.Zero, Shape.Flash, 28, life, Layer.EmissiveCore, core: true, alpha: 218);
+            effect.Scatter(contact, 8, Shape.WarriorSpark, 43, life, rise: true);
+        }
         bool heavy = spell is Spell.FlamingSword or Spell.CrossHalfMoon or Spell.BladeAvalanche or Spell.SlashingBurst;
         bool moon = spell is Spell.HalfMoon or Spell.CrossHalfMoon;
         if (previous is { } old)

@@ -229,6 +229,42 @@ static class Program
         pool.Schedule(sooner);
         Assertions.True(!pool.Advance(900), "Do not replay expired layers after a frame stall.");
 
+        var motion = new SpellParticleMotion(new Vector2(48, 12), new Vector2(-12, 4), 10, 64, 290, 5);
+        var airborne = particle with
+        {
+            Duration = 900, Motion = motion, FieldObjectID = 93,
+            Impact = new SpellParticleImpact(SpellParticleShape.Spark, 3, 6, 300, 40)
+        };
+        long landing = airborne.Start + motion.LandingMilliseconds;
+        Assertions.True(airborne.Position(200).Y < origin.Y && airborne.DepthAt(200) > origin.Y &&
+            airborne.Angle(200) > airborne.Rotation, "Height, ground depth and spin advance on separate axes.");
+        Assertions.True(pool.TryAdd(airborne) && pool.Advance(landing - 1) && pool.Active.Length == 1,
+            "Keep the parent visible until it reaches the projected ground.");
+        Assertions.True(pool.Advance(landing + 40) && pool.Active.Length == 3 &&
+            pool.Active.ToArray().All(p => p.Start == landing && p.FieldObjectID == 93 &&
+                Vector2.Distance(p.Origin, airborne.Position(landing)) < .01f),
+            "Landing spawns one group of children at the physical contact point and backdates their age.");
+        Assertions.True(pool.Advance(landing + 41) && pool.Active.Length == 3, "The contact must fire once.");
+        Assertions.True(pool.RemoveField(93) && pool.Active.IsEmpty, "Removing a field clears its children.");
+        pool.TryAdd(airborne);
+        Assertions.True(pool.Advance(landing + 500) && pool.Active.IsEmpty, "Do not spawn expired contact debris after a stall.");
+        pool.Schedule(airborne);
+        Assertions.True(pool.Advance(landing + 40) && pool.Active.Length == 3 &&
+            pool.Active.ToArray().All(p => p.Start == landing), "A late scheduled parent should enter at the child stage immediately.");
+        pool.Clear();
+
+        var gradient = new SpellParticleColourCurve((0, 0x801000), (.5f, 0xff8000), (1, 0xfffffe));
+        var ember = particle with { Colour = Color.FromArgb(170, Color.White), ColourCurve = gradient };
+        Assertions.True(ember.ColourAt(.75f).ToArgb() == Color.FromArgb(170, 255, 192, 127).ToArgb(),
+            "An age curve interpolates its colour keys while preserving authored opacity.");
+        var fastEmber = ember with { Duration = 1000, Velocity = new Vector2(100, 0), ColourCurveFullSpeed = 200 };
+        Assertions.True(fastEmber.ColourAt(0).ToArgb() == Color.FromArgb(170, 255, 255, 254).ToArgb() &&
+            fastEmber.ColourAt(1).ToArgb() == Color.FromArgb(170, 128, 16, 0).ToArgb(),
+            "A speed curve tracks the instantaneous velocity of a decelerating particle.");
+        fastEmber = fastEmber with { Motion = new SpellParticleMotion(new Vector2(100, 0), new Vector2(-100, 0), 0, 0, 0) };
+        Assertions.True(fastEmber.ColourAt(0).ToArgb() == Color.FromArgb(170, 255, 128, 0).ToArgb(),
+            "Simulated particles sample the colour curve from projected physics velocity.");
+
         byte[] atlas = SpellParticleAtlas.Generate();
         Assertions.Equal(SpellParticleAtlas.Width * SpellParticleAtlas.Height, atlas.Length,
             "All particle masks share one single-channel coverage texture.");

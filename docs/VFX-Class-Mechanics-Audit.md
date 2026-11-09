@@ -8,10 +8,12 @@
 
 ## Universal rendering rules
 
+The [fantasy spell VFX research notes](../Docs/research/fantasy-spell-vfx.md) record the techniques and review checks behind these rules.
+
 1. Mechanic determines origin, direction, targets, duration, and field lifecycle. Never select a visual solely from the spell name.
 2. Named aimed runes **Soul Shield / Blessed Armour / Curse**: exactly one visual per successful cast at the chosen cell, show **above player, monster and scenery sprites**, independent of whether the debuff or friendly buff affects anyone.
 3. Passive stat changes **do not emit looping circles**. Attach optional micro-cues to real attacks only.
-4. For wards, the glyph outline is static. Thin flames, fine texture and embers **rise and disappear vertically from fixed stroke points**, with small lateral shimmer only.
+4. Wards ignite from one corner at their final scale. Thin flames, fine texture and embers **rise and disappear vertically from fixed stroke points** as the ignition reaches them.
 5. AOE: a distinct cast-location warning and/or field; only target-specific feedback where mechanics warrant it. Preserve per-recipient buffs and debuffs without duplicating the main rune.
 6. Melee: use actual weapon traces, direction and confirmed impact frames. Distinguish blade cuts, lightning and fire at contact.
 7. Avoid empty untextured orbs, large halos, over-bloomed billboards, identical temporal phases, and fixed single-colour sprites. Limit dynamic light and particle budgets for crowded scenes.

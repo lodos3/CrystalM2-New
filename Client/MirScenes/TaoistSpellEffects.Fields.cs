@@ -87,7 +87,6 @@ internal static partial class TaoistSpellEffects
         frame.Sprite(feet, 144 * open, 61 * open, Shape.Halo, Amber, .64f * fade,
             Layer.Ground, light: true);
         frame.Sprite(centre, 118, 92, Shape.Wisp, Ochre, .46f * fade, Layer.Glow, light: true);
-        frame.Sprite(centre, 106, 68, Shape.Orb, Ochre, .54f, light: true);
         for (int i = 0; i < 6; i++)
         {
             float turn = i * MathF.Tau / 6 + progress * 5;
@@ -97,6 +96,9 @@ internal static partial class TaoistSpellEffects
             frame.Clip(point - Vector2.UnitY * 8, 18, 26, Shape.FlameSequence, progress * 1.8f + i * .21f,
                 i % 2 == 0 ? 0xe84725 : Amber, .78f * fade, layer, turn * .19f);
             frame.Sprite(point, 31, 21, Shape.Wisp, Amber, .68f, layer);
+            float ignite = .58f + .42f * MathF.Pow(MathF.Sin(progress * MathF.Tau * 1.8f - i), 2);
+            frame.Sprite(point - Vector2.UnitY * 6, 26, 38, Shape.UserFlame,
+                i % 2 == 0 ? Amber : Gold, .63f * ignite * fade, layer, turn * .15f, light: i % 2 == 0);
             if (progress > .32f)
                 for (int j = 0; j < 3; j++)
                 {
@@ -159,33 +161,46 @@ internal static partial class TaoistSpellEffects
         frame.Sparks(centre, 27, 104 * open, 58, progress, Ice, 61);
     }
 
-    private static void Cloud(Frame frame, Vector2 feet, float time)
+    internal static void DrawPoisonField(CrystalM2.Rendering.Core.SpellParticlePool pool, Vector2 feet, long now, long start,
+        float size, uint seed, uint field, Vector2 inward, int neighbours)
     {
-        float bloom = .44f + .56f * Ease(time * 1.9f);
-        float pulse = .81f + .19f * MathF.Sin(time * 3.1f);
-        // Each spell object is one affected tile. These overlapping small puffs
-        // make one cloud bank when the server sends the whole area.
-        frame.Sprite(feet, 82 * bloom, 56 * bloom, Shape.Orb, 0x39741d, .49f, Layer.Floor, light: true);
-        for (int i = 0; i < 4; i++)
+        float time = (now - start) * .001f;
+        if (time < 0) return;
+        var frame = new Frame(pool, feet, now, 1, size, seed ^ (uint)Spell.PoisonCloud * 0x2d5bu, field);
+        Cloud(frame, feet, time, inward, neighbours);
+    }
+
+    private static void Cloud(Frame frame, Vector2 feet, float time, Vector2 inward = default, int neighbours = 2)
+    {
+        float bloom = .56f + .44f * Ease(time * 1.8f);
+        Vector2 drift = new(MathF.Sin(time * .63f + feet.Y * .024f) * 11,
+            MathF.Cos(time * .77f + feet.X * .019f) * 6);
+        Vector2 centre = feet + inward + drift;
+        float coverage = .71f + neighbours * .071f;
+        frame.Sprite(centre, 74 * bloom, 27 * bloom, Shape.MistFilament, 0x9bbf49, .76f * coverage,
+            Layer.Floor, rotation: MathF.Sin(time + feet.X * .024f) * .39f, light: true);
+        for (int i = 0; i < 5; i++)
         {
-            float turn = i * 2.399f + time * .32f;
-            Vector2 point = feet + Ellipse(turn, 30 * bloom, 17 * bloom) * (.28f + frame.Unit(i) * .62f) -
-                Vector2.UnitY * (8 + 15 * frame.Unit(i + 11));
-            frame.Clip(point, (54 + 18 * frame.Unit(i + 2)) * bloom, (37 + frame.Unit(i + 3) * 23) * bloom,
-                Shape.SmokeSequence, time * .31f + i * .19f, i % 3 == 0 ? 0xb0cf56 : 0x598739, .66f * pulse,
-                MathF.Sin(turn) < 0 ? Layer.Ground : Layer.Smoke, turn * .26f);
+            float age = Fract(time * (.24f + .13f * frame.Unit(i + 34)) + frame.Unit(i + 59));
+            float turn = i * 2.399f + time * .32f + frame.Unit(i + 11) * 1.24f;
+            Vector2 root = centre + ProjectGround(Ellipse(turn, 29, 31)) * (.46f + .54f * age);
+            Vector2 point = root - Vector2.UnitY * (5 + 15 * frame.Unit(i + 11) + age * 10);
+            float opacity = coverage * (.28f + .47f * MathF.Sin(age * MathF.PI));
+            frame.Clip(point, (72 + 36 * frame.Unit(i + 2)) * bloom, (26 + frame.Unit(i + 3) * 35) * bloom,
+                Shape.SmokeSequence, age + frame.Unit(i + 8), i % 3 == 0 ? 0xb1c95a : i % 3 == 1 ? 0x628c39 : 0x2d532e, opacity,
+                MathF.Sin(turn) < 0 ? Layer.Ground : Layer.Smoke, MathF.Sin(turn) * .27f, sortY: root.Y);
+            if (i % 2 == 0)
+                frame.Sprite(point, 54 + 26 * age, 21 + age * 14, Shape.MistFilament, 0xc9e26a, .82f * opacity,
+                    Layer.Glow, turn * .11f, light: i == 0, sortY: root.Y);
         }
-        frame.Sprite(feet - Vector2.UnitY * 19, 62 * bloom, 45 * bloom, Shape.Orb, 0xb3df59, .49f * pulse, light: true);
-        frame.Sparks(feet, 5, 33 * bloom, 19 * bloom, time * .37f, 0xcbe871, 26);
+        frame.Sparks(centre, 4, 39 * bloom, 19 * bloom, time * .37f, 0xcbe871, 26, sortY: centre.Y);
     }
 
     private static void Shield(Frame frame, Vector2 feet, float progress, bool aura)
     {
-        // Anchor the shield to the player's feet. In the maintained aura the
-        // geometry never bobs, sways, changes width or rotates as time advances.
+        // Anchor the shell to the actor and send pulses along each curved rim.
         Vector2 centre = feet - Vector2.UnitY * 35;
         float spread = aura ? 0 : 31 * (1 - Ease(progress * 2.6f));
-        frame.Sprite(centre, 96, 110, Shape.Wisp, 0x303d82, .18f, Layer.Glow);
 
         for (int side = -1; side <= 1; side += 2)
         {
@@ -215,20 +230,29 @@ internal static partial class TaoistSpellEffects
                 float taper = MathF.Sin(t1 * MathF.PI);
                 Vector2 from = ShellPoint(t0), to = ShellPoint(t1);
                 Vector2 arcFrom = ElectricPoint(t0), arcTo = ElectricPoint(t1);
+                float wave = .5f + .5f * MathF.Cos(MathF.Tau * (progress * 2 + side * .12f - t1));
+                float pulse = .62f + .38f * wave * wave;
 
                 // Unchanging outline, with a separate high-frequency noisy core.
                 frame.Thread(from, to, 1.7f + taper * 1.4f, 1.5f + taper * 1.4f,
-                    colour, .76f, Layer.Emissive);
+                    colour, .77f * pulse, Layer.Emissive);
                 frame.Thread(arcFrom, arcTo, 1.3f + taper * 1.4f, 1.0f + taper * 1.2f,
-                    rim, .91f, Layer.EmissiveCore, light: i % 6 == 1);
+                    rim, .94f * pulse, Layer.EmissiveCore, light: i % 6 == 1);
 
                 if (i % 4 == 1)
                 {
                     Vector2 midpoint = (arcFrom + arcTo) * .5f;
-                    frame.Sprite(midpoint, 11 + taper * 8, 7 + taper * 5,
-                        Shape.Wisp, colour, .38f, Layer.Glow,
+                    frame.Sprite(midpoint, 13 + taper * 10, 8 + taper * 6,
+                        Shape.Wisp, colour, .21f + .39f * wave * wave, Layer.Glow,
                         MathF.Atan2(arcTo.Y - arcFrom.Y, arcTo.X - arcFrom.X),
                         light: i % 8 == 1);
+                    float tangent = MathF.Atan2(to.Y - from.Y, to.X - from.X);
+                    frame.Sprite(midpoint + Vector2.UnitX * side * (4 + 4 * wave), 12 + taper * 9, 22 + taper * 16,
+                        Shape.UserLightning, colour, .59f * pulse * taper, Layer.Emissive,
+                        tangent - MathF.PI * .5f);
+                    frame.Sprite(midpoint + Vector2.UnitX * side * 6, 34 * taper + 10, 16 + taper * 10,
+                        Shape.MistFilament, side < 0 ? 0x3856cc : Amber, .51f * pulse * taper,
+                        Layer.Glow, tangent, light: i % 8 == 5);
                 }
             }
 
@@ -237,15 +261,19 @@ internal static partial class TaoistSpellEffects
             for (int i = 0; i < 12; i++)
             {
                 int seed = i + (side + 1) * 31;
-                float age = Fract(progress * 2.1f + frame.Unit(seed + 179));
+                float age = Fract(progress * 2 + frame.Unit(seed + 179));
                 float t = (.08f + frame.Unit(seed + 23) * .84f);
                 Vector2 anchor = ElectricPoint(t);
-                Vector2 point = anchor + new Vector2(side * (4 + age * 8), -age * (9 + 18 * frame.Unit(seed + 71)));
-                float alpha = .77f * (1 - age);
+                float drift = MathF.Sin(age * 5 + seed) * age * 7;
+                Vector2 point = anchor + new Vector2(side * (4 + age * 11) + drift, -age * (22 + 27 * frame.Unit(seed + 71)));
+                float alpha = .84f * MathF.Sin(age * MathF.PI);
                 frame.Sprite(point, 3 + frame.Unit(seed + 29) * 4,
                     7 + frame.Unit(seed + 33) * 8,
                     i % 4 == 0 ? Shape.Flash : Shape.Spark, i % 2 == 0 ? rim : colour,
                     alpha, Layer.EmissiveCore, side * .19f, light: i % 6 == 0);
+                if (i % 4 == 0)
+                    frame.Sprite(point, 16 + age * 7, 12 + age * 12, Shape.Wisp, colour,
+                        .36f * alpha, Layer.Glow, drift * .09f);
             }
         }
     }
@@ -274,7 +302,7 @@ internal static partial class TaoistSpellEffects
     private static void HealingCircle(Frame frame, Vector2 feet, float progress, float time, bool field, float fieldSize)
     {
         float opening = Ease((field ? time : progress) * 4);
-        float width = (field ? fieldSize : 396) * (.42f + opening * .58f);
+        float width = field ? fieldSize : 396 * (.42f + opening * .58f);
         float height = width * GroundAspect;
         float rotation = (field ? time : progress) * -.55f;
         Vector2 centre = feet - Vector2.UnitY * 1;

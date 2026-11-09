@@ -13,16 +13,38 @@ public enum SpellParticleShape
     FlameSequence, FireSequence, SmokeSequence, BladeRibbon,
     WarriorCrescent, WarriorTripleCut, WarriorSpark, WarriorDust, WarriorRing, WarriorImpact, MoonRibbon, WindRibbon,
     SoulGlyph, ArmourGlyph, CurseGlyph, Trigrams, YinYang, SpiritFigure,
-    UserFlame, UserLightning, UserEmber, UserSlash, UserRock
+    UserFlame, UserLightning, UserEmber, UserSlash, UserRock, MistFilament, IonCorona
 }
 
 public enum SpellParticleLayer : byte { Legacy, Ground, World, Emissive, EmissiveCore, Smoke, Glow, Floor }
+
+// X/Y are projected ground pixels. Height is a separate axis above that plane.
+public readonly record struct SpellParticleMotion(Vector2 Drift, Vector2 Wind, float Height,
+    float Lift, float Gravity, float Spin = 0)
+{
+    public Vector2 Travel(float seconds) => Drift * seconds + Wind * (.5f * seconds * seconds);
+    public float Elevation(float seconds) => Math.Max(0, Height + Lift * seconds - .5f * Gravity * seconds * seconds);
+
+    public int LandingMilliseconds
+    {
+        get
+        {
+            if (Gravity <= 0 || (Height <= 0 && Lift <= 0)) return 0;
+            float seconds = (Lift + MathF.Sqrt(Lift * Lift + 2 * Gravity * Math.Max(0, Height))) / Gravity;
+            return Math.Max(1, (int)MathF.Ceiling(seconds * 1000));
+        }
+    }
+}
+
+public readonly record struct SpellParticleImpact(SpellParticleShape Shape, int Count, int Size, int Duration,
+    float Scatter, bool Lights = false);
 
 public readonly record struct SpellParticle(Vector2 Origin, Vector2 Velocity, long Start, int Duration,
     int Size, Color Colour, SpellParticleShape Shape, byte Direction, float Aspect = 0, float Rotation = 0,
     float Growth = 0, SpellParticleLayer Layer = SpellParticleLayer.Legacy, bool Linear = false, bool CastsLight = true,
     bool FrameOnly = false, uint FieldObjectID = 0, byte Frame = 0, SpriteQuad? Ribbon = null, float? DepthY = null,
-    bool AlwaysOnTop = false)
+    bool AlwaysOnTop = false, SpellParticleMotion? Motion = null, SpellParticleImpact? Impact = null, float LightEnergy = 1,
+    SpellParticleColourCurve? ColourCurve = null, float ColourCurveFullSpeed = 0, ushort OpacityNoiseSeed = 0)
 {
     public bool Ground => Layer is SpellParticleLayer.Ground or SpellParticleLayer.Floor ||
         (Layer == SpellParticleLayer.Legacy && Shape == SpellParticleShape.Halo);
@@ -30,11 +52,40 @@ public readonly record struct SpellParticle(Vector2 Origin, Vector2 Velocity, lo
     public float GroundDepth => DepthY ?? Origin.Y;
 
     public float Age(long now) => Math.Clamp((now - Start) / (float)Duration, 0, 1);
+
+    // A positive full-speed value maps pixels per second to the last key. Otherwise the curve follows normalized age.
+    public Color ColourAt(float age)
+    {
+        if (ColourCurve is null) return Colour;
+        if (ColourCurveFullSpeed <= 0) return ColourCurve.Apply(Colour, age);
+
+        float speed;
+        if (Motion is { } motion)
+        {
+            float seconds = age * Duration * .001f;
+            Vector2 planar = motion.Drift + motion.Wind * seconds;
+            float vertical = motion.Elevation(seconds) > 0 ? motion.Lift - motion.Gravity * seconds : 0;
+            speed = MathF.Sqrt(planar.LengthSquared() + vertical * vertical);
+        }
+        else
+            speed = Velocity.Length() * (Linear ? 1 : 2 * (1 - age)) * 1000 / Duration;
+        return ColourCurve.Apply(Colour, speed / ColourCurveFullSpeed);
+    }
     public Vector2 Position(long now)
     {
+        if (Motion is { } motion)
+        {
+            float seconds = Age(now) * Duration * .001f;
+            return Origin + motion.Travel(seconds) - Vector2.UnitY * motion.Elevation(seconds);
+        }
         float age = Age(now);
         return Origin + Velocity * (Linear ? age : age * (2 - age));
     }
+
+    public float Angle(long now) => Rotation + (Motion?.Spin ?? 0) * Age(now) * Duration * .001f;
+    public float DepthAt(long now) => GroundDepth + (Motion?.Travel(Age(now) * Duration * .001f).Y ?? 0);
+    public float Fade(float age) => Layer == SpellParticleLayer.Legacy ? (1 - age) * (1 - age) :
+        Math.Clamp((1 - age) / .76f, 0, 1);
 
     public Vector2 Dimensions(float age, float scale)
     {
@@ -43,12 +94,13 @@ public readonly record struct SpellParticle(Vector2 Origin, Vector2 Velocity, lo
         return new Vector2(size, size * (Aspect > 0 ? Aspect : Ground ? .5f : 1));
     }
 
-    public Rectangle Bounds(Vector2 centre, Vector2 dimensions, float ribbonScale = 1f)
+    public Rectangle Bounds(Vector2 centre, Vector2 dimensions, float ribbonScale = 1f, float? angle = null)
     {
         if (Ribbon is { } ribbon) return ribbon.Scaled(ribbonScale).Bounds(centre);
-        if (Rotation != 0)
+        float rotation = angle ?? Rotation;
+        if (rotation != 0)
         {
-            float sin = MathF.Abs(MathF.Sin(Rotation)), cos = MathF.Abs(MathF.Cos(Rotation));
+            float sin = MathF.Abs(MathF.Sin(rotation)), cos = MathF.Abs(MathF.Cos(rotation));
             dimensions = new Vector2(cos * dimensions.X + sin * dimensions.Y, sin * dimensions.X + cos * dimensions.Y);
         }
         Vector2 half = dimensions * .5f;
@@ -122,8 +174,14 @@ public sealed class SpellParticlePool
         bool redraw = _count > 0;
         int alive = 0;
         for (int i = 0; i < _count; i++)
-            if (!_items[i].FrameOnly && now - _items[i].Start < _items[i].Duration)
-                _items[alive++] = _items[i];
+        {
+            SpellParticle particle = _items[i];
+            if (particle.FrameOnly) continue;
+            if (HasLanded(particle, now, out long landing))
+                EmitImpact(particle, landing, now, defer: true);
+            else if (now - particle.Start < particle.Duration)
+                _items[alive++] = particle;
+        }
         _count = alive;
         int pending = 0;
         for (int i = 0; i < _pendingCount; i++)
@@ -131,11 +189,43 @@ public sealed class SpellParticlePool
             SpellParticle particle = _pending[i];
             if (now < particle.Start)
                 _pending[pending++] = particle;
+            else if (HasLanded(particle, now, out long landing))
+                redraw |= EmitImpact(particle, landing, now, defer: false);
             else if (now - particle.Start < particle.Duration)
                 redraw |= TryAdd(particle);
         }
         _pendingCount = pending;
         return redraw;
+    }
+
+    private static bool HasLanded(SpellParticle particle, long now, out long contact)
+    {
+        int elapsed = particle.Impact.HasValue ? particle.Motion?.LandingMilliseconds ?? 0 : 0;
+        contact = particle.Start + elapsed;
+        return elapsed > 0 && elapsed <= particle.Duration && now >= contact;
+    }
+
+    private bool EmitImpact(SpellParticle parent, long landing, long now, bool defer)
+    {
+        if (parent.Impact is not { Count: > 0, Duration: > 0, Size: > 0 } burst ||
+            now - landing >= burst.Duration) return false;
+        Vector2 root = parent.Position(landing);
+        bool emitted = false;
+        for (int i = 0; i < Math.Min(8, burst.Count); i++)
+        {
+            float angle = NextUnit() * MathF.Tau;
+            float speed = burst.Scatter * (.4f + .6f * NextUnit());
+            Vector2 drift = new Vector2(MathF.Cos(angle), MathF.Sin(angle) * .66f) * speed;
+            int size = Math.Max(1, (int)(burst.Size * (.55f + .45f * NextUnit())));
+            var child = new SpellParticle(root, Vector2.Zero, landing, burst.Duration, size, parent.ColourAt(parent.Age(landing)), burst.Shape, 0,
+                Aspect: .76f, Rotation: angle, Growth: .37f, Layer: SpellParticleLayer.Emissive,
+                CastsLight: burst.Lights && i == 0, FieldObjectID: parent.FieldObjectID, DepthY: root.Y,
+                Motion: new SpellParticleMotion(drift, -drift, 0, 29 + 28 * NextUnit(), 140, angle - MathF.PI),
+                LightEnergy: parent.LightEnergy * .55f);
+            if (!(defer ? Schedule(child) : TryAdd(child))) break;
+            emitted = true;
+        }
+        return emitted;
     }
 
     public void Clear() => _count = _pendingCount = 0;
@@ -219,6 +309,7 @@ public static class SpellParticleAtlas
         foreach (SpellParticleShape shape in Enum.GetValues<SpellParticleShape>())
             if ((shape < SpellParticleShape.FlameSequence && shape != SpellParticleShape.Slash) ||
                 shape is SpellParticleShape.BladeRibbon or SpellParticleShape.MoonRibbon or SpellParticleShape.WindRibbon ||
+                shape is SpellParticleShape.MistFilament or SpellParticleShape.IonCorona ||
                 (shape >= SpellParticleShape.SoulGlyph && shape < SpellParticleShape.UserFlame)) Paint(shape);
         for (byte direction = 0; direction < 8; direction++) Paint(SpellParticleShape.Slash, direction);
         ReadClips(coverage);
@@ -275,6 +366,8 @@ public static class SpellParticleAtlas
                 {
                     SpellParticleShape.Spark => 1 - MathF.Pow(ax + ay * 1.3f, .65f),
                     SpellParticleShape.Wisp => (1 - radius) * (1 - radius) * (radius <= 1 ? .6f : 0),
+                    SpellParticleShape.MistFilament => Mist(dx, dy),
+                    SpellParticleShape.IonCorona => Corona(dx, dy),
                     SpellParticleShape.Halo => Stroke(radius - .75f, .095f),
                     SpellParticleShape.Slash => Stroke(radius - .74f, .145f) * Math.Clamp(front * 2, 0, 1),
                     SpellParticleShape.Shard => 1 - MathF.Abs(dx + dy * .45f) * 3.8f - MathF.Abs(dy),
@@ -310,7 +403,7 @@ public static class SpellParticleAtlas
                     SpellParticleShape.Filament => Math.Clamp((1 - ax) * 12, 0, 1) * MathF.Pow(1 - ay, 1.5f),
                     SpellParticleShape.SigilDisc => Sigil(dx, dy, radius),
                     SpellParticleShape.SoulGlyph or SpellParticleShape.ArmourGlyph or SpellParticleShape.CurseGlyph =>
-                        Ink(dx, dy, GlyphStrokes(shape)),
+                        TaoistRuneBrush.Coverage(shape, dx, dy),
                     SpellParticleShape.Trigrams => Trigrams(dx, dy),
                     SpellParticleShape.YinYang => YinYang(dx, dy, radius),
                     SpellParticleShape.SpiritFigure => SpiritFigure(dx, dy),
@@ -321,59 +414,23 @@ public static class SpellParticleAtlas
         }
     }
 
-    private static readonly Vector4[] SoulStrokes =
-    [
-        new(-.2f,-.86f,.14f,-.74f), new(-.68f,-.64f,.77f,-.67f), new(-.66f,-.61f,-.72f,.25f),
-        new(-.72f,.25f,-.89f,.68f), new(-.53f,-.41f,-.08f,-.43f), new(-.31f,-.60f,-.33f,-.15f),
-        new(-.32f,-.39f,-.54f,-.18f), new(-.30f,-.36f,-.09f,-.19f), new(.05f,-.42f,.59f,-.44f),
-        new(.31f,-.61f,.31f,-.14f), new(.29f,-.39f,.08f,-.17f), new(.31f,-.37f,.56f,-.19f),
-        new(-.07f,-.23f,-.22f,-.04f), new(-.37f,-.04f,.43f,-.07f), new(-.36f,-.02f,-.36f,.36f),
-        new(.42f,-.05f,.43f,.34f), new(-.34f,.15f,.42f,.14f), new(-.34f,.35f,.43f,.34f),
-        new(.01f,-.05f,.02f,.37f), new(-.14f,.34f,-.28f,.62f), new(-.28f,.62f,-.60f,.79f),
-        new(.13f,.35f,.18f,.70f), new(.18f,.70f,.56f,.76f), new(.56f,.76f,.78f,.62f),
-        new(.37f,.44f,.24f,.60f), new(.24f,.60f,.56f,.58f), new(.49f,.47f,.62f,.61f)
-    ];
-
-    private static readonly Vector4[] ArmourStrokes =
-    [
-        new(-.70f,-.74f,-.73f,.80f), new(-.69f,-.73f,-.27f,-.76f), new(-.27f,-.76f,-.46f,-.37f),
-        new(-.46f,-.37f,-.25f,-.12f), new(-.25f,-.12f,-.31f,.16f), new(-.31f,.16f,-.58f,.20f),
-        new(.14f,-.81f,.34f,-.62f), new(-.19f,-.49f,.82f,-.53f), new(.21f,-.45f,.10f,.25f),
-        new(.10f,.25f,-.23f,.67f), new(-.23f,.67f,-.48f,.81f), new(.15f,-.12f,.65f,-.18f),
-        new(.65f,-.18f,.54f,.58f), new(.54f,.58f,.36f,.77f), new(.36f,.77f,.11f,.64f)
-    ];
-
-    private static readonly Vector4[] CurseStrokes =
-    [
-        new(-.71f,-.70f,-.22f,-.72f), new(-.70f,-.70f,-.68f,-.26f), new(-.22f,-.71f,-.22f,-.29f),
-        new(-.69f,-.28f,-.23f,-.29f), new(.12f,-.73f,.65f,-.72f), new(.12f,-.73f,.13f,-.27f),
-        new(.65f,-.72f,.63f,-.28f), new(.13f,-.28f,.63f,-.29f), new(-.40f,-.06f,.45f,-.09f),
-        new(-.37f,-.06f,-.41f,.35f), new(-.41f,.35f,-.65f,.66f), new(-.65f,.66f,-.87f,.76f),
-        new(.41f,-.08f,.33f,.56f), new(.33f,.56f,.47f,.72f), new(.47f,.72f,.77f,.72f),
-        new(.77f,.72f,.86f,.47f)
-    ];
-
-    public static ReadOnlySpan<Vector4> GlyphStrokes(SpellParticleShape shape) => shape switch
+    private static float Mist(float x, float y)
     {
-        SpellParticleShape.SoulGlyph => SoulStrokes,
-        SpellParticleShape.ArmourGlyph => ArmourStrokes,
-        SpellParticleShape.CurseGlyph => CurseStrokes,
-        _ => []
-    };
+        float edge = Math.Clamp(1 - MathF.Abs(x), 0, 1);
+        float curl = .18f * MathF.Sin(x * 5) + .11f * MathF.Sin(x * 13 + y * 4);
+        float sheet = Math.Clamp(1 - MathF.Abs(y - curl) * (1.6f + x * x * 2.2f), 0, 1);
+        float fibres = .57f + .24f * MathF.Sin(x * 18 - y * 15) + .18f * MathF.Cos(x * 29 + y * 25);
+        return MathF.Sqrt(edge) * sheet * sheet * fibres;
+    }
 
-    private static float Ink(float x, float y, ReadOnlySpan<Vector4> strokes)
+    private static float Corona(float x, float y)
     {
-        var point = new Vector2(x + .012f * MathF.Sin(y * 37 + x * 23), y + .009f * MathF.Sin(x * 56 - y * 12));
-        float ink = 0;
-        foreach (var stroke in strokes)
-        {
-            Vector2 delta = new(stroke.Z - stroke.X, stroke.W - stroke.Y);
-            Vector2 local = point - new Vector2(stroke.X, stroke.Y);
-            float progress = Math.Clamp(Vector2.Dot(local, delta) / delta.LengthSquared(), 0, 1);
-            float width = .023f + .039f * MathF.Sin(progress * MathF.PI * .87f + .24f);
-            ink = MathF.Max(ink, Stroke((local - delta * progress).Length(), width));
-        }
-        return ink;
+        float end = Math.Clamp((1 - MathF.Abs(y)) * 2, 0, 1);
+        float bend = .19f * MathF.Sin(y * 6.2f) + .08f * MathF.Sin(y * 19);
+        float distance = MathF.Abs(x - bend);
+        float skirt = Math.Clamp(1 - distance * (1.7f + .31f * MathF.Sin(y * 13)), 0, 1);
+        float texture = .71f + .16f * MathF.Sin(y * 29 + x * 12) + .13f * MathF.Cos(y * 59 - x * 23);
+        return end * skirt * skirt * texture;
     }
 
     private static float Trigrams(float x, float y)

@@ -34,14 +34,16 @@ internal static partial class WarriorSpellEffects
         if (visual is { Spell: Spell.Thrusting, Phase: SpellVisualPhase.Swing })
         {
             // Keep the source and reach in world pixels as the artwork size is adjusted.
-            float strength = (.73f + .27f * Ease(progress * 4)) * (1 - Ease((progress - .84f) / .16f));
-            var wind = new Frame(pool, feet, now, strength, size, seed, scalePositions: false);
+            float windStrength = (.73f + .27f * Ease(progress * 4)) * (1 - .77f * Ease((progress - .82f) / .18f));
+            var wind = new Frame(pool, feet, now, windStrength, size, seed, scalePositions: false);
             ThrustWind(wind, feet, facing, progress, visual.ExtraReach);
             return;
         }
         bool aura = visual.Phase == SpellVisualPhase.Aura;
         float cycle = aura ? now % duration / (float)duration : progress;
-        var frame = new Frame(pool, feet, now, aura ? 1 : Envelope(progress), size, seed ^ (uint)visual.Spell * 34763);
+        float strength = aura ? 1 : visual.Spell is Spell.BladeAvalanche or Spell.Entrapment or Spell.TwinDrakeBlade
+            ? Envelope(progress, .79f, .10f) : Envelope(progress);
+        var frame = new Frame(pool, feet, now, strength, size, seed ^ (uint)visual.Spell * 34763);
 
         switch (visual.Phase)
         {
@@ -125,7 +127,11 @@ internal static partial class WarriorSpellEffects
         {
             int seed = 71 + i * 29;
             float x = (i - 3) * 13f + (frame.Unit(seed) - .5f) * 9f;
-            Vector2 root = feet + new Vector2(x, -2 - frame.Unit(seed + 3) * 12);
+            bool behind = i % 2 == 0;
+            float row = (4 + frame.Unit(seed + 3) * 9) * (behind ? -1 : 1);
+            Vector2 root = feet + new Vector2(x, row);
+            Layer flameLayer = behind ? Layer.Ground : Layer.Emissive;
+            Layer coreLayer = behind ? Layer.Ground : Layer.EmissiveCore;
             float height = (66 + frame.Unit(seed + 7) * 64) * ignition;
             float phase = time * (.80f + frame.Unit(seed + 17) * .29f) + frame.Unit(seed + 25);
             float lean = (frame.Unit(seed + 33) - .5f) * 13;
@@ -133,17 +139,17 @@ internal static partial class WarriorSpellEffects
 
             frame.Clip(flame, 21 + frame.Unit(seed + 35) * 15, height,
                 Shape.FlameSequence, phase, i % 3 == 0 ? Heat : i % 2 == 0 ? Flame : Ember,
-                .80f, i % 3 == 0 ? Layer.EmissiveCore : Layer.Emissive,
-                rotation: lean / MathF.Max(50, height), light: i % 3 == 0);
+                .80f, i % 3 == 0 ? coreLayer : flameLayer,
+                rotation: lean / MathF.Max(50, height), light: i % 3 == 0, sortY: root.Y);
             frame.Sprite(flame, 23 + frame.Unit(seed + 35) * 13, height * .87f,
                 Shape.UserFlame, i % 2 == 0 ? Flame : Heat, .71f,
-                Layer.Emissive, rotation: lean / MathF.Max(50, height));
+                flameLayer, rotation: lean / MathF.Max(50, height), sortY: root.Y);
             frame.Sprite(root + new Vector2(lean * .65f, -height * .48f), 10 + frame.Unit(seed + 42) * 9,
                 height * .75f, Shape.FlameTongue, i % 2 == 0 ? Heat : Flame,
-                .70f, Layer.EmissiveCore, lean / MathF.Max(50, height));
+                .70f, coreLayer, lean / MathF.Max(50, height), sortY: root.Y);
             frame.Thread(root - Vector2.UnitY * 9,
                 root + new Vector2(lean * .43f, -height * .74f),
-                2.2f, .6f, Heat, .56f, Layer.EmissiveCore);
+                2.2f, .6f, Heat, .56f, coreLayer, sortY: root.Y);
 
             // Dark smoke rises from the same burning line, not a circular ring.
             if (i % 2 == 0)
@@ -153,7 +159,7 @@ internal static partial class WarriorSpellEffects
                     -height * (.78f + .17f * age) - age * 34);
                 frame.Clip(plume, 33 + age * 24, 46 + age * 31,
                     Shape.SmokeSequence, age + i * .17f, Smoke,
-                    .46f * (1 - age * .75f), Layer.Smoke);
+                    .46f * (1 - age * .75f), behind ? Layer.Ground : Layer.Smoke, sortY: root.Y);
             }
 
             for (int j = 0; j < 2; j++)
@@ -166,7 +172,7 @@ internal static partial class WarriorSpellEffects
                     8 + frame.Unit(index + 132) * 8,
                     j % 2 == 0 ? Shape.UserEmber : Shape.WarriorSpark, Heat,
                     .90f * (1 - age * .65f),
-                    Layer.EmissiveCore, light: j == 0 && i % 3 == 0);
+                    coreLayer, light: j == 0 && i % 3 == 0, sortY: root.Y);
             }
         }
     }
@@ -419,13 +425,13 @@ internal static partial class WarriorSpellEffects
         for (int lane = -1; lane <= 1; lane++)
         for (int step = 0; step < 5; step++)
         {
-            float age = progress - (.37f + step * .066f + Math.Abs(lane) * .032f);
-            if (age < 0 || age >= .42f) continue;
+            float age = progress - (.34f + step * .073f + Math.Abs(lane) * .032f);
+            if (age < 0 || age >= .55f) continue;
             int index = step + (lane + 1) * 5;
             float rise = Ease(age * 14);
-            float fade = 1 - Ease((age - .15f) / .27f);
+            float fade = 1 - Ease((age - .17f) / .38f);
             float opacity = (.54f + .46f * rise) * fade;
-            float stride = 19 + step * 31 + 11 * Ease(age * 4.1f);
+            float stride = 21 + step * 37 + 18 * Ease(age * 4.1f);
             float breadth = lane * (6 + step * 11);
             Vector2 root = feet + ProjectGround(heading * stride + side * breadth);
             Vector2 next = root + ProjectGround(heading * 34 + side * (lane * 12));
@@ -433,7 +439,7 @@ internal static partial class WarriorSpellEffects
                 lane == 0 ? Ice : Steel, .83f * opacity, Layer.Ground, light: lane == 0, sortY: root.Y);
             frame.Sprite(root, 43 + step * 4, 24 + step * 3, Shape.WarriorDust, 0xaebfd1, .73f * opacity,
                 Layer.Ground, angle, sortY: root.Y);
-            frame.Sprite(root, 42 + step * 9, 25 + step * 4, Shape.Orb, 0x4359a0, .45f * opacity,
+            frame.Sprite(root, 42 + step * 9, 25 + step * 4, Shape.Wisp, 0x4359a0, .45f * opacity,
                 Layer.Ground, angle, sortY: root.Y);
 
             for (int blade = -1; blade <= 1; blade++)
