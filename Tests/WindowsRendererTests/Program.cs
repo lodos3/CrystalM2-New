@@ -566,6 +566,39 @@ internal static class Program
         Check(cross.Any(p => p.Ribbon.HasValue && p.Ground && p.Ribbon.Value.TopLeft.X < -62) &&
             cross.Any(p => p.Ribbon.HasValue && p.Emissive && p.Ribbon.Value.TopLeft.X > 62),
             "Cross Half Moon wraps behind and in front of the warrior.");
+        // The two moon techniques must occupy an angled 3D slice of the
+        // world. DepthY comes from each sample's ground-plane position, not
+        // the raised ribbon's screen-space Y or the player's static row.
+        foreach (var (name, particles) in new[] { ("Half Moon", moon), ("Cross Half Moon", cross) })
+        {
+            SpellParticle[] body = particles.Where(p =>
+                p.Shape == SpellParticleShape.MoonRibbon && p.Colour.A == 235).ToArray();
+            Check(body.Length >= 32 && body.All(p => p.DepthY.HasValue) &&
+                  body.Any(p => p.Ground) && body.Any(p => !p.Ground),
+                $"{name} must have both a rear arc behind the actor and a foreground arc.");
+            Check(body.Where(p => p.Ground).All(p => p.DepthY!.Value < feet.Y) &&
+                  body.Where(p => !p.Ground).All(p => p.DepthY!.Value >= feet.Y),
+                $"{name} must sort its ribbon by actual projected ground depth.");
+            float[] heights = body.Select(p =>
+            {
+                var ribbon = p.Ribbon!.Value;
+                float screenY = p.Origin.Y +
+                    (ribbon.TopLeft.Y + ribbon.TopRight.Y + ribbon.BottomLeft.Y + ribbon.BottomRight.Y) * .25f;
+                return p.DepthY!.Value - screenY;
+            }).ToArray();
+            Check(heights.Min() > 10 && heights.Max() < 95 &&
+                  heights.Max() - heights.Min() > 8,
+                $"{name} must arch through real height rather than drawing a flat ellipse.");
+            float rearBrightness = body.Where(p => p.Ground).Average(p => p.Colour.R + p.Colour.G + p.Colour.B);
+            float frontBrightness = body.Where(p => !p.Ground).Average(p => p.Colour.R + p.Colour.G + p.Colour.B);
+            Check(frontBrightness > rearBrightness + 45,
+                $"{name} front-facing blade must read brighter than its recessed rear.");
+            var motes = particles.Where(p => p.Shape == SpellParticleShape.WarriorSpark &&
+                p.Size <= 10 && p.DepthY.HasValue).ToArray();
+            Check(motes.Length >= (name == "Cross Half Moon" ? 18 : 9) &&
+                  motes.Any(p => p.Ground) && motes.Any(p => !p.Ground),
+                $"{name} needs small depth-sorted blade fragments, not oversized flat sparkle decals.");
+        }
         pool.Clear();
         var backswing = new WeaponMaskTrace(blade.Hilt, blade.Tip - new Vector2(4, 26));
         LegacySpellEffects.WeaponSweep(pool, Spell.Thrusting, blade, backswing, cast, 190, 100, Vector2.UnitX, feet: feet);
