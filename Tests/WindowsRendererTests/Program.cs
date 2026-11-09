@@ -583,6 +583,14 @@ internal static class Program
         SpellParticle[] cross = Sweep(Spell.CrossHalfMoon, Vector2.UnitX);
         Check(cross.Count(p => p.Shape == SpellParticleShape.MoonRibbon && p.Colour.A == 235) == 64,
             "Cross Half Moon needs two high-resolution curved ribbons with no faceted joins.");
+        var crossSlashPlanes = cross.Where(p => p.Shape == SpellParticleShape.UserSlash && p.DepthY.HasValue).ToArray();
+        Check(crossSlashPlanes.Length >= 50 &&
+              crossSlashPlanes.Count(p => p.Ground) >= 12 &&
+              crossSlashPlanes.Count(p => !p.Ground) >= 12 &&
+              crossSlashPlanes.Select(p => MathF.Round(p.DepthY!.Value - p.Origin.Y))
+                  .Distinct().Count() >= 18 &&
+              moon.Count(p => p.Shape == SpellParticleShape.UserSlash) < 20,
+            "Cross Half Moon must carry extra multi-height foreground/rear slash planes without duplicating Half Moon.");
         Check(cross.Any(p => p.Ribbon.HasValue && p.Ground && p.Ribbon.Value.TopLeft.X < -62) &&
             cross.Any(p => p.Ribbon.HasValue && p.Emissive && p.Ribbon.Value.TopLeft.X > 62),
             "Cross Half Moon wraps behind and in front of the warrior.");
