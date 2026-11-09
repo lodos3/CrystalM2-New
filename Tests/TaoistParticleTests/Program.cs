@@ -254,6 +254,56 @@ foreach (var phaseTest in new[]
         $"{phaseTest.Item1}/{phaseTest.Item2} should not use large round glow billboards.");
 }
 
+// Regression: the graphics-settings snapshot dropped the earlier Wizard fire
+// and frost remaster. Exercise the real emitters, without test doubles or a GPU.
+var frostPrepare = RenderWizard(Spell.FrostCrunch, SpellVisualPhase.Prepare, 280, 600);
+var frostImpact = RenderWizard(Spell.FrostCrunch, SpellVisualPhase.Impact, 280, 600);
+Check(frostPrepare.Count(p => p.Shape == SpellParticleShape.UserFlame) >= 20 &&
+      frostImpact.Count(p => p.Shape == SpellParticleShape.UserFlame) >= 25 &&
+      !frostPrepare.Any(p => p.Shape == SpellParticleShape.Orb) &&
+      !frostImpact.Any(p => p.Shape == SpellParticleShape.Orb) &&
+      frostImpact.Any(p => p.Shape == SpellParticleShape.SmokeSequence),
+    "Frost Crunch needs dense cold-blue flames, ice flecks and vapour in cast and impact, not round plates.");
+
+var wizardType = typeof(SpellVisual).Assembly.GetType("Client.MirScenes.WizardSpellEffects")
+    ?? throw new InvalidOperationException("Wizard effects type missing.");
+var projectileMethod = wizardType.GetMethod("DrawProjectile", BindingFlags.Static | BindingFlags.NonPublic)
+    ?? throw new InvalidOperationException("Wizard projectile renderer missing.");
+var projectilePool = new SpellParticlePool(2048);
+bool projectileDrawn = (bool)(projectileMethod.Invoke(null,
+    [projectilePool, Spell.FrostCrunch, new Vector2(400, 350), Vector2.UnitX,
+        1000L, 5, 250, true, 1.28f]) ?? false);
+var frostTravel = projectilePool.Active.ToArray();
+Check(projectileDrawn && frostTravel.Count(p => p.Shape == SpellParticleShape.UserFlame) >= 18 &&
+      !frostTravel.Any(p => p.Shape == SpellParticleShape.Orb) &&
+      frostTravel.Any(p => p.Shape == SpellParticleShape.SmokeSequence),
+    "Frost Crunch must remain textured blue frostfire in flight rather than a giant glowing orb.");
+
+var wallMid = RenderWizard(Spell.FireWall, SpellVisualPhase.Prepare, 600, 1000);
+var wallRelease = RenderWizard(Spell.FireWall, SpellVisualPhase.Prepare, 950, 1000);
+Check(wallMid.Count(p => p.Shape == SpellParticleShape.UserFlame) >= 35 &&
+      wallMid.Any(p => p.Shape == SpellParticleShape.UserFlame && p.Origin.Y < 315) &&
+      wallRelease.Count(p => p.Shape == SpellParticleShape.UserEmber) >= 20 &&
+      wallRelease.Any(p => p.Shape == SpellParticleShape.SmokeSequence) &&
+      !wallMid.Any(p => p.Shape == SpellParticleShape.Orb),
+    "Fire Wall casting must climb from the feet, condense overhead and eject many embers on release.");
+Check(RenderWizard(Spell.FireWall, SpellVisualPhase.Field, 400)
+    .Any(p => p.Shape == SpellParticleShape.FlameSequence && p.Ground),
+    "Fire Wall field must still be rooted in its map tile.");
+
+var smallFireball = RenderWizard(Spell.FireBall, SpellVisualPhase.Impact, 260, 600);
+Check(smallFireball.Count(p => p.Shape == SpellParticleShape.UserFlame) >= 40 &&
+      smallFireball.Count(p => p.Shape == SpellParticleShape.UserEmber) >= 9 &&
+      smallFireball.Count(p => p.Shape == SpellParticleShape.SmokeSequence) >= 8 &&
+      !smallFireball.Any(p => p.Shape == SpellParticleShape.Orb),
+    "Fire Ball impact should be a dense spray of small flames, smoke and embers, never a few giant cards.");
+var greatFireball = RenderWizard(Spell.GreatFireBall, SpellVisualPhase.Prepare, 300, 600);
+var greatImpact = RenderWizard(Spell.GreatFireBall, SpellVisualPhase.Impact, 260, 600);
+Check(greatFireball.Count(p => p.Shape == SpellParticleShape.UserFlame) >= 35 &&
+      greatImpact.Count(p => p.Shape == SpellParticleShape.UserFlame) >= 40 &&
+      greatImpact.Count(p => p.Shape == SpellParticleShape.UserEmber) >= 10,
+    "Great Fire Ball should use layered tiny combustion sprites in casting and detonation.");
+
 var curseAtAim = Render(Spell.Curse, SpellVisualPhase.Impact, 850, 2000);
 Check(curseAtAim.Any(p => p.Shape == SpellParticleShape.CurseGlyph),
     "Curse must render a complete rune on the aimed map cell.");
