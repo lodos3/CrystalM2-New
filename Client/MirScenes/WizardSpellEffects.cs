@@ -108,7 +108,7 @@ internal static partial class WizardSpellEffects
                 FireBang(frame, feet, progress, time, prepare);
                 break;
             case Spell.FireWall:
-                if (prepare) FireBurst(frame, feet - Vector2.UnitY * (49 + progress * 38), progress, 59);
+                if (prepare) FireWallCharge(frame, feet, progress);
                 else FireWall(frame, feet, time);
                 break;
             case Spell.Lightning:
@@ -117,7 +117,7 @@ internal static partial class WizardSpellEffects
                 break;
             case Spell.FrostCrunch:
                 if (prepare) FrostCharge(frame, feet, progress);
-                else IceBreak(frame, feet - Vector2.UnitY * 43, progress, 42, 9);
+                else FrostFireImpact(frame, feet - Vector2.UnitY * 43, progress);
                 break;
             case Spell.ThunderStorm:
                 ThunderStorm(frame, feet, progress, time);
@@ -176,44 +176,57 @@ internal static partial class WizardSpellEffects
 
         var frame = new Frame(pool, head, now, 1, size, (uint)spell, depthY: head.Y + 47);
         float angle = MathF.Atan2(heading.Y, heading.X);
-        float spin = frameIndex * .37f;
         Vector2 side = new(-heading.Y, heading.X);
         bool frost = spell == Spell.FrostCrunch;
-        bool curled = spell is not (Spell.FireBall or Spell.FrostCrunch);
         int rim = frost ? 0x4674d5 : spell == Spell.FireBounce ? 0xec421f : Fire;
         int mantle = frost ? 0x8cdaff : spell == Spell.MeteorShower ? 0xffdb77 : Gold;
         int core = frost ? IceWhite : Hot;
-        frame.Sprite(head - heading * 12, 101, curled ? 58 : 72, Shape.Orb, rim, .64f, rotation: angle, light: true);
-        float phase = frameIndex * .078f;
-        frame.Clip(head - heading * 26, 97, curled ? 41 : 57, Shape.SmokeSequence, phase + .31f,
-            frost ? 0x4c679c : 0x75331d, .54f, Layer.Smoke, angle);
-        frame.Clip(head, curled ? 78 : 79, curled ? 58 : 73, Shape.FireSequence, phase,
-            rim, .96f, rotation: angle + spin);
-        if (curled)
-            frame.Sprite(head + heading * 2, 70, 53, Shape.FireCurl, mantle, .90f, Layer.EmissiveCore, angle - spin);
-        else
-            frame.Clip(head + heading * 2, 64, 62, Shape.FireSequence, phase, mantle, .90f, Layer.EmissiveCore, angle + spin);
-        frame.Sprite(head + heading * 4, curled ? 36 : 40, curled ? 31 : 38, Shape.Orb, core, 1, Layer.EmissiveCore, light: true);
+        float phase = frameIndex * .091f;
 
+        // The projectile core is made of individual directional flame tongues,
+        // never a single 100px orb. Frost Crunch uses the same cold-fire flow.
+        for (int i = 0; i < 22; i++)
+        {
+            int seed = i * 37 + 67;
+            float age = Fract(frameIndex * (.11f + frame.Unit(seed + 7) * .08f) +
+                frame.Unit(seed + 13));
+            float along = 5 + age * (27 + frame.Unit(seed + 19) * 29);
+            Vector2 point = head - heading * along +
+                side * ((frame.Unit(seed + 23) - .5f) * (12 + age * 19));
+            float alive = MathF.Sin(age * MathF.PI);
+            frame.Sprite(point, 5 + frame.Unit(seed + 29) * 11,
+                9 + frame.Unit(seed + 31) * 16,
+                Shape.UserFlame, i % 5 == 0 ? core : i % 3 == 0 ? mantle : rim,
+                .77f * alive, i % 6 == 0 ? Layer.EmissiveCore : Layer.Emissive,
+                angle - MathF.PI / 2 + (frame.Unit(seed + 37) - .5f) * .4f,
+                light: i % 17 == 0);
+            if (i % 4 == 0)
+                frame.Sprite(point - heading * 8, 3 + frame.Unit(seed + 41) * 5,
+                    5 + frame.Unit(seed + 43) * 8,
+                    frost ? Shape.Spark : Shape.UserEmber,
+                    i % 2 == 0 ? core : mantle, .75f * alive, Layer.EmissiveCore);
+            if (i % 7 == 0)
+                frame.Clip(point - heading * 13, 12 + frame.Unit(seed + 47) * 9,
+                    15 + frame.Unit(seed + 49) * 12,
+                    Shape.SmokeSequence, phase + frame.Unit(seed + 51),
+                    frost ? 0x516d91 : 0x65402b,
+                    .29f * alive, Layer.Smoke);
+        }
+        frame.Sprite(head, 19, 29, Shape.UserFlame, core, .92f,
+            Layer.EmissiveCore, angle - MathF.PI / 2, light: true);
         if (frost)
         {
             SnowballWake(frame, pool, head, heading, now, frameIndex, remaining, wake);
             return true;
         }
-
-        for (int i = 0; i < 7; i++)
-        {
-            float age = Fract(frameIndex * .17f + frame.Unit(i + 51));
-            Vector2 point = head - heading * (14 + age * (curled ? 53 : 43)) + side * ((frame.Unit(i + 83) - .5f) * (18 + age * 26));
-            frame.Sprite(point, 5 + frame.Unit(i) * 7, 4 + age * 6, Shape.Spark,
-                i % 3 == 0 ? core : i % 2 == 0 ? mantle : rim, .91f - age * .65f, i % 3 == 0 ? Layer.EmissiveCore : Layer.Emissive, angle);
-        }
         if (wake)
         {
-            Vector2 drift = side * (frameIndex % 5 - 2) * 5;
-            pool.TryAdd(new SpellParticle(head - heading * 21 + drift, -heading * 15 + drift, now,
-                Math.Min(remaining, 102), 12, Tint(Gold, .66f), Shape.Spark, 0,
-                Rotation: angle + spin, Growth: -.2f, Layer: Layer.EmissiveCore, CastsLight: false, DepthY: head.Y + 47));
+            Vector2 drift = side * (frameIndex % 5 - 2) * 3;
+            pool.TryAdd(new SpellParticle(head - heading * 17 + drift,
+                -heading * 13 + drift, now, Math.Min(remaining, 102), 6,
+                Tint(Gold, .66f), Shape.UserEmber, 0,
+                Rotation: angle, Growth: -.22f, Layer: Layer.EmissiveCore,
+                CastsLight: false, DepthY: head.Y + 47));
         }
         return true;
     }
