@@ -254,6 +254,57 @@ foreach (var phaseTest in new[]
         $"{phaseTest.Item1}/{phaseTest.Item2} should not use large round glow billboards.");
 }
 
+// Preserve Ice Storm's runic disc as a rigid, orthographically projected
+// seal across preparation/impact. Only opacity is allowed to breathe.
+var stormPrepareA = RenderWizard(Spell.IceStorm, SpellVisualPhase.Prepare, 230, 600);
+var stormPrepareB = RenderWizard(Spell.IceStorm, SpellVisualPhase.Prepare, 430, 600);
+var stormImpact = RenderWizard(Spell.IceStorm, SpellVisualPhase.Impact, 430, 600);
+var sealA = stormPrepareA.Single(p => p.Shape == SpellParticleShape.SigilDisc);
+var sealB = stormPrepareB.Single(p => p.Shape == SpellParticleShape.SigilDisc);
+var sealImpact = stormImpact.Single(p => p.Shape == SpellParticleShape.SigilDisc);
+Check(sealA.Origin == sealB.Origin && sealA.Origin == sealImpact.Origin &&
+      sealA.Rotation == 0 && sealB.Rotation == 0 && sealImpact.Rotation == 0 &&
+      sealA.Dimensions(0, 1.28f) == sealB.Dimensions(0, 1.28f) &&
+      sealA.Dimensions(0, 1.28f) == sealImpact.Dimensions(0, 1.28f),
+    "Ice Storm rune must stay geometrically fixed rather than rotating or skewing its elliptical footprint.");
+foreach (var storm in new[] { stormPrepareB, stormImpact })
+{
+    var heads = storm.Where(p => p.Shape == SpellParticleShape.UserSlash && p.DepthY.HasValue).ToArray();
+    var tails = storm.Where(p => p.Shape == SpellParticleShape.Filament).ToArray();
+    Check(heads.Length >= 10 && tails.Length >= 10,
+        "Ice Storm gusts need continuous curved trailing filaments, not detached radial spokes.");
+    Check(heads.Count(p =>
+    {
+        Vector2 groundRadial = new(p.Origin.X - 400,
+            (p.DepthY!.Value - 400) / (2f / 3f));
+        Vector2 tangent = new(-groundRadial.Y, groundRadial.X * (2f / 3f));
+        return tangent.LengthSquared() > 10 &&
+            Vector2.Dot(Vector2.Normalize(tangent),
+                new Vector2(MathF.Cos(p.Rotation), MathF.Sin(p.Rotation))) > .97f;
+    }) >= heads.Length * .85f,
+        "Ice Storm slash heads must face the orbital tangent, not away from the storm.");
+}
+var stormEarlyHead = stormPrepareA.Where(p => p.Shape == SpellParticleShape.UserSlash).ToArray();
+var stormLateHead = stormPrepareB.Where(p => p.Shape == SpellParticleShape.UserSlash).ToArray();
+Check(stormEarlyHead.Select(p => p.Size).Distinct().Count() >= 6 &&
+      stormLateHead.Select(p => p.Size).Distinct().Count() >= 6 &&
+      !stormEarlyHead.Select(p => p.Size).SequenceEqual(stormLateHead.Select(p => p.Size)),
+    "Ice Storm gust sizes must breathe independently as they orbit.");
+
+// Frost Crunch retains the existing textured frostfire emission but needs an
+// unmistakable near-white centre inside multiple cool-blue shell layers.
+foreach (var phase in new[] { SpellVisualPhase.Prepare, SpellVisualPhase.Impact })
+{
+    var frost = RenderWizard(Spell.FrostCrunch, phase, 280, 600);
+    var bright = frost.Where(p => p.Layer == SpellParticleLayer.EmissiveCore &&
+        p.Colour.R >= 175 && p.Colour.B >= 220 && p.Colour.A >= 170).ToArray();
+    Check(bright.Length >= 8 &&
+          frost.Count(p => p.Shape == SpellParticleShape.FrostCore) >= 4 &&
+          frost.Any(p => p.Shape == SpellParticleShape.Flash && p.Layer == SpellParticleLayer.EmissiveCore) &&
+          !frost.Any(p => p.Shape == SpellParticleShape.Orb),
+        $"Frost Crunch {phase} needs multiple luminous white-blue core and icy shell layers without a flat orb.");
+}
+
 // Regression: the graphics-settings snapshot dropped the earlier Wizard fire
 // and frost remaster. Exercise the real emitters, without test doubles or a GPU.
 var frostPrepare = RenderWizard(Spell.FrostCrunch, SpellVisualPhase.Prepare, 280, 600);
