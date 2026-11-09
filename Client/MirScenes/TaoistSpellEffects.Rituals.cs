@@ -189,7 +189,7 @@ internal static partial class TaoistSpellEffects
         float settling = Ease((progress - .59f) / .40f);
         // The rune forms behind its fire, then burns away while the remaining
         // smoke continues rising off the same fixed brush-stroke positions.
-        float dissipation = 1 - Ease((progress - .71f) / .28f);
+        float dissipation = 1 - Ease((progress - .66f) / .29f);
         frame.Sprite(centre, width * 1.025f, height * 1.03f, glyph, armour ? 0xdd591f : 0x4c89ef,
             formed * dissipation * .65f, Layer.Glow);
         frame.Sprite(centre, width, height, glyph, armour ? 0xf97026 : 0x4ea9ff,
