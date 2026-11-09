@@ -166,9 +166,15 @@ foreach (Spell spell in new[] { Spell.FlamingSword, Spell.TwinDrakeBlade })
               p.Layer == SpellParticleLayer.EmissiveCore) &&
               contact.Any(p => p.Shape == SpellParticleShape.Spark ||
                   p.Shape == SpellParticleShape.WarriorSpark) &&
+              contact.Count(p => p.Shape == SpellParticleShape.SmokeSequence &&
+                  p.Layer == SpellParticleLayer.Smoke && p.Colour.A < 125) >= 8 &&
+              contact.Count(p => p.Shape == SpellParticleShape.Filament &&
+                  p.Ground && p.DepthY.HasValue) >= 8 &&
+              contact.Count(p => p.Shape is SpellParticleShape.Spark or SpellParticleShape.WarriorSpark &&
+                  p.Size <= 9) >= 18 &&
               !contact.Any(p => p.Shape is SpellParticleShape.FlameSequence or
-                  SpellParticleShape.FlameTongue or SpellParticleShape.SmokeSequence),
-            "Twin Drake Blade impact must be electric arcs and sparks without flames.");
+                  SpellParticleShape.FlameTongue),
+            "Twin Drake Blade contact needs fine ground-rooted lightning spikes, small sharp embers and a low-alpha smoke burst without fire.");
 }
 Check(!RenderWarrior(Spell.TwinDrakeBlade, SpellVisualPhase.Prepare, 270, 500)
     .Any(p => p.Shape is SpellParticleShape.Orb or SpellParticleShape.Halo),
@@ -188,6 +194,16 @@ Check(drakeCharge.Count(p => p.Shape == SpellParticleShape.Filament) >= 28 &&
       drakeCharge.Count(p => p.Shape == SpellParticleShape.UserLightning) >= 8 &&
       drakeCharge.Count(p => p.Shape == SpellParticleShape.Spark) >= 14,
     "Twin Drake charge must contain multiple fine coiling filaments and small electrical sparks.");
+Check(drakeCharge.Count(p => p.Shape == SpellParticleShape.Filament &&
+          p.Ground && p.DepthY.HasValue && p.DepthY.Value < 400) >= 10 &&
+      drakeCharge.Count(p => p.Shape == SpellParticleShape.Filament &&
+          !p.Ground && p.DepthY.HasValue && p.DepthY.Value >= 400) >= 10 &&
+      drakeCharge.Any(p => p.Shape == SpellParticleShape.Wisp && p.Layer == SpellParticleLayer.Glow &&
+          p.Size <= 22) &&
+      drakeCharge.Where(p => p.Shape == SpellParticleShape.Filament &&
+          p.Ribbon.HasValue).All(p =>
+          Vector2.Distance(p.Ribbon.Value.TopLeft, p.Ribbon.Value.BottomLeft) < 12),
+    "Twin Drake charge must wrap behind and in front of the actor with hairline electrical branches and restrained blue glow.");
 var movedDrake = RenderWarrior(Spell.TwinDrakeBlade, SpellVisualPhase.Prepare, 260, 500,
     new Vector2(443, 427));
 Check(drakeCharge.Length == movedDrake.Length &&
@@ -199,6 +215,15 @@ Check(remasteredDrakeHit.Count(p => p.Shape == SpellParticleShape.UserLightning)
       remasteredDrakeHit.Count(p => p.Shape == SpellParticleShape.Filament) >= 8 &&
       !remasteredDrakeHit.Any(p => p.Shape is SpellParticleShape.Orb or SpellParticleShape.Halo),
     "Twin Drake impact needs target-wrapping discharge, not a mirrored X or circular plate.");
+Check(remasteredDrakeHit.Any(p => p.Shape == SpellParticleShape.Filament &&
+          p.Ground && p.DepthY.HasValue && p.DepthY.Value < 400) &&
+      remasteredDrakeHit.Any(p => p.Shape == SpellParticleShape.Filament &&
+          !p.Ground && p.DepthY.HasValue && p.DepthY.Value >= 400) &&
+      remasteredDrakeHit.Count(p => p.Shape == SpellParticleShape.SmokeSequence &&
+          p.Layer == SpellParticleLayer.Smoke && p.Colour.A < 125) >= 8 &&
+      remasteredDrakeHit.All(p => p.Shape is not (SpellParticleShape.Orb or SpellParticleShape.Halo or
+          SpellParticleShape.WarriorRing or SpellParticleShape.WarriorImpact)),
+    "Twin Drake contact must surround the struck actor, burst on the ground and fade as soft smoke without solid circular backgrounds.");
 
 foreach (Spell summon in new[] { Spell.SummonSkeleton, Spell.SummonHolyDeva, Spell.SummonShinsu })
     Check(Render(summon, SpellVisualPhase.Impact, 480).Any(p => p.Shape == SpellParticleShape.Spark),
