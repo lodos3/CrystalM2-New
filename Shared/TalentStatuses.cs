@@ -1,0 +1,117 @@
+public sealed record TalentStatusInfo(BuffType Type, string Name, string Description, bool Debuff, byte Icon);
+
+public static class TalentStatuses
+{
+    private static readonly TalentStatusInfo[] Definitions =
+    [
+        new(BuffType.TalentOathguard, "Oathguard", "absorbs part of the next hit for four seconds.", false, 11),
+        new(BuffType.TalentFarFocus, "Far Focus", "gives the next two-tile Thrusting an accuracy bonus within four seconds.", false, 11),
+        new(BuffType.TalentHammerPoise, "Hammer Poise", "reduces recovery for the next Steel Cut family use within four seconds.", false, 11),
+        new(BuffType.TalentCrackedPlate, "Cracked Plate", "reduces physical armour briefly after a marked Hammer.", true, 11),
+        new(BuffType.TalentForgedWound, "Forged Wound", "bleeds for three seconds after White Heat's payoff.", true, 11),
+        new(BuffType.TalentOffBalance, "Off Balance", "reduces the power of the victim's next physical hit against the Iron Vow within three seconds.", true, 11),
+        new(BuffType.TalentRedRhythm, "Red Rhythm", "discounts the next Half Moon family hit within four seconds.", false, 18),
+        new(BuffType.TalentDrakeHaste, "Drake Haste", "shortens recovery on the next ordinary melee swing within three seconds.", false, 18),
+        new(BuffType.TalentRushingBlood, "Rushing Blood", "briefly improves movement after the initial cut of Blood Trail's Drakefall.", false, 18),
+        new(BuffType.TalentRiven, "Riven", "is Bloodrush's short bleed.", true, 18),
+        new(BuffType.TalentExposedFlank, "Exposed Flank", "amplifies your next Gale Cleaver against that target once.", true, 18),
+        new(BuffType.TalentWinded, "Winded", "softens the victim's next physical hit against you.", true, 18),
+        new(BuffType.TalentBastionPlate, "Bastion Plate", "grants capped frontal physical mitigation for three seconds.", false, 2),
+        new(BuffType.TalentRescueCover, "Rescue Cover", "is a small four-second ally ward.", false, 2),
+        new(BuffType.TalentAnchorPoise, "Anchor Poise", "protects the next Protection Field family cast from ordinary hit recovery.", false, 2),
+        new(BuffType.TalentShaken, "Shaken", "briefly reduces normal monsters' physical power after Bulwark Slam.", true, 2),
+        new(BuffType.TalentDented, "Dented", "lowers the primary's armour against your next weapon strike.", true, 2),
+        new(BuffType.TalentRattledAim, "Rattled Aim", "reduces the victim's next eligible ranged accuracy roll.", true, 2),
+        new(BuffType.TalentFlashpoint, "Flashpoint", "shortens the next Primary Bolt's recovery within four seconds.", false, 4),
+        new(BuffType.TalentKilnFavour, "Kiln Favour", "discounts the next Fire Wall within four seconds.", false, 4),
+        new(BuffType.TalentFurnaceSkin, "Furnace Skin", "briefly softens the next hostile physical hit.", false, 4),
+        new(BuffType.TalentSinge, "Singe", "is Cinder Lance's timed burn.", true, 4),
+        new(BuffType.TalentCinderScar, "Cinder Scar", "applies a separate brief burn within the caster's total burn cap.", true, 4),
+        new(BuffType.TalentHeatFracture, "Heat Fracture", "empowers your next confirmed fire hit against that primary once.", true, 4),
+        new(BuffType.TalentClearCrystal, "Clear Crystal", "shortens the next Frost Crunch recovery within four seconds.", false, 3),
+        new(BuffType.TalentRimeguard, "Rimeguard", "provides a short one-hit ward.", false, 3),
+        new(BuffType.TalentStillMind, "Still Mind", "discounts the next Ice Storm.", false, 3),
+        new(BuffType.TalentBrittle, "Brittle", "is Sharp Rime's brief vulnerability to your next frost hit after a single-target spend.", true, 3),
+        new(BuffType.TalentIceFracture, "Ice Fracture", "is one delayed shard tick from Volley.", true, 3),
+        new(BuffType.TalentSnowblind, "Snowblind", "reduces the target's next ranged accuracy roll.", true, 3),
+        new(BuffType.TalentChargedHands, "Charged Hands", "discounts the next Primary Bolt.", false, 8),
+        new(BuffType.TalentStormstride, "Stormstride", "gives a short movement bonus after Surge Return's payoff.", false, 8),
+        new(BuffType.TalentWireGuard, "Wire Guard", "softens the next ordinary ranged spell hit.", false, 8),
+        new(BuffType.TalentFusedArmour, "Fused Armour", "increases the next spell hit from this Stormwright once.", true, 8),
+        new(BuffType.TalentStaticScorch, "Static Scorch", "deals a brief residual tick.", true, 8),
+        new(BuffType.TalentScrambledAim, "Scrambled Aim", "reduces the victim's next ranged accuracy roll.", true, 8),
+        new(BuffType.TalentAfterglow, "Afterglow", "heals a small additional amount over three seconds.", false, 2),
+        new(BuffType.TalentClearBreath, "Clear Breath", "discounts the next Healing within four seconds.", false, 2),
+        new(BuffType.TalentQuietLantern, "Quiet Lantern", "absorbs part of a new hit for up to four seconds.", false, 2),
+        new(BuffType.TalentLanternsRebuke, "Lantern's Rebuke", "weakens the enemy's next ordinary weapon hit after Edict ends.", true, 2),
+        new(BuffType.TalentLightbrand, "Lightbrand", "briefly reduces the control source's accuracy against the cleansed ally.", true, 2),
+        new(BuffType.TalentDulledFervour, "Dulled Fervour", "softens the attacker's next spell hit against the original ward recipient.", true, 2),
+        new(BuffType.TalentSteadyHand, "Steady Hand", "discounts the next Serpent Needle.", false, 7),
+        new(BuffType.TalentVenomWard, "Venom Ward", "is a small self absorption shield after the red recipe.", false, 7),
+        new(BuffType.TalentInkskin, "Inkskin", "briefly shortens Poisoning's recovery.", false, 7),
+        new(BuffType.TalentSealed, "Sealed", "is the shorter armour penalty left by a red Distil, weaker than the live red dose.", true, 7),
+        new(BuffType.TalentCrucibleBurn, "Crucible Burn", "adds a short owner-attributed burn from the green recipe.", true, 7),
+        new(BuffType.TalentScoredMeridian, "Scored Meridian", "softens the victim's next damaging spell against the caster.", true, 7),
+        new(BuffType.TalentRendWard, "Rend Ward", "absorbs part of one hit on the protected ally.", false, 4),
+        new(BuffType.TalentPackFocus, "Pack Focus", "increases the spirit's accuracy for its next ordinary attack.", false, 4),
+        new(BuffType.TalentSpiritTempo, "Spirit Tempo", "reduces recovery on the next successful Pounce.", false, 4),
+        new(BuffType.TalentSpiritScar, "Spirit Scar", "deals a short spirit damage tick from Rend.", true, 4),
+        new(BuffType.TalentHounded, "Hounded", "softens the target's next hit against the companion.", true, 4),
+        new(BuffType.TalentThreadbreak, "Threadbreak", "from Sunder Thread increases the owner's next spell hit once.", true, 4),
+        new(BuffType.TalentBrand, "Brand", "Brand marks the target for the next Arcane Hammer.", true, 11),
+        new(BuffType.TalentPhoenixShroud, "Phoenix Shroud", "A hostile hit triggers one pulse.", false, 4),
+        new(BuffType.TalentStaticMantle, "Static Mantle", "A hostile hit triggers a counter-spark.", false, 8),
+        new(BuffType.TalentConductor, "Conductor", "Storm Relay can discharge on this isolated target.", true, 8),
+        new(BuffType.TalentWick, "Wick", "The next effective direct heal can reach this ally.", false, 2),
+        new(BuffType.TalentEchoFang, "Echo Fang", "The next confirmed attack calls one companion follow-up.", false, 4),
+        new(BuffType.TalentGuardianTether, "Guardian Tether", "Redirect part of one eligible hit.", false, 2),
+        new(BuffType.TalentStandard, "Standard", "Short resistance to movement impairment.", false, 2),
+        new(BuffType.TalentIceglass, "Iceglass", "Absorbs a hit while you hold your ground.", false, 3),
+        new(BuffType.TalentDrakeMark, "Drake Mark", "Strike a different enemy to release the drake echo.", true, 18),
+        new(BuffType.TalentCausticScript, "Caustic Script", "Moving triggers the caustic rune.", true, 7),
+        new(BuffType.TalentRimeWard, "Rime Ward", "Reduce an ordinary hostile hit.", false, 3),
+        new(BuffType.TalentHeatVeil, "Heat Veil", "Brief physical protection.", false, 4),
+        new(BuffType.TalentPermafrost, "Permafrost", "Frost hampers movement while you stand in the area.", true, 3),
+        new(BuffType.TalentSanctuary, "Sanctuary Lantern", "Eligible damage draws from a shared ward pool.", false, 2),
+        new(BuffType.TalentHeatSink, "Heat Sink", "Discounts the next Magic Shield.", false, 4),
+        new(BuffType.TalentSmoulder, "Dry Timber", "Burns once after leaving the caster's Fire Wall.", true, 4),
+        new(BuffType.TalentEmberSeal, "Ember Seal", "Discounts the next Cinder Lance.", false, 4),
+        new(BuffType.TalentDrakeBreath, "Breath of the Drake", "Discounts the next Twin Drake activation.", false, 18),
+        new(BuffType.TalentDuelCircle, "Duel Circle", "Allies in the circle take less damage from the marked enemy.", false, 11),
+        new(BuffType.TalentHoldLine, "Hold Line", "Weakens each normal monster's first hit on a protected ally.", false, 11),
+        new(BuffType.TalentGroundedCircuit, "Grounded Circuit", "Reduces spell damage while inside the grounding field.", false, 8),
+        new(BuffType.TalentAncestralForm, "Ancestral Form", "Nearby allies gain protection based on the active spirit form.", false, 4),
+        new(BuffType.TalentRooted, "Rooted", "Movement and movement skills are blocked.", true, 3),
+        new(BuffType.TalentSilenced, "Silenced", "Ordinary spells cannot be cast.", true, 7),
+        new(BuffType.TalentStunned, "Stunned", "Movement, attacks and ordinary spells are blocked.", true, 11),
+        new(BuffType.TalentSteadySpirit, "Steady Spirit", "Discounts the next Spirit Spark.", false, 4),
+        new(BuffType.TalentPaperScript, "Cleansing Script", "Softens the next ordinary poison tick.", false, 2),
+    ];
+
+    private static readonly IReadOnlyDictionary<BuffType, TalentStatusInfo> ByType = Definitions.ToDictionary(status => status.Type);
+    public static IReadOnlyList<TalentStatusInfo> All { get; } = Array.AsReadOnly(Definitions);
+    public static bool TryGet(BuffType type, out TalentStatusInfo status) => ByType.TryGetValue(type, out status);
+
+    public static BuffType ManaDiscount(Spell spell) => spell switch
+    {
+        Spell.HalfMoon or Spell.CrossHalfMoon => BuffType.TalentRedRhythm,
+        Spell.TwinDrakeBlade or Spell.DrakesEcho => BuffType.TalentDrakeBreath,
+        Spell.FireWall => BuffType.TalentKilnFavour,
+        Spell.MagicShield => BuffType.TalentHeatSink,
+        Spell.CinderLance => BuffType.TalentEmberSeal,
+        Spell.ThunderBolt => BuffType.TalentChargedHands,
+        Spell.IceStorm => BuffType.TalentStillMind,
+        Spell.Healing or Spell.Purification => BuffType.TalentClearBreath,
+        Spell.SerpentNeedle => BuffType.TalentSteadyHand,
+        Spell.SpiritSpark => BuffType.TalentSteadySpirit,
+        _ => BuffType.None
+    };
+
+    public static BuffType ControlStatus(PoisonType poison) => poison switch
+    {
+        PoisonType.TalentRoot => BuffType.TalentRooted,
+        PoisonType.TalentSilence => BuffType.TalentSilenced,
+        PoisonType.TalentStun => BuffType.TalentStunned,
+        _ => BuffType.None
+    };
+}

@@ -76,8 +76,10 @@ namespace Client
         // Artwork keeps its baked lighting. Extra projected shadows require
         // both this switch and an explicitly authorised source library.
         public static bool PostProcessing = true, DynamicShadows = false;
-        public static string ProjectedShadowLibraries = "";
-        internal static CrystalM2.Rendering.Core.ShadowSourcePolicy ShadowSources = new("");
+        public static string ProjectedShadowLibraries { get; private set; } = "";
+        internal static CrystalM2.Rendering.Core.ShadowSourcePolicy ShadowSources { get; private set; } = new("");
+        public static bool ShadowsFollowLights = true;
+        public static int ShadowOpacityPercent = 36, ShadowLengthPercent = 100, ShadowSoftness = 0;
         public static bool EnvironmentAtmosphere = true;
         // Optional atmospheric overlays, pending Windows visual comparison.
         public static bool EnvironmentFogLayers = false;
@@ -86,6 +88,9 @@ namespace Client
         // Opt-in until Windows shader visual validation.
         public static bool LightingBloom = false, MapLightOcclusion = false;
         public static int BloomDivisor = 4;
+        public static int BloomIntensityPercent = 100, VignetteIntensityPercent = 100;
+        public static int AmbientDarknessPercent = 100, SpellLightIntensityPercent = 100,
+            MapLightIntensityPercent = 100, SpellBlendIntensityPercent = 100;
         public static int WeatherParticleCap = 256;
         public static int AtmosphereIntensityPercent = 100;
         public static bool FPSCap = true;
@@ -233,9 +238,13 @@ namespace Client
             TopMost = Reader.ReadBoolean("Graphics", "AlwaysOnTop", TopMost);
             FPSCap = Reader.ReadBoolean("Graphics", "FPSCap", FPSCap);
             PostProcessing = Reader.ReadBoolean("Graphics", "PostProcessing", PostProcessing);
+            GraphicsTuning.Load(ReadGraphicsRange);
             DynamicShadows = Reader.ReadBoolean("Graphics", "DynamicShadows", DynamicShadows);
-            ProjectedShadowLibraries = Reader.ReadString("Graphics", "ProjectedShadowLibraries", ProjectedShadowLibraries);
-            ShadowSources = new(ProjectedShadowLibraries);
+            SetProjectedShadowLibraries(Reader.ReadString("Graphics", "ProjectedShadowLibraries", ProjectedShadowLibraries));
+            ShadowsFollowLights = Reader.ReadBoolean("Graphics", "ShadowsFollowLights", ShadowsFollowLights);
+            ShadowOpacityPercent = ReadGraphicsRange("ShadowOpacityPercent", ShadowOpacityPercent, 0, 100);
+            ShadowLengthPercent = ReadGraphicsRange("ShadowLengthPercent", ShadowLengthPercent, 50, 175);
+            ShadowSoftness = ReadGraphicsRange("ShadowSoftness", ShadowSoftness, 0, 8);
             EnvironmentAtmosphere = Reader.ReadBoolean("Graphics", "EnvironmentAtmosphere", EnvironmentAtmosphere);
             EnvironmentFogLayers = Reader.ReadBoolean("Graphics", "EnvironmentFogLayers", EnvironmentFogLayers);
             AtmosphereWetSurfaces = Reader.ReadBoolean("Graphics", "AtmosphereWetSurfaces", AtmosphereWetSurfaces);
@@ -243,6 +252,12 @@ namespace Client
             LightingBloom = Reader.ReadBoolean("Graphics", "LightingBloom", LightingBloom);
             MapLightOcclusion = Reader.ReadBoolean("Graphics", "MapLightOcclusion", MapLightOcclusion);
             BloomDivisor = Math.Clamp(Reader.ReadInt32("Graphics", "BloomDivisor", BloomDivisor), 2, 8);
+            BloomIntensityPercent = ReadGraphicsRange("BloomIntensityPercent", BloomIntensityPercent, 0, 200);
+            VignetteIntensityPercent = ReadGraphicsRange("VignetteIntensityPercent", VignetteIntensityPercent, 0, 100);
+            AmbientDarknessPercent = ReadGraphicsRange(nameof(AmbientDarknessPercent), AmbientDarknessPercent, 0, 100);
+            SpellLightIntensityPercent = ReadGraphicsRange(nameof(SpellLightIntensityPercent), SpellLightIntensityPercent, 0, 200);
+            MapLightIntensityPercent = ReadGraphicsRange(nameof(MapLightIntensityPercent), MapLightIntensityPercent, 0, 200);
+            SpellBlendIntensityPercent = ReadGraphicsRange(nameof(SpellBlendIntensityPercent), SpellBlendIntensityPercent, 0, 200);
             WeatherParticleCap = Math.Clamp(Reader.ReadInt32("Graphics", "WeatherParticleCap", WeatherParticleCap), 64, 1024);
             AtmosphereIntensityPercent = Math.Clamp(Reader.ReadInt32("Graphics", "AtmosphereIntensityPercent", AtmosphereIntensityPercent), 0, 100);
             Resolution = Reader.ReadInt32("Graphics", "Resolution", Resolution);
@@ -380,6 +395,44 @@ namespace Client
             
         }
 
+        private static int ReadGraphicsRange(string key, int fallback, int minimum, int maximum) =>
+            Math.Clamp(Reader.ReadInt32("Graphics", key, fallback), minimum, maximum);
+
+        internal static void SetProjectedShadowLibraries(string libraries)
+        {
+            ProjectedShadowLibraries = libraries;
+            ShadowSources = new(libraries);
+        }
+
+        internal static void SaveGraphicsEffects()
+        {
+            Write(nameof(PostProcessing), PostProcessing);
+            Write(nameof(DynamicShadows), DynamicShadows);
+            Write(nameof(ProjectedShadowLibraries), ProjectedShadowLibraries);
+            Write(nameof(ShadowsFollowLights), ShadowsFollowLights);
+            Write(nameof(ShadowOpacityPercent), ShadowOpacityPercent);
+            Write(nameof(ShadowLengthPercent), ShadowLengthPercent);
+            Write(nameof(ShadowSoftness), ShadowSoftness);
+            Write(nameof(EnvironmentAtmosphere), EnvironmentAtmosphere);
+            Write(nameof(EnvironmentFogLayers), EnvironmentFogLayers);
+            Write(nameof(AtmosphereWetSurfaces), AtmosphereWetSurfaces);
+            Write(nameof(AtmosphereLightning), AtmosphereLightning);
+            Write(nameof(AtmosphereIntensityPercent), AtmosphereIntensityPercent);
+            Write(nameof(VignetteIntensityPercent), VignetteIntensityPercent);
+            Write(nameof(LightingBloom), LightingBloom);
+            Write(nameof(BloomIntensityPercent), BloomIntensityPercent);
+            Write(nameof(BloomDivisor), BloomDivisor);
+            Write(nameof(MapLightOcclusion), MapLightOcclusion);
+            Write(nameof(AmbientDarknessPercent), AmbientDarknessPercent);
+            Write(nameof(SpellLightIntensityPercent), SpellLightIntensityPercent);
+            Write(nameof(MapLightIntensityPercent), MapLightIntensityPercent);
+            Write(nameof(SpellBlendIntensityPercent), SpellBlendIntensityPercent);
+            GraphicsTuning.Save(Write);
+            Reader.Save();
+
+            void Write(string key, object value) => Reader.Write("Graphics", key, value.ToString(), save: false);
+        }
+
         public static void Save()
         {
             //Graphics
@@ -388,18 +441,8 @@ namespace Client
             Reader.Write("Graphics", "MouseClip", MouseClip);
             Reader.Write("Graphics", "AlwaysOnTop", TopMost);
             Reader.Write("Graphics", "FPSCap", FPSCap);
-            Reader.Write("Graphics", "PostProcessing", PostProcessing);
-            Reader.Write("Graphics", "DynamicShadows", DynamicShadows);
-            Reader.Write("Graphics", "ProjectedShadowLibraries", ProjectedShadowLibraries);
-            Reader.Write("Graphics", "EnvironmentAtmosphere", EnvironmentAtmosphere);
-            Reader.Write("Graphics", "EnvironmentFogLayers", EnvironmentFogLayers);
-            Reader.Write("Graphics", "AtmosphereWetSurfaces", AtmosphereWetSurfaces);
-            Reader.Write("Graphics", "AtmosphereLightning", AtmosphereLightning);
-            Reader.Write("Graphics", "LightingBloom", LightingBloom);
-            Reader.Write("Graphics", "MapLightOcclusion", MapLightOcclusion);
-            Reader.Write("Graphics", "BloomDivisor", BloomDivisor);
+            SaveGraphicsEffects();
             Reader.Write("Graphics", "WeatherParticleCap", WeatherParticleCap);
-            Reader.Write("Graphics", "AtmosphereIntensityPercent", AtmosphereIntensityPercent);
             Reader.Write("Graphics", "Resolution", Resolution);
             Reader.Write("Graphics", "DebugMode", DebugMode);
             Reader.Write("Graphics", "UseMouseCursors", UseMouseCursors);

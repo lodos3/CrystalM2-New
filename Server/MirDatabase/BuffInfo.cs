@@ -83,6 +83,16 @@ namespace Server.MirDatabase
                 new BuffInfo { Type = BuffType.Knapsack, Properties = BuffProperty.None, StackType = BuffStackType.StackDuration }
             };
 
+            foreach (TalentStatusInfo status in TalentStatuses.All)
+                info.Add(new BuffInfo
+                {
+                    Type = status.Type,
+                    Properties = BuffProperty.RemoveOnDeath | BuffProperty.RemoveOnExit |
+                        (status.Debuff ? BuffProperty.Debuff : BuffProperty.None),
+                    StackType = BuffStackType.ResetStatAndDuration,
+                    Icon = status.Icon,
+                    Visible = true
+                });
             return info;
         }
     }

@@ -104,27 +104,12 @@ namespace Server
             for (int i = 0; i < Character.Magics.Count; i++)
             {
                 UserMagic magic = Character.Magics[i];
-                if (magic == null) continue;
+                if (magic?.Info == null || SpellCurriculum.IsRetired(magic.Spell)) continue;
 
                 ListViewItem ListItem = new ListViewItem(magic.Info.Name.ToString()) { Tag = this };
 
-                ListItem.SubItems.Add(magic.Level.ToString());
-
-                switch (magic.Level)
-                {
-                    case 0:
-                        ListItem.SubItems.Add($"{magic.Experience}/{magic.Info.Need1}");
-                        break;
-                    case 1:
-                        ListItem.SubItems.Add($"{magic.Experience}/{magic.Info.Need2}");
-                        break;
-                    case 2:
-                        ListItem.SubItems.Add($"{magic.Experience}/{magic.Info.Need3}");
-                        break;
-                    case 3:
-                        ListItem.SubItems.Add($"-");
-                        break;
-                }
+                ListItem.SubItems.Add(SpellCurriculum.UnlockLevel(magic.Spell, magic.Info.Level1).ToString());
+                ListItem.SubItems.Add(Character.SpellPerks.Picks.Where(pick => pick.Spell == magic.Spell).Sum(pick => pick.Rank).ToString());
 
                 if (magic.Key > 8)
                 {
@@ -641,27 +626,12 @@ namespace Server
 
                 foreach (UserMagic magic in hero.Magics)
                 {
-                    if (magic == null) continue;
+                    if (magic?.Info == null || SpellCurriculum.IsRetired(magic.Spell)) continue;
 
                     ListViewItem listItem = new ListViewItem(magic.Info.Name.ToString()) { Tag = this };
 
-                    listItem.SubItems.Add(magic.Level.ToString());
-
-                    switch (magic.Level)
-                    {
-                        case 0:
-                            listItem.SubItems.Add($"{magic.Experience}/{magic.Info.Need1}");
-                            break;
-                        case 1:
-                            listItem.SubItems.Add($"{magic.Experience}/{magic.Info.Need2}");
-                            break;
-                        case 2:
-                            listItem.SubItems.Add($"{magic.Experience}/{magic.Info.Need3}");
-                            break;
-                        case 3:
-                            listItem.SubItems.Add("-");
-                            break;
-                    }
+                    listItem.SubItems.Add(SpellCurriculum.UnlockLevel(magic.Spell, magic.Info.Level1).ToString());
+                    listItem.SubItems.Add(hero.SpellPerks.Picks.Where(pick => pick.Spell == magic.Spell).Sum(pick => pick.Rank).ToString());
 
                     if (magic.Key > 8)
                     {

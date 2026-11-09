@@ -21,6 +21,7 @@ namespace Client.MirObjects
         public Point AnimationOffset = new(0, 0);
         public int FrameCount, FrameInterval, FrameIndex;
         public bool Repeat, Ended;
+        internal long ParticleStart { get; private set; }
         private long _nextParticleTime;
         private bool _emitParticles;
         
@@ -39,59 +40,27 @@ namespace Client.MirObjects
             Repeat = true;
             Ended = false;
             _emitParticles = MapControl.HasGroundSpellParticles(Spell);
-            _nextParticleTime = CMain.Time + ObjectID % 180;
+            ParticleStart = _nextParticleTime = CMain.Time;
 
             switch (Spell)
             {
                 case Spell.TrapHexagon:
-                    BodyLibrary = Libraries.Magic;
-                    DrawFrame = 1390;
-                    FrameInterval = 100;
-                    FrameCount = 10;
-                    Blend = true;
-                    break;
                 case Spell.FireWall:
-                    BodyLibrary = Libraries.Magic;
-                    DrawFrame = 1630;
-                    FrameInterval = 120;
-                    FrameCount = 6;
-                    Light = 3;
-                    Blend = true;
-                    break;
                 case Spell.PoisonCloud:
-                    BodyLibrary = Libraries.Magic2;
-                    DrawFrame = 1650;
-                    FrameInterval = 120;
-                    FrameCount = 20;
-                    Light = 3;
-                    Blend = true;
+                case Spell.Blizzard:
+                case Spell.MeteorStrike:
+                case Spell.Reincarnation:
+                case Spell.Trap:
+                case Spell.Portal:
+                case Spell.HealingCircle:
+                    FrameCount = 1;
+                    FrameInterval = LegacySpellEffects.FieldInterval(Spell);
                     break;
                 case Spell.DigOutZombie:
-                    BodyLibrary = (ushort)Monster.DigOutZombie < Libraries.Monsters.Count() ? Libraries.Monsters[(ushort)Monster.DigOutZombie] : Libraries.Magic;
-                    DrawFrame = 304 + (byte) Direction;
+                    BodyLibrary = (ushort)Monster.DigOutZombie < Libraries.Monsters.Count() ? Libraries.Monsters[(ushort)Monster.DigOutZombie] : null;
+                    DrawFrame = 304 + (byte)Direction;
                     FrameCount = 0;
                     Blend = false;
-                    break;
-                case Spell.Blizzard:
-                    AnimationOffset = new Point(0, -20);
-                    BodyLibrary = Libraries.Magic2;
-                    DrawFrame = 1550;
-                    FrameInterval = 100;
-                    FrameCount = 30;
-                    Light = 3;
-                    Blend = true;
-                    Repeat = false;
-                    break;
-                case Spell.MeteorStrike:
-                    AnimationOffset = new Point(0, -20);
-                    MapControl.Effects.Add(new Effect(Libraries.Magic2, 1600, 10, 800, CurrentLocation) { Repeat = true, RepeatUntil = CMain.Time + 3000 });
-                    BodyLibrary = Libraries.Magic2;
-                    DrawFrame = 1610;
-                    FrameInterval = 100;
-                    FrameCount = 30;
-                    Light = 3;
-                    Blend = true;
-                    Repeat = false;
                     break;
                 case Spell.Rubble:
                     if (Direction == 0)
@@ -104,42 +73,15 @@ namespace Client.MirObjects
                         FrameInterval = 10000;
                     }
                     break;
-                case Spell.Reincarnation:
-                    BodyLibrary = Libraries.Magic2;
-                    DrawFrame = 1680;
-                    FrameInterval = 100;
-                    FrameCount = 10;
-                    Light = 1;
-                    Blend = true;
-                    Repeat = true;
-                    break;
                 case Spell.ExplosiveTrap:
-                    BodyLibrary = Libraries.Magic3;
+                    FrameCount = 1;
+                    FrameInterval = LegacySpellEffects.FieldInterval(Spell);
                     if (info.Param)
                     {
-                        DrawFrame = 1570;
-                        FrameInterval = 100;
-                        FrameCount = 9;
-                        Repeat = false;
-                        SoundManager.PlaySound(20000 + 124 * 10 + 5);//Boom for all players in range
+                        _emitParticles = false;
+                        SoundManager.PlaySound(20000 + 124 * 10 + 5);
                         GameScene.Scene.MapControl.EmitSpellImpact(Spell, CurrentLocation);
                     }
-                    else
-                    {
-                        DrawFrame = 1560;
-                        FrameInterval = 100;
-                        FrameCount = 10;
-                        Repeat = true;
-                    }
-                    //Light = 1;
-                    Blend = true;
-                    break;
-                case Spell.Trap:
-                    BodyLibrary = Libraries.Magic2;
-                    DrawFrame = 2360;
-                    FrameInterval = 100;
-                    FrameCount = 8;
-                    Blend = true;
                     break;
                 case Spell.MapLightning:
                     MapControl.Effects.Add(new Effect(Libraries.Dragon, 400 + (CMain.Random.Next(3) * 10), 5, 600, CurrentLocation));
@@ -227,21 +169,6 @@ namespace Client.MirObjects
                     Blend = true;
                     Repeat = false;
                     break;
-                case Spell.Portal:
-                    BodyLibrary = Libraries.Magic2;
-                    DrawFrame = 2360;
-                    FrameInterval = 100;
-                    FrameCount = 8;
-                    Blend = true;
-                    break;
-                case Spell.HealingCircle:
-                    BodyLibrary = Libraries.Magic3;
-                    DrawFrame = 630;
-                    FrameInterval = 80;
-                    FrameCount = 11;
-                    Light = 3;
-                    Blend = true;
-                    break;
                 case Spell.FlyingStatueIceTornado:
                     BodyLibrary = Libraries.Monsters[(ushort)Monster.FlyingStatue];
                     DrawFrame = 314;
@@ -290,16 +217,21 @@ namespace Client.MirObjects
                     break;
             }
 
+            if (_emitParticles) Light = 0;
+
             NextMotion = CMain.Time + FrameInterval;
             NextMotion -= NextMotion % 100;
         }
 
         public override void Process()
         {
-            if (_emitParticles && CMain.Time >= _nextParticleTime && (Repeat || FrameIndex < FrameCount))
+            if (_emitParticles && (Repeat || FrameIndex < FrameCount))
             {
-                _nextParticleTime = CMain.Time + 240;
-                GameScene.Scene.MapControl.EmitGroundSpellParticles(Spell, CurrentLocation);
+                if (LegacySpellEffects.HasLiveArt(Spell) || CMain.Time >= _nextParticleTime)
+                {
+                    _nextParticleTime = CMain.Time + FrameInterval * 2;
+                    GameScene.Scene.MapControl.EmitGroundSpellParticles(this);
+                }
             }
 
             if (CMain.Time >= NextMotion)
@@ -333,45 +265,34 @@ namespace Client.MirObjects
 
             DrawLocation = new Point((CurrentLocation.X - User.Movement.X + MapControl.OffSetX) * MapControl.CellWidth, (CurrentLocation.Y - User.Movement.Y + MapControl.OffSetY) * MapControl.CellHeight);
             DrawLocation.Offset(GlobalDisplayLocationOffset);
+            DrawLocation.Offset(GraphicsTuning.Offset(GraphicsLayer.Spell).Pixels);
             DrawLocation.Offset(User.OffSetMove);
         }
 
         public override void Draw()
         {
+            using var artwork = BlendArtwork();
             if (FrameIndex >= FrameCount && !Repeat) return;
             if (BodyLibrary == null) return;
 
-            if (Blend)
-            {
-                BodyLibrary.DrawBlend(
-                    DrawFrame + FrameIndex,
-                    AnimationOffset == default ? DrawLocation : GetDrawWithOffset(),
-                    DrawColour, true,
-                    0.8F);
-            }
-            else
-            {
-                BodyLibrary.Draw(DrawFrame + FrameIndex,
-                    AnimationOffset == default ? DrawLocation : GetDrawWithOffset(),
-                    DrawColour,
-                    true);
-            }
+            BodyLibrary.DrawSpellFrame(DrawFrame + FrameIndex,
+                AnimationOffset == default ? DrawLocation : GetDrawWithOffset(), DrawColour, Blend, 0.8f);
         }
 
         // The spell's actual animated frame contributes its own alpha silhouette
         // to the light map, rather than being represented solely by a round glow.
         // This is called only while the light render target is active.
-        public bool DrawLightMask()
+        internal Point LightPosition => GraphicsTuning.LightPosition(LightSource.Spell,
+            AnimationOffset == default ? DrawLocation : GetDrawWithOffset(), GraphicsTuning.Offset(GraphicsLayer.Spell).Linked);
+
+        internal bool DrawLightMask(Color tint, float intensity, ref int pixelBudget, out Point centre)
         {
+            centre = LightPosition;
             if (BodyLibrary == null || (FrameIndex >= FrameCount && !Repeat))
                 return false;
 
-            BodyLibrary.Draw(
-                DrawFrame + FrameIndex,
-                AnimationOffset == default ? DrawLocation : GetDrawWithOffset(),
-                Color.White,
-                true);
-            return true;
+            return BodyLibrary.DrawLightShape(DrawFrame + FrameIndex,
+                centre, tint, true, intensity, ref pixelBudget, LightSource.Spell, out centre);
         }
 
         public override bool MouseOver(Point p)
@@ -394,6 +315,7 @@ namespace Client.MirObjects
                 (CurrentLocation.Y + AnimationOffset.Y - User.Movement.Y + MapControl.OffSetY) * MapControl.CellHeight);
 
             newDrawLocation.Offset(GlobalDisplayLocationOffset);
+            newDrawLocation.Offset(GraphicsTuning.Offset(GraphicsLayer.Spell).Pixels);
             newDrawLocation.Offset(User.OffSetMove);
 
             return newDrawLocation;

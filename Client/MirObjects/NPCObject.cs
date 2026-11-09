@@ -107,6 +107,7 @@ namespace Client.MirObjects
             DrawLocation = new Point((Movement.X - User.Movement.X + MapControl.OffSetX) * MapControl.CellWidth, (Movement.Y - User.Movement.Y + MapControl.OffSetY) * MapControl.CellHeight);
             DrawLocation.Offset(User.OffSetMove);
             DrawLocation.Offset(GlobalDisplayLocationOffset);
+            DrawLocation.Offset(GraphicsTuning.Offset(GraphicsLayer.Npc).Pixels);
 
             if (BodyLibrary != null)
                 FinalDrawLocation = DrawLocation.Add(BodyLibrary.GetOffSet(DrawFrame));
@@ -292,9 +293,8 @@ namespace Client.MirObjects
         {
             if (BodyLibrary == null) return;
 
-            //BodyLibrary.Draw(DrawFrame, DrawLocation, DrawColour, true);
-
-            BodyLibrary.DrawTinted(DrawFrame, DrawLocation, DrawColour, Colour, true);
+            using (BlendArtwork())
+                BodyLibrary.DrawTinted(DrawFrame, DrawLocation, DrawColour, Colour, true);
 
             if (QuestIcon == QuestIcon.None) return;
 

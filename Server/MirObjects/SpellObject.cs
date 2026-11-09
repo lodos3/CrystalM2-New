@@ -26,7 +26,20 @@ namespace Server.MirObjects
         }
 
         public long TickTime, StartTime;
-        public MapObject Caster;
+        private MapObject _caster;
+        private int _talentRevision = -1;
+        public MapObject Caster
+        {
+            get => _caster;
+            set
+            {
+                _caster = value;
+                _talentRevision = value is HumanObject actor && actor.Info != null && TalentCatalog.Supports(actor.Info.Class)
+                    ? actor.Info.Talents.Revision : -1;
+            }
+        }
+        internal TalentCastCredit HealCredit;
+        internal int HealPower = 25;
         public int Value, TickSpeed, BonusDmg;
         public Spell Spell;
         public Point CastLocation;
@@ -51,6 +64,12 @@ namespace Server.MirObjects
         public override void Process()
         {
             if (Decoration) return;
+            if (TalentFieldExpired())
+            {
+                CurrentMap.RemoveObject(this);
+                Despawn();
+                return;
+            }
 
             if (Caster != null && Caster.Node == null) Caster = null;
 
@@ -122,7 +141,7 @@ namespace Server.MirObjects
         }
         public void ProcessSpell(MapObject ob)
         {
-            if (Envir.Time < StartTime) return;
+            if (Envir.Time < StartTime || TalentFieldExpired()) return;
             switch (Spell)
             {
                 case Spell.FireWall:
@@ -134,7 +153,7 @@ namespace Server.MirObjects
                         var caster = (HumanObject)Caster;
                         if (ob.Attacked(caster, Value, DefenceType.MAC, false) > 0 && !caster.Dead &&
                             caster.CurrentMap == CurrentMap)
-                            caster.RecordComboHit(Spell.FireWall, ob);
+                            caster.OnTalentFireWallHit(ob, Value);
                     }
                     break;
                 case Spell.Healing: //SafeZone
@@ -165,7 +184,7 @@ namespace Server.MirObjects
                                 PType = PoisonType.Green,
                                 TickSpeed = TickSpeed,
                                 Value = (Caster.Stats[Stat.MinSC] + Caster.Stats[Stat.MaxSC]) / 2 + BonusDmg
-                            }, ignoreDefence: false);
+                            }, ignoreDefence: false, action: Spell.PoisonCloud);
                     }
                     break;
                 case Spell.Blizzard:
@@ -191,7 +210,8 @@ namespace Server.MirObjects
                         if (ob.Dead) return;
                         if (Caster != null && ((HumanObject)Caster).ActiveBlizzard == false) return;
                         if (!ob.IsAttackTarget(Caster)) return;
-                        ob.Attacked(((HumanObject)Caster), Value, DefenceType.MAC, false);
+                        if (Caster is HumanObject mage && ob.Attacked(mage, mage.MeteorTalentPower(Value, StartTime), DefenceType.MAC, false) > 0)
+                            mage.RecordMeteorTalentHit(ob, CastLocation, StartTime);
                     }
                     break;
                 case Spell.ExplosiveTrap:
@@ -386,8 +406,8 @@ namespace Server.MirObjects
                     {
                         if (ob.Dead || ob.HealAmount != 0 || ob.PercentHealth == 100) return;
 
-                        if (Caster is HumanObject healer) healer.QueueSpellHealing(ob, 25);
-                        else ob.HealAmount += 25;
+                        if (Caster is HumanObject healer) healer.QueueSpellHealing(ob, HealPower, Spell.HealingCircle, HealCredit);
+                        else ob.HealAmount = (ushort)Math.Min(ushort.MaxValue, ob.HealAmount + HealPower);
                         Broadcast(new S.ObjectEffect { ObjectID = ob.ObjectID, Effect = SpellEffect.Healing });
                     }
                     else if (ob.IsAttackTarget(Caster))
@@ -513,6 +533,14 @@ namespace Server.MirObjects
                 case Spell.PoisonCloud:
                 case Spell.Blizzard:
                 case Spell.MeteorStrike:
+                case Spell.HealingCircle:
+                    return new S.ObjectSpell
+                    {
+                        ObjectID = ObjectID,
+                        Location = CurrentLocation,
+                        Spell = Spell,
+                        Direction = Direction
+                    };
                 case Spell.StoneGolemQuake:
                 case Spell.EarthGolemPile:
                 case Spell.TreeQueenMassRoots:
@@ -522,7 +550,6 @@ namespace Server.MirObjects
                 case Spell.HornedSorcererDustTornado:
                 case Spell.HornedCommanderRockFall:
                 case Spell.HornedCommanderRockSpike:
-                case Spell.HealingCircle:
                     if (!Show)
                         return null;
 
@@ -570,6 +597,11 @@ namespace Server.MirObjects
         {
             throw new NotSupportedException();
         }
+
+        private bool TalentFieldExpired() => _talentRevision >= 0 && (Spell is Spell.FireWall or Spell.PoisonCloud or Spell.Blizzard or
+            Spell.MeteorStrike or Spell.HealingCircle or Spell.TrapHexagon or Spell.Reincarnation) &&
+            Caster is HumanObject actor && (actor.Dead || actor.Node == null || actor.CurrentMap != CurrentMap ||
+                actor.Info.Talents.Revision != _talentRevision || !actor.CanUseBuildSpell(Spell));
 
         public override void Spawned()
         {

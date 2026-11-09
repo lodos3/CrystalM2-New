@@ -39,6 +39,12 @@ namespace Server.MirDatabase
         public List<Point> ActiveCoords = new List<Point>();
         public WeatherSetting WeatherParticles = WeatherSetting.None;
 
+        // Keep the older project's custom lighting settings when resaving its maps.
+        private readonly List<LegacyLightRegion> _lightRegions = new();
+        private readonly bool _useCustomAmbient;
+        private readonly Color _customAmbientColour = Color.White;
+        private readonly byte _customAmbientIntensity = 100;
+
         public MapInfo()
         {
 
@@ -121,6 +127,18 @@ namespace Server.MirDatabase
                 FireWallLimit = reader.ReadBoolean();
                 FireWallCount = reader.ReadInt32();
             }
+
+            if (Envir.LoadVersion >= 119)
+            {
+                int regionCount = reader.ReadInt32();
+                if (regionCount < 0) throw new InvalidDataException("Invalid map light region count.");
+                for (int i = 0; i < regionCount; i++)
+                    _lightRegions.Add(new LegacyLightRegion(reader));
+
+                _useCustomAmbient = reader.ReadBoolean();
+                _customAmbientColour = Color.FromArgb(reader.ReadByte(), reader.ReadByte(), reader.ReadByte());
+                _customAmbientIntensity = reader.ReadByte();
+            }
         }
 
         public void Save(BinaryWriter writer)
@@ -191,8 +209,51 @@ namespace Server.MirDatabase
             writer.Write(FireWallLimit);
             writer.Write(FireWallCount);
 
+            writer.Write(_lightRegions.Count);
+            foreach (LegacyLightRegion region in _lightRegions)
+                region.Save(writer);
+
+            writer.Write(_useCustomAmbient);
+            writer.Write(_customAmbientColour.R);
+            writer.Write(_customAmbientColour.G);
+            writer.Write(_customAmbientColour.B);
+            writer.Write(_customAmbientIntensity);
         }
 
+        private sealed class LegacyLightRegion
+        {
+            private readonly string _name;
+            private readonly Color _colour;
+            private readonly byte _intensity;
+            private readonly List<Point> _points = new();
+
+            public LegacyLightRegion(BinaryReader reader)
+            {
+                _name = reader.ReadString();
+                _colour = Color.FromArgb(reader.ReadByte(), reader.ReadByte(), reader.ReadByte());
+                _intensity = reader.ReadByte();
+
+                int pointCount = reader.ReadInt32();
+                if (pointCount < 0) throw new InvalidDataException("Invalid map light region point count.");
+                for (int i = 0; i < pointCount; i++)
+                    _points.Add(new Point(reader.ReadInt32(), reader.ReadInt32()));
+            }
+
+            public void Save(BinaryWriter writer)
+            {
+                writer.Write(_name);
+                writer.Write(_colour.R);
+                writer.Write(_colour.G);
+                writer.Write(_colour.B);
+                writer.Write(_intensity);
+                writer.Write(_points.Count);
+                foreach (Point point in _points)
+                {
+                    writer.Write(point.X);
+                    writer.Write(point.Y);
+                }
+            }
+        }
 
         public void CreateMap()
         {

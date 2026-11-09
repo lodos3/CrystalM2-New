@@ -12,6 +12,8 @@ namespace Client.MirGraphics
         // shadow masks; ordinary sprite textures retain their existing policy.
         internal static readonly ShadowMaskBudget ShadowMasks =
             new ShadowMaskBudget(16L * 1024 * 1024);
+        internal static readonly ShadowMaskBudget SpellMasks =
+            new ShadowMaskBudget(16L * 1024 * 1024);
         public static List<MirControl> ControlList = new List<MirControl>();
 
         public static RendererDevice Device;
@@ -44,7 +46,9 @@ namespace Client.MirGraphics
             new Vector4(1f, 1f, 1f, 0f),
             new Vector4(0f, 0.78f, 0.84f, 0.94f),
             new Vector4(0f, 0.78f, 1.38f, 0.095f),
-            new Vector4(0f, 0.80f, 0.90f, 1.0f)
+            new Vector4(0f, 0.80f, 0.90f, 1.0f),
+            Vector4.One,
+            new Vector4(0, 1, 0, 1)
         };
 
         public static bool GrayScale;
@@ -69,6 +73,7 @@ namespace Client.MirGraphics
         public static void Create()
         {
             Device = new RendererDevice(Program.Form.Handle, Settings.ScreenWidth, Settings.ScreenHeight);
+            ApplyTextureSettings();
             Sprite = Device.Sprite;
             Opacity = BlendingRate = 1f;
             Blending = GrayScale = false;
@@ -205,21 +210,36 @@ namespace Client.MirGraphics
                                                AtmosphericWeatherFrame weatherFrame, Color hazeTint)
         {
             float intensity = AtmosphereIntensity.Scale(Settings.AtmosphereIntensityPercent);
+            float vignette = Settings.VignetteIntensityPercent / 100f;
             PostProcessConstants[0] = new Vector4(
-                AtmosphereExposure.Brightness(weatherFrame.CloudCover, intensity),
-                0.22f, 1f, 0.80f);
+                AtmosphereExposure.Brightness(weatherFrame.CloudCover, intensity) * GraphicsTuning.Exposure.Current / 100f,
+                0.22f * vignette, 100f / GraphicsTuning.Gamma.Current, 1f - 0.20f * vignette);
+            PostProcessConstants[1].Z = GraphicsTuning.Contrast.Current / 100f - 1;
+            PostProcessConstants[1].W = GraphicsTuning.Saturation.Current / 100f - 1;
             PostProcessConstants[2] = new Vector4(atmosphere.R / 255f, atmosphere.G / 255f,
                                                    atmosphere.B / 255f,
                                                    Math.Clamp(gradeStrength * intensity, 0f, 0.4f));
-            PostProcessConstants[3] = new Vector4(Math.Clamp(fogStrength * intensity, 0f, 0.2f),
+            PostProcessConstants[3] = new Vector4(Math.Clamp(fogStrength * intensity * GraphicsTuning.FogDensity.Current / 100f, 0f, 0.4f),
                                                    hazeTint.R / 255f, hazeTint.G / 255f,
                                                    hazeTint.B / 255f);
             PostProcessConstants[4] = new Vector4(
-                Settings.AtmosphereWetSurfaces ? Math.Clamp(weatherFrame.Wetness * intensity, 0f, 1f) : 0f,
+                GraphicsTuning.WeatherSource.Current != 0 && Settings.AtmosphereWetSurfaces
+                    ? Math.Clamp(weatherFrame.Wetness * intensity, 0f, 1f) : 0f,
                 0.78f, 1.38f, 0.095f);
             PostProcessConstants[5] = new Vector4(
-                Settings.AtmosphereLightning ? Math.Clamp(weatherFrame.LightningFlash * intensity, 0f, 0.12f) : 0f,
+                Math.Clamp(weatherFrame.LightningFlash * intensity, 0f, 0.12f),
                 0.80f, 0.90f, 1f);
+            Vector3 grade = GraphicsTuning.Grade.Current switch
+            {
+                1 => new(1.09f, 1.01f, 0.87f),
+                2 => new(0.88f, 1.02f, 1.12f),
+                3 => new(1.06f, 0.99f, 0.79f),
+                4 => new(0.94f, 1.09f, 1.02f),
+                _ => Vector3.One
+            };
+            PostProcessConstants[6] = new Vector4(grade, GraphicsTuning.Tone.Current + 4 * GraphicsTuning.PostShader.Current);
+            PostProcessConstants[7] = new Vector4(GraphicsTuning.BlackLift.Current / 100f, GraphicsTuning.Highlights.Current / 100f,
+                GraphicsTuning.Vibrance.Current / 100f, GraphicsTuning.PostShaderStrength.Current / 100f);
             Sprite.Flush();
             Device.PixelShader = PostProcessingPixelShader;
             Device.SetPixelShaderConstant(0, PostProcessConstants);
@@ -244,19 +264,37 @@ namespace Client.MirGraphics
 
             Matrix original = Sprite.Transform;
             ShaderEffect originalShader = Device.PixelShader;
+            float scale = halfResolution ? 2f : 1f;
+            float blurRadius = Settings.ShadowSoftness / scale;
+            Span<Vector4> originalConstants = stackalloc Vector4[RendererDevice.EffectConstantCount];
+            if (blurRadius > 0) Device.CopyPixelShaderConstants(originalConstants);
             Sprite.Flush();
             try
             {
-                float scale = halfResolution ? 2f : 1f;
                 Matrix projection = Matrix.Identity;
-                projection.M11 = scale;
+                float width = GraphicsTuning.ProjectedWidth.Current / 100f;
+                projection.M11 = scale * width;
                 projection.M21 = -horizontal * scale;
                 projection.M22 = -vertical * scale;
-                projection.M41 = topLeft.X + horizontal * sourceHeight;
+                projection.M41 = topLeft.X + horizontal * sourceHeight + sourceRect.Width * scale * (1 - width) * 0.5f;
                 projection.M42 = topLeft.Y + (1f + vertical) * sourceHeight;
                 Sprite.Transform = projection;
-                if (halfResolution) Device.PixelShader = ShaderEffect.ShadowMask;
-                Draw(texture, sourceRect, Vector3.Zero, Color.FromArgb(92, 0, 0, 0));
+
+                Vector3 origin = Vector3.Zero;
+                if (blurRadius > 0)
+                {
+                    // Expand the quad so the soft edge can extend beyond the sprite.
+                    int padding = (int)Math.Ceiling(blurRadius) + 1;
+                    sourceRect.Inflate(padding, padding);
+                    origin = new Vector3(-padding, -padding, 0);
+                    Device.PixelShader = ShaderEffect.ProjectedShadow;
+                    Device.SetPixelShaderConstant(0, [new Vector4(blurRadius / texture.Width,
+                        blurRadius / texture.Height, 0, 0)]);
+                }
+                else if (halfResolution) Device.PixelShader = ShaderEffect.ShadowMask;
+
+                int alpha = (int)Math.Round(Settings.ShadowOpacityPercent * 255 / 100d);
+                Draw(texture, sourceRect, origin, Color.FromArgb(alpha, 0, 0, 0));
                 ProjectedShadowsDrawn++;
                 Sprite.Flush();
             }
@@ -264,6 +302,7 @@ namespace Client.MirGraphics
             {
                 Sprite.Transform = original;
                 Device.PixelShader = originalShader;
+                if (blurRadius > 0) Device.SetPixelShaderConstant(0, originalConstants);
             }
         }
 
@@ -275,8 +314,91 @@ namespace Client.MirGraphics
 
         public static void Draw(Texture texture, Rectangle? sourceRect, Vector3? position, Color color)
         {
+            WorldSpriteCapture.Record(texture, sourceRect, position, color);
             Sprite.Draw(texture, sourceRect, position, RendererDevice.ToVector(color));
             CMain.DPSCounter++;
+        }
+
+        internal static void DrawLine(Point from, Point to, Color colour)
+        {
+            int dx = to.X - from.X, dy = to.Y - from.Y;
+            if (dx == 0 && dy == 0) return;
+            Matrix transform = Sprite.Transform;
+            Sprite.Transform = Matrix.CreateRotationZ(MathF.Atan2(dy, dx)) *
+                Matrix.CreateTranslation(from.X, from.Y, 0) * transform;
+            try { Device.Ui.Fill(new Rectangle(0, 0, (int)MathF.Ceiling(MathF.Sqrt(dx * dx + dy * dy)), 1), colour); }
+            finally { Sprite.Transform = transform; }
+        }
+
+        internal static void DrawSpellArtwork(Texture texture, Point position, Color colour, bool additive)
+        {
+            ShaderEffect shader = Device.PixelShader;
+            SpriteBlendMode blend = Device.Blend;
+            SpriteBlendMode? artworkBlend = Device.ArtworkBlend;
+            Span<Vector4> constants = stackalloc Vector4[RendererDevice.EffectConstantCount];
+            Device.CopyPixelShaderConstants(constants);
+            int style = GraphicsTuning.SpellComposite.Current;
+            bool key = style is 1 or 2;
+            var shape = new Vector4(GraphicsTuning.SpellBlackCutoff.Current / 100f, GraphicsTuning.SpellBlackFeather.Current / 100f,
+                GraphicsTuning.SpellExposure.Current / 100f, GraphicsTuning.SpellSaturation.Current / 100f);
+            var glow = new Vector4(key ? 1 : 0, 0, GraphicsTuning.SpellGlowCutoff.Current / 100f,
+                GraphicsTuning.SpellGlowStrength.Current / 100f);
+            var origin = new Vector3(position.X, position.Y, 0);
+            try
+            {
+                Device.PixelShader = ShaderEffect.SpellArtwork;
+                if (additive) Device.Blend = SpriteBlendMode.Additive;
+                Device.SetPixelShaderConstant(0, [shape, glow]);
+                Draw(texture, null, origin, colour);
+                if (style is 2 or 3 && glow.W > 0)
+                {
+                    Device.ArtworkBlend = GraphicsTuning.SpellGlowBlend.Current == 0 ? SpriteBlendMode.Additive : SpriteBlendMode.Screen;
+                    glow.Y = 1;
+                    Device.SetPixelShaderConstant(1, [glow]);
+                    Draw(texture, null, origin, colour);
+                }
+            }
+            finally
+            {
+                Sprite.Flush();
+                Device.ArtworkBlend = artworkBlend;
+                Device.Blend = blend;
+                Device.PixelShader = shader;
+                Device.SetPixelShaderConstant(0, constants);
+            }
+        }
+
+        internal static ArtworkBlendScope BlendArtwork(GraphicsLayer layer) => new(GraphicsTuning.Blend(layer).Current);
+        internal static ArtworkBlendScope BlendArtwork(GraphicsLayer layer, GraphicsLayer fallback)
+        {
+            int mode = GraphicsTuning.Blend(layer).Current;
+            return new ArtworkBlendScope(mode == 0 ? GraphicsTuning.Blend(fallback).Current : mode);
+        }
+
+        internal static ArtworkBlendScope BlendArtwork(GraphicsLayer layer, GraphicsTuning.Value state) =>
+            new(state is { Current: > 0 } ? state.Current : GraphicsTuning.Blend(layer).Current);
+
+        internal readonly struct ArtworkBlendScope : IDisposable
+        {
+            private readonly SpriteBlendMode? _previous;
+
+            public ArtworkBlendScope(int mode)
+            {
+                _previous = Device.ArtworkBlend;
+                Device.ArtworkBlend = mode switch
+                {
+                    1 => SpriteBlendMode.Alpha,
+                    2 => SpriteBlendMode.Additive,
+                    3 => SpriteBlendMode.Screen,
+                    4 => SpriteBlendMode.ArtworkMultiply,
+                    5 => SpriteBlendMode.Subtractive,
+                    6 => SpriteBlendMode.Maximum,
+                    7 => SpriteBlendMode.Minimum,
+                    _ => null
+                };
+            }
+
+            public void Dispose() => Device.ArtworkBlend = _previous;
         }
 
         public static void AttemptReset()
@@ -334,6 +456,14 @@ namespace Client.MirGraphics
             Device.Opacity = Opacity;
         }
 
+        internal static void ApplyTextureSettings()
+        {
+            if (Device == null) return;
+            Device.TextureFilter = (TextureFilterMode)GraphicsTuning.TextureFilter.Current;
+            Device.TextureAdjustment = new Vector3(GraphicsTuning.TextureEdgeMatch.Current, GraphicsTuning.TextureSmoothing.Current,
+                GraphicsTuning.TextureDetail.Current) / 100f;
+        }
+
         public static void SetBlend(bool value, float rate = 1F, BlendMode mode = BlendMode.NORMAL)
         {
             Blending = value;
@@ -383,7 +513,7 @@ namespace Client.MirGraphics
                     continue;
                 }
 
-                m.CleanRepairedShadow(CMain.Time);
+                m.CleanDerivedMasks(CMain.Time);
                 if (CMain.Time <= m.CleanTime) continue;
 
                 m.DisposeTexture(false);
@@ -414,6 +544,10 @@ namespace Client.MirGraphics
             LightBloomPass.DisposeAll();
             AtmosphereFogOverlay.DisposeAll();
             WetSurfacePass.DisposeAll();
+            WeatherMaskPass.DisposeAll();
+            SpellOcclusionPass.DisposeAll();
+            ShapedLightPass.DisposeAll();
+            MapAmbientPass.DisposeAll();
             MainSurface?.Dispose();
             MainSurface = null;
 

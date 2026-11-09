@@ -4,4 +4,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Assets/BrackeysSpellMasks.r8.gz" LogicalName="CrystalM2.SpellMasks" />
+    <EmbeddedResource Include="Assets/WarriorParticleMasks.r8.gz" LogicalName="CrystalM2.WarriorMasks" />
+    <EmbeddedResource Include="Assets/UserVfxFireElectric.r8.gz" LogicalName="CrystalM2.UserVfxFireElectric" />
+    <EmbeddedResource Include="Assets/UserVfxEmberSlashRock.r8.gz" LogicalName="CrystalM2.UserVfxEmberSlashRock" />
+  </ItemGroup>
 </Project>

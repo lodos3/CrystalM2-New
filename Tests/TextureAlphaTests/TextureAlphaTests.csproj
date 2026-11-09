@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../Client.Rendering.Core/Client.Rendering.Core.csproj" />
     <Compile Include="../../Client/MirGraphics/AlphaCoverage.cs" Link="AlphaCoverage.cs" />
   </ItemGroup>
 </Project>

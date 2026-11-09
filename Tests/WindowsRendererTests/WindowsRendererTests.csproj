@@ -9,9 +9,16 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Client.Rendering.Core/Client.Rendering.Core.csproj" />
+    <ProjectReference Include="../../Shared/Shared.csproj" />
     <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
     <PackageReference Include="Vortice.D3DCompiler" Version="3.8.3" />
     <Compile Include="../../Client/Rendering/*.cs" Link="Rendering/%(Filename)%(Extension)" />
+    <Compile Include="../../Client/MirScenes/SignatureSpellEffects.cs" Link="Rendering/SignatureSpellEffects.cs" />
+    <Compile Include="../../Client/MirScenes/LegacySpellEffects.cs" Link="Rendering/LegacySpellEffects.cs" />
+    <Compile Include="../../Client/MirScenes/WizardSpellEffects*.cs" Link="Rendering/%(Filename)%(Extension)" />
+    <Compile Include="../../Client/MirScenes/WarriorSpellEffects*.cs" Link="Rendering/%(Filename)%(Extension)" />
+    <Compile Include="../../Client/MirScenes/TaoistSpellEffects*.cs" Link="Rendering/%(Filename)%(Extension)" />
+    <Compile Include="../../Client/MirScenes/SpellParticleFrame.cs" Link="Rendering/SpellParticleFrame.cs" />
     <None Include="../../Client/Data/Shaders/World.hlsl" Link="Data/Shaders/World.hlsl" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

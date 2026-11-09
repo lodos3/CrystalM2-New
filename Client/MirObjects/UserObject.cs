@@ -12,6 +12,42 @@ namespace Client.MirObjects
         public byte ComboCount;
         public uint ComboTarget;
         public long ComboExpires;
+        internal TalentProfile Talents = new();
+        internal TalentLoadout Build => Talents.Active(Class, Specialisation);
+        internal uint RotationTarget;
+        internal byte RotationStep;
+        internal bool RotationReady;
+        internal long RotationExpires;
+        internal TalentRotation Rotation => TalentRotations.Get(Class, Specialisation, Build.Engine);
+        internal int SpellPerkRevision;
+        internal SpellPerkPick[] SpellPerkPicks = [];
+        internal int PerkRank(Spell spell, SpellPerk perk) => Array.Find(SpellPerkPicks, pick => pick.Spell == spell && pick.Perk == perk).Rank;
+
+        internal bool CanUseBuildSpell(Spell spell) =>
+            Magics.Find(magic => magic.Spell == spell) is { } magic &&
+            SpellCurriculum.CanUseLegacy(Class, spell, Level, magic.Level1, magic.IsTempSpell);
+        internal bool IsFinisherReady(Spell spell) => Rotation?.Finisher == spell && RotationReady && CMain.Time < RotationExpires;
+        internal Spell PendingSignature;
+        internal MirDirection PendingSignatureDirection;
+        internal long PendingSignatureUntil, SignatureRecoveryUntil;
+
+        internal bool CanBindAction(Spell spell) => !SpellCurriculum.IsPassive(spell) &&
+            CanUseBuildSpell(spell);
+
+        internal ClientMagic FinisherAction(Spell finisher)
+        {
+            Spell action = TalentRotations.ActionForFinisher(finisher, Build.Engine);
+            if (action == Spell.None) return null;
+            Spell family = TalentCatalog.Family(action);
+            return Magics.Find(magic => TalentCatalog.Family(magic.Spell) == family && CanBindAction(magic.Spell));
+        }
+
+        internal ClientMagic ReadyFollowup(ClientMagic action)
+        {
+            if (action == null || Rotation is not { } rotation || !IsFinisherReady(rotation.Finisher) ||
+                FinisherAction(rotation.Finisher) != action) return null;
+            return GetMagic(rotation.Finisher);
+        }
 
         public int ActiveComboCount(Spell spell) =>
             spell == ComboSpender && CMain.Time < ComboExpires ? ComboCount : 0;
@@ -160,7 +196,6 @@ namespace Client.MirObjects
             RefreshItemSetStats();
             RefreshMirSetStats();
             RefreshSkills();
-            SpecialisationAbilities.ApplyTraitStats(Stats, Class, Specialisation, Level);
             RefreshBuffs();
             RefreshGuildBuffs();
 
@@ -617,13 +652,13 @@ namespace Client.MirObjects
             for (int i = 0; i < Magics.Count; i++)
             {
                 ClientMagic magic = Magics[i];
-                if (!SpellCurriculum.CanUse(Class, Specialisation, magic.Spell)) continue;
+                if (!CanUseBuildSpell(magic.Spell)) continue;
 
                 switch (magic.Spell)
                 {
                     case Spell.Fencing:
-                        Stats[Stat.Accuracy] += magic.Level * 3;
-                        //Stats[Stat.MaxAC] += (magic.Level + 1) * 3;
+                        Stats[Stat.Accuracy] += magic.Level * 3 + PerkRank(Spell.Fencing, SpellPerk.Accuracy) * 2;
+                        Stats[Stat.MaxAC] += PerkRank(Spell.Fencing, SpellPerk.Guard) * 2;
                         break;
                     case Spell.Slaying:
                     // case Spell.FatalSword:
@@ -631,9 +666,8 @@ namespace Client.MirObjects
                         Stats[Stat.MaxDC] += slayingLvPlus[magic.Level];
                         break;
                     case Spell.SpiritSword:
-                        Stats[Stat.Accuracy] += spiritSwordLvPlus[magic.Level];
-                        // Stats[Stat.Accuracy] += magic.Level;
-                        // Stats[Stat.MaxDC] += (int)(Stats[Stat.MaxSC] * (magic.Level + 1) * 0.1F);
+                        Stats[Stat.Accuracy] += spiritSwordLvPlus[magic.Level] + PerkRank(Spell.SpiritSword, SpellPerk.Accuracy) * 2;
+                        Stats[Stat.MaxMAC] += PerkRank(Spell.SpiritSword, SpellPerk.Guard) * 2;
                         break;
                 }
             }

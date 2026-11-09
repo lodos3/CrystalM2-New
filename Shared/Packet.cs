@@ -221,6 +221,10 @@ public abstract class Packet
                 return new C.Magic();
             case (short)ClientPacketIds.SelectSpecialisation:
                 return new C.SelectSpecialisation();
+            case (short)ClientPacketIds.TalentDraft:
+                return new C.TalentDraft();
+            case (short)ClientPacketIds.SpellPerkDraft:
+                return new C.SpellPerkDraft();
             case (short)ClientPacketIds.SwitchGroup:
                 return new C.SwitchGroup();
             case (short)ClientPacketIds.AddMember:
@@ -462,6 +466,12 @@ public abstract class Packet
                 return new S.SpecialisationResult();
             case (short)ServerPacketIds.SpellComboState:
                 return new S.SpellComboState();
+            case (short)ServerPacketIds.TalentState:
+                return new S.TalentState();
+            case (short)ServerPacketIds.RotationState:
+                return new S.RotationState();
+            case (short)ServerPacketIds.SpellPerkState:
+                return new S.SpellPerkState();
             case (short)ServerPacketIds.UserSlotsRefresh:
                 return new S.UserSlotsRefresh();
             case (short)ServerPacketIds.UserLocation:

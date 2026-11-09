@@ -69,6 +69,7 @@ namespace Client.MirObjects
         }
         public override void Draw()
         {
+            using var artwork = BlendArtwork();
             if (BodyLibrary != null)
                 BodyLibrary.Draw(DrawFrame, DrawLocation, DrawColour);
         }
@@ -79,6 +80,7 @@ namespace Client.MirObjects
             DrawLocation.Offset((MapControl.CellWidth - Size.Width) / 2, (MapControl.CellHeight - Size.Height) / 2);
             DrawLocation.Offset(User.OffSetMove);
             DrawLocation.Offset(GlobalDisplayLocationOffset);
+            DrawLocation.Offset(GraphicsTuning.Offset(GraphicsLayer.Item).Pixels);
             FinalDrawLocation = DrawLocation;
 
             DisplayRectangle = new Rectangle(DrawLocation, Size);

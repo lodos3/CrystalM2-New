@@ -27,6 +27,9 @@
         public List<MapObject> CellObjects;
 
         public bool FishingCell;
+        internal bool AdditionalMovementBlock;
+        internal bool AllowsWeather => !FishingCell && !AdditionalMovementBlock &&
+            (BackImage & 0x20000000) == 0 && (FrontImage & 0x8000) == 0;
 
         public void AddObject(MapObject ob)
         {
@@ -52,7 +55,7 @@
                 return mo.ObjectID == ObjectID;
             });
         }
-        public void DrawObjects()
+        internal void DrawObjects(List<MirGraphics.WorldSpriteCapture.Draw> weatherActors)
         {
             if (CellObjects == null) return;
 
@@ -61,14 +64,18 @@
                 if (!CellObjects[i].Dead)
                 {
                     MapObject actor = CellObjects[i];
-                    if (Settings.DynamicShadows && !actor.Hidden)
+                    bool preview = actor == MapObject.User && MirScenes.GameScene.Scene?.MapControl?.ProjectionPreviewActive == true;
+                    if ((Settings.DynamicShadows || preview) && !actor.Hidden)
                     {
+                        bool linked = GraphicsTuning.Offset(GraphicsTuning.Layer(actor.Race)).Linked;
                         if (actor is PlayerObject player && player.BodyLibrary != null)
-                            player.BodyLibrary.DrawProjectedShadow(player.DrawFrame + player.ArmourOffSet, player.DrawLocation, player.CurrentLocation);
+                            player.BodyLibrary.DrawProjectedShadow(player.DrawFrame + player.ArmourOffSet, player.DrawLocation, player.CurrentLocation, linked, preview);
                         else if (actor is MonsterObject monster && monster.BodyLibrary != null && monster.Frame != null)
-                            monster.BodyLibrary.DrawProjectedShadow(monster.DrawFrame, monster.DrawLocation, monster.CurrentLocation);
+                            monster.BodyLibrary.DrawProjectedShadow(monster.DrawFrame, monster.DrawLocation, monster.CurrentLocation, linked, preview);
+                        else if (actor is NPCObject npc && npc.BodyLibrary != null)
+                            npc.BodyLibrary.DrawProjectedShadow(npc.DrawFrame, npc.DrawLocation, npc.CurrentLocation, linked, preview);
                     }
-                    actor.Draw();
+                    DrawActor(actor, weatherActors);
                     continue;
                 }
 
@@ -83,7 +90,7 @@
                         case Monster.SSabukWall2:
                         case Monster.SSabukWall3:
                         case Monster.HellLord:
-                            CellObjects[i].Draw();
+                            DrawActor(CellObjects[i], weatherActors);
                             break;
                         default:
                             continue;
@@ -92,7 +99,7 @@
             }
         }
 
-        public void DrawDeadObjects()
+        internal void DrawDeadObjects(List<MirGraphics.WorldSpriteCapture.Draw> weatherActors)
         {
             if (CellObjects == null) return;
             for (int i = 0; i < CellObjects.Count; i++)
@@ -114,8 +121,16 @@
                     }
                 }
 
-                CellObjects[i].Draw();
+                DrawActor(CellObjects[i], weatherActors, groundCorpse: true);
             }
+        }
+
+        private static void DrawActor(MapObject actor, List<MirGraphics.WorldSpriteCapture.Draw> weatherActors, bool groundCorpse = false)
+        {
+            using var capture = new MirGraphics.WorldSpriteCapture.Scope(
+                actor is SpellObject ? null : weatherActors, MirGraphics.WorldSpriteCapture.Kind.Actor,
+                groundCorpse ? -1 : actor.CurrentLocation.Y);
+            actor.Draw();
         }
 
         public void Sort()
@@ -250,6 +265,7 @@
                         MapCells[x, y].BackImage = (short)BitConverter.ToInt16(Bytes, offset);
                         offset += 2;
                         MapCells[x, y].MiddleImage = (short)BitConverter.ToInt16(Bytes, offset);
+                        MapCells[x, y].AdditionalMovementBlock = (MapCells[x, y].MiddleImage & 0x8000) != 0;
                         offset += 2;
                         MapCells[x, y].FrontImage = (short)BitConverter.ToInt16(Bytes, offset);
                         offset += 2;
@@ -345,6 +361,7 @@
                         MapCells[x, y].BackImage = (short)BitConverter.ToInt16(Bytes, offset);
                         offset += 2;
                         MapCells[x, y].MiddleImage = (short)BitConverter.ToInt16(Bytes, offset);
+                        MapCells[x, y].AdditionalMovementBlock = (MapCells[x, y].MiddleImage & 0x8000) != 0;
                         offset += 2;
                         MapCells[x, y].FrontImage = (short)BitConverter.ToInt16(Bytes, offset);
                         offset += 2;
@@ -387,6 +404,7 @@
                         MapCells[x, y].BackImage = (short)BitConverter.ToInt16(Bytes, offset);
                         offset += 2;
                         MapCells[x, y].MiddleImage = (short)BitConverter.ToInt16(Bytes, offset);
+                        MapCells[x, y].AdditionalMovementBlock = (MapCells[x, y].MiddleImage & 0x8000) != 0;
                         offset += 2;
                         MapCells[x, y].FrontImage = (short)BitConverter.ToInt16(Bytes, offset);
                         offset += 2;
@@ -435,6 +453,9 @@
                     for (int y = 0; y < Height; y++)
                     {//12
                         MapCells[x, y] = new CellInfo();
+                        // The server reads these collision bits before decoding the image indices.
+                        MapCells[x, y].AdditionalMovementBlock =
+                            ((BitConverter.ToInt16(Bytes, offset) | BitConverter.ToInt16(Bytes, offset + 2)) & 0x8000) != 0;
                         MapCells[x, y].BackIndex = 0;
                         MapCells[x, y].MiddleIndex = 1;
                         MapCells[x, y].BackImage = (short)(BitConverter.ToInt16(Bytes, offset) ^ xor);

@@ -2,6 +2,7 @@
 using Frame = Client.MirObjects.Frame;
 using Client.MirObjects;
 using Client.MirScenes;
+using CrystalM2.Rendering.Core;
 using System.Text.RegularExpressions;
 
 namespace Client.MirGraphics
@@ -24,11 +25,11 @@ namespace Client.MirGraphics
             Title = new MLibrary(Settings.DataPath + "Title"),
             MagIcon = new MLibrary(Settings.DataPath + "MagIcon"),
             MagIcon2 = new MLibrary(Settings.DataPath + "MagIcon2"),
-            Magic = new MLibrary(Settings.DataPath + "Magic"),
-            Magic2 = new MLibrary(Settings.DataPath + "Magic2"),
-            Magic3 = new MLibrary(Settings.DataPath + "Magic3"),
+
+
+
             Effect = new MLibrary(Settings.DataPath + "Effect"),
-            MagicC = new MLibrary(Settings.DataPath + "MagicC"),
+
             GuildSkill = new MLibrary(Settings.DataPath + "GuildSkill"),
             Weather = new MLibrary(Settings.DataPath + "Weather");
 
@@ -240,7 +241,7 @@ namespace Client.MirGraphics
                 CHair.Length + CWeapons.Length + CWeaponEffect.Length + AArmours.Length + AHair.Length + AWeaponsL.Length + AWeaponsR.Length +
                 ARArmours.Length + ARHair.Length + ARWeapons.Length + ARWeaponsS.Length +
                 CHumEffect.Length + AHumEffect.Length + ARHumEffect.Length + Mounts.Length + Fishing.Length + Pets.Length +
-                Transform.Length + TransformMounts.Length + TransformEffect.Length + TransformWeaponEffect.Length + 19;
+                Transform.Length + TransformMounts.Length + TransformEffect.Length + TransformWeaponEffect.Length + 15;
 
             Dragon.Initialize();
             Progress++;
@@ -261,14 +262,9 @@ namespace Client.MirGraphics
             MagIcon2.Initialize();
             Progress++;
 
-            Magic.Initialize();
-            Progress++;
-            Magic2.Initialize();
-            Progress++;
-            Magic3.Initialize();
-            Progress++;
-            MagicC.Initialize();
-            Progress++;
+
+
+
 
             Effect.Initialize();
             Progress++;
@@ -478,6 +474,8 @@ namespace Client.MirGraphics
         public const int LibVersion = 3;
 
         private readonly string _fileName;
+        private readonly bool _worldArtwork;
+        private readonly Lazy<LegacyMirLibReader> _mapShadowBackup;
 
         private MImage[] _images;
         private FrameSet _frames;
@@ -496,6 +494,40 @@ namespace Client.MirGraphics
         public MLibrary(string filename)
         {
             _fileName = Path.ChangeExtension(filename, Extention);
+            if (string.IsNullOrEmpty(filename)) return;
+            string relativePath = Path.GetRelativePath(Settings.DataPath, _fileName);
+            string[] parts = relativePath.Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries);
+            string family = parts[0].ToUpperInvariant();
+            _worldArtwork = parts.Length == 1
+                ? family is "DECO.LIB" or "DNITEMS.LIB" or "DRAGON.LIB"
+                : family is "MAP" or "MONSTER" or "CARMOUR" or "AARMOUR" or "ARARMOUR" or
+                    "CHAIR" or "AHAIR" or "ARHAIR" or "CHELMET" or "CWEAPON" or "AWEAPON" or "ARWEAPON" or
+                    "MOUNT" or "PET" or "NPC" or "GATE" or "SIEGE" or "FLAG" or "FISHING" or "TRANSFORM" or "TRANSFORMRIDE2";
+            if (_worldArtwork && family == "MAP")
+            {
+                _mapShadowBackup = new Lazy<LegacyMirLibReader>(() => OpenMapShadowBackup(relativePath));
+            }
+        }
+
+        private static LegacyMirLibReader OpenMapShadowBackup(string relativePath)
+        {
+            string root = Path.Combine(Settings.DataPath, ".shadow-backup");
+            if (!Directory.Exists(root)) return null;
+            try
+            {
+                foreach (string snapshot in Directory.GetDirectories(root).OrderByDescending(path => path, StringComparer.Ordinal))
+                {
+                    string path = Path.Combine(snapshot, relativePath);
+                    if (!File.Exists(path)) continue;
+                    try
+                    {
+                        return new LegacyMirLibReader(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete));
+                    }
+                    catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { }
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            return null;
         }
 
         public void Initialize()
@@ -579,10 +611,13 @@ namespace Client.MirGraphics
             if (mi == null || mi.Width <= 0 || mi.Height <= 0)
                 return false;
 
+            if (_worldArtwork && mi.TextureValid && mi.ShadowRevision != GraphicsTuning.ShadowRevision)
+                mi.DisposeTexture();
+
             if (!mi.TextureValid)
             {
                 _fStream.Seek(_indexList[index] + 17, SeekOrigin.Begin);
-                mi.CreateTexture(_reader);
+                mi.CreateTexture(_reader, _worldArtwork, _mapShadowBackup, index);
             }
             return true;
         }
@@ -638,7 +673,7 @@ namespace Client.MirGraphics
                         return Size.Empty;
 
                     _fStream.Seek(_indexList[index] + 17, SeekOrigin.Begin);
-                    mi.CreateTexture(_reader);
+                    mi.CreateTexture(_reader, _worldArtwork, _mapShadowBackup, index);
                 }
                 return mi.GetTrueSize();
             }
@@ -647,9 +682,11 @@ namespace Client.MirGraphics
 
         // Redraw the current animation frame's alpha silhouette at ground level.
         // Only checked/dithered sprites need an additional repaired GPU texture.
-        public void DrawProjectedShadow(int index, Point location, Point worldCell)
+        public void DrawProjectedShadow(int index, Point location, Point worldCell, bool originLinked = false, bool preview = false)
         {
-            if (!Settings.DynamicShadows || !Settings.ShadowSources.Allows(_fileName) || DXManager.Blending ||
+            bool automatic = GraphicsTuning.ProjectedPolicy.Current == 1 && _worldArtwork && GraphicsTuning.RepairBakedShadows;
+            if ((!Settings.DynamicShadows && !preview) || Settings.ShadowOpacityPercent == 0 ||
+                (!preview && !automatic && !Settings.ShadowSources.Allows(_fileName)) || DXManager.Blending ||
                 DXManager.ProjectedShadowsDrawn >= DXManager.MaxProjectedShadowsPerMapDraw)
                 return;
 
@@ -658,10 +695,13 @@ namespace Client.MirGraphics
                 mi.Width > 320 || mi.Height > 320)
                 return; // Reject oversized frames before their texture is uploaded.
 
-            Point imagePoint = location;
+            Point imagePoint = GraphicsTuning.ProjectedOffset.Apply(location, originLinked);
             imagePoint.Offset(mi.X, mi.Y);
             ShadowProjection direction = GameScene.Scene?.MapControl?.GetShadowProjection(worldCell)
                                         ?? ShadowProjection.Sunlight;
+            float length = Settings.ShadowLengthPercent / 100f;
+            direction = new ShadowProjection(direction.Horizontal * length + GraphicsTuning.ProjectedSlope.Current / 100f,
+                direction.Vertical * length);
             if (!direction.IsProjectedVisible(imagePoint, mi.Width, mi.Height,
                                               Settings.ScreenWidth, Settings.ScreenHeight))
                 return;
@@ -669,6 +709,7 @@ namespace Client.MirGraphics
             if (!CheckImage(index))
                 return;
 
+            if (mi.HasBakedShadow && !preview) return;
             Texture repaired = mi.GetRepairedShadowTexture();
             bool halfSize = repaired != null;
             DXManager.DrawProjectedShadow(repaired ?? mi.Image,
@@ -749,6 +790,111 @@ namespace Client.MirGraphics
 
             DXManager.SetBlend(oldBlend);
             mi.CleanTime = CMain.Time + Settings.CleanDelay;
+        }
+
+        internal void DrawSpellFrame(int index, Point point, Color colour, bool additive, float rate)
+        {
+            float strength = additive ? Math.Clamp(rate * Settings.SpellBlendIntensityPercent / 100f, 0, 1) : 1;
+            if (strength == 0) return;
+            colour = Color.FromArgb((int)MathF.Round(colour.A * strength), colour);
+            if (GraphicsTuning.SpellComposite.Current == 0)
+            {
+                if (additive) DrawBlend(index, point, colour, true);
+                else Draw(index, point, colour, true);
+                return;
+            }
+
+            MImage frame = GetImageMetadata(index);
+            if (frame == null) return;
+            point.Offset(frame.X, frame.Y);
+            if (!SpriteVisibility.IsVisible(point.X, point.Y, frame.Width, frame.Height, Settings.ScreenWidth, Settings.ScreenHeight) ||
+                !CheckImage(index)) return;
+            DXManager.DrawSpellArtwork(frame.Image, point, colour, additive);
+            frame.CleanTime = CMain.Time + Settings.CleanDelay;
+        }
+
+        internal WeaponMaskTrace? GetWeaponTrace(int index, Point point)
+        {
+            var frame = GetImageMetadata(index);
+            if (frame == null) return null;
+            point.Offset(frame.X, frame.Y);
+            if (!SpriteVisibility.IsVisible(point.X, point.Y, frame.Width, frame.Height,
+                    Settings.ScreenWidth, Settings.ScreenHeight) || !CheckImage(index) ||
+                frame.WeaponTrace is not { } trace) return null;
+            Vector2 offset = new(point.X, point.Y);
+            return new WeaponMaskTrace(trace.Hilt + offset, trace.Tip + offset);
+        }
+
+        internal void DrawSpellMask(int index, Point point, Color colour, Color core, float strength, SpellMaskStyle style)
+        {
+            var frame = GetImageMetadata(index);
+            if (frame == null || strength <= 0) return;
+            point.Offset(frame.X, frame.Y);
+            if (!SpriteVisibility.IsVisible(point.X, point.Y, frame.Width, frame.Height,
+                    Settings.ScreenWidth, Settings.ScreenHeight) || !CheckImage(index)) return;
+            if (frame.NeedsSpellMask(CMain.Time))
+            {
+                _fStream.Position = _indexList[index] + 17;
+                frame.CreateSpellMask(_reader.ReadBytes(frame.Length), CMain.Time);
+            }
+            Texture mask = frame.GetSpellMask(CMain.Time, out bool coverage);
+            if (mask == null) return;
+            Vector4 tint = RendererDevice.ToVector(colour);
+            tint.W = Math.Min(1, strength);
+            DXManager.Device.SpellParticles.DrawSpriteMask(mask, new Rectangle(point, new Size(frame.Width, frame.Height)),
+                tint, RendererDevice.ToVector(core), CMain.Time, style, coverage);
+            frame.CleanTime = CMain.Time + Settings.CleanDelay;
+        }
+
+        internal void DrawTexturePreview(int index, Rectangle bounds)
+        {
+            if (!CheckImage(index)) return;
+            MImage frame = _images[index];
+            float scale = Math.Min((float)bounds.Width / frame.Width, (float)bounds.Height / frame.Height);
+            int width = Math.Max(1, (int)MathF.Round(frame.Width * scale));
+            int height = Math.Max(1, (int)MathF.Round(frame.Height * scale));
+            var destination = new Rectangle(bounds.X + (bounds.Width - width) / 2, bounds.Y + (bounds.Height - height) / 2, width, height);
+            DXManager.Sprite.Draw(frame.Image, new Rectangle(0, 0, frame.Width, frame.Height), destination, Vector4.One);
+            frame.CleanTime = CMain.Time + Settings.CleanDelay;
+        }
+
+        internal bool DrawLightShape(int index, Point point, Color colour, bool offset, float intensity,
+                                     ref int pixelBudget, LightSource source, out Point centre)
+        {
+            centre = point;
+            MImage image = GetImageMetadata(index);
+            if (image == null || image.Width <= 0 || image.Height <= 0) return false;
+            if (offset) point.Offset(image.X, image.Y);
+
+            var emitter = GraphicsTuning.Light(source);
+            if (emitter.Shape.Current == 0 &&
+                !ShapedLightPass.PotentiallyVisible(point, new Size(image.Width, image.Height), emitter))
+                return true;
+            if (!CheckImage(index)) return false;
+
+            PointF pivot = image.EmissionPivot;
+            centre = new Point(point.X + (int)MathF.Round(pivot.X), point.Y + (int)MathF.Round(pivot.Y));
+            Color spriteColour = image.EmissionColour;
+            Color halo = emitter.CustomColour.Current != 0 ? colour : Color.FromArgb(colour.A,
+                colour.R * spriteColour.R / 255, colour.G * spriteColour.G / 255, colour.B * spriteColour.B / 255);
+            ShapedLightPass.AddHalo(centre, halo, intensity, emitter, source);
+            image.CleanTime = CMain.Time + Settings.CleanDelay;
+            if (emitter.Shape.Current != 0) return false;
+
+            Rectangle bounds = ShapedLightPass.ScaleFrame(point, image.Width, image.Height,
+                emitter.Radius.Current, pivot);
+            Rectangle footprint = bounds;
+            int blur = emitter.Blur.Current;
+            footprint.Inflate(blur, blur);
+            Rectangle visible = Rectangle.Intersect(footprint, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight));
+            int pixels = visible.Width * visible.Height;
+            int divisor = ShapedLightPass.BlurDivisor(blur);
+            int cost = (pixels + divisor * divisor - 1) / (divisor * divisor);
+            if (cost == 0 || cost > pixelBudget) return true; // Keep the cheaper halo when the shape budget is used.
+
+            ShapedLightPass.Add(source, image.Image, bounds, colour, intensity);
+            pixelBudget -= cost;
+            return true;
         }
         public void Draw(int index, Rectangle section, Point point, Color colour, bool offSet)
         {
@@ -913,15 +1059,23 @@ namespace Client.MirGraphics
 
         public Texture MaskImage;
         public Boolean HasMask;
+        public bool HasBakedShadow { get; private set; }
+        internal int ShadowRevision { get; private set; }
 
         public long CleanTime;
         public Size TrueSize;
 
         private AlphaCoverage _alphaCoverage;
+        internal PointF EmissionPivot => _alphaCoverage.EmissionPivot;
+        internal Color EmissionColour => _alphaCoverage.EmissionColour;
+        internal WeaponMaskTrace? WeaponTrace => _alphaCoverage?.GetWeaponTrace();
         private Texture _repairedShadowTexture;
         private int _repairedShadowBytes;
         private long _repairedShadowLastUsed;
         private bool _shadowAllocationFailed;
+        private Texture _spellMask;
+        private bool _spellMaskChecked;
+        private long _spellMaskLastUsed, _spellMaskRetry;
 
         public MImage(BinaryReader reader)
         {
@@ -948,7 +1102,7 @@ namespace Client.MirGraphics
             }
         }
 
-        public unsafe void CreateTexture(BinaryReader reader)
+        public unsafe void CreateTexture(BinaryReader reader, bool worldArtwork, Lazy<LegacyMirLibReader> mapShadowBackup, int index)
         {
             int width = Width;
             int height = Height;
@@ -961,9 +1115,12 @@ namespace Client.MirGraphics
                 {
                     DecompressBgraRows(reader.ReadBytes(Length), locked.Data, width, height, locked.Pitch);
                     // Snapshot alpha BEFORE UnlockRectangle. Never retain the native pointer.
-                    var pixels = new ReadOnlySpan<byte>((void*)locked.Data.DataPointer, checked(locked.Pitch * height));
+                    var pixels = new Span<byte>((void*)locked.Data.DataPointer, checked(locked.Pitch * height));
                     _alphaCoverage = AlphaCoverage.Capture(pixels, width, height, locked.Pitch);
+                    Image.IsWorldArtwork = worldArtwork;
                     TrueSize = _alphaCoverage.VisibleSize;
+                    HasBakedShadow = worldArtwork && GraphicsTuning.RepairBakedShadows &&
+                        SmoothShadowLayer(pixels, locked.Pitch, mapShadowBackup, index, mask: false);
                 }
                 finally
                 {
@@ -984,6 +1141,11 @@ namespace Client.MirGraphics
                         {
                             DecompressBgraRows(reader.ReadBytes(MaskLength), maskLocked.Data,
                                                MaskWidth, MaskHeight, maskLocked.Pitch);
+                            if (worldArtwork && GraphicsTuning.RepairBakedShadows)
+                            {
+                                var pixels = new Span<byte>((void*)maskLocked.Data.DataPointer, checked(maskLocked.Pitch * MaskHeight));
+                                HasBakedShadow |= SmoothShadowLayer(pixels, maskLocked.Pitch, mapShadowBackup, index, mask: true);
+                            }
                         }
                         finally
                         {
@@ -994,6 +1156,7 @@ namespace Client.MirGraphics
                 }
 
                 _shadowAllocationFailed = false;
+                ShadowRevision = GraphicsTuning.ShadowRevision;
                 DXManager.TextureList.Add(this);
                 TextureValid = true;
                 CleanTime = CMain.Time + Settings.CleanDelay;
@@ -1010,6 +1173,29 @@ namespace Client.MirGraphics
                 TextureValid = false;
                 throw;
             }
+        }
+
+        private bool SmoothShadowLayer(Span<byte> pixels, int pitch, Lazy<LegacyMirLibReader> backup, int index, bool mask)
+        {
+            int width = mask ? MaskWidth : Width, height = mask ? MaskHeight : Height;
+            int x = mask ? MaskX : X, y = mask ? MaskY : Y;
+            bool join = backup != null && GraphicsTuning.JoinBakedEdges;
+            var settings = GraphicsTuning.BakedSettings;
+            if (backup != null && BakedShadowRepair.HasOfflineRepair(pixels, width, height, pitch) && backup.Value is { } library)
+            {
+                try
+                {
+                    if (library.TryReadFrame(index, out var original, includeMask: mask))
+                    {
+                        var layer = mask ? original.Mask : original;
+                        if (layer != null && layer.Width == width && layer.Height == height && layer.OffsetX == x && layer.OffsetY == y &&
+                            BakedShadowRepair.TryUseOriginal(pixels, width, height, pitch, layer.Bgra, join, settings)) return true;
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or InvalidDataException) { }
+            }
+
+            return BakedShadowRepair.Smooth(pixels, width, height, pitch, join, settings);
         }
 
         // Generate a compact repair texture once per checked sprite frame. Original
@@ -1077,11 +1263,67 @@ namespace Client.MirGraphics
             }
         }
 
-        public void CleanRepairedShadow(long now)
+        internal bool NeedsSpellMask(long now) => !_spellMaskChecked && now >= _spellMaskRetry;
+
+        internal void CreateSpellMask(byte[] compressed, long now)
         {
-            if (_repairedShadowTexture == null || now - _repairedShadowLastUsed < 30000)
+            byte[] pixels = DecompressImage(compressed);
+            if (!BakedShadowRepair.StripFromMask(pixels, Width, Height, Width * 4))
+            {
+                _spellMaskChecked = true;
                 return;
-            ReleaseRepairedShadow();
+            }
+
+            int bytes = Width * Height;
+            if (!DXManager.SpellMasks.TryReserve(bytes))
+            {
+                _spellMaskRetry = now + 1000;
+                return;
+            }
+
+            try
+            {
+                for (int i = 0; i < bytes; i++) pixels[i] = pixels[i * 4 + 3];
+                _spellMask = Texture.CreateCoverageAtlas(DXManager.Device, Width, Height, mipLevels: 1);
+                DataRectangle upload = _spellMask.BeginUpload();
+                upload.Data.Write(pixels.AsSpan(0, bytes));
+                _spellMask.EndUpload();
+                _spellMaskChecked = true;
+            }
+            catch
+            {
+                _spellMask?.Dispose();
+                _spellMask = null;
+                DXManager.SpellMasks.Release(bytes);
+                throw;
+            }
+        }
+
+        internal Texture GetSpellMask(long now, out bool coverage)
+        {
+            coverage = _spellMask != null;
+            if (coverage) _spellMaskLastUsed = now;
+            return _spellMaskChecked ? _spellMask ?? Image : null;
+        }
+
+        private void ReleaseSpellMask()
+        {
+            if (_spellMask != null)
+            {
+                _spellMask.Dispose();
+                _spellMask = null;
+                DXManager.SpellMasks.Release(Width * Height);
+            }
+            _spellMaskChecked = false;
+            _spellMaskRetry = 0;
+        }
+
+        public void CleanDerivedMasks(long now)
+        {
+            if (_repairedShadowTexture != null && now - _repairedShadowLastUsed >= 30000)
+                ReleaseRepairedShadow();
+            if (_spellMask != null && now - _spellMaskLastUsed >= 30000)
+                ReleaseSpellMask();
         }
 
         // The caller already knows whether the manager is removing the list entry.
@@ -1092,6 +1334,7 @@ namespace Client.MirGraphics
                 DXManager.TextureList.Remove(this);
 
             ReleaseRepairedShadow();
+            ReleaseSpellMask();
             _shadowAllocationFailed = false;
 
             if (Image != null && !Image.Disposed)

@@ -32,7 +32,9 @@ public class ClientMagic
         Need3 = reader.ReadUInt16();
 
         Level = reader.ReadByte();
-        Key = reader.ReadByte();
+        byte binding = reader.ReadByte();
+        IsTempSpell = (binding & 0x80) != 0;
+        Key = (byte)(binding & 0x7f);
         Experience = reader.ReadUInt16();
 
         Delay = reader.ReadInt64();
@@ -57,7 +59,7 @@ public class ClientMagic
         writer.Write(Need3);
 
         writer.Write(Level);
-        writer.Write(Key);
+        writer.Write((byte)(Key | (IsTempSpell ? 0x80 : 0)));
         writer.Write(Experience);
 
         writer.Write(Delay);

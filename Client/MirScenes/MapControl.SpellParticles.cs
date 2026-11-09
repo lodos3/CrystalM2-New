@@ -1,279 +1,485 @@
 using System.Numerics;
 using Client.MirGraphics;
+using Client.MirObjects;
 using CrystalM2.Rendering.Core;
 
 namespace Client.MirScenes;
 
 public sealed partial class MapControl
 {
-    private readonly SpellParticlePool _spellParticles = new(512);
+    private const int SpellParticleCapacity = 2048;
+    private readonly SpellParticlePool _spellParticles = new(SpellParticleCapacity);
+    private readonly SpellParticle[] _groundSpellRow = new SpellParticle[SpellParticleCapacity];
+    private readonly List<WizardArc> _wizardArcs = new(16);
+    private readonly List<SpellObject> _healingCircleCells = new(25);
+    private static float SpellParticleSize => GraphicsTuning.SpellVisualSize.Current / 100f;
+    private static bool SpellOffsetLinked => GraphicsTuning.Offset(GraphicsLayer.Spell).Linked || GraphicsTuning.Offset(GraphicsLayer.Particles).Linked;
     internal int SpellParticleMapGeneration { get; private set; }
+
+    private readonly record struct WizardArc(Spell Spell, Point From, Point To, long Start, int Duration,
+        MirDirection? Direction = null, long LastCellTime = 0);
 
     private void ResetSpellParticles()
     {
         if (!_spellParticles.Active.IsEmpty) TextureValid = false;
         _spellParticles.Clear();
+        _wizardArcs.Clear();
+        _healingCircleCells.Clear();
         SpellParticleMapGeneration++;
     }
 
-    internal static bool HasSpellTrail(Spell spell) => spell is Spell.FireBall or Spell.GreatFireBall or
-        Spell.FireBounce or Spell.MeteorShower or Spell.FrostCrunch or Spell.SoulFireBall or Spell.Plague or
-        Spell.StraightShot or Spell.DoubleShot or Spell.ElementalShot or Spell.BindingShot or Spell.NapalmShot;
-
     internal void EmitSpellCast(Spell spell, Point location, Point target, MirDirection direction)
     {
-        if (!CanEmitSpellParticles(location)) return;
-
-        Vector2 centre = SpellWorldPoint(location);
-        float angle = ((int)direction - 2) * MathF.PI / 4;
-        Vector2 heading = new(MathF.Cos(angle), MathF.Sin(angle));
         if (SpecialisationAbilities.TryGet(spell, out var ability))
         {
-            Color colour = ThemeColour(ability.Theme);
-            if (ability.Theme is AbilityTheme.Steel or AbilityTheme.Blood or AbilityTheme.Shadow or AbilityTheme.Arrow)
-                EmitAccent(centre + heading * 14, heading * 8, colour, SpellParticleShape.Slash,
-                    56, Math.Max(ability.Windup, (ushort)200), (byte)direction);
-            else
-                EmitAccent(centre, -Vector2.UnitY * 8, colour, SpellParticleShape.Wisp, 39, ability.Windup);
-
-            if (ability.Target == AbilityTarget.Enemy && CanEmitSpellParticles(target) &&
-                ability.Theme is AbilityTheme.Arrow or AbilityTheme.Spirit or AbilityTheme.Storm)
-            {
-                Vector2 destination = SpellWorldPoint(target);
-                for (int step = 1; step <= 5; step++)
-                {
-                    Vector2 point = Vector2.Lerp(centre, destination, step / 6f) - Vector2.UnitY * 15;
-                    EmitAccent(point, heading * 10, colour, SpellParticleShape.Wisp,
-                        18 + step * 2, 170, delay: ability.Windup * step / 6);
-                }
-            }
-            return;
-        }
-
-        switch (spell)
-        {
-            case Spell.BladeAvalanche:
-            case Spell.SlashingBurst:
-            case Spell.CounterAttack:
-            case Spell.CrescentSlash:
-            case Spell.HeavenlySword:
-            case Spell.FlashDash:
-            case Spell.Lightning:
-                centre += heading * 24;
-                EmitAccent(centre, heading * 6, Palette(spell), SpellParticleShape.Slash, 78, 270, (byte)direction);
-                EmitAccent(centre, heading * 15, Palette(spell), SpellParticleShape.Slash, 90, 210, (byte)direction, delay: 65);
-                EmitBurst(spell, centre, heading, 12, delay: 85);
-                break;
-            case Spell.ProtectionField:
-            case Spell.ImmortalSkin:
-            case Spell.MagicShield:
-            case Spell.SoulShield:
-            case Spell.BlessedArmour:
-            case Spell.EnergyShield:
-            case Spell.ElementalBarrier:
-            case Spell.SummonSkeleton:
-            case Spell.SummonShinsu:
-            case Spell.SummonHolyDeva:
-                EmitAccent(centre, Vector2.Zero, Palette(spell), SpellParticleShape.Halo, 78, 650);
-                EmitAccent(centre, Vector2.Zero, Palette(spell), SpellParticleShape.Halo, 104, 480, delay: 140);
-                EmitBurst(spell, centre - new Vector2(0, 8), -Vector2.UnitY, 10, delay: 95);
-                break;
-            default:
-                if (HasSpellTrail(spell)) EmitBurst(spell, centre - new Vector2(0, 16), heading, 6);
-                break;
+            if (!CanEmitSpellParticles(location) && !CanEmitSpellParticles(target)) return;
+            SignatureSpellEffects.Cast(_spellParticles, ability, SpellWorldPoint(location), SpellWorldPoint(target), direction, CMain.Time);
+            TextureValid = false;
         }
     }
 
     internal void EmitSignatureEffect(Spell spell, Point location, SpellEffect phase)
     {
         if (!CanEmitSpellParticles(location) || !SpecialisationAbilities.TryGet(spell, out var ability)) return;
+        SignatureSpellEffects.Cell(_spellParticles, ability, SpellWorldPoint(location), phase, CMain.Time);
+        TextureValid = false;
+    }
 
-        Vector2 centre = SpellWorldPoint(location);
-        Color colour = ThemeColour(ability.Theme);
-        SpellParticleShape fragment = ability.Theme switch
-        {
-            AbilityTheme.Frost or AbilityTheme.Storm or AbilityTheme.Arrow => SpellParticleShape.Shard,
-            AbilityTheme.Venom or AbilityTheme.Shadow or AbilityTheme.Spirit => SpellParticleShape.Wisp,
-            _ => SpellParticleShape.Spark
-        };
+    internal void EmitRelayArc(Spell spell, Point from, Point to)
+    {
+        if (!CanEmitSpellParticles(from) && !CanEmitSpellParticles(to)) return;
+        if (SpecialisationAbilities.TryGet(spell, out var ability))
+            SignatureSpellEffects.RelayArc(_spellParticles, ability, SpellWorldPoint(from), SpellWorldPoint(to), CMain.Time);
+        else if (spell is Spell.Lightning or Spell.ThunderBolt or Spell.Vampirism)
+            AddWizardArc(new WizardArc(spell, from, to, CMain.Time, spell == Spell.Vampirism ? 350 : 440));
+        TextureValid = false;
+    }
 
-        if (phase == SpellEffect.SignatureArmed)
+    internal void QueueWizardLightning(Point to, MirDirection direction)
+    {
+        Point from = Functions.PointMove(to, Functions.ReverseDirection(direction), 1);
+        long now = CMain.Time;
+        // Lightning's server cue is one packet per affected cell. Reassemble the contiguous
+        // cells while the cast is arriving so the forks can span the entire travelled path.
+        for (int i = _wizardArcs.Count - 1; i >= 0; i--)
         {
-            EmitAccent(centre, Vector2.Zero, colour, SpellParticleShape.Halo, 66, 1300);
-            EmitAccent(centre - new Vector2(0, 5), -Vector2.UnitY * 7, colour, SpellParticleShape.Spark, 18, 550, delay: 140);
+            WizardArc arc = _wizardArcs[i];
+            if (arc.Direction != direction || arc.To != from || now - arc.LastCellTime > 80 ||
+                now - arc.Start > 160 || Functions.MaxDistance(arc.From, arc.To) >= 12) continue;
+            _wizardArcs[i] = arc with { To = to, LastCellTime = now };
             return;
         }
+        AddWizardArc(new WizardArc(Spell.Lightning, from, to, now, WizardSpellEffects.LightningDuration, direction, now));
+    }
 
-        if (phase == SpellEffect.SignatureWindup)
-        {
-            int width = (ability.Target is AbilityTarget.Ground or AbilityTarget.Self) && spell != Spell.GlacialGate ? 105 : 53;
-            int windupTime = ability.Windup;
-            EmitAccent(centre, Vector2.Zero, colour, SpellParticleShape.Halo, width, windupTime);
-            EmitAccent(centre - new Vector2(0, 6), new Vector2(0, -15), colour, SpellParticleShape.Wisp,
-                width / 2, windupTime / 2, delay: windupTime / 3);
-            return;
-        }
+    private void AddWizardArc(WizardArc arc)
+    {
+        if (_wizardArcs.Count >= 32) _wizardArcs.RemoveAt(0);
+        _wizardArcs.Add(arc);
+    }
 
-        int radius = ability.Target is AbilityTarget.Ground or AbilityTarget.Self ? 88 : 61;
-        int glowHeight = ability.Theme == AbilityTheme.Storm ? 30 : 16;
-        Vector2 core = centre - new Vector2(0, glowHeight);
-        if (ability.Theme is AbilityTheme.Ward or AbilityTheme.Frost or AbilityTheme.Flame or AbilityTheme.Blood)
+    private void ProcessWizardArcs()
+    {
+        long now = CMain.Time;
+        for (int i = _wizardArcs.Count - 1; i >= 0; i--)
         {
-            EmitAccent(centre, Vector2.Zero, colour, SpellParticleShape.Halo, radius, 500);
-            EmitAccent(centre, Vector2.Zero, colour, SpellParticleShape.Halo, radius + 24, 365, delay: 115);
-        }
-        EmitAccent(core, Vector2.Zero, Color.FromArgb(237, 255, 238, 216), SpellParticleShape.Spark, 33, 120);
-        EmitAccent(core, -Vector2.UnitY * 14, colour, fragment, 44, 245, delay: 30);
-        EmitAccent(core, -Vector2.UnitY * 26, colour, SpellParticleShape.Wisp, 66, 425, delay: 115);
-        if (_spellParticles.Active.Length < 448)
-        {
-            _spellParticles.Burst(core, -Vector2.UnitY, colour, CMain.Time, 8, fragment, delay: 70);
-            _spellParticles.Burst(core, -Vector2.UnitY * .6f, colour, CMain.Time, 5, fragment, delay: 180);
+            WizardArc arc = _wizardArcs[i];
+            if (now - arc.Start >= arc.Duration)
+            {
+                _wizardArcs.RemoveAt(i);
+                continue;
+            }
+            if (!CanEmitSpellParticles(arc.From) && !CanEmitSpellParticles(arc.To) &&
+                !CanEmitSpellParticles(new Point((arc.From.X + arc.To.X) / 2, (arc.From.Y + arc.To.Y) / 2))) continue;
+            WizardSpellEffects.DrawArc(_spellParticles, arc.Spell, SpellWorldPoint(arc.From), SpellWorldPoint(arc.To),
+                now, arc.Start, arc.Duration, SpellParticleSize, CellSeed(arc.From) ^ (uint)arc.Start);
+            TextureValid = false;
         }
     }
 
-    private static Color ThemeColour(AbilityTheme theme) => theme switch
+    internal void EmitLegacy(SpellVisual visual, Point cell, MirDirection direction = MirDirection.Right, Point drawOffset = default,
+        long? start = null, int duration = 0)
     {
-        AbilityTheme.Steel => Color.FromArgb(227, 241, 228, 195),
-        AbilityTheme.Blood => Color.FromArgb(233, 251, 69, 49),
-        AbilityTheme.Ward => Color.FromArgb(221, 255, 214, 125),
-        AbilityTheme.Flame => Color.FromArgb(224, 255, 112, 48),
-        AbilityTheme.Frost => Color.FromArgb(221, 118, 216, 255),
-        AbilityTheme.Storm => Color.FromArgb(229, 172, 163, 255),
-        AbilityTheme.Spirit => Color.FromArgb(213, 106, 236, 184),
-        AbilityTheme.Venom => Color.FromArgb(218, 134, 226, 81),
-        AbilityTheme.Shadow => Color.FromArgb(220, 179, 112, 237),
-        AbilityTheme.Arrow => Color.FromArgb(228, 254, 205, 121),
-        _ => Color.White
-    };
-
-    // For spells whose baked effect resolves directly at the target without a missile.
-    internal void EmitDirectSpellEffect(Spell spell, Point caster, Point groundTarget, Point? actorTarget)
-    {
-        switch (spell)
+        if (!CanEmitSpellParticles(cell) || !visual.HasArt) return;
+        if (LegacySpellEffects.HasLiveArt(visual.Spell))
         {
-            case Spell.ThunderStorm:
-                EmitSpellImpact(spell, caster);
-                break;
-            case Spell.FireBang:
-            case Spell.IceStorm:
-            case Spell.MassHealing:
-                EmitSpellImpact(spell, groundTarget);
-                break;
-            case Spell.ThunderBolt:
-            case Spell.Healing:
-            case Spell.Purification:
-            case Spell.FlameDisruptor:
-                EmitSpellImpact(spell, actorTarget ?? groundTarget);
-                break;
-            case Spell.Poisoning:
-            case Spell.Curse:
-                if (actorTarget.HasValue) EmitSpellImpact(spell, actorTarget.Value);
-                break;
+            Effects.Add(new Effect(visual, duration > 0 ? duration : LegacySpellEffects.PacketDuration(visual), cell, start ?? CMain.Time)
+                { ParticleDirection = direction, DrawOffset = drawOffset });
+            return;
         }
+        EmitLegacy(visual, SpellWorldPoint(cell) + new Vector2(drawOffset.X, drawOffset.Y), Facing(direction), start, duration);
+    }
+
+    internal void EmitLegacy(SpellVisual visual, MapObject actor, long? start = null, int duration = 0)
+    {
+        if (!CanEmitSpellParticles(actor.CurrentLocation) || !visual.HasArt) return;
+        if (LegacySpellEffects.HasLiveArt(visual.Spell))
+        {
+            actor.Effects.Add(new Effect(visual, duration > 0 ? duration : LegacySpellEffects.PacketDuration(visual), actor, start ?? CMain.Time));
+            return;
+        }
+        EmitLegacy(visual, SpellActorFeet(actor), Facing(actor.Direction), start, duration);
+    }
+
+    private static Vector2 SpellActorFeet(MapObject actor)
+    {
+        // DrawLocation is already interpolated by the actor and includes its sprite offset.
+        Point camera = ToMouseLocation(Point.Empty);
+        var feet = new Vector2(actor.DrawLocation.X - camera.X + CellWidth / 2, actor.DrawLocation.Y - camera.Y + CellHeight / 2);
+        if (!GraphicsTuning.Offset(GraphicsTuning.Layer(actor.Race)).Linked)
+        {
+            Point offset = GraphicsTuning.Offset(GraphicsTuning.Layer(actor.Race)).Pixels;
+            feet -= new Vector2(offset.X, offset.Y);
+        }
+        return feet;
+    }
+
+    internal void EmitAuthoredSpellFrame(SpellVisual visual, Effect effect, long start, int duration)
+    {
+        MapObject actor = effect.Owner;
+        if (actor is PlayerObject { Class: MirClass.Warrior } && WarriorSpellEffects.UsesBodyMask(visual.Spell)) return;
+        Point cell = actor?.CurrentLocation ?? effect.Source;
+        if (!CanEmitSpellParticles(cell)) return;
+        Vector2 feet = actor != null ? SpellActorFeet(actor) : SpellWorldPoint(cell) + new Vector2(effect.DrawOffset.X, effect.DrawOffset.Y);
+        if (actor != null && SpellOffsetLinked && GraphicsTuning.Offset(GraphicsTuning.Layer(actor.Race)).Linked)
+        {
+            // The shared offset is applied to the particle pass, so keep just one copy of it.
+            Point linked = GraphicsTuning.GroupOffset.Pixels;
+            feet -= new Vector2(linked.X, linked.Y);
+        }
+        uint seed = actor?.ObjectID ?? CellSeed(cell);
+        if (!effect.Repeat && !effect.ImpactDebrisStarted && CMain.Time >= start)
+        {
+            effect.ImpactDebrisStarted = true;
+            if (CMain.Time - start <= 150)
+                SpellImpactDebris.Emit(_spellParticles, visual, feet, Facing(effect.ParticleDirection), start,
+                    GraphicsTuning.ParticleDebris.Current, GraphicsTuning.ParticleGravity.Current / 100f,
+                    GraphicsTuning.ParticleDrift.Current / 100f, seed ^ (uint)start);
+        }
+        if (WarriorSpellEffects.HasArt(visual.Spell))
+        {
+            Vector2? tip = null;
+            if (visual is { Spell: Spell.FlamingSword, Phase: SpellVisualPhase.Prepare } &&
+                actor is PlayerObject player && player.EquippedWeaponTrace() is { } trace)
+            {
+                Point camera = SpellParticleOrigin();
+                tip = trace.Tip - new Vector2(camera.X, camera.Y);
+            }
+            MirDirection direction = visual.Phase == SpellVisualPhase.Swing
+                ? effect.ParticleDirection : actor?.Direction ?? effect.ParticleDirection;
+            WarriorSpellEffects.DrawFrame(_spellParticles, visual, feet, Facing(direction), CMain.Time, start,
+                duration, SpellParticleSize, seed, tip);
+        }
+        else if (TaoistSpellEffects.HasArt(visual.Spell))
+        {
+            TaoistSpellEffects.DrawFrame(_spellParticles, visual, feet, Facing(actor?.Direction ?? effect.ParticleDirection),
+                CMain.Time, start, duration, SpellParticleSize, seed);
+        }
+        else
+        {
+            WizardSpellEffects.DrawFrame(_spellParticles, visual, feet, Facing(actor?.Direction ?? effect.ParticleDirection),
+                CMain.Time, start, duration, SpellParticleSize, seed);
+        }
+        TextureValid = false;
+    }
+
+    private void EmitLegacy(SpellVisual visual, Vector2 feet, Vector2 facing, long? start = null, int duration = 0)
+    {
+        LegacySpellEffects.Emit(_spellParticles, visual, feet, facing, start ?? CMain.Time, duration, CMain.Time);
+        TextureValid = false;
     }
 
     internal void EmitSpellImpact(Spell spell, Point location)
     {
-        if (!CanEmitSpellParticles(location)) return;
+        // Protective wards and Curse share the same single, aim-anchored
+        // impact path. Buffs/debuffs are applied individually server-side,
+        // but their rune animations must never attach to each recipient.
+        if (spell is Spell.SoulShield or Spell.BlessedArmour or Spell.Curse)
+        {
+            EmitLegacy(new SpellVisual(spell, SpellVisualPhase.Impact), location);
+            return;
+        }
 
-        Vector2 centre = SpellWorldPoint(location);
-        Color colour = Palette(spell);
-        if (spell is Spell.Healing or Spell.MassHealing or Spell.Purification or Spell.ExplosiveTrap)
-            EmitAccent(centre, Vector2.Zero, colour, SpellParticleShape.Halo, 68, 540);
+        // Mass Healing and Mass Hiding still have distinct per-recipient impacts.
+        if (spell is Spell.MassHealing or Spell.MassHiding)
+        {
+            var hit = new SpellVisual(spell, SpellVisualPhase.Hit);
+            if (!CanEmitSpellParticles(location)) return;
+            MapObject recipient = null;
+            if (M2CellInfo[location.X, location.Y].CellObjects is { } wardOccupants)
+            {
+                foreach (MapObject actor in wardOccupants)
+                {
+                    if (actor.CurrentLocation != location ||
+                        actor.Race is not (ObjectType.Player or ObjectType.Hero or ObjectType.Monster)) continue;
+                    // MapEffect currently identifies the tile, not a unique object ID. If
+                    // multiple occupants share it, avoid attaching the cue to the wrong one.
+                    if (recipient != null) { recipient = null; break; }
+                    recipient = actor;
+                }
+            }
+            if (recipient == null) EmitLegacy(hit, location);
+            else EmitLegacy(hit, recipient);
+            return;
+        }
 
-        centre.Y -= 14;
-        EmitAccent(centre, Vector2.Zero, Color.FromArgb(230, 255, 242, 214), SpellParticleShape.Spark, 29, 120);
-        EmitAccent(centre, new Vector2(0, -9), colour, SpellParticleShape.Wisp, 54, 320, delay: 45);
-        EmitBurst(spell, centre, -Vector2.UnitY, 13, delay: 65);
+        // These spells already show the complete field at the cast location. The hit packets
+        // confirm contacts elsewhere in that field and only need a small accent on each target.
+        var phase = WarriorSpellEffects.HasArt(spell) ||
+            spell is Spell.FireBang or Spell.IceStorm or Spell.IceThrust or Spell.FlameField or Spell.ThunderStorm or Spell.StormEscape
+            ? SpellVisualPhase.Contact : SpellVisualPhase.Impact;
+        var visual = new SpellVisual(spell, phase);
+        if (spell == Spell.FlamingSword && CanEmitSpellParticles(location) &&
+            M2CellInfo[location.X, location.Y].CellObjects is { } occupants)
+        {
+            MapObject target = null;
+            foreach (MapObject actor in occupants)
+            {
+                if (actor.CurrentLocation != location || actor.Race is not (ObjectType.Player or ObjectType.Hero or ObjectType.Monster))
+                    continue;
+                if (target != null)
+                {
+                    target = null;
+                    break;
+                }
+                target = actor;
+            }
+            if (target != null)
+            {
+                EmitLegacy(visual, target);
+                return;
+            }
+        }
+        EmitLegacy(visual, location);
     }
 
-    internal void EmitSpellTrail(Spell spell, Point source, Point destination, float progress)
+    internal void EmitProjectileFrame(Spell spell, Point source, Point destination, LegacyProjectileTimeline timing, bool wake)
     {
-        if (!Settings.Effect || User == null || M2CellInfo == null) return;
+        float progress = timing.Progress(CMain.Time);
+        Point cell = new((int)MathF.Round(source.X + (destination.X - source.X) * progress),
+            (int)MathF.Round(source.Y + (destination.Y - source.Y) * progress));
+        if (!CanEmitSpellParticles(cell)) return;
 
         Vector2 origin = SpellWorldPoint(source);
         Vector2 target = SpellWorldPoint(destination);
-        Vector2 point = Vector2.Lerp(origin, target, progress);
-        var cell = new Point((int)point.X / CellWidth, (int)point.Y / CellHeight);
-        if (!CanEmitSpellParticles(cell)) return;
+        Vector2 heading = target == origin ? Vector2.UnitX : Vector2.Normalize(target - origin);
+        Vector2 head = LegacySpellEffects.ProjectileAnchor(spell, Vector2.Lerp(origin, target, progress));
+        LegacySpellEffects.ProjectileFrame(_spellParticles, spell, head, heading, CMain.Time, timing.Frame(CMain.Time),
+            (int)(timing.Impact - CMain.Time), wake, SpellParticleSize);
+        TextureValid = false;
+    }
 
-        Vector2 drift = (origin - target) * .12f;
-        if (drift.LengthSquared() > 24 * 24) drift = Vector2.Normalize(drift) * 24;
-        point.Y -= 16;
-        Color colour = Palette(spell);
-        EmitAccent(point, drift, colour, SpellParticleShape.Wisp, 22, 290);
-        EmitAccent(point, drift - new Vector2(0, 8), colour, Fragment(spell), 12, 230);
+    internal void EmitWeaponSweep(Spell spell, WeaponMaskTrace screenPose, WeaponMaskTrace? previousWorld,
+        Point screenFeet, MirDirection direction, float progress, float previousProgress, int remaining, int frameInterval,
+        out WeaponMaskTrace worldPose, bool followThrough = false)
+    {
+        Point camera = SpellParticleOrigin();
+        Vector2 offset = new(camera.X, camera.Y);
+        worldPose = new WeaponMaskTrace(screenPose.Hilt - offset, screenPose.Tip - offset);
+        Vector2 feet = new Vector2(screenFeet.X, screenFeet.Y) - offset;
+        LegacySpellEffects.WeaponSweep(_spellParticles, spell, worldPose, previousWorld, CMain.Time, remaining, frameInterval,
+            Facing(direction), progress, feet, previousProgress, followThrough);
+        TextureValid = false;
+    }
+
+    internal WeaponMaskTrace WeaponPoseInWorld(WeaponMaskTrace screen)
+    {
+        Point camera = SpellParticleOrigin();
+        Vector2 offset = new(camera.X, camera.Y);
+        return new WeaponMaskTrace(screen.Hilt - offset, screen.Tip - offset);
+    }
+
+    internal void EmitWeaponEnchant(Spell spell, WeaponMaskTrace world, MapObject actor, bool striking)
+    {
+        if (_spellParticles.Active.Length >= (striking ? SpellParticleCapacity * 7 / 8 : SpellParticleCapacity * 3 / 4)) return;
+        WarriorSpellEffects.DrawWeaponEnchant(_spellParticles, spell, world, Facing(actor.Direction), CMain.Time,
+            SpellParticleSize, actor.ObjectID, striking, SpellActorFeet(actor).Y);
+        TextureValid = false;
+    }
+
+    internal WeaponMaskTrace WeaponPoseOnScreen(WeaponMaskTrace world)
+    {
+        Point camera = SpellParticleOrigin();
+        Vector2 offset = new(camera.X, camera.Y);
+        return new WeaponMaskTrace(world.Hilt + offset, world.Tip + offset);
+    }
+
+    internal void EmitDashTrail(Point from, Point to, MirDirection direction, bool shoulderDash)
+    {
+        if (!CanEmitSpellParticles(from) && !CanEmitSpellParticles(to)) return;
+        Vector2 start = SpellWorldPoint(from);
+        Vector2 end = SpellWorldPoint(to);
+        if (shoulderDash)
+        {
+            WarriorSpellEffects.Dash(_spellParticles, start, end, CMain.Time);
+            TextureValid = false;
+            return;
+        }
+        for (int i = 0; i < 4; i++)
+            EmitLegacy(new SpellVisual(Spell.ShoulderDash, SpellVisualPhase.Flight), Vector2.Lerp(start, end, i / 4f), Facing(direction));
     }
 
     internal static bool HasGroundSpellParticles(Spell spell) => spell is Spell.FireWall or Spell.PoisonCloud or
-        Spell.Blizzard or Spell.MeteorStrike or Spell.HealingCircle or Spell.TrapHexagon;
+        Spell.Blizzard or Spell.MeteorStrike or Spell.HealingCircle or Spell.TrapHexagon or Spell.Reincarnation or
+        Spell.ExplosiveTrap or Spell.Trap or Spell.Portal;
 
-    internal void EmitGroundSpellParticles(Spell spell, Point location)
+    internal void EmitGroundSpellParticles(SpellObject field)
     {
-        // Reserve room for casts and impacts during overlapping ground effects.
-        if (_spellParticles.Active.Length >= 384 || !CanEmitSpellParticles(location)) return;
-
-        Vector2 centre = SpellWorldPoint(location);
-        Color colour = Palette(spell);
-        if (spell is Spell.HealingCircle or Spell.TrapHexagon)
-            EmitAccent(centre, Vector2.Zero, colour, SpellParticleShape.Halo, 50, 520);
+        if (field.Spell == Spell.HealingCircle)
+        {
+            if (Settings.Effect) _healingCircleCells.Add(field);
+            return;
+        }
+        if (_spellParticles.Active.Length >= SpellParticleCapacity * 5 / 8 || !CanEmitSpellParticles(field.CurrentLocation)) return;
+        var visual = new SpellVisual(field.Spell, SpellVisualPhase.Field);
+        Vector2 feet = SpellWorldPoint(field.CurrentLocation);
+        if (field.Spell == Spell.PoisonCloud)
+        {
+            Point cell = field.CurrentLocation;
+            int west = HasCloud(cell.X - 1, cell.Y), east = HasCloud(cell.X + 1, cell.Y);
+            int north = HasCloud(cell.X, cell.Y - 1), south = HasCloud(cell.X, cell.Y + 1);
+            Vector2 inward = new((east - west) * 10, (south - north) * 7);
+            TaoistSpellEffects.DrawPoisonField(_spellParticles, feet, CMain.Time, field.ParticleStart,
+                SpellParticleSize, CellSeed(cell), field.ObjectID, inward, west + east + north + south);
+        }
+        else if (WizardSpellEffects.HasArt(field.Spell))
+            WizardSpellEffects.DrawFrame(_spellParticles, visual, feet, Facing(field.Direction), CMain.Time,
+                field.ParticleStart, int.MaxValue, SpellParticleSize, CellSeed(field.CurrentLocation), field.ObjectID);
+        else if (TaoistSpellEffects.HasArt(field.Spell))
+            TaoistSpellEffects.DrawFrame(_spellParticles, visual, feet, Facing(field.Direction), CMain.Time,
+                field.ParticleStart, int.MaxValue, SpellParticleSize, CellSeed(field.CurrentLocation), field.ObjectID);
         else
-            EmitBurst(spell, centre, -Vector2.UnitY, 3);
+            LegacySpellEffects.Emit(_spellParticles, visual, feet, Facing(field.Direction), CMain.Time, fieldObjectID: field.ObjectID);
+        TextureValid = false;
+
+        int HasCloud(int x, int y)
+        {
+            if ((uint)x >= (uint)Width || (uint)y >= (uint)Height || M2CellInfo[x, y].CellObjects is not { } objects)
+                return 0;
+            foreach (MapObject occupant in objects)
+                if (occupant is SpellObject { Spell: Spell.PoisonCloud, Ended: false }) return 1;
+            return 0;
+        }
     }
 
-    private static SpellParticleShape Fragment(Spell spell) => spell switch
+    private void ProcessHealingCircles()
     {
-        Spell.FrostCrunch or Spell.IceStorm or Spell.Blizzard or Spell.IceThrust or
-        Spell.ThunderBolt or Spell.Lightning or Spell.ThunderStorm => SpellParticleShape.Shard,
-        Spell.Poisoning or Spell.PoisonCloud or Spell.PoisonSword or Spell.Curse or Spell.Plague => SpellParticleShape.Wisp,
-        _ => SpellParticleShape.Spark
-    };
+        if (_healingCircleCells.Count == 0) return;
+        // The server allocates the cells of a cast in map row order. Combine its
+        // adjacent cells into one seal, sized to the usual three- or five-cell field.
+        _healingCircleCells.Sort(static (left, right) => left.ObjectID.CompareTo(right.ObjectID));
+        for (int i = 0; i < _healingCircleCells.Count && _spellParticles.Active.Length < SpellParticleCapacity * 5 / 8;)
+        {
+            SpellObject first = _healingCircleCells[i++];
+            Point previous = first.CurrentLocation;
+            int left = previous.X, right = previous.X, top = previous.Y, bottom = previous.Y;
+            long start = first.ParticleStart;
+            bool visible = CanEmitSpellParticles(previous);
+            while (i < _healingCircleCells.Count)
+            {
+                SpellObject next = _healingCircleCells[i];
+                Point cell = next.CurrentLocation;
+                if (next.ObjectID - first.ObjectID >= 25 || Math.Abs(next.ParticleStart - start) > 160 ||
+                    cell.Y < previous.Y || cell.Y == previous.Y && cell.X <= previous.X || cell.Y - bottom > 2 ||
+                    cell.Y - top > 4 || Math.Max(right, cell.X) - Math.Min(left, cell.X) > 4)
+                    break;
+                i++;
+                previous = cell;
+                left = Math.Min(left, cell.X);
+                right = Math.Max(right, cell.X);
+                bottom = cell.Y;
+                visible |= CanEmitSpellParticles(cell);
+            }
 
-    private static Color Palette(Spell spell) => spell switch
+            if (!visible) continue;
+            Vector2 feet = (SpellWorldPoint(new Point(left, top)) + SpellWorldPoint(new Point(right, bottom))) * .5f;
+            float width = 354 + Math.Max(0, Math.Max(right - left, bottom - top) - 2) * CellWidth;
+            TaoistSpellEffects.DrawFrame(_spellParticles, new SpellVisual(Spell.HealingCircle, SpellVisualPhase.Field),
+                feet, Vector2.UnitX, CMain.Time, start, int.MaxValue, SpellParticleSize, first.ObjectID, first.ObjectID, width);
+            TextureValid = false;
+        }
+        _healingCircleCells.Clear();
+    }
+
+    internal void EndGroundSpellParticles(uint objectID)
     {
-        Spell.FireBall or Spell.GreatFireBall or Spell.FireBang or Spell.FireWall or Spell.FlameDisruptor or
-        Spell.FireBounce or Spell.FlameField or Spell.MeteorStrike or Spell.MeteorShower or
-        Spell.FlamingSword or Spell.ExplosiveTrap or Spell.NapalmShot => Color.FromArgb(224, 255, 111, 46),
-        Spell.FrostCrunch or Spell.IceStorm or Spell.Blizzard or Spell.IceThrust or
-        Spell.MagicShield or Spell.ElementalBarrier => Color.FromArgb(214, 129, 216, 255),
-        Spell.ThunderBolt or Spell.Lightning or Spell.ThunderStorm => Color.FromArgb(228, 173, 170, 255),
-        Spell.Poisoning or Spell.PoisonCloud or Spell.PoisonSword or Spell.Curse or Spell.Plague => Color.FromArgb(205, 127, 221, 83),
-        Spell.SoulFireBall or Spell.SummonSkeleton or Spell.SummonShinsu or Spell.SummonHolyDeva or
-        Spell.TrapHexagon => Color.FromArgb(210, 121, 236, 196),
-        Spell.FatalSword or Spell.DoubleSlash or Spell.FlashDash or Spell.CrescentSlash or
-        Spell.HeavenlySword => Color.FromArgb(213, 206, 139, 252),
-        _ => Color.FromArgb(217, 255, 216, 139)
-    };
+        if (_spellParticles.RemoveField(objectID)) TextureValid = false;
+    }
+
+    private static Vector2 Facing(MirDirection direction)
+    {
+        float angle = ((int)direction - 2) * MathF.PI / 4;
+        return Vector2.Normalize(new Vector2(MathF.Cos(angle), MathF.Sin(angle) * .68f));
+    }
 
     private static Vector2 SpellWorldPoint(Point cell) =>
         new(cell.X * CellWidth + CellWidth / 2, cell.Y * CellHeight + CellHeight / 2);
+
+    private static uint CellSeed(Point cell) => unchecked((uint)cell.X * 73856093u ^ (uint)cell.Y * 19349663u);
 
     private bool CanEmitSpellParticles(Point cell) => Settings.Effect && User != null && M2CellInfo != null &&
         cell.X >= 0 && cell.Y >= 0 && cell.X < Width && cell.Y < Height &&
         Math.Abs(cell.X - User.Movement.X) <= ViewRangeX + 2 &&
         Math.Abs(cell.Y - User.Movement.Y) <= ViewRangeY + 2;
 
-    private void EmitAccent(Vector2 centre, Vector2 velocity, Color colour, SpellParticleShape shape,
-        int size, int duration, byte direction = 0, int delay = 0)
-    {
-        var particle = new SpellParticle(centre, velocity, CMain.Time + delay, duration, size, colour, shape, direction);
-        if (delay > 0) _spellParticles.Schedule(particle);
-        else if (_spellParticles.TryAdd(particle))
-            TextureValid = false;
-    }
-
-    private void EmitBurst(Spell spell, Vector2 centre, Vector2 heading, int count, int delay = 0)
-    {
-        if (_spellParticles.Burst(centre, heading, Palette(spell), CMain.Time, count, Fragment(spell), delay) && delay == 0)
-            TextureValid = false;
-    }
-
-    private void DrawSpellParticles(bool ground)
+    private void DrawGroundSpellRow(int y, int firstRow, int lastRow)
     {
         if (!Settings.Effect || _spellParticles.Active.IsEmpty) return;
+        float start = y == firstRow ? float.NegativeInfinity : y * CellHeight;
+        float end = y == lastRow ? float.PositiveInfinity : (y + 1) * CellHeight;
+        int count = 0;
+        foreach (ref readonly SpellParticle particle in _spellParticles.Active)
+            if (particle.Ground && particle.Layer != SpellParticleLayer.Floor && particle.DepthAt(CMain.Time) >= start && particle.DepthAt(CMain.Time) < end)
+                _groundSpellRow[count++] = particle;
 
-        Point camera = ToMouseLocation(Point.Empty);
-        DXManager.Device.SpellParticles.Draw(_spellParticles.Active, new Vector2(camera.X, camera.Y), CMain.Time, ground);
+        DrawSpellParticles(_groundSpellRow.AsSpan(0, count), ground: true);
     }
+
+    private void DrawFloorSpellParticles()
+    {
+        int count = 0;
+        foreach (ref readonly SpellParticle particle in _spellParticles.Active)
+            if (particle.Layer == SpellParticleLayer.Floor) _groundSpellRow[count++] = particle;
+        DrawSpellParticles(_groundSpellRow.AsSpan(0, count), ground: true);
+    }
+
+    private void DrawSpellParticles(ReadOnlySpan<SpellParticle> particles, bool ground, bool emissiveOverlay = false,
+        Texture occlusion = null, int depthOrigin = 0)
+    {
+        if (!Settings.Effect || particles.IsEmpty) return;
+
+        Point camera = SpellParticleOrigin();
+        using var artwork = ground && GraphicsTuning.GroundParticleBlend.Current != 0
+            ? DXManager.BlendArtwork(GraphicsLayer.Particles, GraphicsTuning.GroundParticleBlend)
+            : DXManager.BlendArtwork(GraphicsLayer.Particles, GraphicsLayer.Spell);
+        DXManager.Device.SpellParticles.Draw(particles, new Vector2(camera.X, camera.Y), CMain.Time, ground,
+            ground ? 1f : Settings.SpellBlendIntensityPercent / 100f,
+            sizeScale: ground ? 1f : SpellParticleSize, emissiveOverlay: emissiveOverlay,
+            exposure: GraphicsTuning.SpellExposure.Current / 100f, saturation: GraphicsTuning.SpellSaturation.Current / 100f,
+            glowPolicy: new SpellParticleGlowPolicy(
+                GraphicsTuning.SpellComposite.Current,
+                GraphicsTuning.SpellGlowCutoff.Current / 100f,
+                GraphicsTuning.SpellGlowStrength.Current / 100f,
+                GraphicsTuning.SpellGlowBlend.Current != 0),
+            occlusion: occlusion, depthOrigin: depthOrigin, cellHeight: CellHeight,
+            grade: new SpellParticleGrade(GraphicsTuning.ParticleHue.Current * (MathF.PI / 180f),
+                GraphicsTuning.ParticleCoreColour.Current / 100f, GraphicsTuning.ParticleSmokeOpacity.Current / 100f,
+                GraphicsTuning.ParticleEdgeSoftness.Current / 100f, GraphicsTuning.ParticleMaskDetail.Current / 100f));
+    }
+
+    private void DrawSpellParticleLights(float intensity)
+    {
+        if (_spellParticles.Active.IsEmpty) return;
+        Point position = GraphicsTuning.LightPosition(LightSource.Spell, SpellParticleOrigin(), SpellOffsetLinked);
+        Vector2 camera = new(position.X, position.Y);
+        var light = GraphicsTuning.Light(LightSource.Spell);
+        float radius = light.Radius.Current / 100f, warmth = light.Warmth.Current * 0.003f;
+        Vector4 tint = RendererDevice.ToVector(light.Colour);
+        ShapedLightPass.AddParticles(_spellParticles, camera, CMain.Time, intensity * GraphicsTuning.ParticleLightGain.Current / 100f, radius,
+            SpellParticleSize, warmth,
+            light.CustomColour.Current == 0 ? null : new Vector3(tint.X, tint.Y, tint.Z));
+    }
+
+    private Point SpellParticleOrigin() => GraphicsTuning.Offset(GraphicsLayer.Particles).Apply(
+        GraphicsTuning.Offset(GraphicsLayer.Spell).Apply(ToMouseLocation(Point.Empty)), GraphicsTuning.Offset(GraphicsLayer.Spell).Linked);
 }

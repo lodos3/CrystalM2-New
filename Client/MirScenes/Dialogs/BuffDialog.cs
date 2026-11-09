@@ -273,6 +273,8 @@ namespace Client.MirScenes.Dialogs
 
         public string BuffString(ClientBuff buff)
         {
+            if (TalentStatuses.TryGet(buff.Type, out var status))
+                return $"{status.Name}\n{status.Description}\n{Math.Max(0, (buff.ExpireTime - CMain.Time + 999) / 1000)}s";
             string text = RegexFunctions.SeperateCamelCase(buff.Type.ToLocalizedString()) + "\n";
             bool overridestats = false;
 
@@ -415,6 +417,7 @@ namespace Client.MirScenes.Dialogs
 
         private int BuffImage(BuffType type)
         {
+            if (TalentStatuses.TryGet(type, out var status)) return 20000 + status.Icon * 2;
             switch (type)
             {
                 //Skills

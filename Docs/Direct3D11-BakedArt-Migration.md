@@ -7,8 +7,9 @@ files have been removed. There is no renderer selector or fallback client.
 
 ## Rendering contract
 
-- Original Mir 2/Mir 3 LIB BGRA bytes, independent mask layers, X/Y offsets,
-  transparency and painter's order are preserved during upload and drawing.
+- Mir 2/Mir 3 LIB files stay intact on disk. World sprite uploads smooth
+  recognised transparent checker shadows while preserving the original layer
+  offsets, hit-test coverage and draw order.
 - Original artwork uses point-clamped BGRA8 UNORM sampling, without automatic
   normal maps, sRGB conversion, inferred materials or per-sprite relighting.
 - Intermediate map/UI textures accumulate premultiplied RGB and correct alpha.
@@ -29,6 +30,17 @@ files have been removed. There is no renderer selector or fallback client.
 
 ## Baked shadows and checker masks
 
+Map, character and monster textures automatically rebuild dense near-black
+checker regions over transparency as soft translucent shadows at their authored
+positions. This runs when a sprite is uploaded, including its mask layer. Dark
+patterns inside opaque artwork require source art or an authored shadow mask to
+identify the shadow pixels reliably.
+
+Map strips reflect checker samples at the frame boundary so joined sections
+retain shadow coverage. For maps previously converted by the library editor,
+the client can read an original frame from `Data/.shadow-backup` when its
+dimensions, offsets and artwork match. It uses that frame in memory only.
+
 Projected shadows are disabled by default. Enabling `DynamicShadows=True`
 alone does not authorise another shadow on already shaded artwork. List the
 exact libraries that an artist has verified contain no baked ground shadow:
@@ -44,12 +56,9 @@ libraries in a particular asset installation are safe. Use the actual path
 relative to the client working directory. Matching ignores case and slash
 style; similarly named libraries in other folders do not inherit permission.
 
-For explicitly permitted sources, checker-pattern alpha detection and the
-16 MiB repaired-shadow mask budget are retained. Repair affects the separate
-half-resolution projected mask, never the original artwork or hit-test alpha.
-Current animation frames and light-responsive projection continue to be used.
-The separate repaired masks use linear filtering for soft edges, while the
-source artwork keeps point sampling.
+Recognised baked checker shadows suppress the extra projection for that frame.
+For permitted projection sources, the separate half-resolution masks use linear
+filtering and share a 16 MiB budget.
 
 ## Environmental and light effects
 
@@ -58,10 +67,11 @@ weather exposure, authored wet-surface overlays and optional lightning. It is
 composited before the HUD. No surface normals or materials are inferred from
 sprite colour.
 
-Emission and ambient light now have separate roles. The light buffer clears
-to black and receives explicit map/actor light draws. Ambient colour is added
-only when that buffer multiplies the world. This prevents ambient brightness
-itself from crossing the bloom threshold, including on daylight maps.
+Spell sprites and light-marked or additive map animations use the frame drawn
+that tick to emit coloured light. Static map lights and torches keep radial
+glows. Ambient shade stays separate from emission, and a small additive pass
+keeps emission visible during daylight. **Settings → Graphics** exposes ambient
+shade, spell light, map light and additive spell blending.
 
 `LightingBloom=True` enables emitted-light extraction followed by horizontal
 and vertical Gaussian blur. The two reduced-resolution targets follow

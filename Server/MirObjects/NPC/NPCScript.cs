@@ -1177,7 +1177,7 @@ namespace Server.MirObjects
                 }
             }
 
-            if (goods == null || count == 0 || count > goods.Info.StackSize) return;
+            if (goods == null || goods.Info.Type == ItemType.Book || count == 0 || count > goods.Info.StackSize) return;
 
             if (isBuyBack || isUsed)
                 count = Math.Min(count, goods.Count);

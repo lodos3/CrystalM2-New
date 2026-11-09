@@ -1,12 +1,24 @@
 ﻿using Client.MirGraphics;
 using Client.MirScenes;
 using Client.MirSounds;
+using CrystalM2.Rendering.Core;
 
 namespace Client.MirObjects
 {
+    public readonly record struct EffectArt(MLibrary Library, SpellVisual Visual)
+    {
+        public bool IsParticle => Visual.HasArt;
+        public static implicit operator EffectArt(MLibrary library) => new(library, default);
+        public static implicit operator EffectArt(Spell spell) => new(null, new SpellVisual(spell));
+        public static implicit operator EffectArt(SpellVisual visual) => new(null, visual);
+    }
+
     public class Effect
     {
-        public MLibrary Library;
+        public EffectArt Art { get; }
+        private long _nextParticleTime;
+        internal bool ImpactDebrisStarted;
+        protected readonly int? ParticleMapGeneration;
 
         public int BaseIndex, Count, Duration;
         public long Start;
@@ -16,6 +28,7 @@ namespace Client.MirObjects
 
         public Point Source;
         public MapObject Owner;
+        public MirDirection ParticleDirection = MirDirection.Right;
 
         public int Light = 6;
         public Color LightColour = Color.White;
@@ -28,6 +41,7 @@ namespace Client.MirObjects
         public long RepeatUntil;
 
         public bool DrawBehind = false;
+        protected virtual int DrawnFrame => BaseIndex + CurrentFrame;
 
         public long CurrentDelay;
         public long Delay;
@@ -35,9 +49,10 @@ namespace Client.MirObjects
         public event EventHandler Complete;
         public event EventHandler Played;
 
-        public Effect(MLibrary library, int baseIndex, int count, int duration, MapObject owner, long starttime = 0, bool drawBehind = false)
+        public Effect(EffectArt library, int baseIndex, int count, int duration, MapObject owner, long starttime = 0, bool drawBehind = false)
         {
-            Library = library;
+            Art = library;
+            if (Art.IsParticle) ParticleMapGeneration = GameScene.Scene?.MapControl?.SpellParticleMapGeneration;
             BaseIndex = baseIndex;
             Count = count == 0 ? 1 : count;
             Duration = duration;
@@ -49,9 +64,10 @@ namespace Client.MirObjects
 
             DrawBehind = drawBehind;
         }
-        public Effect(MLibrary library, int baseIndex, int count, int duration, Point source, long starttime = 0, bool drawBehind = false)
+        public Effect(EffectArt library, int baseIndex, int count, int duration, Point source, long starttime = 0, bool drawBehind = false)
         {
-            Library = library;
+            Art = library;
+            if (Art.IsParticle) ParticleMapGeneration = GameScene.Scene?.MapControl?.SpellParticleMapGeneration;
             BaseIndex = baseIndex;
             Count = count == 0 ? 1 : count;
             Duration = duration;
@@ -63,6 +79,12 @@ namespace Client.MirObjects
             DrawBehind = drawBehind;
         }
 
+        public Effect(SpellVisual visual, int duration, MapObject owner, long start = 0, int frames = 1)
+            : this(visual, 0, frames, duration, owner, start) { }
+
+        public Effect(SpellVisual visual, int duration, Point source, long start = 0)
+            : this(visual, 0, 1, duration, source, start) { }
+
         public void SetStart(long start)
         {
             Start = start;
@@ -72,6 +94,34 @@ namespace Client.MirObjects
 
         public virtual void Process()
         {
+            if (Art.IsParticle && this is not Missile && CMain.Time >= Start &&
+                (this is not SpecialEffect { EffectType: 1 } || Settings.LevelEffect))
+            {
+                var map = GameScene.Scene.MapControl;
+                if (Repeat || ParticleMapGeneration == null || ParticleMapGeneration == map.SpellParticleMapGeneration)
+                {
+                    var visual = Repeat ? Art.Visual with { Phase = SpellVisualPhase.Aura } : Art.Visual;
+                    if (LegacySpellEffects.HasLiveArt(visual.Spell))
+                    {
+                        if (RepeatUntil == 0 || CMain.Time < RepeatUntil)
+                            map.EmitAuthoredSpellFrame(visual, this, Repeat ? CMain.Time : Start, Duration);
+                    }
+                    else if (CMain.Time >= _nextParticleTime)
+                    {
+                        long end = RepeatUntil > 0 ? Math.Min(Start + Duration, RepeatUntil) : Start + Duration;
+                        long begin = Repeat ? CMain.Time : Start;
+                        int window = (int)Math.Max(0, end - begin);
+                        if (Repeat) window = Math.Min(520, window);
+                        _nextParticleTime = Repeat ? begin + 240 : long.MaxValue;
+                        if (window > 0 && CMain.Time < end)
+                        {
+                            if (Owner == null) map.EmitLegacy(visual, Source, ParticleDirection, DrawOffset, start: begin, duration: window);
+                            else map.EmitLegacy(visual, Owner, begin, window);
+                        }
+                    }
+                }
+            }
+
             if (CurrentFrame == 1)
             {
                 if (Played != null)
@@ -111,7 +161,7 @@ namespace Client.MirObjects
 
         public virtual void Draw()
         {
-            if (CMain.Time < Start) return;
+            if (CMain.Time < Start || Art.IsParticle) return;
 
             if (Owner != null)
             {
@@ -126,10 +176,21 @@ namespace Client.MirObjects
             }
 
 
-            if (Blend)
-                Library.DrawBlend(BaseIndex + CurrentFrame, DrawLocation, Color.White, true, Rate);
-            else
-                Library.Draw(BaseIndex + CurrentFrame, DrawLocation, Color.White, true);
+            DrawLocation = GraphicsTuning.Offset(GraphicsLayer.Spell).Apply(DrawLocation, OwnerOffsetLinked);
+            using var artwork = DXManager.BlendArtwork(GraphicsLayer.Spell);
+            Art.Library?.DrawSpellFrame(DrawnFrame, DrawLocation, Color.White, Blend, Rate);
+        }
+
+        private bool OwnerOffsetLinked => Owner != null && this is not Missile &&
+            GraphicsTuning.Offset(GraphicsTuning.Layer(Owner.Race)).Linked;
+        internal Point LightPosition => GraphicsTuning.LightPosition(LightSource.Spell, DrawLocation,
+            OwnerOffsetLinked || GraphicsTuning.Offset(GraphicsLayer.Spell).Linked);
+
+        internal bool DrawLightMask(Color tint, float intensity, ref int pixelBudget, out Point centre)
+        {
+            centre = LightPosition;
+            return Art.Library != null && CurrentFrame >= 0 && CurrentFrame < Count &&
+                Art.Library.DrawLightShape(DrawnFrame, centre, tint, true, intensity, ref pixelBudget, LightSource.Spell, out centre);
         }
 
         public void Clear()
@@ -147,17 +208,10 @@ namespace Client.MirObjects
         public int Interval, FrameCount, Skip;
         public int Direction;
         public bool Explode;
-        private Spell _particleSpell;
-        private int _particleMapGeneration;
-        private long _nextParticleTime;
+        protected override int DrawnFrame => BaseIndex + CurrentFrame % Math.Max(1, FrameCount) + Direction * (Skip + FrameCount);
+        private long _nextTrailTime;
 
-        internal void TrackSpellParticles(Spell spell)
-        {
-            _particleSpell = spell;
-            _particleMapGeneration = GameScene.Scene.MapControl.SpellParticleMapGeneration;
-        }
-
-        public Missile(MLibrary library, int baseIndex, int count, int duration, MapObject owner, Point target, bool direction16 = true)
+        public Missile(EffectArt library, int baseIndex, int count, int duration, MapObject owner, Point target, bool direction16 = true)
             : base(library, baseIndex, count, duration, owner)
         {
             Missiles.Add(this);
@@ -166,7 +220,7 @@ namespace Client.MirObjects
             Direction = direction16 ? MapControl.Direction16(Source, Destination) : (int)Functions.DirectionFromPoint(Source, Destination);
         }
 
-        public Missile(MLibrary library, int baseIndex, int count, int duration, Point source, Point target)
+        public Missile(EffectArt library, int baseIndex, int count, int duration, Point source, Point target)
             : base(library, baseIndex, count, duration, source)
         {
             Missiles.Add(this);
@@ -182,7 +236,7 @@ namespace Client.MirObjects
             if (CMain.Time < Start) return;
 
             if (Target != null) Destination = Target.CurrentLocation;
-            else if (!Explode)
+            else if (!Explode && Owner != null && Destination != Source)
             {
                 int dist = Functions.MaxDistance(Owner.CurrentLocation, Destination);
 
@@ -190,27 +244,36 @@ namespace Client.MirObjects
                     Destination.Offset(Destination.X - Source.X, Destination.Y - Source.Y);
             }
 
-            Duration = Functions.MaxDistance(Source, Destination) * 50;
-            Count = Duration / Interval;
-            if (Count == 0) Count = 1;
-
-            base.Process();
-
-            if (_particleSpell == Spell.None || !Settings.Effect) return;
-
-            MapControl map = GameScene.Scene.MapControl;
-            if (_particleMapGeneration != map.SpellParticleMapGeneration) return;
-
-            if (CurrentFrame >= Count)
+            var timing = new LegacyProjectileTimeline(Start, Functions.MaxDistance(Source, Destination), Interval);
+            Duration = timing.Duration;
+            Count = timing.Frames;
+            if (!Art.IsParticle)
             {
-                if (Target != null || Explode) map.EmitSpellImpact(_particleSpell, Destination);
+                base.Process();
+                return;
             }
-            else if (CMain.Time >= _nextParticleTime)
+
+            var map = GameScene.Scene.MapControl;
+            if (ParticleMapGeneration != map.SpellParticleMapGeneration)
             {
-                _nextParticleTime = CMain.Time + 32;
-                map.EmitSpellTrail(_particleSpell, Source, Destination, (float)CurrentFrame / Count);
+                Clear();
+                Remove();
+                return;
             }
+            if (!timing.InFlight(CMain.Time))
+            {
+                CurrentFrame = Count;
+                Remove();
+                map.TextureValid = false;
+                return;
+            }
+
+            CurrentFrame = timing.Frame(CMain.Time);
+            bool wake = CMain.Time >= _nextTrailTime;
+            if (wake) _nextTrailTime = CMain.Time + 24;
+            map.EmitProjectileFrame(Art.Visual.Spell, Source, Destination, timing, wake);
         }
+
         public override void Remove()
         {
             base.Remove();
@@ -218,10 +281,10 @@ namespace Client.MirObjects
         }
         public override void Draw()
         {
-            if (CMain.Time < Start) return;
+            if (CMain.Time < Start || Art.IsParticle) return;
 
 
-            int index = BaseIndex + (CurrentFrame % FrameCount) + Direction * (Skip + FrameCount);
+            int index = DrawnFrame;
 
             DrawLocation = new Point((Source.X - MapObject.User.Movement.X + MapControl.OffSetX) * MapControl.CellWidth,
                                        (Source.Y - MapObject.User.Movement.Y + MapControl.OffSetY) * MapControl.CellHeight);
@@ -232,11 +295,10 @@ namespace Client.MirObjects
 
 
             DrawLocation.Offset(x * CurrentFrame / Count, y * CurrentFrame / Count);
+            DrawLocation.Offset(GraphicsTuning.Offset(GraphicsLayer.Spell).Pixels);
 
-            if (!Blend)
-                Library.Draw(index, DrawLocation, Color.White, true);
-            else
-                Library.DrawBlend(index, DrawLocation, Color.White, true, Rate);
+            using var artwork = DXManager.BlendArtwork(GraphicsLayer.Spell);
+            Art.Library?.DrawSpellFrame(index, DrawLocation, Color.White, Blend, Rate);
         }
 
     }
@@ -246,7 +308,7 @@ namespace Client.MirObjects
         public static List<InterruptionEffect> effectlist = new List<InterruptionEffect>();
         bool noProcess = false;
 
-        public InterruptionEffect(MLibrary library, int baseIndex, int count, int duration, MapObject owner, bool blend, long starttime = 0)
+        public InterruptionEffect(EffectArt library, int baseIndex, int count, int duration, MapObject owner, bool blend, long starttime = 0)
             : base(library, baseIndex, count, duration, owner)
         {
             Repeat = true;
@@ -295,7 +357,7 @@ namespace Client.MirObjects
         long killAt;//holds the exp value for 4 orbs : kills all orbs when myType 4 is reached
         bool loopit = false;//soundloop
 
-        public ElementsEffect(MLibrary library, int baseIndex, int count, int duration, MapObject owner, bool blend, int elementType, int killtime, bool loopon = false)
+        public ElementsEffect(EffectArt library, int baseIndex, int count, int duration, MapObject owner, bool blend, int elementType, int killtime, bool loopon = false)
             : base(library, baseIndex, count, duration, owner)
         {
             Repeat = true;
@@ -346,7 +408,7 @@ namespace Client.MirObjects
         public static List<DelayedExplosionEffect> effectlist = new List<DelayedExplosionEffect>();
         public int stage;
 
-        public DelayedExplosionEffect(MLibrary library, int baseIndex, int count, int duration, MapObject owner, bool blend, int Stage, long until)
+        public DelayedExplosionEffect(EffectArt library, int baseIndex, int count, int duration, MapObject owner, bool blend, int Stage, long until)
             : base(library, baseIndex, count, duration, owner)
         {
             Repeat = (Stage == 2) ? false : true;
@@ -395,7 +457,7 @@ namespace Client.MirObjects
     {
         public uint EffectType = 0;
 
-        public SpecialEffect(MLibrary library, int baseIndex, int count, int duration, MapObject owner, bool blend, bool drawBehind, uint type)
+        public SpecialEffect(EffectArt library, int baseIndex, int count, int duration, MapObject owner, bool blend, bool drawBehind, uint type)
             : base(library, baseIndex, count, duration, owner, 0, drawBehind)
         {
             Blend = blend;
@@ -414,7 +476,7 @@ namespace Client.MirObjects
     {
         public BuffType BuffType;
 
-        public BuffEffect(MLibrary library, int baseIndex, int count, int duration, MapObject owner, bool blend, BuffType buffType)
+        public BuffEffect(EffectArt library, int baseIndex, int count, int duration, MapObject owner, bool blend, BuffType buffType)
             : base(library, baseIndex, count, duration, owner, 0)
         {
             Repeat = true;
@@ -435,7 +497,7 @@ namespace Client.MirObjects
         public string EffectName = "default";
 
         public TrackableEffect(Effect baseEffect, string effName = "null")
-            : base(baseEffect.Library, baseEffect.BaseIndex, baseEffect.Count, baseEffect.Duration, baseEffect.Owner, baseEffect.Start)
+            : base(baseEffect.Art, baseEffect.BaseIndex, baseEffect.Count, baseEffect.Duration, baseEffect.Owner, baseEffect.Start)
         {
             Repeat = baseEffect.Repeat;
             RepeatUntil = baseEffect.RepeatUntil;

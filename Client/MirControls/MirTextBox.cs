@@ -140,6 +140,7 @@ namespace Client.MirControls
         public bool CanLoseFocus;
         public readonly TextBox TextBox;
         private Pen CaretPen;
+        private bool _applyingNativeState;
 
         private static Point HiddenTextBoxLocation
         {
@@ -148,10 +149,20 @@ namespace Client.MirControls
 
         private void ApplyNativeTextBoxState()
         {
-            if (TextBox == null || TextBox.IsDisposed) return;
+            if (TextBox == null || TextBox.IsDisposed || _applyingNativeState) return;
 
-            TextBox.Location = HiddenTextBoxLocation;
-            TextBox.Visible = Visible && TextBox.Parent != null;
+            // WinForms can raise VisibleChanged again while assigning visibility
+            // to a native edit control under a hidden parent window.
+            _applyingNativeState = true;
+            try
+            {
+                TextBox.Location = HiddenTextBoxLocation;
+                TextBox.Visible = Visible && TextBox.Parent != null;
+            }
+            finally
+            {
+                _applyingNativeState = false;
+            }
         }
 
         #endregion

@@ -1030,10 +1030,11 @@ namespace Client.MirScenes
                 break;
             }
 
-            if (magic == null || SpellCurriculum.IsPassive(magic.Spell)) return;
-            if (!SpellCurriculum.CanUse(actor.Class, actor.Specialisation, magic.Spell))
+            if (magic == null || !actor.CanBindAction(magic.Spell)) return;
+            magic = actor.ReadyFollowup(magic) ?? magic;
+            if (TalentAbilities.TryGet(magic.Spell, out var talent) && talent.Kind == TalentAbilityKind.Counter)
             {
-                OutputMessage("This ability is unavailable in your specialisation.");
+                CastTalentCounter(actor, magic, talent);
                 return;
             }
 
@@ -1105,12 +1106,7 @@ namespace Client.MirScenes
                         Scene.OutputMessage(GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.LowMana));
                         return;
                     }
-                    actor.TwinDrakeBlade = true;
                     SendSpellToggle(actor, magic.Spell, true);
-                    if (actor == Hero)
-                        HeroObject?.Effects.Add(new Effect(Libraries.Magic2, 210, 6, 500, HeroObject));
-                    else
-                        actor.Effects.Add(new Effect(Libraries.Magic2, 210, 6, 500, actor));
                     break;
                 case Spell.FlamingSword:
                     if (CMain.Time < ToggleTime) return;
@@ -1142,12 +1138,22 @@ namespace Client.MirScenes
                     break;
                 default:
                     actor.NextMagic = magic;
-                    actor.NextMagicLocation = MapControl.MapLocation;
-                    actor.NextMagicObject = MapObject.MouseObject;
-                    actor.NextMagicDirection = MapControl.MouseDirection();
-
-                    if (actor == Hero)
-                        MapControl.UseMagic(Hero.NextMagic, Hero);
+                    bool signature = SpecialisationAbilities.TryGet(magic.Spell, out _);
+                    if (signature && MouseControl is ActionSlot)
+                    {
+                        actor.NextMagicObject = MapObject.TargetObject ?? MapObject.MagicObject;
+                        actor.NextMagicLocation = actor.NextMagicObject?.CurrentLocation ?? actor.CurrentLocation;
+                        actor.NextMagicDirection = actor.NextMagicLocation == actor.CurrentLocation ? actor.Direction :
+                            Functions.DirectionFromPoint(actor.CurrentLocation, actor.NextMagicLocation);
+                    }
+                    else
+                    {
+                        actor.NextMagicLocation = MapControl.MapLocation;
+                        actor.NextMagicObject = MapObject.MouseObject;
+                        actor.NextMagicDirection = MapControl.MouseDirection();
+                    }
+                    if (actor == Hero || signature)
+                        MapControl.UseMagic(magic, actor);
                     break;
             }
         }
@@ -1380,11 +1386,8 @@ namespace Client.MirScenes
                 case (short)ServerPacketIds.UserInformation:
                     UserInformation((S.UserInformation)p);
                     break;
-                case (short)ServerPacketIds.SpecialisationResult:
-                    SpecialisationResult((S.SpecialisationResult)p);
-                    break;
-                case (short)ServerPacketIds.SpellComboState:
-                    SpellComboState((S.SpellComboState)p);
+                case (short)ServerPacketIds.SpellPerkState:
+                    ReceiveSpellPerks((S.SpellPerkState)p);
                     break;
                 case (short)ServerPacketIds.UserSlotsRefresh:
                     UserSlotsRefresh((S.UserSlotsRefresh)p);
@@ -1667,9 +1670,6 @@ namespace Client.MirScenes
                     break;
                 case (short)ServerPacketIds.NewMagic:
                     NewMagic((S.NewMagic)p);
-                    break;
-                case (short)ServerPacketIds.MagicLeveled:
-                    MagicLeveled((S.MagicLeveled)p);
                     break;
                 case (short)ServerPacketIds.Magic:
                     Magic((S.Magic)p);
@@ -2172,7 +2172,7 @@ namespace Client.MirScenes
                 MapDarkLight = p.MapDarkLight,
                 Music = p.Music
             };
-            MapControl.Weather = p.WeatherParticles;
+            MapControl.ServerWeather = p.WeatherParticles;
             MapControl.LoadMap();
             InsertControl(0, MapControl);
         }
@@ -3480,12 +3480,12 @@ namespace Client.MirScenes
                         effect.Clear();
                         effect.Remove();
 
-                        User.Effects.Add(effect = new BuffEffect(Libraries.Magic2, 1890, 6, 600, User, true, BuffType.EnergyShield) { Repeat = false });
+                        User.Effects.Add(effect = new BuffEffect(Spell.EnergyShield, 0, 6, 600, User, true, BuffType.EnergyShield) { Repeat = false });
                         SoundManager.PlaySound(20000 + (ushort)Spell.EnergyShield * 10 + 1);
 
                         effect.Complete += (o, e) =>
                         {
-                            User.Effects.Add(new BuffEffect(Libraries.Magic2, 1900, 2, 800, User, true, BuffType.EnergyShield) { Repeat = true });
+                            User.Effects.Add(new BuffEffect(Spell.EnergyShield, 0, 2, 800, User, true, BuffType.EnergyShield) { Repeat = true });
                         };
 
 
@@ -3560,12 +3560,12 @@ namespace Client.MirScenes
                             effect.Clear();
                             effect.Remove();
 
-                            ob.Effects.Add(effect = new BuffEffect(Libraries.Magic2, 1890, 6, 600, ob, true, BuffType.EnergyShield) { Repeat = false });
+                            ob.Effects.Add(effect = new BuffEffect(Spell.EnergyShield, 0, 6, 600, ob, true, BuffType.EnergyShield) { Repeat = false });
                             SoundManager.PlaySound(20000 + (ushort)Spell.EnergyShield * 10 + 1);
 
                             effect.Complete += (o, e) =>
                             {
-                                ob.Effects.Add(new BuffEffect(Libraries.Magic2, 1900, 2, 800, ob, true, BuffType.EnergyShield) { Repeat = true });
+                                ob.Effects.Add(new BuffEffect(Spell.EnergyShield, 0, 2, 800, ob, true, BuffType.EnergyShield) { Repeat = true });
                             };
 
                             break;
@@ -3867,12 +3867,12 @@ namespace Client.MirScenes
                         ob.Dead = true;
                         break;
                     case 1:
-                        MapControl.Effects.Add(new Effect(Libraries.Magic2, 690, 10, 1000, ob.CurrentLocation));
+                        MapControl.Effects.Add(new Effect(new SpellVisual(Spell.Mirroring, SpellVisualPhase.Expire), 1000, ob.CurrentLocation));
                         ob.Remove();
                         break;
                     case 2:
                         SoundManager.PlaySound(20000 + (ushort)Spell.DarkBody * 10 + 1);
-                        MapControl.Effects.Add(new Effect(Libraries.Magic2, 2600, 10, 1200, ob.CurrentLocation));
+                        MapControl.Effects.Add(new Effect(new SpellVisual(Spell.DarkBody), 1200, ob.CurrentLocation));
                         ob.Remove();
                         break;
                 }
@@ -3916,7 +3916,7 @@ namespace Client.MirScenes
             User.MaxExperience = p.MaxExperience;
             User.RefreshStats();
             OutputMessage(GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.LevelUp));
-            User.Effects.Add(new Effect(Libraries.Magic2, 1200, 20, 2000, User));
+            User.Effects.Add(new Effect(new SpellVisual(ParticleMotif.Celebration), 2000, User));
             SoundManager.PlaySound(SoundList.LevelUp);
             ChatDialog.ReceiveChat(GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.LevelUp), ChatType.LevelUp);
         }
@@ -3926,7 +3926,7 @@ namespace Client.MirScenes
             Hero.Experience = p.Experience;
             Hero.MaxExperience = p.MaxExperience;
             Hero.RefreshStats();
-            Hero.Effects.Add(new Effect(Libraries.Magic2, 1200, 20, 2000, User));
+            Hero.Effects.Add(new Effect(new SpellVisual(ParticleMotif.Celebration), 2000, Hero));
             SoundManager.PlaySound(SoundList.LevelUp);
             MainDialog.HeroInfoPanel.Update();
         }
@@ -3934,7 +3934,7 @@ namespace Client.MirScenes
         {
             if (MapControl.Objects.TryGetValue(p.ObjectID, out var ob))
             {
-                ob.Effects.Add(new Effect(Libraries.Magic2, 1180, 16, 2500, ob));
+                ob.Effects.Add(new Effect(new SpellVisual(ParticleMotif.Celebration), 2500, ob));
                 SoundManager.PlaySound(SoundList.LevelUp);
             }
         }
@@ -4017,7 +4017,8 @@ namespace Client.MirScenes
             var previousPoisons = User.Poison;
 
             User.Poison = p.Poison;
-            if (p.Poison.HasFlag(PoisonType.Stun) || p.Poison.HasFlag(PoisonType.Dazed) || p.Poison.HasFlag(PoisonType.Frozen) || p.Poison.HasFlag(PoisonType.Paralysis) || p.Poison.HasFlag(PoisonType.LRParalysis))
+            if ((p.Poison & (PoisonType.Stun | PoisonType.Dazed | PoisonType.Frozen | PoisonType.Paralysis |
+                PoisonType.LRParalysis | PoisonType.TalentStun | PoisonType.TalentSilence)) != 0)
             {
                 User.ClearMagic();
             }
@@ -4050,7 +4051,7 @@ namespace Client.MirScenes
                 MapControl.Lights = p.Lights;
                 MapControl.MapDarkLight = p.MapDarkLight;
                 MapControl.Music = p.Music;
-                MapControl.Weather = p.Weather;
+                MapControl.ServerWeather = p.Weather;
                 MapControl.LoadMap();
             }
 
@@ -4064,6 +4065,8 @@ namespace Client.MirScenes
 
             User.QueuedAction = null;
             User.ActionFeed.Clear();
+            User.PendingSignature = Spell.None;
+            User.SignatureRecoveryUntil = 0;
             User.ClearMagic();
             User.SetAction();
 
@@ -4086,7 +4089,7 @@ namespace Client.MirScenes
                 {
                     case 1: //Yimoogi
                         {
-                            effect = new Effect(Libraries.Magic2, 1300, 10, 500, ob.CurrentLocation);
+                            effect = new Effect(new SpellVisual(Spell.Teleport, SpellVisualPhase.Departure), 500, ob.CurrentLocation);
                             break;
                         }
                     case 2: //RedFoxman
@@ -4151,7 +4154,7 @@ namespace Client.MirScenes
                         }
                     default:
                         {
-                            effect = new Effect(Libraries.Magic, 250, 10, 500, ob.CurrentLocation);
+                            effect = new Effect(new SpellVisual(Spell.Teleport, SpellVisualPhase.Departure), 500, ob.CurrentLocation);
                             break;
                         }
                 }
@@ -4172,7 +4175,7 @@ namespace Client.MirScenes
                 {
                     case 1: //Yimoogi
                         {
-                            ob.Effects.Add(new Effect(Libraries.Magic2, 1310, 10, 500, ob));
+                            ob.Effects.Add(new Effect(new SpellVisual(Spell.Teleport, SpellVisualPhase.Arrival), 500, ob));
                             break;
                         }
                     case 2: //RedFoxman
@@ -4236,7 +4239,7 @@ namespace Client.MirScenes
                         }
                     default:
                         {
-                            ob.Effects.Add(new Effect(Libraries.Magic, 260, 10, 500, ob));
+                            ob.Effects.Add(new Effect(new SpellVisual(Spell.Teleport, SpellVisualPhase.Arrival), 500, ob));
                             break;
                         }
                 }
@@ -4251,7 +4254,7 @@ namespace Client.MirScenes
 
         private void TeleportIn()
         {
-            User.Effects.Add(new Effect(Libraries.Magic, 260, 10, 500, User));
+            User.Effects.Add(new Effect(new SpellVisual(Spell.Teleport, SpellVisualPhase.Arrival), 500, User));
             SoundManager.PlaySound(SoundList.Teleport);
         }
         private void NPCGoods(S.NPCGoods p)
@@ -4673,6 +4676,7 @@ namespace Client.MirScenes
 
         private void RemoveMagic(S.RemoveMagic p)
         {
+            if ((uint)p.PlaceId >= (uint)User.Magics.Count) return;
             User.Magics.RemoveAt(p.PlaceId);
             User.RefreshStats();
             foreach (SkillBarDialog Bar in SkillBarDialogs)
@@ -4681,27 +4685,19 @@ namespace Client.MirScenes
             }
         }
 
-        private void MagicLeveled(S.MagicLeveled p)
-        {
-            UserObject actor = p.ObjectID == Hero?.ObjectID ? Hero : User;
-
-            for (int i = 0; i < actor.Magics.Count; i++)
-            {
-                ClientMagic magic = actor.Magics[i];
-                if (magic.Spell != p.Spell) continue;
-
-                if (magic.Level != p.Level)
-                {
-                    magic.Level = p.Level;
-                    actor.RefreshStats();
-                }
-
-                magic.Experience = p.Experience;
-                break;
-            }
-        }
         private void Magic(S.Magic p)
         {
+            if (SpecialisationAbilities.TryGet(p.Spell, out var ability))
+            {
+                if (!Observing)
+                {
+                    MirDirection direction = User.PendingSignature == p.Spell ? User.PendingSignatureDirection : User.Direction;
+                    if (p.TargetID != 0 && p.TargetID != User.ObjectID && p.Target != User.CurrentLocation)
+                        direction = Functions.DirectionFromPoint(User.CurrentLocation, p.Target);
+                    PresentSignatureCast(User, ability, User.CurrentLocation, p.Target, direction, p.Cast);
+                }
+                return;
+            }
             User.Spell = p.Spell;
             User.Cast = p.Cast;
             User.TargetID = p.TargetID;
@@ -4711,7 +4707,6 @@ namespace Client.MirScenes
 
             if (!p.Cast) return;
 
-            if (!Observing) MapControl.EmitSpellCast(p.Spell, User.CurrentLocation, p.Target, User.Direction);
             ClientMagic magic = User.GetMagic(p.Spell);
             if (magic != null) magic.CastTime = CMain.Time;
         }
@@ -4723,29 +4718,34 @@ namespace Client.MirScenes
                 magic = Hero.GetMagic(p.Spell);
             else
                 magic = User.GetMagic(p.Spell);
-            magic.Delay = p.Delay;
+            if (magic != null) magic.Delay = p.Delay;
         }
 
         private void MagicCast(S.MagicCast p)
         {
             ClientMagic magic = User.GetMagic(p.Spell);
-            magic.CastTime = CMain.Time;
+            if (magic != null) magic.CastTime = CMain.Time;
         }
 
         private void ObjectMagic(S.ObjectMagic p)
         {
             if (p.SelfBroadcast == false && p.ObjectID == User.ObjectID && !Observing) return;
 
+            if (SpecialisationAbilities.TryGet(p.Spell, out var ability))
+            {
+                if (MapControl.Objects.TryGetValue(p.ObjectID, out var caster))
+                    PresentSignatureCast(caster, ability, p.Location, p.Target, p.Direction, p.Cast);
+                return;
+            }
+
             if (p.ObjectID == Hero?.ObjectID && p.Cast)
             {
                 ClientMagic magic = Hero.GetMagic(p.Spell);
-                magic.CastTime = CMain.Time;
+                if (magic != null) magic.CastTime = CMain.Time;
             }
 
             if (MapControl.Objects.TryGetValue(p.ObjectID, out var ob))
             {
-                if (p.Cast) MapControl.EmitSpellCast(p.Spell, p.Location, p.Target, p.Direction);
-
                 QueuedAction action = new QueuedAction { Action = MirAction.Spell, Direction = p.Direction, Location = p.Location, Params = new List<object>() };
                 action.Params.Add(p.Spell);
                 action.Params.Add(p.TargetID);
@@ -4766,12 +4766,17 @@ namespace Client.MirScenes
 
             switch (p.Spell)
             {
+                case Spell.StormRelay:
+                case Spell.ThunderBolt:
+                case Spell.Lightning:
+                    if (MapControl.GetObject(p.Destination) is { } relayTarget)
+                        MapControl.EmitRelayArc(p.Spell, source.CurrentLocation, relayTarget.CurrentLocation);
+                    break;
                 case Spell.FireBounce:
                     {
                         SoundManager.PlaySound(20000 + (ushort)Spell.GreatFireBall * 10 + 1);
 
-                        Missile missile = source.CreateProjectile(410, Libraries.Magic, true, 6, 30, 4, targetID: p.Destination);
-                        missile.TrackSpellParticles(p.Spell);
+                        Missile missile = source.CreateProjectile(0, Spell.FireBounce, true, 6, 30, 4, targetID: p.Destination);
 
                         if (missile.Target != null)
                         {
@@ -4780,7 +4785,7 @@ namespace Client.MirScenes
                                 var sender = (Missile)o;
 
                                 if (sender.Target.CurrentAction == MirAction.Dead) return;
-                                sender.Target.Effects.Add(new Effect(Libraries.Magic, 570, 10, 600, sender.Target));
+                                sender.Target.Effects.Add(new Effect(new SpellVisual(Spell.FireBounce), 600, sender.Target));
                                 SoundManager.PlaySound(20000 + (ushort)Spell.GreatFireBall * 10 + 2);
                             };
                         }
@@ -4802,43 +4807,40 @@ namespace Client.MirScenes
                         SoundManager.PlaySound(20000 + (ushort)Spell.FatalSword * 10);
                         break;
                     case SpellEffect.FatalSword:
-                        MapControl.EmitSpellImpact(Spell.FatalSword, ob.CurrentLocation);
-                        ob.Effects.Add(new Effect(Libraries.Magic2, 1940, 4, 400, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.FatalSword), 400, ob));
                         SoundManager.PlaySound(20000 + (ushort)Spell.FatalSword * 10);
                         break;
                     case SpellEffect.StormEscape:
-                        ob.Effects.Add(new Effect(Libraries.Magic3, 610, 10, 600, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.StormEscape), 600, ob));
                         SoundManager.PlaySound(SoundList.Teleport);
                         break;
                     case SpellEffect.Teleport:
-                        ob.Effects.Add(new Effect(Libraries.Magic, 1600, 10, 600, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.Blink, SpellVisualPhase.Arrival), 600, ob));
                         SoundManager.PlaySound(SoundList.Teleport);
                         break;
                     case SpellEffect.Healing:
                         SoundManager.PlaySound(20000 + (ushort)Spell.Healing * 10 + 1);
-                        ob.Effects.Add(new Effect(Libraries.Magic, 370, 10, 800, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.Healing), 800, ob));
                         break;
                     case SpellEffect.RedMoonEvil:
                         ob.Effects.Add(new Effect(Libraries.Monsters[(ushort)Monster.RedMoonEvil], 32, 6, 400, ob) { Blend = false });
                         break;
                     case SpellEffect.TwinDrakeBlade:
-                        ob.Effects.Add(new Effect(Libraries.Magic2, 380, 6, 800, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.TwinDrakeBlade), 800, ob));
                         break;
                     case SpellEffect.MPEater:
                         if (MapControl.Objects.TryGetValue(p.EffectType, out var ob2))
-                            ob2.Effects.Add(new Effect(Libraries.Magic2, 2411, 19, 1900, ob2));
+                            ob2.Effects.Add(new Effect(new SpellVisual(Spell.MPEater), 1900, ob2));
 
-                        ob.Effects.Add(new Effect(Libraries.Magic2, 2400, 9, 900, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.MPEater), 900, ob));
                         SoundManager.PlaySound(20000 + (ushort)Spell.FatalSword * 10);
                         break;
                     case SpellEffect.Bleeding:
-                        ob.Effects.Add(new Effect(Libraries.Magic3, 60, 3, 400, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.Hemorrhage), 400, ob));
                         break;
                     case SpellEffect.Hemorrhage:
                         SoundManager.PlaySound(20000 + (ushort)Spell.Hemorrhage * 10);
-                        ob.Effects.Add(new Effect(Libraries.Magic3, 0, 4, 400, ob));
-                        ob.Effects.Add(new Effect(Libraries.Magic3, 28, 6, 600, ob));
-                        ob.Effects.Add(new Effect(Libraries.Magic3, 46, 8, 800, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.Hemorrhage), 400, ob));
                         break;
                     case SpellEffect.MagicShieldUp:
                         if (ob.Race != ObjectType.Player && ob.Race != ObjectType.Hero) return;
@@ -4849,7 +4851,7 @@ namespace Client.MirScenes
                             player.ShieldEffect.Remove();
                         }
                         player.MagicShield = true;
-                        player.Effects.Add(player.ShieldEffect = new Effect(Libraries.Magic, 3890, 3, 600, ob) { Repeat = true });
+                        player.Effects.Add(player.ShieldEffect = new Effect(new SpellVisual(Spell.MagicShield), 600, ob) { Repeat = true });
                         break;
                     case SpellEffect.MagicShieldDown:
                         if (ob.Race != ObjectType.Player && ob.Race != ObjectType.Hero) return;
@@ -4867,8 +4869,7 @@ namespace Client.MirScenes
                         SoundManager.PlaySound(((ushort)Monster.GreatFoxSpirit * 10) + 5);
                         break;
                     case SpellEffect.Entrapment:
-                        ob.Effects.Add(new Effect(Libraries.Magic2, 1010, 10, 1500, ob));
-                        ob.Effects.Add(new Effect(Libraries.Magic2, 1020, 8, 1200, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.Entrapment), 1500, ob));
                         break;
                     case SpellEffect.Critical:
                         //ob.Effects.Add(new Effect(Libraries.CustomEffects, 0, 12, 60, ob));
@@ -4886,7 +4887,7 @@ namespace Client.MirScenes
                         }
 
                         player.ElementalBarrier = true;
-                        player.Effects.Add(player.ElementalBarrierEffect = new Effect(Libraries.Magic3, 1890, 10, 2000, ob) { Repeat = true });
+                        player.Effects.Add(player.ElementalBarrierEffect = new Effect(new SpellVisual(Spell.ElementalBarrier), 2000, ob) { Repeat = true });
                         break;
                     case SpellEffect.ElementalBarrierDown:
                         if (ob.Race != ObjectType.Player) return;
@@ -4898,56 +4899,52 @@ namespace Client.MirScenes
                         }
                         player.ElementalBarrierEffect = null;
                         player.ElementalBarrier = false;
-                        player.Effects.Add(player.ElementalBarrierEffect = new Effect(Libraries.Magic3, 1910, 7, 1400, ob));
+                        player.Effects.Add(player.ElementalBarrierEffect = new Effect(new SpellVisual(Spell.ElementalBarrier, SpellVisualPhase.Expire), 1400, ob));
                         SoundManager.PlaySound(20000 + 131 * 10 + 5);
                         break;
                     case SpellEffect.DelayedExplosion:
                         int effectid = DelayedExplosionEffect.GetOwnerEffectID(ob.ObjectID);
                         if (effectid < 0)
                         {
-                            ob.Effects.Add(new DelayedExplosionEffect(Libraries.Magic3, 1590, 8, 1200, ob, true, 0, 0));
+                            ob.Effects.Add(new DelayedExplosionEffect(Spell.DelayedExplosion, 0, 8, 1200, ob, true, 0, 0));
                         }
                         else if (effectid >= 0)
                         {
                             if (DelayedExplosionEffect.effectlist[effectid].stage < p.EffectType)
                             {
                                 DelayedExplosionEffect.effectlist[effectid].Remove();
-                                ob.Effects.Add(new DelayedExplosionEffect(Libraries.Magic3, 1590 + ((int)p.EffectType * 10), 8, 1200, ob, true, (int)p.EffectType, 0));
+                                ob.Effects.Add(new DelayedExplosionEffect(Spell.DelayedExplosion, 0, 8, 1200, ob, true, (int)p.EffectType, 0));
                             }
                         }
                         break;
                     case SpellEffect.AwakeningSuccess:
                         {
-                            Effect ef = new Effect(Libraries.Magic3, 900, 16, 1600, ob, CMain.Time + p.DelayTime);
+                            Effect ef = new Effect(new SpellVisual(ParticleMotif.CraftSuccess), 1600, ob, CMain.Time + p.DelayTime, 16);
                             ef.Played += (o, e) => SoundManager.PlaySound(50002);
                             ef.Complete += (o, e) => MapControl.AwakeningAction = false;
                             ob.Effects.Add(ef);
-                            ob.Effects.Add(new Effect(Libraries.Magic3, 840, 16, 1600, ob, CMain.Time + p.DelayTime) { Blend = false });
                         }
                         break;
                     case SpellEffect.AwakeningFail:
                         {
-                            Effect ef = new Effect(Libraries.Magic3, 920, 9, 900, ob, CMain.Time + p.DelayTime);
+                            Effect ef = new Effect(new SpellVisual(ParticleMotif.CraftFail), 900, ob, CMain.Time + p.DelayTime, 9);
                             ef.Played += (o, e) => SoundManager.PlaySound(50003);
                             ef.Complete += (o, e) => MapControl.AwakeningAction = false;
                             ob.Effects.Add(ef);
-                            ob.Effects.Add(new Effect(Libraries.Magic3, 860, 9, 900, ob, CMain.Time + p.DelayTime) { Blend = false });
                         }
                         break;
                     case SpellEffect.AwakeningHit:
                         {
-                            Effect ef = new Effect(Libraries.Magic3, 880, 5, 500, ob, CMain.Time + p.DelayTime);
+                            Effect ef = new Effect(new SpellVisual(ParticleMotif.CraftSuccess), 500, ob, CMain.Time + p.DelayTime, 5);
                             ef.Played += (o, e) => SoundManager.PlaySound(50001);
                             ob.Effects.Add(ef);
-                            ob.Effects.Add(new Effect(Libraries.Magic3, 820, 5, 500, ob, CMain.Time + p.DelayTime) { Blend = false });
                         }
                         break;
                     case SpellEffect.AwakeningMiss:
                         {
-                            Effect ef = new Effect(Libraries.Magic3, 890, 5, 500, ob, CMain.Time + p.DelayTime);
+                            Effect ef = new Effect(new SpellVisual(ParticleMotif.CraftFail), 500, ob, CMain.Time + p.DelayTime, 5);
                             ef.Played += (o, e) => SoundManager.PlaySound(50000);
                             ob.Effects.Add(ef);
-                            ob.Effects.Add(new Effect(Libraries.Magic3, 830, 5, 500, ob, CMain.Time + p.DelayTime) { Blend = false });
                         }
                         break;
                     case SpellEffect.TurtleKing:
@@ -4994,7 +4991,7 @@ namespace Client.MirScenes
                         ob.Effects.Add(new Effect(Libraries.Monsters[(ushort)Monster.DeathCrawler], 272 + ((int)ob.Direction * 4), 4, 400, ob) { Blend = true });
                         break;
                     case SpellEffect.MoonMist:
-                        ob.Effects.Add(new Effect(Libraries.Magic3, 705, 10, 800, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.MoonMist), 800, ob));
                         break;
                 }
             }
@@ -5108,7 +5105,7 @@ namespace Client.MirScenes
         {
             User.SetAction();
             User.Dead = false;
-            User.Effects.Add(new Effect(Libraries.Magic2, 1220, 20, 2000, User));
+            User.Effects.Add(new Effect(new SpellVisual(Spell.Reincarnation), 2000, User));
             SoundManager.PlaySound(SoundList.Revive);
         }
         private void ObjectRevived(S.ObjectRevived p)
@@ -5117,7 +5114,7 @@ namespace Client.MirScenes
             {
                 if (p.Effect)
                 {
-                    ob.Effects.Add(new Effect(Libraries.Magic2, 1220, 20, 2000, ob));
+                    ob.Effects.Add(new Effect(new SpellVisual(Spell.Reincarnation), 2000, ob));
                     SoundManager.PlaySound(SoundList.Revive);
                 }
                 ob.Dead = false;
@@ -5166,10 +5163,19 @@ namespace Client.MirScenes
                         prefix + (actor.DoubleSlash ? GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.UseDoubleSlash) : GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.DoNotUseDoubleSlash)),
                         ChatType.Hint);
                     break;
+                case Spell.TwinDrakeBlade:
+                    actor.TwinDrakeBlade = p.CanUse;
+                    if (p.CanUse)
+                        MapControl.EmitLegacy(new SpellVisual(Spell.TwinDrakeBlade, SpellVisualPhase.Prepare), actor);
+                    break;
                 case Spell.FlamingSword:
                     actor.FlamingSword = p.CanUse;
                     if (actor.FlamingSword)
+                    {
+                        if (actor.GetMagic(p.Spell) is { } magic) magic.CastTime = CMain.Time;
+                        MapControl.EmitLegacy(new SpellVisual(Spell.FlamingSword, SpellVisualPhase.Prepare), actor);
                         ChatDialog.ReceiveChat(prefix + GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.WeaponSpiritFire), ChatType.Hint);
+                    }
                     else
                         ChatDialog.ReceiveChat(prefix + GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.SpiritsFireDisappeared), ChatType.System);
                     break;
@@ -5209,6 +5215,16 @@ namespace Client.MirScenes
                     break;
                 case SpellEffect.WeaponSpellImpact:
                     MapControl.EmitSpellImpact((Spell)p.Value, p.Location);
+                    break;
+                case SpellEffect.SpellPerkBurn:
+                    MapControl.EmitLegacy(new SpellVisual((Spell)p.Value, SpellVisualPhase.Burn), p.Location);
+                    break;
+                case SpellEffect.SpellPerkWard:
+                    MapControl.EmitLegacy(new SpellVisual((Spell)p.Value, SpellVisualPhase.Ward), p.Location);
+                    break;
+                case SpellEffect.LightningArc:
+                    if (p.Value < 8)
+                        MapControl.QueueWizardLightning(p.Location, (MirDirection)p.Value);
                     break;
                 case SpellEffect.Mine:
                     SoundManager.PlaySound(10091);
@@ -5644,7 +5660,7 @@ namespace Client.MirScenes
 
                 if (p.Enabled && !p.Interrupted && InterruptionEffect.GetOwnerEffectID(player.ObjectID) < 0)
                 {
-                    player.Effects.Add(new InterruptionEffect(Libraries.Magic3, 1860, 8, 8 * 100, player, true));
+                    player.Effects.Add(new InterruptionEffect(Spell.Concentration, 0, 8, 8 * 100, player, true));
                     SoundManager.PlaySound(20000 + 129 * 10);
                 }
             }
@@ -5663,7 +5679,7 @@ namespace Client.MirScenes
                 {
                     int elementType = (int)p.ElementType;
                     int maxExp = (int)p.ExpLast;
-                    player.Effects.Add(new ElementsEffect(Libraries.Magic3, 1630 + ((elementType - 1) * 10), 10, 10 * 100, player, true, 1 + (elementType - 1), maxExp, User.ObjectID == p.ObjectID && (elementType == 4 || elementType == 3)));
+                    player.Effects.Add(new ElementsEffect(Spell.ElementalShot, 0, 10, 10 * 100, player, true, 1 + (elementType - 1), maxExp, User.ObjectID == p.ObjectID && (elementType == 4 || elementType == 3)));
                 }
             }
         }
@@ -5682,9 +5698,9 @@ namespace Client.MirScenes
 
             if (MapControl.Objects.TryGetValue(p.ObjectID, out MapObject ob) && ob.Race == ObjectType.Monster)
             {
-                var NetCast = new TrackableEffect(new Effect(Libraries.MagicC, 0, 8, 700, ob)) { EffectName = "BindingShotDrop" };
-                var NetDropped = new TrackableEffect(new Effect(Libraries.MagicC, 7, 1, 1000, ob) { Repeat = true, RepeatUntil = CMain.Time + (p.Value - 1500) }) { EffectName = "BindingShotDown" };
-                var NetFall = new TrackableEffect(new Effect(Libraries.MagicC, 8, 8, 700, ob)) { EffectName = "BindingShotFall" };
+                var NetCast = new TrackableEffect(new Effect(Spell.BindingShot, 0, 8, 700, ob)) { EffectName = "BindingShotDrop" };
+                var NetDropped = new TrackableEffect(new Effect(Spell.BindingShot, 7, 1, 1000, ob) { Repeat = true, RepeatUntil = CMain.Time + (p.Value - 1500) }) { EffectName = "BindingShotDown" };
+                var NetFall = new TrackableEffect(new Effect(Spell.BindingShot, 8, 8, 700, ob)) { EffectName = "BindingShotFall" };
 
                 NetDropped.Complete += (o1, e1) =>
                 {
@@ -10448,13 +10464,10 @@ namespace Client.MirScenes
         private readonly Func<int, int, bool> _staticOccluder;
         private readonly List<Point> _movingLights = new List<Point>(48);
         private readonly AmbientLightTransition _atmosphereFade = new AmbientLightTransition();
-        private readonly SmoothScalarTransition _fogFade = new SmoothScalarTransition(10000);
         private readonly AtmosphericWeatherController _weatherController = new AtmosphericWeatherController();
         private AtmosphericWeatherFrame _weatherFrame;
         internal AtmosphericWeatherFrame WeatherFrame => _weatherFrame;
         private Color _atmosphereTint = Color.White;
-        private Color _atmosphereHazeTint = Color.FromArgb(255, 198, 214, 240);
-        private float _atmosphereFog;
         private const int DynamicLightLimit = 48;
 
         private byte ReadStaticLight(int x, int y) => M2CellInfo[x, y].Light;
@@ -10495,12 +10508,18 @@ namespace Client.MirScenes
                 if (ob.Race != ObjectType.Spell && ob.Race != ObjectType.Merchant &&
                     ob.Light < 15)
                     continue;
+                if (ob.Race == ObjectType.Spell
+                    ? !Settings.Effect || Settings.SpellLightIntensityPercent == 0 || GraphicsTuning.Light(LightSource.Spell).Intensity == 0
+                    : GraphicsTuning.Light(ActorLightSource(ob)).Intensity == 0)
+                    continue;
                 _movingLights.Add(ob.CurrentLocation);
             }
         }
 
         internal ShadowProjection GetShadowProjection(Point worldCell)
         {
+            if (!Settings.ShadowsFollowLights) return ShadowProjection.Sunlight;
+
             LightSetting setting = Lights == LightSetting.Normal ? GameScene.Scene.Lights : Lights;
             if (AmbientLightTransition.Target(setting, MapDarkLight).ToArgb() == Color.White.ToArgb())
                 return ShadowProjection.Sunlight;
@@ -10526,6 +10545,8 @@ namespace Client.MirScenes
 
             foreach (CachedMapLight light in _staticLightCache.Items)
             {
+                if (Settings.MapLightIntensityPercent == 0 || GraphicsTuning.Light(LightSource.Map).Intensity == 0)
+                    break;
                 long dx = (long)light.X - worldCell.X, dy = (long)light.Y - worldCell.Y;
                 long distance = dx * dx + dy * dy;
                 if (distance > bestDistance ||
@@ -10541,7 +10562,8 @@ namespace Client.MirScenes
                          : ShadowProjection.Sunlight;
         }
         public long LightningTime, FireTime;
-        public WeatherSetting Weather = WeatherSetting.None;
+        public WeatherSetting ServerWeather = WeatherSetting.None;
+        private WeatherSetting Weather => GraphicsTuning.WeatherSource.Current == 0 ? GraphicsTuning.LocalWeather : ServerWeather;
         public bool FloorValid, LightsValid;
 
         public long OutputDelay;
@@ -10628,12 +10650,12 @@ namespace Client.MirScenes
         {
             ResetMap();
             _ambientLighting.Reset();
+            MapAmbientPass.Reset();
             _atmosphereFade.Reset();
-            _fogFade.Reset();
             _weatherController.Reset();
             _weatherFrame = default;
+            ResetMapWeather();
             _atmosphereTint = Color.White;
-            _atmosphereFog = 0;
             _movingLights.Clear();
             _staticLightCache.Reset();
             _mapMaterials = MapMaterialMap.Empty;
@@ -10676,6 +10698,8 @@ namespace Client.MirScenes
         public void Process()
         {
             Processdoors();
+            if (LightPreviewActive || ProjectionPreviewActive) TextureValid = false;
+            if (Weather != WeatherSetting.None || MapWeatherActive) TextureValid = false;
             if (_spellParticles.Advance(CMain.Time)) TextureValid = false;
             User.Process();
             for (int i = ObjectsList.Count - 1; i >= 0; i--)
@@ -10686,6 +10710,9 @@ namespace Client.MirScenes
 
             for (int i = Effects.Count - 1; i >= 0; i--)
                 Effects[i].Process();
+
+            ProcessWizardArcs();
+            ProcessHealingCircles();
 
             if (MapObject.TargetObject != null && MapObject.TargetObject is MonsterObject && MapObject.TargetObject.AI == 64)
                 MapObject.TargetObjectID = 0;
@@ -10782,7 +10809,19 @@ namespace Client.MirScenes
         {
             if (User == null) return;
 
-            if (!FloorValid || DXManager.FloorTexture == null || DXManager.FloorTexture.Disposed)
+            LightSetting setting = Lights == LightSetting.Normal ? GameScene.Scene.Lights : Lights;
+            Color targetAmbient = ApplyAmbientDarkness(AmbientLightTransition.Target(setting, MapDarkLight), setting);
+            Color ambient = _ambientLighting.Sample(targetAmbient, CMain.Time);
+            bool mapColour = GraphicsTuning.MapColour.Current > 0 && ambient.ToArgb() != Color.White.ToArgb() &&
+                !User.Poison.HasFlag(PoisonType.Blindness);
+            _captureWeather = MapWeatherActive;
+            if (!_captureWeather) WeatherMaskPass.DisposeAll();
+            _scenerySprites.Clear();
+            _weatherActors.Clear();
+            bool drawFloorDirectly = GraphicsTuning.Blend(GraphicsLayer.Ground).Current != 0 ||
+                GraphicsTuning.Blend(GraphicsLayer.Middle).Current != 0 ||
+                GraphicsTuning.Blend(GraphicsLayer.Front).Current != 0;
+            if (!drawFloorDirectly && (!FloorValid || DXManager.FloorTexture == null || DXManager.FloorTexture.Disposed))
                 DrawFloor();
 
 
@@ -10803,78 +10842,79 @@ namespace Client.MirScenes
 
             DrawBackground();
 
-            if (FloorValid)
+            if (drawFloorDirectly)
+                DrawFloorTiles();
+            else if (FloorValid)
             {
                 DXManager.Draw(DXManager.FloorTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White);
             }
+            bool captureMapColours = mapColour && MapAmbientPass.CaptureFloor(ControlTexture, CMain.Time);
+            DrawFloorSpellParticles();
 
+            bool legacyWeather = GraphicsTuning.WeatherSource.Current != 0;
             if (Settings.EnvironmentAtmosphere)
                 _weatherFrame = _weatherController.Sample(
-                    Weather, CMain.Time, Settings.AtmosphereLightning && Lightning, Index);
+                    Weather, CMain.Time, legacyWeather ? Settings.AtmosphereLightning && Lightning
+                        : GraphicsTuning.WeatherStorm.Current != 0, Index);
             else
             {
                 _weatherController.Reset();
                 _weatherFrame = default;
             }
 
-            if (Settings.DynamicShadows)
+            if ((Settings.DynamicShadows || ProjectionPreviewActive) && Settings.ShadowsFollowLights && Settings.ShadowOpacityPercent > 0)
             {
                 UpdateStaticLights();
                 IndexMovingLights();
             }
             DXManager.ProjectedShadowsDrawn = 0;
 
-            // Apply authored terrain wetness before foreground sprites, preserving
-            // the original map/actor layering and avoiding any new render target.
-            if (Settings.AtmosphereWetSurfaces)
-                WetSurfacePass.Draw(_mapMaterials, _weatherFrame, User.Movement,
-                                    User.OffSetMove, OffSetX, OffSetY,
-                                    ViewRangeX, ViewRangeY, Width, Height);
-            DrawSpellParticles(ground: true);
-            DrawObjects();
-            DrawSpellParticles(ground: false);
+            _animatedMapLights.Clear();
+            bool captureSpellDepth = Settings.Effect && !_spellParticles.Active.IsEmpty;
+            DrawObjects(captureMapColours, captureSpellDepth);
+            int spellDepthOrigin = User.Movement.Y - ViewRangeY - 2;
+            Texture spellOcclusion = captureSpellDepth
+                ? SpellOcclusionPass.Render(_scenerySprites, _weatherActors, spellDepthOrigin)
+                : null;
+            if (captureMapColours) MapAmbientPass.Finish(_scenerySprites, CMain.Time);
+            if (_captureWeather) DrawMapWeather(legacyWeather);
+            DrawSpellParticles(_spellParticles.Active, ground: false, occlusion: spellOcclusion, depthOrigin: spellDepthOrigin);
 
             //render weather
-            foreach (ParticleEngine engine in GameScene.Scene.ParticleEngines)
+            if (legacyWeather)
             {
-                engine.Draw();
+                using var artwork = DXManager.BlendArtwork(GraphicsLayer.Weather);
+                foreach (ParticleEngine engine in GameScene.Scene.ParticleEngines)
+                    engine.Draw();
+                if (Settings.EnvironmentAtmosphere && Settings.EnvironmentFogLayers)
+                    AtmosphereFogOverlay.DrawClouds(_weatherFrame, Weather);
             }
-
-            // Wind-driven mist/overcast belongs to the world render target.
-            // The ambient darkness pass shades it; floating HUD stays sharp.
-            if (Settings.EnvironmentAtmosphere && Settings.EnvironmentFogLayers)
-                AtmosphereFogOverlay.Draw(_weatherFrame, Weather);
 
             //Render Death, 
 
-            LightSetting setting = Lights == LightSetting.Normal ? GameScene.Scene.Lights : Lights;
-            Color targetAmbient = AmbientLightTransition.Target(setting, MapDarkLight);
-            Color ambient = _ambientLighting.Sample(targetAmbient, CMain.Time);
             if (Settings.EnvironmentAtmosphere)
             {
                 Color desiredTint = AtmosphereColourGrade.Target(setting, Weather, MapDarkLight);
                 _atmosphereTint = _atmosphereFade.Sample(desiredTint, CMain.Time);
-                _atmosphereHazeTint = AtmosphereColourGrade.FogTint(Weather, MapDarkLight);
-                _atmosphereFog = _fogFade.Sample(AtmosphereColourGrade.FogStrength(Weather),
-                                                 CMain.Time);
             }
             else
             {
                 _atmosphereTint = Color.White;
-                _atmosphereHazeTint = Color.FromArgb(255, 198, 214, 240);
-                _atmosphereFog = 0;
                 _atmosphereFade.Reset();
-                _fogFade.Reset();
             }
 
-            // Continue the light pass when transitioning into day, then avoid
-            // its render target and blend operations once daylight is fully white.
             if (ambient.ToArgb() != Color.White.ToArgb() ||
-                Settings.LightingBloom ||
+                (Settings.LightingBloom && Settings.BloomIntensityPercent > 0) ||
+                _animatedMapLights.Count != 0 || HasSpellLights() || HasDaylightEmitters() || LightPreviewActive ||
                 GameScene.User.Poison.HasFlag(PoisonType.Blindness))
             {
-                DrawLights(ambient);
+                DrawLights(ambient, mapColour ? MapAmbientPass.Average : null);
             }
+            // Composite emission after darkness, or release the blur buffers when disabled.
+            LightBloomPass.Composite();
+            DrawSpellParticles(_spellParticles.Active, ground: false, emissiveOverlay: true, occlusion: spellOcclusion,
+                depthOrigin: spellDepthOrigin);
+            DrawWorldObjectLabels();
 
             if (Settings.DropView || GameScene.DropViewTime > CMain.Time)
             {
@@ -10929,17 +10969,17 @@ namespace Client.MirScenes
 
             float oldOpacity = DXManager.Opacity;
 
-            bool dead = MapObject.User.Dead;
-            if (dead) DXManager.SetGrayscale(true);
-            bool postProcessing = !dead && Settings.PostProcessing &&
+            bool grayscale = MapObject.User.Dead && GraphicsTuning.DeathLook.Current == 0;
+            if (grayscale) DXManager.SetGrayscale(true);
+            bool postProcessing = (!MapObject.User.Dead || GraphicsTuning.DeathLook.Current == 1) && Settings.PostProcessing &&
                 DXManager.BeginPostProcessing(_atmosphereTint,
-                    AtmosphereColourGrade.GradeStrength(_atmosphereTint), _atmosphereFog,
-                    _weatherFrame, _atmosphereHazeTint);
+                    AtmosphereColourGrade.GradeStrength(_atmosphereTint), 0, _weatherFrame, Color.White);
 
             DXManager.DrawOpaque(ControlTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White, Opacity);
 
             if (postProcessing) DXManager.EndPostProcessing();
-            if (dead) DXManager.SetGrayscale(false);
+            if (grayscale) DXManager.SetGrayscale(false);
+            DrawOffsetGuides();
 
             CleanTime = CMain.Time + Settings.CleanDelay;
         }
@@ -10954,9 +10994,23 @@ namespace Client.MirScenes
 
             Surface oldSurface = DXManager.CurrentSurface;
             DXManager.SetSurface(DXManager.FloorSurface);
-            DXManager.Device.Clear(Color.Empty);
+            try
+            {
+                DXManager.Device.Clear(Color.Empty);
+                DrawFloorTiles();
+                FloorValid = true;
+            }
+            finally
+            {
+                DXManager.SetSurface(oldSurface);
+            }
+        }
 
-
+        private void DrawFloorTiles()
+        {
+            Point ground = GraphicsTuning.Offset(GraphicsLayer.Ground).Pixels;
+            Point middle = GraphicsTuning.Offset(GraphicsLayer.Middle).Pixels;
+            Point front = GraphicsTuning.Offset(GraphicsLayer.Front).Pixels;
             int startX = User.Movement.X - ViewRangeX;
             int endX = User.Movement.X + ViewRangeX;
             int startY = User.Movement.Y - ViewRangeY;
@@ -10995,26 +11049,28 @@ namespace Client.MirScenes
                         {
                             int index = (cell.BackImage & 0x1FFFFFFF) - 1;
                             var lib = Libraries.MapLibs[cell.BackIndex];
-                            lib.Draw(index, drawX, drawY);
+                            using var artwork = DXManager.BlendArtwork(GraphicsLayer.Ground);
+                            lib.Draw(index, drawX + ground.X, drawY + ground.Y);
                         }
                     }
 
                     // Middle
                     int midIndex = cell.MiddleImage - 1;
-                    if (midIndex >= 0 && cell.MiddleIndex != -1)
+                    if (midIndex >= 0 && cell.MiddleIndex != -1 && cell.MiddleAnimationFrame is 0 or 255)
                     {
                         var lib = Libraries.MapLibs[cell.MiddleIndex];
                         Size s = lib.GetSize(midIndex);
                         if ((s.Width == CellWidth && s.Height == CellHeight) ||
                             (s.Width == CellWidth * 2 && s.Height == CellHeight * 2))
                         {
-                            lib.Draw(midIndex, drawX, drawY);
+                            using var artwork = DXManager.BlendArtwork(GraphicsLayer.Middle);
+                            lib.Draw(midIndex, drawX + middle.X, drawY + middle.Y);
                         }
                     }
 
                     // Front
                     int frontIndex = (cell.FrontImage & 0x7FFF) - 1;
-                    if (frontIndex != -1)
+                    if (frontIndex != -1 && (cell.FrontAnimationFrame & 0x7F) == 0)
                     {
                         int fileIndex = cell.FrontIndex;
                         if (fileIndex != -1 && fileIndex != 200)
@@ -11041,40 +11097,46 @@ namespace Client.MirScenes
                                 ((s.Width == CellWidth && s.Height == CellHeight) ||
                                  (s.Width == CellWidth * 2 && s.Height == CellHeight * 2)))
                             {
-                                lib.Draw(frontIndex, drawX, drawY);
+                                using var artwork = DXManager.BlendArtwork(GraphicsLayer.Front);
+                                lib.Draw(frontIndex, drawX + front.X, drawY + front.Y);
                             }
                         }
                     }
                 }
             }
 
-            DXManager.SetSurface(oldSurface);
-            FloorValid = true;
         }
         private void DrawBackground()
         {
             string cleanFilename = FileName.Replace(Settings.MapPath, "");
+            Point offset = GraphicsTuning.Offset(GraphicsLayer.Background).Pixels;
+            using var artwork = DXManager.BlendArtwork(GraphicsLayer.Background);
 
             if (cleanFilename.StartsWith("ID1") || cleanFilename.StartsWith("ID2"))
             {
-                Libraries.Background.Draw(10, 0, 0); //mountains
+                Libraries.Background.Draw(10, offset.X, offset.Y); //mountains
             }
             else if (cleanFilename.StartsWith("ID3_013"))
             {
-                Libraries.Background.Draw(22, 0, 0); //desert
+                Libraries.Background.Draw(22, offset.X, offset.Y); //desert
             }
             else if (cleanFilename.StartsWith("ID3_015"))
             {
-                Libraries.Background.Draw(23, 0, 0); //greatwall
+                Libraries.Background.Draw(23, offset.X, offset.Y); //greatwall
             }
             else if (cleanFilename.StartsWith("ID3_023") || cleanFilename.StartsWith("ID3_025"))
             {
-                Libraries.Background.Draw(21, 0, 0); //village entrance
+                Libraries.Background.Draw(21, offset.X, offset.Y); //village entrance
             }
         }
 
-        private void DrawObjects()
+        private void DrawObjects(bool captureMapColours, bool captureSpellDepth)
         {
+            var sceneryCapture = _captureWeather || captureMapColours || captureSpellDepth ? _scenerySprites : null;
+            var actorCapture = _captureWeather || captureSpellDepth ? _weatherActors : null;
+            var animationOffset = GraphicsTuning.Offset(GraphicsLayer.MapAnimation);
+            var middleOffset = GraphicsTuning.Offset(GraphicsLayer.Middle);
+            var frontOffset = GraphicsTuning.Offset(GraphicsLayer.Front);
             if (Settings.Effect)
             {
                 for (int i = Effects.Count - 1; i >= 0; i--)
@@ -11084,22 +11146,20 @@ namespace Client.MirScenes
                 }
             }
 
-            for (int y = User.Movement.Y - ViewRangeY; y <= User.Movement.Y + ViewRangeY + 25; y++)
+            int firstRow = Math.Max(1, User.Movement.Y - ViewRangeY);
+            int lastRow = Math.Min(Height - 1, User.Movement.Y + ViewRangeY + 25);
+            for (int y = firstRow; y <= lastRow; y++)
             {
-                if (y <= 0) continue;
-                if (y >= Height) break;
                 for (int x = User.Movement.X - ViewRangeX; x <= User.Movement.X + ViewRangeX; x++)
                 {
                     if (x < 0) continue;
                     if (x >= Width) break;
-                    M2CellInfo[x, y].DrawDeadObjects();
+                    M2CellInfo[x, y].DrawDeadObjects(actorCapture);
                 }
             }
 
-            for (int y = User.Movement.Y - ViewRangeY; y <= User.Movement.Y + ViewRangeY + 25; y++)
+            for (int y = firstRow; y <= lastRow; y++)
             {
-                if (y <= 0) continue;
-                if (y >= Height) break;
                 int drawY = (y - User.Movement.Y + OffSetY + 1) * CellHeight + User.OffSetMove.Y;
 
                 for (int x = User.Movement.X - ViewRangeX; x <= User.Movement.X + ViewRangeX; x++)
@@ -11119,46 +11179,51 @@ namespace Client.MirScenes
                         index--;
                         int animationoffset = M2CellInfo[x, y].TileAnimationOffset ^ 0x2000;
                         index += animationoffset * (AnimationCount % animation);
-                        Libraries.MapLibs[190].DrawUp(index, drawX, drawY);
+                        using var artwork = DXManager.BlendArtwork(GraphicsLayer.MapAnimation);
+                        using var capture = new WorldSpriteCapture.Scope(sceneryCapture, WorldSpriteCapture.Kind.Scenery, y);
+                        Point position = animationOffset.Apply(new Point(drawX, drawY));
+                        Libraries.MapLibs[190].DrawUp(index, position.X, position.Y);
+                        CaptureAnimatedMapLight(Libraries.MapLibs[190], index,
+                            new Point(position.X, position.Y - Libraries.MapLibs[190].GetSize(index).Height), false, x, y, false,
+                            animationOffset.Linked);
                     }
 
                     #endregion
 
                     #region Draw mir3 middle layer
-                    if ((M2CellInfo[x, y].MiddleIndex >= 0) && (M2CellInfo[x, y].MiddleIndex != -1))   //M2P '> 199' changed to '>= 0' to include mir2 libraries. Fixes middle layer tile strips draw. Also changed in 'DrawFloor' above.
+                    var cell = M2CellInfo[x, y];
+                    index = cell.MiddleImage - 1;
+                    if (cell.MiddleIndex >= 0 && index >= 0)
                     {
-                        index = M2CellInfo[x, y].MiddleImage - 1;
-                        if (index > 0)
+                        MLibrary library = Libraries.MapLibs[cell.MiddleIndex];
+                        Point position = middleOffset.Apply(new Point(drawX, drawY));
+                        animation = cell.MiddleAnimationFrame;
+                        bool animated = animation is > 0 and < 255;
+                        bool additive = false;
+                        if (animated)
                         {
-                            animation = M2CellInfo[x, y].MiddleAnimationFrame;
-                            blend = false;
-                            if ((animation > 0) && (animation < 255))
+                            if ((animation & 0x0f) > 0)
                             {
-                                if ((animation & 0x0f) > 0)
-                                {
-                                    blend = true;
-                                    animation &= 0x0f;
-                                }
-                                if (animation > 0)
-                                {
-                                    byte animationTick = M2CellInfo[x, y].MiddleAnimationTick;
-                                    index += (AnimationCount % (animation + (animation * animationTick))) / (1 + animationTick);
-
-                                    if (blend && (animation == 10 || animation == 8)) //diamond mines, abyss blends
-                                    {
-                                        Libraries.MapLibs[M2CellInfo[x, y].MiddleIndex].DrawUpBlend(index, new Point(drawX, drawY));
-                                    }
-                                    else
-                                    {
-                                        Libraries.MapLibs[M2CellInfo[x, y].MiddleIndex].DrawUp(index, drawX, drawY);
-                                    }
-                                }
+                                animation &= 0x0f;
+                                additive = animation is 10 or 8; // Diamond mines and abyss effects.
                             }
-                            s = Libraries.MapLibs[M2CellInfo[x, y].MiddleIndex].GetSize(index);
-                            if ((s.Width != CellWidth || s.Height != CellHeight) && (s.Width != (CellWidth * 2) || s.Height != (CellHeight * 2)) && !blend)
-                            {
-                                Libraries.MapLibs[M2CellInfo[x, y].MiddleIndex].DrawUp(index, drawX, drawY);
-                            }
+                            int tick = 1 + cell.MiddleAnimationTick;
+                            index += AnimationCount % (animation * tick) / tick;
+                            position = animationOffset.Apply(position, middleOffset.Linked);
+                        }
+                        s = library.GetSize(index);
+                        bool flat = (s.Width == CellWidth && s.Height == CellHeight) ||
+                            (s.Width == CellWidth * 2 && s.Height == CellHeight * 2);
+                        if (animated || !flat)
+                        {
+                            using var artwork = DXManager.BlendArtwork(animated ? GraphicsLayer.MapAnimation : GraphicsLayer.Middle, GraphicsLayer.Middle);
+                            using var capture = new WorldSpriteCapture.Scope(sceneryCapture,
+                                flat ? WorldSpriteCapture.Kind.Terrain : WorldSpriteCapture.Kind.Scenery, y);
+                            if (additive) library.DrawUpBlend(index, position);
+                            else library.DrawUp(index, position.X, position.Y);
+                            if (animated) CaptureAnimatedMapLight(library, index,
+                                new Point(position.X, position.Y - s.Height), false, x, y, additive,
+                                middleOffset.Linked || animationOffset.Linked);
                         }
                     }
                     #endregion
@@ -11206,31 +11271,34 @@ namespace Client.MirScenes
                     }
 
                     s = Libraries.MapLibs[fileIndex].GetSize(index);
-                    if (s.Width == CellWidth && s.Height == CellHeight && animation == 0) continue;
-                    if ((s.Width == CellWidth * 2) && (s.Height == CellHeight * 2) && (animation == 0)) continue;
+                    bool flatFront = (s.Width == CellWidth && s.Height == CellHeight) ||
+                        (s.Width == CellWidth * 2 && s.Height == CellHeight * 2);
+                    if (flatFront && animation == 0) continue;
 
-                    if (blend)
-                    {
-                        if (fileIndex == 14 || fileIndex == 27 || (fileIndex > 99 & fileIndex < 199))
-                            Libraries.MapLibs[fileIndex].DrawBlend(index, new Point(drawX, drawY - (3 * CellHeight)), Color.White, true);
-                        else
-                            Libraries.MapLibs[fileIndex].DrawBlend(index, new Point(drawX, drawY - s.Height), Color.White, (index >= 2723 && index <= 2732));
-                    }
-                    else
-                    {
-                        if (fileIndex == 28 && Libraries.MapLibs[fileIndex].GetOffSet(index) != Point.Empty)
-                            Libraries.MapLibs[fileIndex].Draw(index, new Point(drawX, drawY - CellHeight), Color.White, true);
-                        else
-                            Libraries.MapLibs[fileIndex].Draw(index, drawX, drawY - s.Height);
-                    }
+                    MLibrary front = Libraries.MapLibs[fileIndex];
+                    bool highBlend = blend && (fileIndex is 14 or 27 || fileIndex is > 99 and < 199);
+                    bool offsetFront = !blend && fileIndex == 28 && front.GetOffSet(index) != Point.Empty;
+                    bool useOffset = highBlend || offsetFront || (blend && index is >= 2723 and <= 2732);
+                    Point frontPosition = new(drawX, drawY - (highBlend ? 3 * CellHeight : offsetFront ? CellHeight : s.Height));
+                    frontPosition = frontOffset.Apply(frontPosition);
+                    if (animation > 0) frontPosition = animationOffset.Apply(frontPosition, frontOffset.Linked);
+                    using var frontArtwork = DXManager.BlendArtwork(animation > 0 ? GraphicsLayer.MapAnimation : GraphicsLayer.Front, GraphicsLayer.Front);
+                    using var frontCapture = new WorldSpriteCapture.Scope(sceneryCapture,
+                        flatFront && !useOffset ? WorldSpriteCapture.Kind.Terrain : WorldSpriteCapture.Kind.Scenery, y);
+                    if (blend) front.DrawBlend(index, frontPosition, Color.White, useOffset);
+                    else front.Draw(index, frontPosition, Color.White, useOffset);
+                    if (animation > 0) CaptureAnimatedMapLight(front, index, frontPosition, useOffset, x, y, blend,
+                        frontOffset.Linked || animationOffset.Linked);
                     #endregion
                 }
 
+                // Ground effects share the map's depth order and can still sit behind their caster.
+                DrawGroundSpellRow(y, firstRow, lastRow);
                 for (int x = User.Movement.X - ViewRangeX; x <= User.Movement.X + ViewRangeX; x++)
                 {
                     if (x < 0) continue;
                     if (x >= Width) break;
-                    M2CellInfo[x, y].DrawObjects();
+                    M2CellInfo[x, y].DrawObjects(actorCapture);
                 }
             }
 
@@ -11238,23 +11306,19 @@ namespace Client.MirScenes
             float oldOpacity = DXManager.Opacity;
             DXManager.SetOpacity(0.4F);
 
-            //MapObject.User.DrawMount();
-
-            MapObject.User.DrawBody();
-
-            if ((MapObject.User.Direction == MirDirection.Up) ||
-                (MapObject.User.Direction == MirDirection.UpLeft) ||
-                (MapObject.User.Direction == MirDirection.UpRight) ||
-                (MapObject.User.Direction == MirDirection.Right) ||
-                (MapObject.User.Direction == MirDirection.Left))
+            using (DXManager.BlendArtwork(GraphicsLayer.Player, User.Dead ? GraphicsTuning.CorpseBlend : null))
             {
-                MapObject.User.DrawHead();
-                MapObject.User.DrawWings();
-            }
-            else
-            {
-                MapObject.User.DrawWings();
-                MapObject.User.DrawHead();
+                MapObject.User.DrawBody(spellMask: false);
+                if (MapObject.User.Direction is MirDirection.Up or MirDirection.UpLeft or MirDirection.UpRight or MirDirection.Right or MirDirection.Left)
+                {
+                    MapObject.User.DrawHead(spellMask: false);
+                    MapObject.User.DrawWings();
+                }
+                else
+                {
+                    MapObject.User.DrawWings();
+                    MapObject.User.DrawHead(spellMask: false);
+                }
             }
 
             DXManager.SetOpacity(oldOpacity);
@@ -11278,14 +11342,17 @@ namespace Client.MirScenes
             }
 
             foreach (var ob in Objects.Values)
-            {
                 ob.DrawEffects(Settings.Effect);
+        }
 
+        private static void DrawWorldObjectLabels()
+        {
+            foreach (var ob in Objects.Values)
+            {
                 if (Settings.NameView && !(ob is ItemObject) && !ob.Dead)
                     ob.DrawName();
 
                 ob.DrawChat();
-                //ob.DrawHealth();
                 ob.DrawPoison();
                 ob.DrawDamages();
             }
@@ -11308,219 +11375,6 @@ namespace Client.MirScenes
             light = Color.FromArgb(255, Math.Max(20, light.R - (count * 10)), Math.Max(20, light.G - (count * 10)), Math.Max(20, light.B - (count * 10)));
 
             return light;
-        }
-
-        private void DrawLights(Color darkness)
-        {
-            if (DXManager.Lights == null || DXManager.Lights.Count == 0) return;
-
-            if (DXManager.LightTexture == null || DXManager.LightTexture.Disposed)
-            {
-                DXManager.LightTexture = new Texture(DXManager.Device, Settings.ScreenWidth, Settings.ScreenHeight, true);
-                DXManager.LightSurface = DXManager.LightTexture.GetSurface();
-            }
-
-            Surface oldSurface = DXManager.CurrentSurface;
-            DXManager.SetSurface(DXManager.LightSurface);
-
-            #region Ambient Light
-
-            if (MapObject.User.Poison.HasFlag(PoisonType.Blindness))
-            {
-                darkness = GetBlindLight(darkness);
-            }
-
-            // Keep emitted light separate from ambient. Otherwise the ambient
-            // colour itself crosses the bloom threshold on brighter maps.
-            DXManager.Device.Clear(Color.Black);
-
-            #endregion
-
-            int light;
-            Point p;
-            DXManager.SetBlend(true);
-            DXManager.Device.Blend = SpriteBlendMode.Additive;
-
-            #region Object Lights (Player/Mob/NPC)
-            foreach (var ob in Objects.Values)
-            {
-                if (ob.Light > 0 && (!ob.Dead || ob == MapObject.User || ob.Race == ObjectType.Spell))
-                {
-                    light = ob.Light;
-
-                    int lightRange = light % 15;
-                    if (lightRange >= DXManager.Lights.Count)
-                        lightRange = DXManager.Lights.Count - 1;
-
-                    p = ob.DrawLocation;
-
-                    Color lightColour = ob.LightColour;
-
-                    if (ob.Race == ObjectType.Player)
-                    {
-                        switch (light / 15)
-                        {
-                            case 0://no light source
-                                lightColour = Color.FromArgb(255, 60, 60, 60);
-                                break;
-                            case 1:
-                                lightColour = Color.FromArgb(255, 120, 120, 120);
-                                break;
-                            case 2://Candle
-                                lightColour = Color.FromArgb(255, 180, 180, 180);
-                                break;
-                            case 3://Torch
-                                lightColour = Color.FromArgb(255, 240, 240, 240);
-                                break;
-                            default://Peddler Torch
-                                lightColour = Color.FromArgb(255, 255, 255, 255);
-                                break;
-                        }
-                    }
-                    else if (ob.Race == ObjectType.Merchant)
-                    {
-                        lightColour = Color.FromArgb(255, 120, 120, 120);
-                    }
-
-                    if (MapObject.User.Poison.HasFlag(PoisonType.Blindness))
-                    {
-                        lightColour = GetBlindLight(lightColour);
-                    }
-
-                    // Spell sprites illuminate using the animation's own alpha silhouette.
-                    // Other objects (torch, player, NPC) retain their soft radial light.
-                    bool drawnSpellShape = ob is SpellObject spell && spell.DrawLightMask();
-                    if (!drawnSpellShape && DXManager.Lights[lightRange] != null && !DXManager.Lights[lightRange].Disposed)
-                    {
-                        p.Offset(-(DXManager.LightSizes[lightRange].X / 2) - (CellWidth / 2), -(DXManager.LightSizes[lightRange].Y / 2) - (CellHeight / 2) - 5);
-                        DXManager.Draw(DXManager.Lights[lightRange], null, new Vector3((float)p.X, (float)p.Y, 0.0F), lightColour);
-                    }
-                }
-
-                #region Object Effect Lights
-                if (!Settings.Effect) continue;
-                for (int e = 0; e < ob.Effects.Count; e++)
-                {
-                    Effect effect = ob.Effects[e];
-                    if (!effect.Blend || CMain.Time < effect.Start || effect.Light <= 0) continue;
-
-                    light = Math.Min(effect.Light, DXManager.Lights.Count - 1);
-                    p = effect.DrawLocation;
-
-                    var lightColour = effect.LightColour;
-
-                    if (MapObject.User.Poison.HasFlag(PoisonType.Blindness))
-                    {
-                        lightColour = GetBlindLight(lightColour);
-                    }
-
-                    if (effect.Library != null && effect.CurrentFrame >= 0 && effect.CurrentFrame < effect.Count)
-                    {
-                        effect.Library.Draw(effect.BaseIndex + effect.CurrentFrame, p, lightColour, true);
-                    }
-                    else if (DXManager.Lights[light] != null && !DXManager.Lights[light].Disposed)
-                    {
-                        p.Offset(-(DXManager.LightSizes[light].X / 2) - (CellWidth / 2), -(DXManager.LightSizes[light].Y / 2) - (CellHeight / 2) - 5);
-                        DXManager.Draw(DXManager.Lights[light], null, new Vector3((float)p.X, (float)p.Y, 0.0F), lightColour);
-                    }
-
-                }
-                #endregion
-            }
-            #endregion
-
-            #region Map Effect Lights
-            if (Settings.Effect)
-            {
-                for (int e = 0; e < Effects.Count; e++)
-                {
-                    Effect effect = Effects[e];
-                    if (!effect.Blend || CMain.Time < effect.Start) continue;
-
-                    if (effect.Light <= 0) continue;
-                    light = Math.Min(effect.Light, DXManager.Lights.Count - 1);
-
-                    p = effect.DrawLocation;
-
-                    var lightColour = effect.LightColour;
-
-                    if (MapObject.User.Poison.HasFlag(PoisonType.Blindness))
-                    {
-                        lightColour = GetBlindLight(lightColour);
-                    }
-
-                    if (effect.Library != null && effect.CurrentFrame >= 0 && effect.CurrentFrame < effect.Count)
-                    {
-                        effect.Library.Draw(effect.BaseIndex + effect.CurrentFrame, p, lightColour, true);
-                    }
-                    else if (DXManager.Lights[light] != null && !DXManager.Lights[light].Disposed)
-                    {
-                        p.Offset(-(DXManager.LightSizes[light].X / 2) - (CellWidth / 2), -(DXManager.LightSizes[light].Y / 2) - (CellHeight / 2) - 5);
-                        DXManager.Draw(DXManager.Lights[light], null, new Vector3((float)p.X, (float)p.Y, 0.0F), lightColour);
-                    }
-                }
-            }
-            #endregion
-
-            #region Map Lights
-            UpdateStaticLights();
-            int centerX = MapObject.User.Movement.X, centerY = MapObject.User.Movement.Y;
-            foreach (CachedMapLight emitter in _staticLightCache.Items)
-            {
-                if (!_staticLightCache.InViewport(emitter, centerX, centerY, ViewRangeX, ViewRangeY))
-                    continue;
-
-                int x = emitter.X, y = emitter.Y;
-                light = emitter.Index;
-                Color lightIntensity = emitter.Colour;
-
-                int imageIndex = (M2CellInfo[x, y].FrontImage & 0x7FFF) - 1;
-                int fileIndex = M2CellInfo[x, y].FrontIndex;
-
-                if (MapObject.User.Poison.HasFlag(PoisonType.Blindness))
-                    lightIntensity = GetBlindLight(lightIntensity);
-
-                p = new Point(
-                    (x + OffSetX - centerX) * CellWidth + MapObject.User.OffSetMove.X,
-                    (y + OffSetY - centerY) * CellHeight + MapObject.User.OffSetMove.Y + 32);
-
-                if (M2CellInfo[x, y].FrontAnimationFrame > 0 && imageIndex >= 0 &&
-                    fileIndex >= 0 && fileIndex < Libraries.MapLibs.Length &&
-                    Libraries.MapLibs[fileIndex] != null)
-                    p.Offset(Libraries.MapLibs[fileIndex].GetOffSet(imageIndex));
-
-                if (light >= 0 && light < DXManager.Lights.Count &&
-                    DXManager.Lights[light] != null && !DXManager.Lights[light].Disposed)
-                {
-                    p.Offset(-(DXManager.LightSizes[light].X / 2) - (CellWidth / 2) + 10,
-                             -(DXManager.LightSizes[light].Y / 2) - (CellHeight / 2) - 5);
-                    DXManager.Draw(DXManager.Lights[light], null,
-                                   new Vector3((float)p.X, (float)p.Y, 0.0F), lightIntensity);
-                }
-            }
-            #endregion
-
-            DXManager.SetBlend(false);
-            DXManager.SetSurface(oldSurface);
-
-            DXManager.Device.Blend = SpriteBlendMode.Multiply;
-            ShaderEffect previousLightShader = DXManager.Device.PixelShader;
-            DXManager.Device.PixelShader = ShaderEffect.LightComposite;
-            DXManager.Device.SetPixelShaderConstant(0, stackalloc Vector4[]
-            {
-                new Vector4(darkness.R / 255f, darkness.G / 255f, darkness.B / 255f, 1f)
-            });
-
-            DXManager.Draw(DXManager.LightTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White);
-
-            DXManager.Sprite.End();
-            DXManager.Device.PixelShader = previousLightShader;
-            DXManager.Sprite.Begin();
-
-            // Composite extracted lights after multiplicative darkness and
-            // before UI. The emission buffer contains no ambient colour.
-            if (Settings.LightingBloom)
-                LightBloomPass.Composite();
         }
 
         private static void OnMouseClick(object sender, EventArgs e)
@@ -11566,7 +11420,7 @@ namespace Client.MirScenes
                                     GameScene.Scene.MapControl.CurrentPath = path;
                                     GameScene.Scene.MapControl.AutoPath = true;
                                     var offset = MouseLocation.Subtract(ToMouseLocation(MapLocation));
-                                    Effects.Add(new Effect(Libraries.Magic3, 500, 10, 600, MapLocation) { DrawOffset = offset.Subtract(8, 15) });
+                                    Effects.Add(new Effect(new SpellVisual(ParticleMotif.Click), 600, MapLocation) { DrawOffset = offset.Subtract(8, 15) });
                                 }
                             }
                             return;
@@ -11708,7 +11562,8 @@ namespace Client.MirScenes
             if ((MouseControl == this) && (MapButtons != MouseButtons.None)) AutoHit = false;//mouse actions stop mining even when frozen!
             if (!CanRideAttack()) AutoHit = false;
 
-            if (CMain.Time < InputDelay || User.Poison.HasFlag(PoisonType.Paralysis) || User.Poison.HasFlag(PoisonType.LRParalysis) || User.Poison.HasFlag(PoisonType.Frozen) || User.Fishing) return;
+            if (CMain.Time < InputDelay || (User.PendingSignature != Spell.None && CMain.Time < User.PendingSignatureUntil) ||
+                User.Poison.HasFlag(PoisonType.Paralysis) || User.Poison.HasFlag(PoisonType.LRParalysis) || User.Poison.HasFlag(PoisonType.Frozen) || User.Fishing) return;
 
             if (User.NextMagic != null && !User.RidingMount)
             {
@@ -12026,13 +11881,16 @@ namespace Client.MirScenes
         public void UseMagic(ClientMagic magic, UserObject actor)
         {
             if (magic == null || actor == null ||
-                !SpellCurriculum.CanUse(actor.Class, actor.Specialisation, magic.Spell))
+                !actor.CanUseBuildSpell(magic.Spell))
             {
                 actor?.ClearMagic();
                 return;
             }
 
-            if (CMain.Time < GameScene.SpellTime || actor.Poison.HasFlag(PoisonType.Stun))
+            bool signature = SpecialisationAbilities.TryGet(magic.Spell, out var ability);
+            if (CMain.Time < (actor == User ? Math.Max(GameScene.SpellTime, actor.SignatureRecoveryUntil) : actor.SignatureRecoveryUntil) ||
+                (actor.PendingSignature != Spell.None && CMain.Time < actor.PendingSignatureUntil) ||
+                (actor.Poison & (PoisonType.Stun | PoisonType.TalentStun | PoisonType.TalentSilence)) != 0)
             {
                 actor.ClearMagic();
                 return;
@@ -12066,6 +11924,11 @@ namespace Client.MirScenes
                 cost += (cost * actor.Stats[Stat.ManaPenaltyPercent]) / 100;
             }
 
+            BuffType discount = TalentStatuses.ManaDiscount(magic.Spell);
+            if (discount != BuffType.None && actor.GetBuffDialog?.Buffs.Find(buff => buff.Type == discount &&
+                !buff.Paused && buff.ExpireTime > CMain.Time) is { Values.Length: > 0 } modifier)
+                cost = Math.Max(0, cost - modifier.Values[0]);
+
             if (cost > actor.MP)
             {
                 if (CMain.Time >= OutputDelay)
@@ -12081,13 +11944,16 @@ namespace Client.MirScenes
 
             MapObject target = null;
 
-            if (SpecialisationAbilities.TryGet(magic.Spell, out var ability))
+            if (signature)
             {
                 MapObject hovered = actor.NextMagicObject;
-                switch (ability.Target)
+                bool aimedLane = magic.Spell == Spell.WinterglassVolley && actor.Build.Engine == 1;
+                MapObject procTarget = actor.IsFinisherReady(magic.Spell) && Objects.TryGetValue(actor.RotationTarget, out MapObject marked) ? marked : null;
+                switch (aimedLane ? AbilityTarget.Ground : ability.Target)
                 {
                     case AbilityTarget.Enemy:
-                        target = IsSignatureClientTarget(hovered, actor) ? hovered : MapObject.TargetObject;
+                        target = procTarget ?? (IsSignatureClientTarget(hovered, actor) ? hovered : MapObject.TargetObject);
+                        if (!IsSignatureClientTarget(target, actor)) target = MapObject.MagicObject;
                         if (!IsSignatureClientTarget(target, actor))
                         {
                             actor.ClearMagic();
@@ -12098,8 +11964,8 @@ namespace Client.MirScenes
                         if (IsSignatureClientTarget(hovered, actor)) target = hovered;
                         break;
                     case AbilityTarget.Ally:
-                        target = hovered != null && !hovered.Dead && hovered.Race is ObjectType.Player or ObjectType.Hero
-                            ? hovered : User;
+                        target = procTarget ?? (hovered != null && !hovered.Dead && hovered.Race is ObjectType.Player or ObjectType.Hero
+                            ? hovered : User);
                         break;
                     case AbilityTarget.Self:
                         target = actor;
@@ -12259,7 +12125,7 @@ namespace Client.MirScenes
                     break;
             }
 
-            MirDirection dir = (target == null || target == User) ? actor.NextMagicDirection : Functions.DirectionFromPoint(actor.CurrentLocation, target.CurrentLocation);
+            MirDirection dir = (target == null || target == actor || target == User) ? actor.NextMagicDirection : Functions.DirectionFromPoint(actor.CurrentLocation, target.CurrentLocation);
 
             Point location = target != null ? target.CurrentLocation : actor.NextMagicLocation;
             if (target == null && ability?.Target == AbilityTarget.Companion) location = actor.CurrentLocation;
@@ -12269,7 +12135,8 @@ namespace Client.MirScenes
             if (magic.Spell == Spell.FlashDash)
                 dir = actor.Direction;
 
-            if ((magic.Range != 0) && (!Functions.InRange(actor.CurrentLocation, location, magic.Range)))
+            int range = magic.Range;
+            if (magic.Range != 0 && !Functions.InRange(actor.CurrentLocation, location, range))
             {
                 if (CMain.Time >= OutputDelay)
                 {
@@ -12282,7 +12149,12 @@ namespace Client.MirScenes
 
             GameScene.LogTime = CMain.Time + Globals.LogDelay;
 
-            if (actor == User)
+            if (signature)
+            {
+                actor.ClearMagic();
+                GameScene.SendSignatureRequest(actor, magic.Spell, dir, targetID, location);
+            }
+            else if (actor == User)
             {
                 User.QueuedAction = new QueuedAction { Action = MirAction.Spell, Direction = dir, Location = User.CurrentLocation, Params = new List<object>() };
                 User.QueuedAction.Params.Add(magic.Spell);
@@ -12503,22 +12375,24 @@ namespace Client.MirScenes
             return false;
         }
 
-        public bool CanHalfMoon(Point p, MirDirection d)
+        public bool CanHalfMoon(Point p, MirDirection d, bool extended = false)
         {
             d = Functions.PreviousDir(d);
-            for (int i = 0; i < 4; i++)
+            if (extended) d = Functions.PreviousDir(d);
+            for (int i = 0; i < (extended ? 6 : 4); i++)
             {
                 if (HasTarget(Functions.PointMove(p, d, 1))) return true;
                 d = Functions.NextDir(d);
             }
             return false;
         }
-        public bool CanCrossHalfMoon(Point p)
+        public bool CanCrossHalfMoon(Point p, bool extended = false)
         {
             MirDirection dir = MirDirection.Up;
             for (int i = 0; i < 8; i++)
             {
                 if (HasTarget(Functions.PointMove(p, dir, 1))) return true;
+                if (extended && i % 2 == 0 && HasTarget(Functions.PointMove(p, dir, 2))) return true;
                 dir = Functions.NextDir(dir);
             }
             return false;
@@ -12572,6 +12446,7 @@ namespace Client.MirScenes
                 GameScene.Scene.ParticleEngines[i].Dispose();
 
             GameScene.Scene.ParticleEngines.Clear();
+            if (GraphicsTuning.WeatherSource.Current == 0) return;
             List<ParticleImageInfo> textures = new List<ParticleImageInfo>();
             foreach (WeatherSetting itemWeather in Enum.GetValues(typeof(WeatherSetting)).Cast<object>().ToArray())
             {
@@ -12620,64 +12495,6 @@ namespace Client.MirScenes
                             }
                         FLeavesEngine2.GenerateParticles = false;
                         GameScene.Scene.ParticleEngines.Add(FLeavesEngine2);
-                        break;
-                    case WeatherSetting.Rain:
-                        textures = new List<ParticleImageInfo>();
-                        //Rain
-                        textures.Add(new ParticleImageInfo(Libraries.Weather, 164, 150, 50));
-
-
-                        ParticleEngine RainEngine2 = new ParticleEngine(textures, new Vector2(2f, 0), ParticleType.Rain);
-                        Vector2 rsevelocity = new Vector2(0F, 0F);
-                        var xVar = 512;
-                        var yVar = 512;
-                        for (int y = yVar * -1; y < Settings.ScreenHeight + yVar; y += yVar)
-                            for (int x = xVar * -1; x < Settings.ScreenWidth + xVar; x += xVar)
-                            {
-                                Particle part = RainEngine2.GenerateNewParticle(ParticleType.Rain);
-                                part.Position = new Vector2(x, y);
-                                part.Velocity = rsevelocity;
-                            }
-                        RainEngine2.GenerateParticles = false;
-                        GameScene.Scene.ParticleEngines.Add(RainEngine2);
-                        break;
-
-                    case WeatherSetting.Snow:
-                        textures = new List<ParticleImageInfo>();
-                        textures.Add(new ParticleImageInfo(Libraries.Weather, 43, 20, 50));
-
-                        ParticleEngine RainEngine = new ParticleEngine(textures, new Vector2(0, 0), ParticleType.Snow);
-                        Vector2 rsvelocity = new Vector2(1F, -1F);
-
-                        for (int y = -400; y < Settings.ScreenHeight + 400; y += 400)
-                            for (int x = -400; x < Settings.ScreenWidth + 400; x += 400)
-                            {
-                                Particle part = RainEngine.GenerateNewParticle(ParticleType.Snow);
-                                part.Position = new Vector2(x, y);
-                                part.Velocity = rsvelocity;
-                            }
-                        RainEngine.GenerateParticles = false;
-                        GameScene.Scene.ParticleEngines.Add(RainEngine);
-
-                        break;
-                    case WeatherSetting.Fog:
-                        List<ParticleImageInfo> ftextures = new List<ParticleImageInfo>();
-                        ftextures.Add(new ParticleImageInfo(Libraries.Weather, 0));
-                        ParticleEngine fengine = new ParticleEngine(ftextures, new Vector2(0, 0), ParticleType.Fog);
-                        fengine.UpdateDelay = TimeSpan.FromMilliseconds(20);
-
-                        Vector2 fvelocity = new Vector2(2F, -2F);
-                        for (int y = -512; y < Settings.ScreenHeight + 512; y += 512)
-                            for (int x = -512; x < Settings.ScreenWidth + 512; x += 512)
-                            {
-                                Particle part = fengine.GenerateNewParticle(ParticleType.Fog);
-                                part.Position = new Vector2(x, y);
-                                part.Velocity = fvelocity;
-                            }
-
-
-                        fengine.GenerateParticles = false;
-                        GameScene.Scene.ParticleEngines.Add(fengine);
                         break;
                     case WeatherSetting.RedEmber:
                         var rtextures = new List<ParticleImageInfo>();

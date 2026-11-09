@@ -794,7 +794,7 @@ namespace Server.MirEnvir
             switch (action.Type)
             {
                 case DelayedType.Magic:
-                    CompleteMagic(action.Params);
+                    CompleteMagic(action.Params, action);
                     break;
                 case DelayedType.Spawn:
                     MapObject obj = (MapObject)action.Params[0];
@@ -853,13 +853,14 @@ namespace Server.MirEnvir
             return pointsWithinTheMap;
         }
 
-        private void CompleteMagic(IList<object> data)
+        private void CompleteMagic(IList<object> data, DelayedAction pending)
         {
             bool train = false;
             HumanObject player = (HumanObject)data[0];
             UserMagic magic = (UserMagic)data[1];
 
             if (player == null || player.Info == null || player.Node == null) return;
+            if (player.CurrentMap != this || (pending.PerkRevision >= 0 && player.Info.SpellPerks.Revision != pending.PerkRevision)) return;
 
             int value, value2;
             Point location;
@@ -879,6 +880,7 @@ namespace Server.MirEnvir
                     int count = (int)data[5] - 1;
 
                     if (!ValidPoint(location)) return;
+                    player.BroadcastLegacyImpact(magic.Spell, location);
 
                     if (count > 0)
                     {
@@ -929,7 +931,10 @@ namespace Server.MirEnvir
                     else
                         monster.Spawn(player.CurrentMap, player.CurrentLocation);
 
+                    if (monster.Node == null) return;
                     monster.Master.Pets.Add(monster);
+                    player.ApplyCompanionPerk(magic, monster);
+                    player.BroadcastLegacyImpact(magic.Spell, monster.CurrentLocation);
                     break;
                 case Spell.Stonetrap:
                     monster = (MonsterObject)data[2];
@@ -953,12 +958,13 @@ namespace Server.MirEnvir
                     value = (int)data[2];
                     location = (Point)data[3];
 
-                    for (int y = location.Y - 1; y <= location.Y + 1; y++)
+                    int impactRadius = magic.Area(1);
+                    for (int y = location.Y - impactRadius; y <= location.Y + impactRadius; y++)
                     {
                         if (y < 0) continue;
                         if (y >= Height) break;
 
-                        for (int x = location.X - 1; x <= location.X + 1; x++)
+                        for (int x = location.X - impactRadius; x <= location.X + impactRadius; x++)
                         {
                             if (x < 0) continue;
                             if (x >= Width) break;
@@ -977,8 +983,13 @@ namespace Server.MirEnvir
                                         //Only targets
                                         if (target.IsAttackTarget(player))
                                         {
-                                            if (target.Attacked(player, value, DefenceType.MAC, false) > 0)
+                                            int dealt = target.Attacked(player, value, DefenceType.MAC, false);
+                                            if (dealt > 0)
+                                            {
+                                                player.ApplyLandedSpellPerks(magic, target, dealt, DefenceType.MAC);
+                                                if (target.CurrentLocation != location) player.BroadcastLegacyImpact(magic.Spell, target.CurrentLocation);
                                                 train = true;
+                                            }
                                         }
                                         break;
                                 }
@@ -998,12 +1009,13 @@ namespace Server.MirEnvir
                     value = (int)data[2];
                     location = (Point)data[3];
 
-                    for (int y = location.Y - 1; y <= location.Y + 1; y++)
+                    int hidingRadius = magic.Area(1);
+                    for (int y = location.Y - hidingRadius; y <= location.Y + hidingRadius; y++)
                     {
                         if (y < 0) continue;
                         if (y >= Height) break;
 
-                        for (int x = location.X - 1; x <= location.X + 1; x++)
+                        for (int x = location.X - hidingRadius; x <= location.X + hidingRadius; x++)
                         {
                             if (x < 0) continue;
                             if (x >= Width) break;
@@ -1025,7 +1037,9 @@ namespace Server.MirEnvir
                                         //Only targets
                                         if (target.IsFriendlyTarget(player))
                                         {
-                                            target.AddBuff(BuffType.Hiding, player, (Settings.Second * value), new Stats());
+                                            target.AddBuff(BuffType.Hiding, player, magic.EffectDuration(Settings.Second * value), new Stats());
+                                            // Each concealed ally gets a separate falling-veil impact.
+                                            player.BroadcastLegacyImpact(magic.Spell, target.CurrentLocation);
                                             target.OperateTime = 0;
                                             train = true;
                                         }
@@ -1049,12 +1063,13 @@ namespace Server.MirEnvir
                     location = (Point)data[3];
                     BuffType type = magic.Spell == Spell.SoulShield ? BuffType.SoulShield : BuffType.BlessedArmour;
 
-                    for (int y = location.Y - 3; y <= location.Y + 3; y++)
+                    int armourRadius = magic.Area(3);
+                    for (int y = location.Y - armourRadius; y <= location.Y + armourRadius; y++)
                     {
                         if (y < 0) continue;
                         if (y >= Height) break;
 
-                        for (int x = location.X - 3; x <= location.X + 3; x++)
+                        for (int x = location.X - armourRadius; x <= location.X + armourRadius; x++)
                         {
                             if (x < 0) continue;
                             if (x >= Width) break;
@@ -1082,7 +1097,8 @@ namespace Server.MirEnvir
                                                 [type == BuffType.SoulShield ? Stat.MaxMAC : Stat.MaxAC] = target.Level / 7 + 4
                                             };
 
-                                            target.AddBuff(type, player, Settings.Second * value, stats);
+                                            target.AddBuff(type, player, magic.EffectDuration(Settings.Second * value), stats);
+                                            player.ApplyLegacyShelter(magic, target);
                                             target.OperateTime = 0;
                                             train = true;
                                         }
@@ -1094,6 +1110,9 @@ namespace Server.MirEnvir
 
                     }
 
+                    // Emit the complete ward once at the server-validated aimed cell.
+                    // Nearby allies still receive their buffs without individual glyphs.
+                    player.BroadcastLegacyImpact(magic.Spell, location);
                     break;
 
                 #endregion
@@ -1103,83 +1122,32 @@ namespace Server.MirEnvir
                 case Spell.FireWall:
                     value = (int)data[2];
                     location = (Point)data[3];
+                    int castId = data.Count >= 5 && data[4] is int ci ? ci : 0;
 
-                    int castId = 0;
-                    if (data.Count >= 5 && data[4] is int ci) castId = ci;
+                    var wallCells = new List<Point> { location };
+                    for (int distance = 1; distance <= magic.Area(1); distance++)
+                        for (int direction = 0; direction < 8; direction += 2)
+                            wallCells.Add(Functions.PointMove(location, (MirDirection)direction, distance));
 
-                    player.LevelMagic(magic);
-
-                    if (ValidPoint(location))
+                    foreach (Point point in wallCells)
                     {
-                        cell = GetCell(location);
-
-                        bool cast = true;
-                        if (cell.Objects != null)
-                            for (int o = 0; o < cell.Objects.Count; o++)
-                            {
-                                MapObject target = cell.Objects[o];
-                                if (target.Race != ObjectType.Spell || ((SpellObject)target).Spell != Spell.FireWall) continue;
-
-                                cast = false;
-                                break;
-                            }
-
-                        if (cast)
-                        {
-                            SpellObject ob = new SpellObject
-                            {
-                                Spell = Spell.FireWall,
-                                Value = value,
-                                ExpireTime = Envir.Time + (10 + value / 2) * 1000,
-                                TickSpeed = 2000,
-                                Caster = player,
-                                CurrentLocation = location,
-                                CurrentMap = this,
-                                CastInstanceId = castId
-                            };
-                            AddObject(ob);
-                            ob.Spawned();
-                        }
-                    }
-
-                    dir = MirDirection.Up;
-                    for (int i = 0; i < 4; i++)
-                    {
-                        location = Functions.PointMove((Point)data[3], dir, 1);
-                        dir += 2;
-
-                        if (!ValidPoint(location)) continue;
-
-                        cell = GetCell(location);
-                        bool cast = true;
-
-                        if (cell.Objects != null)
-                            for (int o = 0; o < cell.Objects.Count; o++)
-                            {
-                                MapObject target = cell.Objects[o];
-                                if (target.Race != ObjectType.Spell || ((SpellObject)target).Spell != Spell.FireWall) continue;
-
-                                cast = false;
-                                break;
-                            }
-
-                        if (!cast) continue;
-
-                        SpellObject ob = new SpellObject
+                        if (!ValidPoint(point)) continue;
+                        cell = GetCell(point);
+                        if (cell.Objects?.Any(target => target is SpellObject { Spell: Spell.FireWall }) == true) continue;
+                        var wall = new SpellObject
                         {
                             Spell = Spell.FireWall,
                             Value = value,
-                            ExpireTime = Envir.Time + (10 + value / 2) * 1000,
+                            ExpireTime = Envir.Time + magic.EffectDuration((10 + value / 2) * 1000),
                             TickSpeed = 2000,
                             Caster = player,
-                            CurrentLocation = location,
+                            CurrentLocation = point,
                             CurrentMap = this,
                             CastInstanceId = castId
                         };
-                        AddObject(ob);
-                        ob.Spawned();
+                        AddObject(wall);
+                        wall.Spawned();
                     }
-
                     break;
 
                 #endregion
@@ -1191,11 +1159,12 @@ namespace Server.MirEnvir
                     location = (Point)data[3];
                     dir = (MirDirection)data[4];
 
-                    for (int i = 0; i < 6; i++)
+                    for (int i = 0; i < 6 + magic.Perk(SpellPerk.Reach); i++)
                     {
                         location = Functions.PointMove(location, dir, 1);
 
-                        if (!ValidPoint(location)) continue;
+                        if (!ValidPoint(location)) break;
+                        Broadcast(new S.MapEffect { Location = location, Effect = SpellEffect.LightningArc, Value = (byte)dir }, location);
 
                         cell = GetCell(location);
 
@@ -1207,9 +1176,10 @@ namespace Server.MirEnvir
                             if (target.Race != ObjectType.Player && target.Race != ObjectType.Monster) continue;
 
                             if (!target.IsAttackTarget(player)) continue;
-                            if (target.Attacked(player, value, DefenceType.MAC, false) > 0)
+                            int dealt = target.Attacked(player, value, DefenceType.MAC, false);
+                            if (dealt > 0)
                             {
-                                player.RecordComboHit(Spell.Lightning, target);
+                                player.ApplyLandedSpellPerks(magic, target, dealt, DefenceType.MAC);
                                 train = true;
                             }
                             break;
@@ -1259,12 +1229,13 @@ namespace Server.MirEnvir
                     value = (int)data[2];
                     location = (Point)data[3];
 
-                    for (int y = location.Y - 1; y <= location.Y + 1; y++)
+                    int healingRadius = magic.Area(1);
+                    for (int y = location.Y - healingRadius; y <= location.Y + healingRadius; y++)
                     {
                         if (y < 0) continue;
                         if (y >= Height) break;
 
-                        for (int x = location.X - 1; x <= location.X + 1; x++)
+                        for (int x = location.X - healingRadius; x <= location.X + healingRadius; x++)
                         {
                             if (x < 0) continue;
                             if (x >= Width) break;
@@ -1285,7 +1256,8 @@ namespace Server.MirEnvir
                                         if (target.IsFriendlyTarget(player))
                                         {
                                             if (target.Health >= target.MaxHealth) continue;
-                                            player.QueueSpellHealing(target, value);
+                                            player.QueueSpellHealing(target, value, magic.Spell, pending.Credit);
+                                            player.BroadcastLegacyImpact(magic.Spell, target.CurrentLocation);
                                             target.OperateTime = 0;
                                             train = true;
                                         }
@@ -1309,12 +1281,13 @@ namespace Server.MirEnvir
                 case Spell.StormEscape:
                     value = (int)data[2];
                     location = (Point)data[3];
-                    for (int y = location.Y - 2; y <= location.Y + 2; y++)
+                    int stormRadius = magic.Area(2);
+                    for (int y = location.Y - stormRadius; y <= location.Y + stormRadius; y++)
                     {
                         if (y < 0) continue;
                         if (y >= Height) break;
 
-                        for (int x = location.X - 2; x <= location.X + 2; x++)
+                        for (int x = location.X - stormRadius; x <= location.X + stormRadius; x++)
                         {
                             if (x < 0) continue;
                             if (x >= Width) break;
@@ -1332,7 +1305,8 @@ namespace Server.MirEnvir
                                     case ObjectType.Player:
                                         //Only targets
                                         if (!target.IsAttackTarget(player)) break;
-                                        target.Attacked(player, magic.Spell == Spell.ThunderStorm && !target.Undead ? value / 10 : value, DefenceType.MAC, false);
+                                        if (target.Attacked(player, magic.Spell == Spell.ThunderStorm && !target.Undead ? value / 10 : value, DefenceType.MAC, false) > 0)
+                                            player.BroadcastLegacyImpact(magic.Spell, target.CurrentLocation);
                                         train = true;
                                         break;
                                 }
@@ -1400,13 +1374,14 @@ namespace Server.MirEnvir
 
                 case Spell.LionRoar:
                     location = (Point)data[2];
+                    int roarRadius = magic.Area(2);
 
-                    for (int y = location.Y - 2; y <= location.Y + 2; y++)
+                    for (int y = location.Y - roarRadius; y <= location.Y + roarRadius; y++)
                     {
                         if (y < 0) continue;
                         if (y >= Height) break;
 
-                        for (int x = location.X - 2; x <= location.X + 2; x++)
+                        for (int x = location.X - roarRadius; x <= location.X + roarRadius; x++)
                         {
                             if (x < 0) continue;
                             if (x >= Width) break;
@@ -1421,7 +1396,8 @@ namespace Server.MirEnvir
                                 if (target.Race != ObjectType.Monster) continue;
                                 //Only targets
                                 if (!target.IsAttackTarget(player) || player.Level + 3 < target.Level) continue;
-                                target.ApplyPoison(new Poison { PType = PoisonType.LRParalysis, Duration = magic.Level + 2, TickSpeed = 1000 }, player);
+                                target.ApplyPoison(new Poison { PType = PoisonType.LRParalysis, Duration = magic.EffectDuration(magic.Level + 2), TickSpeed = 1000 }, player);
+                                player.BroadcastLegacyImpact(magic.Spell, target.CurrentLocation);
                                 target.OperateTime = 0;
                                 train = true;
                             }
@@ -1443,12 +1419,13 @@ namespace Server.MirEnvir
                     train = true;
                     bool show = true;
 
-                    for (int y = location.Y - 1; y <= location.Y + 1; y++)
+                    int cloudRadius = magic.Area(1);
+                    for (int y = location.Y - cloudRadius; y <= location.Y + cloudRadius; y++)
                     {
                         if (y < 0) continue;
                         if (y >= Height) break;
 
-                        for (int x = location.X - 1; x <= location.X + 1; x++)
+                        for (int x = location.X - cloudRadius; x <= location.X + cloudRadius; x++)
                         {
                             if (x < 0) continue;
                             if (x >= Width) break;
@@ -1475,7 +1452,7 @@ namespace Server.MirEnvir
                                     Spell = Spell.PoisonCloud,
                                     Value = value,
                                     BonusDmg = bonusdmg,
-                                    ExpireTime = Envir.Time + 6000,
+                                    ExpireTime = Envir.Time + magic.EffectDuration(6000),
                                     TickSpeed = 1000,
                                     Caster = player,
                                     CurrentLocation = new Point(x, y),
@@ -1506,7 +1483,7 @@ namespace Server.MirEnvir
                         int farDamage = (int)data[5];
 
                         int col = 3;
-                        int row = 3;
+                        int row = 3 + magic.Perk(SpellPerk.Reach);
 
                         Point[] loc = new Point[col]; //0 = left 1 = center 2 = right
                         loc[0] = Functions.PointMove(location, Functions.PreviousDir(direction), 1);
@@ -1521,6 +1498,7 @@ namespace Server.MirEnvir
                                 Point hitPoint = Functions.PointMove(startPoint, direction, j);
 
                                 if (!ValidPoint(hitPoint)) continue;
+                                player.BroadcastLegacyImpact(magic.Spell, hitPoint);
 
                                 cell = GetCell(hitPoint);
 
@@ -1537,15 +1515,10 @@ namespace Server.MirEnvir
                                             {
                                                 //Only targets
                                                 int damage = j <= 1 ? nearDamage : farDamage;
-                                                bool shatter = player.HasRime(target);
-                                                if (shatter) damage = HumanObject.ComboDamage(damage, 125);
-                                                if (target.Attacked(player, damage, DefenceType.MAC, false) > 0)
+                                                int dealt = target.Attacked(player, damage, DefenceType.MAC, false);
+                                                if (dealt > 0)
                                                 {
-                                                    if (shatter)
-                                                    {
-                                                        player.SpendRime(target);
-                                                        player.ApplyRimeSlow(target);
-                                                    }
+                                                    player.ApplyLandedSpellPerks(magic, target, dealt, DefenceType.MAC);
                                                     train = true;
                                                 }
                                             }
@@ -1584,8 +1557,13 @@ namespace Server.MirEnvir
                             if (target.Race != ObjectType.Player && target.Race != ObjectType.Monster) continue;
 
                             if (!target.IsAttackTarget(player)) continue;
-                            if (target.Attacked(player, value, DefenceType.AC, false) > 0)
+                            int dealt = target.Attacked(player, value, DefenceType.AC, false);
+                            if (dealt > 0)
+                            {
                                 train = true;
+                                player.BroadcastLegacyImpact(magic.Spell, target.CurrentLocation);
+                                player.ApplyLandedSpellPerks(magic, target, dealt, DefenceType.AC);
+                            }
                             break;
                         }
                     }
@@ -1602,6 +1580,7 @@ namespace Server.MirEnvir
 
                     if (finish)
                     {
+                        player.BroadcastLegacyImpact(magic.Spell, monster.CurrentLocation);
                         monster.Die();
                         return;
                     };
@@ -1610,6 +1589,7 @@ namespace Server.MirEnvir
                         monster.Spawn(this, front);
                     else
                         monster.Spawn(player.CurrentMap, player.CurrentLocation);
+                    if (monster.Node != null) player.BroadcastLegacyImpact(magic.Spell, monster.CurrentLocation);
                     break;
 
                 #endregion
@@ -1654,7 +1634,7 @@ namespace Server.MirEnvir
                                 {
                                     Spell = Spell.Blizzard,
                                     Value = value,
-                                    ExpireTime = Envir.Time + 3000,
+                                    ExpireTime = Envir.Time + magic.EffectDuration(3000),
                                     TickSpeed = 440,
                                     Caster = player,
                                     CurrentLocation = new Point(x, y),
@@ -1684,12 +1664,13 @@ namespace Server.MirEnvir
                     train = true;
                     show = true;
 
-                    for (int y = location.Y - 2; y <= location.Y + 2; y++)
+                    int meteorRadius = magic.Area(2);
+                    for (int y = location.Y - meteorRadius; y <= location.Y + meteorRadius; y++)
                     {
                         if (y < 0) continue;
                         if (y >= Height) break;
 
-                        for (int x = location.X - 2; x <= location.X + 2; x++)
+                        for (int x = location.X - meteorRadius; x <= location.X + meteorRadius; x++)
                         {
                             if (x < 0) continue;
                             if (x >= Width) break;
@@ -1715,7 +1696,7 @@ namespace Server.MirEnvir
                             {
                                 Spell = Spell.MeteorStrike,
                                 Value = value,
-                                ExpireTime = Envir.Time + 3000,
+                                ExpireTime = Envir.Time + magic.EffectDuration(3000),
                                 TickSpeed = 440,
                                 Caster = player,
                                 CurrentLocation = new Point(x, y),
@@ -1742,6 +1723,7 @@ namespace Server.MirEnvir
                     value = (int)data[2];
                     location = (Point)data[3];
 
+                    value = magic.EffectDuration(value);
                     MonsterObject centerTarget = null;
 
                     for (int y = location.Y - 1; y <= location.Y + 1; y++)
@@ -1794,8 +1776,7 @@ namespace Server.MirEnvir
                         {
                             MirDirection spawndirection = i == 0 || i == 4 ? MirDirection.Right : MirDirection.Up;
                             Point spawnpoint = Functions.PointMove(startpoint, spawndirection + j, 1);
-                            if (spawnpoint.X <= 0 || spawnpoint.X > centerTarget.CurrentMap.Width) continue;
-                            if (spawnpoint.Y <= 0 || spawnpoint.Y > centerTarget.CurrentMap.Height) continue;
+                            if (!ValidPoint(spawnpoint)) continue;
                             SpellObject ob = new SpellObject
                             {
                                 Spell = Spell.TrapHexagon,
@@ -1822,16 +1803,25 @@ namespace Server.MirEnvir
                 #region Curse
 
                 case Spell.Curse:
-                    value = (int)data[2];
+                    value = magic.EffectDuration((int)data[2]);
                     location = (Point)data[3];
                     value2 = (int)data[4];
 
-                    for (int y = location.Y - 3; y <= location.Y + 3; y++)
+                    // A zero strength indicates a valid cast whose debuff
+                    // roll failed. Emit the rune, but never apply a poison.
+                    if (value2 == 0)
+                    {
+                        player.BroadcastLegacyImpact(magic.Spell, location);
+                        break;
+                    }
+
+                    int curseRadius = magic.Area(3);
+                    for (int y = location.Y - curseRadius; y <= location.Y + curseRadius; y++)
                     {
                         if (y < 0) continue;
                         if (y >= Height) break;
 
-                        for (int x = location.X - 3; x <= location.X + 3; x++)
+                        for (int x = location.X - curseRadius; x <= location.X + curseRadius; x++)
                         {
                             if (x < 0) continue;
                             if (x >= Width) break;
@@ -1878,6 +1868,9 @@ namespace Server.MirEnvir
 
                     }
 
+                    // The curse glyph is a single cast-location effect, whether it
+                    // afflicts zero, one or several targets. Keep debuffs per target.
+                    player.BroadcastLegacyImpact(magic.Spell, location);
                     break;
 
                 #endregion
@@ -1906,7 +1899,7 @@ namespace Server.MirEnvir
 
                         if (cast)
                         {
-                            player.LevelMagic(magic);
+                            player.ResolveSpellPerks(magic);
 
                             System.Drawing.Point[] traps = new Point[3];
                             traps[0] = front;
@@ -1965,7 +1958,7 @@ namespace Server.MirEnvir
                     location = (Point)data[3];
 
                     // the skill affect a 3x3 square
-                    var points= GetPointsInEffectiveSquare(location, Width, Height, 3);
+                    var points= GetPointsInEffectiveSquare(location, Width, Height, magic.Area(1) * 2 + 1);
                     foreach (var point in points)
                     {
                         cell = GetCell(point.X, point.Y);
@@ -2018,7 +2011,8 @@ namespace Server.MirEnvir
                                             tempOb.ChangeMP(-tempValue);
                                         }
 
-                                        target.Attacked(player, player.Stats[Stat.MaxSC] * 2, DefenceType.MAC, true);
+                                        if (target.Attacked(player, magic.ScalePower(player.Stats[Stat.MaxSC] * 2), DefenceType.MAC, true) > 0)
+                                            player.BroadcastLegacyImpact(magic.Spell, target.CurrentLocation);
 
                                         train = true;
                                     }
@@ -2237,10 +2231,11 @@ namespace Server.MirEnvir
                 case Spell.BattleCry:
                     location = (Point)data[2];
 
-                    int startX = Math.Max(location.X - 2, 0);
-                    int endX = Math.Min(location.X + 2, Width - 1);
-                    int startY = Math.Max(location.Y - 2, 0);
-                    int endY = Math.Min(location.Y + 2, Height - 1);
+                    int cryRadius = magic.Area(2);
+                    int startX = Math.Max(location.X - cryRadius, 0);
+                    int endX = Math.Min(location.X + cryRadius, Width - 1);
+                    int startY = Math.Max(location.Y - cryRadius, 0);
+                    int endY = Math.Min(location.Y + cryRadius, Height - 1);
 
                     int randomValue = Envir.Random.Next(100);
 
@@ -2288,12 +2283,13 @@ namespace Server.MirEnvir
                     train = true;
                     show = true;
 
-                    for (int y = location.Y - 1; y <= location.Y + 1; y++)
+                    int circleRadius = magic.Area(1);
+                    for (int y = location.Y - circleRadius; y <= location.Y + circleRadius; y++)
                     {
                         if (y < 0) continue;
                         if (y >= Height) break;
 
-                        for (int x = location.X - 1; x <= location.X + 1; x++)
+                        for (int x = location.X - circleRadius; x <= location.X + circleRadius; x++)
                         {
                             if (x < 0) continue;
                             if (x >= Width) break;
@@ -2318,8 +2314,10 @@ namespace Server.MirEnvir
                             SpellObject ob = new SpellObject
                             {
                                 Spell = Spell.HealingCircle,
+                                HealCredit = pending.Credit,
+                                HealPower = magic.ScalePower(25),
                                 Value = value,
-                                ExpireTime = Envir.Time + (10000) + (5000 * magic.Level),
+                                ExpireTime = Envir.Time + magic.EffectDuration(10000 + 5000 * magic.Level),
                                 TickSpeed = 400,
                                 Caster = player,
                                 CurrentLocation = new Point(x, y),
@@ -2341,7 +2339,7 @@ namespace Server.MirEnvir
         }
 
             if (train)
-                player.LevelMagic(magic);
+                player.ResolveSpellPerks(magic);
 
         }
 

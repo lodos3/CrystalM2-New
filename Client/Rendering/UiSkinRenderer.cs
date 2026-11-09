@@ -38,7 +38,10 @@ public sealed class UiSkinRenderer
     }
 
     public void Fill(Rectangle bounds, Color colour) =>
-        _device.Sprite.Draw(_atlas, DarkFantasyAtlas.WhitePixel, bounds, RendererDevice.ToVector(colour));
+        Fill(bounds, RendererDevice.ToVector(colour));
+
+    internal void Fill(Rectangle bounds, Vector4 colour) =>
+        _device.Sprite.Draw(_atlas, DarkFantasyAtlas.WhitePixel, bounds, colour);
 
     public void Orb(Point location, double fraction, bool mana)
     {

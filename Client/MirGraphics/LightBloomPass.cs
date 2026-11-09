@@ -37,7 +37,7 @@ namespace Client.MirGraphics
 
         internal static void Composite()
         {
-            if (!Settings.LightingBloom)
+            if (!Settings.LightingBloom || Settings.BloomIntensityPercent == 0)
             {
                 ReleaseTarget();
                 return;
@@ -51,7 +51,7 @@ namespace Client.MirGraphics
             SpriteBlendMode originalBlend = DXManager.Device.Blend;
             float originalRate = DXManager.Device.BlendRate;
             float originalOpacity = DXManager.Device.Opacity;
-            Span<Vector4> originalConstants = stackalloc Vector4[6];
+            Span<Vector4> originalConstants = stackalloc Vector4[RendererDevice.EffectConstantCount];
             DXManager.Device.CopyPixelShaderConstants(originalConstants);
             bool failed = false;
 
@@ -64,6 +64,7 @@ namespace Client.MirGraphics
                 DXManager.SetSurface(_surface);
                 DXManager.Device.Clear(Color.Black);
                 DXManager.Device.PixelShader = ShaderEffect.BloomExtract;
+                ExtractConstants[0].X = GraphicsTuning.BloomThreshold.Current / 100f;
                 DXManager.Device.SetPixelShaderConstant(0, ExtractConstants);
                 DXManager.Sprite.Transform = Matrix.CreateScale(
                     (float)_size.Width / Settings.ScreenWidth,
@@ -84,7 +85,7 @@ namespace Client.MirGraphics
                 DXManager.SetSurface(originalSurface);
                 DXManager.Device.Blend = SpriteBlendMode.Additive;
                 BlurConstants[0] = new Vector4(0, 1f / _size.Height, 0, 0);
-                BlurConstants[1] = new Vector4(0.575f, 0, 0, 0);
+                BlurConstants[1] = new Vector4(0.575f * Settings.BloomIntensityPercent / 100f, 0, 0, 0);
                 DXManager.Device.SetPixelShaderConstant(0, BlurConstants);
                 DXManager.Sprite.Transform = Matrix.CreateScale(
                     (float)Settings.ScreenWidth / _size.Width,

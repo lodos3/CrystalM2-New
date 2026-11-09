@@ -36,11 +36,13 @@ namespace Client.MirObjects
         {
             DrawLocation = new Point((CurrentLocation.X - User.Movement.X + MapControl.OffSetX) * MapControl.CellWidth, (CurrentLocation.Y - User.Movement.Y + MapControl.OffSetY) * MapControl.CellHeight);
             DrawLocation.Offset(GlobalDisplayLocationOffset);
+            DrawLocation.Offset(GraphicsTuning.Offset(GraphicsLayer.Decoration).Pixels);
             DrawLocation.Offset(User.OffSetMove);
         }
 
         public override void Draw()
         {
+            using var artwork = BlendArtwork();
             BodyLibrary.Draw(Image, DrawLocation, DrawColour, true);
         }
 

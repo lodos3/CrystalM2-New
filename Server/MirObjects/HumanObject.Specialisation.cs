@@ -9,10 +9,17 @@ public partial class HumanObject
 {
     private sealed record SignatureCast(Map Map, int Generation, Point Location, MapObject Target, MonsterObject Companion,
         MirDirection Direction, int Power, bool Concealed, int Stage = 0, bool Trained = false,
-        Point LastImpact = default, List<MapObject> RelayTargets = null, byte RelayCharge = 0);
+        Point LastImpact = default, List<MapObject> RelayTargets = null, byte RelayCharge = 0, bool Reinforced = false);
 
-    private int _signatureWard, _signatureGeneration;
-    private long _signatureWardUntil, _signatureFieldUntil;
+    private sealed record SignatureWard(HumanObject Source, Spell Spell, int Generation, byte Charge, long Until, Point Anchor)
+    {
+        public int Capacity;
+        public bool Observed;
+    }
+
+    private int _signatureGeneration;
+    private long _signatureFieldUntil, _lastBastionUntil, _lastLanternUntil;
+    private List<SignatureWard> _signatureWards;
     private readonly object _signatureWardLock = new();
 
     private void TryCastSpecialisation(UserMagic magic, SpecialisationAbility ability, MirDirection direction, uint targetId, Point location)
@@ -56,15 +63,10 @@ public partial class HumanObject
                 location = CurrentLocation;
                 break;
             case AbilityTarget.Companion:
-                // A selected owned spirit is a mend-only target, not a hostile focus.
-                // Preserve existing enemy-focus and untargeted recall behaviour.
-                bool selectedOwnedPet = target is MonsterObject requested && Pets.Contains(requested);
-                companion = selectedOwnedPet ? (MonsterObject)target : Pets.FirstOrDefault(pet =>
-                    IsSignatureCompanion(pet, ability.Spell) && SignatureReach(pet.CurrentLocation, range));
-                if (companion == null || !IsSignatureCompanion(companion, ability.Spell) ||
-                    !SignatureReach(companion.CurrentLocation, range) || CurrentMap.Info.NoPets ||
-                    (targetId != 0 && !selectedOwnedPet &&
-                        (!CanHitSignatureTarget(target) || !SignatureReach(target.CurrentLocation, range))))
+                companion = Pets.FirstOrDefault(pet => IsSignatureCompanion(pet, ability.Spell) &&
+                    SignatureReach(pet.CurrentLocation, range));
+                if (companion == null || CurrentMap.Info.NoPets ||
+                    (targetId != 0 && (!CanHitSignatureTarget(target) || !SignatureReach(target.CurrentLocation, range))))
                 {
                     RejectSignature(ability.Spell);
                     return;
@@ -91,10 +93,11 @@ public partial class HumanObject
         }
         Direction = direction;
         AttackTime = ActionTime = Envir.Time + MoveDelay;
-        SpellTime = Envir.Time + 1800;
+        SpellTime = Envir.Time + ability.CastRecovery;
         LogTime = Envir.Time + Globals.LogDelay;
         RegenTime = Envir.Time + RegenDelay;
-        ChangeMP(-cost);
+        SpendTalentMagicCost(ability.Spell, cost);
+        ApplyTalentRecovery(ability.Spell);
         magic.CastTime = Envir.Time;
 
         int basePower = ability.Class switch
@@ -107,7 +110,7 @@ public partial class HumanObject
         int castPower = double.IsFinite(power) ? (int)Math.Clamp(power, 1, int.MaxValue / 32) : 1;
 
         var cast = new SignatureCast(CurrentMap, _signatureGeneration, location, target, companion, direction, castPower, concealed);
-        ActionList.Add(new DelayedAction(DelayedType.Magic, Envir.Time + ability.Windup, magic, cast));
+        ActionList.Add(new DelayedAction(DelayedType.Magic, Envir.Time + TalentSignatureWindup(ability.Spell, target, ability.Windup), magic, cast));
         if (ability.Spell == Spell.AshSeal) _signatureFieldUntil = Envir.Time + ability.Windup + 1600;
         if (ability.Spell == Spell.CinderMine) _signatureFieldUntil = Envir.Time + ability.Windup + 4000;
 
@@ -127,8 +130,14 @@ public partial class HumanObject
 
     private void RejectSignature(Spell spell)
     {
-        Enqueue(new S.Magic { Spell = spell, Cast = false });
-        Enqueue(new S.UserLocation { Direction = Direction, Location = CurrentLocation });
+        if (this is HeroObject hero)
+            hero.Owner?.Enqueue(new S.ObjectMagic { ObjectID = ObjectID, Spell = spell, Location = CurrentLocation, Direction = Direction, Cast = false });
+        else
+        {
+            Enqueue(new S.Magic { Spell = spell, Cast = false });
+            if (!SpecialisationAbilities.TryGet(spell, out _))
+                Enqueue(new S.UserLocation { Direction = Direction, Location = CurrentLocation });
+        }
     }
 
     private bool SignatureReach(Point location, int range) => CurrentMap.ValidPoint(location) &&
@@ -152,20 +161,25 @@ public partial class HumanObject
             : name == Settings.VampireName || name == Settings.ToadName || name == Settings.SnakeTotemName;
     }
 
-    protected Poison FindDistilPoison(MapObject target) =>
-        target.PoisonList.FirstOrDefault(poison => poison.Source == this && poison.Duration > poison.Time &&
+    protected Poison FindDistilPoison(MapObject target, PoisonType requested = PoisonType.None)
+    {
+        var doses = target.PoisonList.Where(poison => poison.Source == this && !poison.CopiedDose && poison.Duration > poison.Time &&
             poison.PType is PoisonType.Green or PoisonType.Red);
+        if (requested != PoisonType.None) return doses.FirstOrDefault(poison => poison.PType == requested);
+        PoisonType preferred = GetPoison(1)?.Info.Shape == 2 ? PoisonType.Red : PoisonType.Green;
+        return doses.FirstOrDefault(poison => poison.PType == preferred) ?? doses.FirstOrDefault();
+    }
 
     private void CompleteSpecialisationSpell(UserMagic magic, SpecialisationAbility ability, SignatureCast cast)
     {
         if (Dead || Node == null || cast.Map != CurrentMap || cast.Generation != _signatureGeneration ||
             GetMagic(ability.Spell) != magic) return;
         // Short wind-ups can be interrupted. Active fields finish while their caster remains on the map.
-        if (cast.Stage == 0 && (CurrentPoison & (PoisonType.Stun | PoisonType.Dazed | PoisonType.Paralysis | PoisonType.Frozen)) != 0)
+        if (cast.Stage == 0 && (CurrentPoison & (TalentCastLock | PoisonType.Stun | PoisonType.Dazed | PoisonType.Paralysis | PoisonType.Frozen)) != 0)
             return;
 
-        bool advanced = Level >= SpecialisationAbilities.AdvancedTraitLevel;
-        bool master = Level >= SpecialisationAbilities.MasterTraitLevel;
+        bool advanced = !TalentCatalog.Supports(Class) && Level >= SpecialisationAbilities.AdvancedTraitLevel;
+        bool master = !TalentCatalog.Supports(Class) && Level >= SpecialisationAbilities.MasterTraitLevel;
         int power = cast.Power;
         Spell spell = ability.Spell;
         MapObject target = cast.Target;
@@ -183,6 +197,7 @@ public partial class HumanObject
             case Spell.SteelCut:
             case Spell.QuickCut:
                 landed = HitSignatureTarget(target, spell, power, DefenceType.ACAgility);
+                if (landed && spell == Spell.SteelCut) RecordComboHit(spell, target);
                 break;
             case Spell.SpiritSpark:
                 landed = HitSignatureTarget(target, spell, power, DefenceType.MAC);
@@ -197,7 +212,12 @@ public partial class HumanObject
                 bool opening = spell == Spell.Notchbreaker && ComboStacks(spell, target) > 0;
                 if (opening) power = ScaleSignature(power, 118);
                 landed = HitSignatureTarget(target, spell, power, DefenceType.ACAgility);
-                if (landed && opening) SpendCombo(spell, target);
+                if (landed && opening)
+                {
+                    SpendCombo(spell, target);
+                    if (!target.Dead && Talent(8, 1) > 0)
+                        StartTalentField(spell, BuffType.TalentDuelCircle, target.CurrentLocation, 2, 4000, 8, target);
+                }
                 if (landed && far && master) ChangeMP(4);
                 break;
             }
@@ -205,33 +225,65 @@ public partial class HumanObject
             {
                 BroadcastSignatureEffect(spell, CurrentLocation, SpellEffect.SignatureImpact);
                 byte momentum = ComboStacks(spell);
-                int hits = HitSignatureArea(spell, CurrentLocation, 1, advanced ? 5 : 4, power, DefenceType.AC,
-                    55 + momentum * 12);
+                var enemies = GetSignatureTargets(CurrentLocation, 1, Talent(1, 0) > 0 ? 5 : 4);
+                MapObject primary = enemies.FirstOrDefault();
+                if (enemies.Count == 1 && momentum > 0)
+                    power = ScaleSignature(power, Talent(8, 2) > 0 ? 100 + momentum * 17 : 106);
+                int hits = HitSignatureArea(spell, enemies, power, DefenceType.AC, 55 + momentum * 12);
                 landed = hits > 0;
-                if (hits >= 2 && momentum > 0) SpendCombo(spell);
+                if (landed && momentum > 0)
+                {
+                    bool spendTwo = hits >= 2 || Talent(8, 2) > 0;
+                    SpendCombo(spell, primary, amount: spendTwo ? 2 : 1);
+                    if (spendTwo && momentum == 2 && Talent(8, 1) > 0)
+                        StartTalentField(spell, BuffType.None, CurrentLocation, 1, 3000, power / 4, this);
+                    if (hits >= 2 && Talent(2, 1) > 0) ChangeMP(Talent(2, 1));
+                }
                 if (master && hits >= 3) ChangeMP(4);
                 break;
             }
             case Spell.Interpose:
             {
                 var ally = (HumanObject)target;
-                int capacity = advanced ? ScaleSignature(power, 125) : power;
+                int capacity = ScaleSignature(power, 100 + (ally != this && Functions.InRange(CurrentLocation, ally.CurrentLocation, 1) ? Talent(1, 2) * 5 : 0));
                 byte guard = ComboStacks(spell);
                 capacity = ScaleSignature(capacity, 100 + guard * 15);
-                landed = GrantSignatureWard(ally, spell, capacity, 4000);
-                if (landed && guard > 0) SpendCombo(spell);
-                if (landed && master && ally != this) GrantSignatureWard(this, spell, capacity / 3, 3000);
+                bool lastBastion = guard == 2 && ally == this && PercentHealth < 40 && Talent(8, 1) > 0 && Envir.Time >= _lastBastionUntil;
+                if (lastBastion) capacity = ScaleSignature(capacity, 130);
+                landed = GrantSignatureWard(ally, spell, capacity, 4000, guard);
+                if (landed && lastBastion) _lastBastionUntil = Envir.Time + 25000;
+                if (landed && guard > 0) SpendCombo(spell, ally, variant: ally == this ? TalentRotations.Isolated : 1, ally: ally);
+                if (landed && guard == 2 && ally != this && Talent(8, 2) > 0)
+                {
+                    var second = TalentAllies(ally.CurrentLocation, 2).FirstOrDefault(candidate => candidate != ally && candidate != this);
+                    if (second != null) GrantSignatureWard(second, spell, capacity / 3, 3000);
+                }
                 break;
             }
             case Spell.AshSeal:
             {
-                int percent = advanced && cast.Stage == 2 ? 53 : 39;
+                int percent = cast.Reinforced && cast.Stage == 2 ? 52 : 39;
                 byte embers = cast.Trained ? (byte)0 : ComboStacks(spell);
                 int pulse = ScaleSignature(ScaleSignature(power, percent), 100 + embers * 12);
-                landed = HitSignatureArea(spell, cast.Location, 1, 5, pulse, DefenceType.MAC, 80) > 0;
-                if (landed && embers > 0) SpendCombo(spell);
+                MapObject primary = null, singed = null;
+                foreach (MapObject enemy in GetSignatureTargets(cast.Location, 1, 5))
+                {
+                    int amount = primary == null ? pulse : ScaleSignature(pulse, 80);
+                    if (primary == null && embers > 0 && enemy == _lastBoltTarget && Envir.Time - _lastBoltHit <= 3000)
+                        amount = ScaleSignature(amount, 100 + Talent(2, 1) * 4);
+                    if (!HitSignatureTarget(enemy, spell, amount, DefenceType.MAC)) continue;
+                    primary ??= enemy;
+                    if (HasOwnedStatus(enemy, BuffType.TalentSinge)) singed ??= enemy;
+                }
+                landed = primary != null;
+                if (landed && embers > 0) SpendCombo(spell, singed ?? primary, variant: singed != null ? 1 : 0, tile: cast.Location);
                 BroadcastSignatureEffect(spell, cast.Location, SpellEffect.SignatureImpact);
-                if (cast.Stage < 2) QueueSignatureStage(magic, cast with { Trained = cast.Trained || landed }, 800);
+                if (cast.Stage < 2)
+                {
+                    bool reinforced = cast.Reinforced || (landed && embers == 2 && Talent(6, 1) > 0);
+                    QueueSignatureStage(magic, cast with { Trained = cast.Trained || landed, Reinforced = reinforced },
+                        cast.Stage == 1 && reinforced ? 1050 : 800);
+                }
                 else if (landed && master) ChangeMP(4);
                 break;
             }
@@ -239,18 +291,24 @@ public partial class HumanObject
             {
                 var enemies = new List<MapObject>(4);
                 foreach (Point tile in GlacialGateTiles(cast.Location, cast.Direction))
+                {
+                    if (!CurrentMap.ValidPoint(tile)) continue;
                     AddSignatureTargets(enemies, tile, 4);
+                    BroadcastSignatureEffect(spell, tile, SpellEffect.SignatureImpact);
+                }
                 foreach (var enemy in enemies)
                 {
                     int damage = advanced && enemy.CurrentPoison.HasFlag(PoisonType.Slow) ? ScaleSignature(power, 120) : power;
                     bool shatter = HasRime(enemy);
                     if (shatter) damage = ScaleSignature(damage, 125);
-                    if (!HitSignatureTarget(enemy, spell, damage, DefenceType.MAC)) continue;
+                    if (!HitSignatureTarget(enemy, spell, damage, DefenceType.MAC, showImpact: false)) continue;
                     if (shatter) SpendRime(enemy);
                     SlowSignatureTarget(enemy, 2);
                     landed = true;
                 }
-                if (landed && master) GrantSignatureWard(this, spell, power / 4, 2500);
+                if (landed && Talent(8, 2) > 0) GrantSignatureWard(this, spell, power / 4, 2500);
+                if (Talent(6, 1) > 0 || Talent(8, 1) > 0)
+                    StartTalentField(spell, BuffType.None, cast.Location, Talent(8, 1) > 0 ? 1 : 0, 2700, 0);
                 break;
             }
             case Spell.StormRelay:
@@ -260,23 +318,40 @@ public partial class HumanObject
 
                 Point impact = target.CurrentLocation;
                 landed = HitSignatureTarget(target, spell,
-                    ScaleSignature(power, cast.Stage == 0 ? 100 : 55 + cast.RelayCharge * 12), DefenceType.MAC);
+                    ScaleSignature(power, cast.Stage == 0 ? 100 : 55 + cast.RelayCharge * 12 + (cast.Stage == 1 ? Talent(2, 0) * 4 : 0)), DefenceType.MAC);
                 if (!landed) break;
+                if (cast.Stage > 0 && cast.RelayTargets?.LastOrDefault() is { } prior && prior.CurrentLocation == cast.LastImpact)
+                    CurrentMap.Broadcast(new S.ObjectProjectile { Spell = spell, Source = prior.ObjectID, Destination = target.ObjectID }, impact);
+                if (cast.Stage == 1 && Talent(6, 0) > 0) ShortenTalentCooldown(spell, 1100);
                 if (cast.Stage == 2 && master) ChangeMP(4);
-                int max = advanced ? 4 : 3;
+                int max = Talent(8, 0) > 0 ? 4 : 3;
                 if (cast.Stage + 1 < max)
                 {
                     var visited = cast.RelayTargets ?? new List<MapObject>(max);
                     visited.Add(target);
                     var next = GetSignatureTargets(impact, 3, 1, visited).FirstOrDefault();
+                    if (next == null && cast.Stage == 0 && Envir.Time < _fluxUntil && Functions.InRange(impact, _fluxPylon, 3))
+                    {
+                        next = GetSignatureTargets(_fluxPylon, 3, 1, visited).FirstOrDefault();
+                        if (next != null) impact = _fluxPylon;
+                    }
                     if (next != null)
                     {
                         byte charge = cast.Stage == 0 ? ComboStacks(spell) : cast.RelayCharge;
-                        if (cast.Stage == 0 && charge > 0) SpendCombo(spell);
+                        if (cast.Stage == 0 && charge > 0) SpendCombo(spell, target, variant: 1);
                         QueueSignatureStage(magic, cast with
                         {
                             Target = next, LastImpact = impact, RelayTargets = visited, Trained = true, RelayCharge = charge
                         }, 95);
+                    }
+                    else if (cast.Stage == 0 && HasOwnedStatus(target, BuffType.TalentConductor) && ComboStacks(spell) > 0)
+                    {
+                        byte charge = ComboStacks(spell);
+                        SpendCombo(spell, target, variant: TalentRotations.Isolated);
+                        target.RemoveBuff(BuffType.TalentConductor);
+                        HitSignatureTarget(target, spell, ScaleSignature(power, 18 + charge * (Talent(6, 1) > 0 ? 13 : 9)), DefenceType.MAC);
+                        if (Talent(8, 1) > 0 && charge == 2)
+                            QueueSignatureStage(magic, cast with { Stage = max - 1, LastImpact = impact, Power = power / 2, Trained = true }, 340);
                     }
                 }
                 break;
@@ -288,11 +363,12 @@ public partial class HumanObject
                 ally.ChangeHP(Math.Min(Math.Max(0, ally.MaxHealth - before), power));
                 int effective = Math.Max(0, ally.HP - before);
                 byte reserve = ComboStacks(spell);
-                int ward = power / 2 + (advanced ? effective / 3 : 0) + ScaleSignature(power, reserve * 15);
-                bool protectedAlly = GrantSignatureWard(ally, spell, ward, 3500);
-                if (protectedAlly && reserve > 0) SpendCombo(spell);
+                int ward = power / 2 + (Talent(1, 2) > 0 ? effective / 3 : 0) + ScaleSignature(power, reserve * (15 + Talent(2, 2) * 2));
+                bool protectedAlly = GrantSignatureWard(ally, spell, ward, Talent(6, 2) > 0 && ally.PercentHealth < 50 ? 4300 : 3500, reserve);
+                if (protectedAlly && reserve > 0) SpendCombo(spell, ally, ally: ally);
+                CreditTalentHealing(ally, spell, effective, grantReserve: false);
                 landed = protectedAlly || effective > 0;
-                if (master)
+                if (Talent(8, 1) > 0 && reserve == 2 && protectedAlly)
                 {
                     int index = ally.PoisonList.FindIndex(p => p.PType is PoisonType.Green or PoisonType.Red);
                     if (index >= 0)
@@ -305,15 +381,36 @@ public partial class HumanObject
             }
             case Spell.Distil:
             {
+                if (cast.Stage > 0)
+                {
+                    if (CanHitSignatureTarget(target) && Functions.InRange(cast.Location, target.CurrentLocation, 2))
+                        HitSignatureTarget(target, spell, power, DefenceType.MAC);
+                    break;
+                }
                 Poison dose = FindDistilPoison(target);
                 if (dose == null) break;
                 bool ink = ComboStacks(spell, target) > 0;
-                int bonus = (int)Math.Min(dose.Duration - dose.Time, 4) * (advanced ? 8 : 5) + (ink ? 18 : 0);
+                int remaining = (int)Math.Min(dose.Duration - dose.Time, 4);
+                int bonus = remaining * (advanced || (dose.PType == PoisonType.Green && Talent(1, 0) > 0) ? 8 : 5) + (ink ? 18 : 0);
                 Point impact = target.CurrentLocation;
                 landed = HitSignatureTarget(target, spell, ScaleSignature(power, 100 + bonus), DefenceType.MAC);
                 if (!landed) break;
-                if (ink) SpendCombo(spell, target);
+                if (ink) SpendCombo(spell, target, variant: dose.PType == PoisonType.Red ? TalentRotations.RedDose : TalentRotations.GreenDose);
                 target.PoisonList.Remove(dose);
+                if (dose.PType == PoisonType.Red)
+                {
+                    ApplyTalentStatus(target, BuffType.TalentSealed, 4000, Stat.MaxAC, -2);
+                    if (Talent(6, 1) > 0 && FindDistilPoison(target, PoisonType.Green) is { } green) green.NextTickBonus += Math.Max(1, green.Value / 10);
+                }
+                else
+                {
+                    ReleaseTalentVessel(target, dose.Value);
+                    if (Talent(8, 0) > 0 && remaining >= 3 && !target.Dead)
+                    {
+                        BroadcastSignatureEffect(spell, impact, SpellEffect.SignatureWindup);
+                        QueueSignatureStage(magic, cast with { Power = power / 3, Trained = true }, 350);
+                    }
+                }
                 if (master && GetSignatureTargets(impact, 2, 1, new[] { target }).FirstOrDefault() is { } next)
                 {
                     next.ApplyPoison(new Poison { Owner = this, PType = dose.PType, Duration = 2,
@@ -330,9 +427,14 @@ public partial class HumanObject
                 if (target == null)
                 {
                     pet.PetRecall();
+                    if (Talent(7, 1) > 0 && Envir.Time < _nextRecallUntil)
+                    {
+                        _nextRecallUntil = 0;
+                        ActionTime = Math.Max(Envir.Time, ActionTime - 150);
+                    }
                     if (master) ChangeHP(Math.Min(power / 4, Math.Max(0, MaxHealth - HP)));
                 }
-                else if (target != pet)
+                else
                 {
                     if (!CanHitSignatureTarget(target) || !SignatureReach(target.CurrentLocation, magic.Info.Range) ||
                         !pet.CanFly(target.CurrentLocation)) break;
@@ -344,17 +446,31 @@ public partial class HumanObject
                         pet.Target = priorTarget;
                         break;
                     }
+                    if (spell == Spell.SpiritCommand) ObserveRotation(RotationEvent.Focus, spell, target);
                 }
                 int missing = Math.Max(0, pet.MaxHealth - pet.Health);
-                int baseMend = advanced ? ScaleSignature(power, 125) : power;
+                int baseMend = advanced || Talent(1, 1) > 0 ? ScaleSignature(power, 125) : power;
+                if (Talent(6, 0) > 0 && Functions.InRange(CurrentLocation, pet.CurrentLocation, 2)) baseMend = ScaleSignature(baseMend, 112);
                 byte bond = spell == Spell.SpiritCommand ? ComboStacks(spell) : (byte)0;
                 int mend = Math.Min(missing, ScaleSignature(baseMend, 100 + bond * 20));
                 pet.ChangeHP(mend);
-                if (bond > 0 && mend > baseMend) SpendCombo(spell);
+                if (bond > 0 && mend > baseMend)
+                {
+                    SpendCombo(spell);
+                    if (target == null) ObserveRotation(RotationEvent.Recall, spell, pet);
+                    if (Talent(2, 1) > 0) ChangeMP(Talent(2, 1));
+                    if (Talent(6, 1) > 0 && HP < MaxHealth && pet.HP < pet.MaxHealth)
+                        ApplyTalentStatus(pet, BuffType.TalentRimeguard, 3000, Stat.DamageReductionPercent, 7);
+                    if (bond == 2 && Talent(8, 0) > 0)
+                    {
+                        var ally = TalentAllies(pet.CurrentLocation, 2, 1).FirstOrDefault();
+                        if (ally != null) GrantSignatureWard(ally, spell, power / 3, 3000);
+                    }
+                    if (bond == 2 && Talent(8, 1) > 0)
+                        StartTalentField(spell, BuffType.TalentAncestralForm, pet.CurrentLocation, 2, 4000, 7, pet);
+                }
                 BroadcastSignatureEffect(spell, pet.CurrentLocation, SpellEffect.SignatureImpact);
-                // A direct mend on a full-health pet is cosmetic, not proficiency.
-                // Enemy focus and recall remain valid commands even without healing.
-                landed = target != pet || mend > 0;
+                landed = true;
                 break;
             }
             case Spell.VeilStrike:
@@ -408,7 +524,7 @@ public partial class HumanObject
         }
 
         // A multi-pulse cast advances proficiency at most once.
-        if (landed && !cast.Trained) LevelMagic(magic);
+        if (landed && !cast.Trained) ResolveSpellPerks(magic);
     }
 
     private void QueueSignatureStage(UserMagic magic, SignatureCast cast, int delay) =>
@@ -426,11 +542,12 @@ public partial class HumanObject
     {
         _signatureGeneration++;
         ResetCombo();
+        ResetTalentRotation();
+        ResetTalentMagic();
         _signatureFieldUntil = 0;
         lock (_signatureWardLock)
         {
-            _signatureWard = 0;
-            _signatureWardUntil = 0;
+            _signatureWards?.Clear();
         }
     }
 
@@ -443,37 +560,99 @@ public partial class HumanObject
         SendMagicInfo(magic);
     }
 
-    private bool GrantSignatureWard(HumanObject recipient, Spell spell, int capacity, int milliseconds)
+    private bool GrantSignatureWard(HumanObject recipient, Spell spell, int capacity, int milliseconds, byte charge = 0)
     {
         capacity = Math.Min(capacity, Math.Max(1, recipient.MaxHealth / 6));
         if (capacity <= 0) return false;
         lock (recipient._signatureWardLock)
         {
-            if (recipient.Dead || (Envir.Time < recipient._signatureWardUntil && recipient._signatureWard >= capacity))
-                return false;
-
-            recipient._signatureWard = capacity;
-            recipient._signatureWardUntil = Envir.Time + milliseconds;
+            if (recipient.Dead) return false;
+            var wards = recipient._signatureWards ??= new List<SignatureWard>(4);
+            wards.RemoveAll(ward => !recipient.ValidSignatureWard(ward));
+            SignatureWard existing = wards.Find(ward => ward.Source == this && ward.Spell == spell);
+            if (existing != null && existing.Capacity >= capacity) return false;
+            if (existing != null) wards.Remove(existing);
+            if (wards.Count >= 8)
+            {
+                SignatureWard smallest = wards.MinBy(ward => ward.Capacity);
+                if (smallest.Capacity >= capacity) return false;
+                wards.Remove(smallest);
+            }
+            wards.Add(new SignatureWard(this, spell, _signatureGeneration, charge, Envir.Time + milliseconds, recipient.CurrentLocation)
+                { Capacity = capacity });
         }
-        BroadcastSignatureEffect(spell, recipient.CurrentLocation, SpellEffect.SignatureImpact);
+        BroadcastSignatureEffect(spell, recipient.CurrentLocation,
+            SpellCurriculum.IsRetired(spell) ? SpellEffect.SignatureImpact : SpellEffect.SpellPerkWard);
         return true;
     }
 
-    private int DamageAfterSignatureWard(int damage)
+    private bool ValidSignatureWard(SignatureWard ward) => ward.Capacity > 0 && Envir.Time < ward.Until &&
+        ward.Source._signatureGeneration == ward.Generation && ward.Source.CurrentMap == CurrentMap &&
+        (ward.Spell != Spell.IceglassRefuge || Functions.InRange(ward.Anchor, CurrentLocation, 1));
+
+    private int DamageAfterSignatureWard(int damage, MapObject attacker = null, DefenceType defence = DefenceType.None)
     {
-        if (damage <= 0 || Volatile.Read(ref _signatureWard) <= 0) return damage;
+        if (damage <= 0) return damage;
+        if (attacker != null) ReactToTalentHit(attacker);
+        SignatureWard ward = null;
+        bool observed = false;
+        int absorbed = 0;
+        SanctuaryPool pool = FindSanctuaryPool();
         lock (_signatureWardLock)
         {
-            if (Envir.Time >= _signatureWardUntil)
+            _signatureWards?.RemoveAll(candidate => !ValidSignatureWard(candidate));
+            if (_signatureWards != null)
             {
-                _signatureWard = 0;
-                return damage;
+                foreach (SignatureWard candidate in _signatureWards)
+                {
+                    if (candidate.Spell is Spell.Skywire or Spell.StormRelay && defence is not (DefenceType.MAC or DefenceType.MACAgility)) continue;
+                    if (ward == null || candidate.Capacity > ward.Capacity) ward = candidate;
+                }
             }
-
-            int absorbed = Math.Min(damage, _signatureWard);
-            _signatureWard -= absorbed;
-            return damage - absorbed;
+            if (pool != null && Volatile.Read(ref pool.Capacity) > (ward?.Capacity ?? 0))
+            {
+                do
+                {
+                    int available = Volatile.Read(ref pool.Capacity);
+                    absorbed = Math.Min(damage, available);
+                    if (Interlocked.CompareExchange(ref pool.Capacity, available - absorbed, available) == available) break;
+                } while (true);
+                if (absorbed > 0) return damage - absorbed;
+            }
+            if (ward != null)
+            {
+                if (ward.Spell == Spell.Interpose && attacker != null && !ward.Observed)
+                {
+                    bool magical = defence is DefenceType.MAC or DefenceType.MACAgility;
+                    if (ward.Charge > 0 && !magical && Direction == Functions.DirectionFromPoint(CurrentLocation, attacker.CurrentLocation))
+                        ward.Capacity = ScaleSignature(ward.Capacity, 100 + 4 * ward.Source.Talent(2, 1));
+                    if (ward.Source != this && Functions.MaxDistance(CurrentLocation, attacker.CurrentLocation) > 1)
+                        damage = ScaleSignature(damage, 100 - 3 * ward.Source.Talent(2, 2));
+                }
+                absorbed = Math.Min(damage, ward.Capacity);
+                ward.Capacity -= absorbed;
+                observed = ward.Observed;
+                if (attacker != null) ward.Observed = true;
+            }
         }
+        if (ward != null && attacker != null && absorbed > 0)
+        {
+            if (ward.Charge != 0 && !observed)
+                ward.Source.ObserveRotation(RotationEvent.WardHit, ward.Spell, ward.Spell == Spell.Interpose ? attacker : this,
+                    ward.Charge, this != ward.Source ? 1 : TalentRotations.Isolated, this);
+            if (!observed && ward.Spell == Spell.Interpose && ward.Source != this && ward.Source.Talent(6, 2) > 0)
+                ward.Source.ChangeMP(2);
+            if (ward.Spell == Spell.LanternLink && ward.Capacity == 0)
+            {
+                if (ward.Source.Talent(7, 2) > 0) ward.Source.ApplyTalentStatus(attacker, BuffType.TalentDulledFervour, 3500, value: 8);
+                if (ward.Source.Talent(8, 2) > 0 && ward.Charge == 2 && Envir.Time >= _lastLanternUntil)
+                {
+                    _lastLanternUntil = Envir.Time + 20000;
+                    ChangeHP(Math.Min(MaxHealth - HP, absorbed / 3));
+                }
+            }
+        }
+        return TransferTalentDamage(damage - absorbed, attacker);
     }
 
     private void SlowSignatureTarget(MapObject target, int pveSeconds)
@@ -483,13 +662,13 @@ public partial class HumanObject
                 TickTime = Envir.Time + 1000, Duration = target is HumanObject ? 1 : pveSeconds }, this);
     }
 
-    private bool HitSignatureTarget(MapObject target, Spell spell, int power, DefenceType defence)
+    private bool HitSignatureTarget(MapObject target, Spell spell, int power, DefenceType defence, bool showImpact = true)
     {
         if (!CanHitSignatureTarget(target)) return false;
         Point impact = target.CurrentLocation;
         if (target is HumanObject) power = ScaleSignature(power, 62);
-        if (target.Attacked(this, Math.Max(1, power), defence, false) <= 0) return false;
-        BroadcastSignatureEffect(spell, impact, SpellEffect.SignatureImpact);
+        if (TalentSpellDamage(target, spell, Math.Max(1, power), defence) <= 0) return false;
+        if (showImpact) BroadcastSignatureEffect(spell, impact, SpellEffect.SignatureImpact);
         return true;
     }
 

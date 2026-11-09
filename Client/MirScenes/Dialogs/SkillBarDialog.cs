@@ -52,9 +52,7 @@ public sealed class SkillBarDialog : MirPanel
         UserObject actor = Actor;
         foreach (ActionSlot slot in _slots)
             slot.Update(actor?.Magics.Find(magic =>
-                magic.Key == slot.Number &&
-                !SpellCurriculum.IsPassive(magic.Spell) &&
-                SpellCurriculum.CanUse(actor.Class, actor.Specialisation, magic.Spell)));
+                magic.Key == slot.Number && actor.CanBindAction(magic.Spell)));
     }
 
     public void Process()
@@ -70,6 +68,7 @@ internal sealed class ActionSlot : MirControl
     private readonly MirLabel _key, _cooldown, _comboBadge;
     private long _lastSeconds;
     private int _lastComboStacks;
+    private ClientMagic _shownSpell;
     public readonly int Number;
     public readonly SkillBarDialog Bar;
     public ClientMagic Magic { get; private set; }
@@ -85,7 +84,7 @@ internal sealed class ActionSlot : MirControl
         _cooldown = MirPanel.AddCaption(this, "", new Rectangle(0, 3, 38, 19), false);
         _cooldown.DrawFormat |= TextFormatFlags.HorizontalCenter;
         _cooldown.OutLine = true;
-        _comboBadge = MirPanel.AddCaption(this, "", new Rectangle(3, 1, 13, 16), false);
+        _comboBadge = MirPanel.AddCaption(this, "", new Rectangle(3, 1, 33, 16), false);
         _comboBadge.ForeColour = Color.Gold;
         _comboBadge.OutLine = true;
     }
@@ -101,19 +100,26 @@ internal sealed class ActionSlot : MirControl
             (key.Length == 0 ? "\nUnbound" : $"\n{key}");
         if (magic != null && SpellCombos.For(magic.Spell) is { } combo)
             Hint += $"\n{combo.Rotation}";
+        if (magic != null && Bar.Actor?.Rotation is { } recipe && Bar.Actor.FinisherAction(recipe.Finisher) == magic &&
+            SpecialisationAbilities.TryGet(recipe.Finisher, out var finisher))
+            Hint += $"\n{finisher.Name} uses this slot when ready.\n" + string.Join(" → ", recipe.Steps.Select(step => step.Hint));
         UpdateCooldown();
     }
 
     public void UpdateCooldown()
     {
+        ClientMagic followup = Bar.Actor?.ReadyFollowup(Magic);
+        ClientMagic shown = followup ?? Magic;
         int stacks = Magic == null ? 0 : Bar.Actor?.ActiveComboCount(Magic.Spell) ?? 0;
-        if (stacks != _lastComboStacks)
+        if (stacks != _lastComboStacks || shown != _shownSpell)
         {
             _lastComboStacks = stacks;
-            _comboBadge.Text = stacks == 0 ? "" : stacks.ToString();
+            _shownSpell = shown;
+            _comboBadge.Text = followup != null ? "PROC" : stacks == 0 ? "" : stacks.ToString();
+            Redraw();
         }
-        long seconds = Magic == null || Magic.CastTime <= 0 ? 0 :
-            Math.Max(0, (Magic.CastTime + Magic.Delay - CMain.Time + 999) / 1000);
+        long seconds = shown == null || shown.CastTime <= 0 ? 0 :
+            Math.Max(0, (shown.CastTime + shown.Delay - CMain.Time + 999) / 1000);
         if (seconds == _lastSeconds) return;
         _lastSeconds = seconds;
         _cooldown.Text = seconds > 0 ? seconds.ToString() : "";
@@ -127,15 +133,18 @@ internal sealed class ActionSlot : MirControl
         bool comboReady = Magic != null && _lastSeconds == 0 && actor?.ActiveComboCount(Magic.Spell) > 0 &&
             (actor.ComboTarget == 0 || actor.ComboTarget == MapObject.TargetObjectID ||
                 actor.ComboTarget == MapObject.MouseObjectID);
-        UiVisualState state = comboReady || scene.IsActionDropTarget(this) || (scene.BindingActionKeys && MouseControl == this)
+        ClientMagic followup = actor?.ReadyFollowup(Magic);
+        bool procReady = followup != null;
+        UiVisualState state = comboReady || procReady || scene.IsActionDropTarget(this) || (scene.BindingActionKeys && MouseControl == this)
             ? UiVisualState.Selected : SkinState;
         DXManager.Device.Ui.Draw(UiSurface.Slot, bounds, state);
         bounds.Inflate(-3, -3);
         if (Magic == null) return;
-        Libraries.MagIcon.Draw(Magic.Icon * 2, bounds.Location, bounds.Size, Color.White);
-        if (_lastSeconds > 0 && Magic.Delay > 0)
+        ClientMagic shown = followup ?? Magic;
+        Libraries.MagIcon.Draw(shown.Icon * 2, bounds.Location, bounds.Size, Color.White);
+        if (_lastSeconds > 0 && shown.Delay > 0)
         {
-            double remaining = (Magic.CastTime + Magic.Delay - CMain.Time) / (double)Magic.Delay;
+            double remaining = (shown.CastTime + shown.Delay - CMain.Time) / (double)shown.Delay;
             bounds.Height = (int)Math.Round(bounds.Height * Math.Clamp(remaining, 0, 1));
             DXManager.Device.Ui.Fill(bounds, Color.FromArgb(175, 5, 6, 9));
         }

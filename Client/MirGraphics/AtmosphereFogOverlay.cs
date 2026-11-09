@@ -4,8 +4,7 @@ using Client.MirScenes;
 
 namespace Client.MirGraphics
 {
-    // Two slowly drifting translucent world layers. One 128x128 managed
-    // noise texture is shared by both; no extra render targets are allocated.
+    // A slowly drifting overcast layer. Ground fog is rendered by the map's weather pass.
     internal static class AtmosphereFogOverlay
     {
         private const int TilePixels = 128;
@@ -50,47 +49,26 @@ namespace Client.MirGraphics
             }
         }
 
-        internal static void Draw(AtmosphericWeatherFrame frame, WeatherSetting weather)
+        internal static void DrawClouds(AtmosphericWeatherFrame frame, WeatherSetting weather)
         {
-            float intensity = AtmosphereIntensity.Scale(Settings.AtmosphereIntensityPercent);
+            float intensity = AtmosphereIntensity.Scale(Settings.AtmosphereIntensityPercent) * GraphicsTuning.FogDensity.Current / 100f;
             if (intensity <= 0f || !Settings.EnvironmentFogLayers || DXManager.DeviceLost ||
                 DXManager.Sprite == null || DXManager.Sprite.Disposed ||
                 DXManager.CurrentSurface == null ||
-                (frame.FogCover < 0.01f && frame.CloudCover < 0.01f) ||
+                frame.CloudCover <= 0.02f ||
                 !EnsureTexture())
                 return;
 
             Matrix original = DXManager.Sprite.Transform;
             try
             {
-                // World-space haze: draw before nameplates and HUD; existing
-                // precipitation particles remain an independent effect.
-                if (frame.FogCover > 0.01f)
-                {
-                    bool snow = (weather & WeatherSetting.Snow) != 0;
-                    bool rain = (weather & WeatherSetting.Rain) != 0;
-                    bool ash = (weather & (WeatherSetting.RedEmber |
-                                           WeatherSetting.FireParticle)) != 0;
-                    Color mist = ash ? Color.FromArgb(219, 158, 116) :
-                                 snow ? Color.FromArgb(220, 233, 246) :
-                                 rain ? Color.FromArgb(176, 196, 220) :
-                                        Color.FromArgb(201, 213, 226);
-                    int alpha = Math.Min(66, Math.Max(0, (int)(frame.FogCover * 74f * intensity)));
-                    RenderLayer(512, frame.DriftX, frame.DriftY, Color.FromArgb(alpha, mist));
-                }
-
-                if (frame.CloudCover > 0.02f)
-                {
-                    // A broad, lower-frequency dark overcast layer introduces
-                    // soft moving canopy shadows without scene depth geometry.
-                    int alpha = Math.Min(32, Math.Max(0, (int)(frame.CloudCover * 34f * intensity)));
-                    RenderLayer(768, frame.DriftX * 0.42f + 100f,
-                                frame.DriftY * 0.35f + 210f,
-                                (weather & (WeatherSetting.RedEmber |
-                                            WeatherSetting.FireParticle)) != 0
-                                    ? Color.FromArgb(alpha, 70, 47, 43)
-                                    : Color.FromArgb(alpha, 32, 42, 57));
-                }
+                Point offset = GraphicsTuning.Offset(GraphicsLayer.Weather).Pixels;
+                int alpha = Math.Min(32, Math.Max(0, (int)(frame.CloudCover * 34f * intensity)));
+                RenderLayer(768, frame.DriftX * 0.42f + 100f + offset.X,
+                            frame.DriftY * 0.35f + 210f + offset.Y,
+                            (weather & (WeatherSetting.RedEmber | WeatherSetting.FireParticle)) != 0
+                                ? Color.FromArgb(alpha, 70, 47, 43)
+                                : Color.FromArgb(alpha, 32, 42, 57));
             }
             catch (Exception ex)
             {

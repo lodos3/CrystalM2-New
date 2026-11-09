@@ -21,6 +21,19 @@ Check((short)ClientPacketIds.SelectSpecialisation >
 Check((short)ServerPacketIds.SpecialisationResult >
     (short)ServerPacketIds.StoragePasswordResult, "Append server ID without renumbering");
 
+SpellPerkPick[] spellPicks = [new(Spell.FlamingSword, SpellPerk.Splash, 1), new(Spell.FlamingSword, SpellPerk.Burn, 2)];
+var perkDraft = RoundTrip<ClientPackets.SpellPerkDraft>(new ClientPackets.SpellPerkDraft
+    { ObjectID = 123, Revision = 7, Apply = true, Picks = spellPicks }, true);
+Check(perkDraft.ObjectID == 123 && perkDraft.Revision == 7 && perkDraft.Apply &&
+    perkDraft.Picks.SequenceEqual(spellPicks), "Perk draft roundtrip");
+var perkState = RoundTrip<ServerPackets.SpellPerkState>(new ServerPackets.SpellPerkState
+    { ObjectID = 123, Revision = 8, Picks = spellPicks, Message = "Spell perks applied." }, false);
+Check(perkState.ObjectID == 123 && perkState.Revision == 8 && perkState.Picks.SequenceEqual(spellPicks) &&
+    perkState.Message == "Spell perks applied.", "Authoritative perk state roundtrip");
+var temporary = RoundTrip<ServerPackets.NewMagic>(new ServerPackets.NewMagic
+    { Magic = new ClientMagic { Name = "Blink", Spell = Spell.Blink, IsTempSpell = true, Key = 17 }, Hero = true }, false);
+Check(temporary.Magic.IsTempSpell && temporary.Magic.Key == 17 && temporary.Hero, "Temporary spell flag preserves hero binding");
+
 var request = RoundTrip<ClientPackets.SelectSpecialisation>(
     new ClientPackets.SelectSpecialisation { ForHero = true, Specialisation = CombatSpecialisation.Third }, true);
 Check(request.ForHero && request.Specialisation == CombatSpecialisation.Third,
@@ -59,5 +72,27 @@ var combo = RoundTrip<ServerPackets.SpellComboState>(new ServerPackets.SpellComb
 }, false);
 Check(combo.ObjectID == 123 && combo.TargetID == 456 && combo.Spender == Spell.GlacialGate &&
     combo.Stacks == 1 && combo.Remaining == 6500, "Combo proc updates preserve actor, target and expiry");
+
+var profile = new TalentProfile();
+TalentPick picked = new(TalentCatalog.Tree(MirClass.Warrior).At(1, 0).Id, 1, 0);
+profile.Apply(CombatSpecialisation.First, [picked], []);
+profile.SaveBindings(CombatSpecialisation.First, [new(Spell.ArcaneHammer, 2)]);
+var draft = RoundTrip<ClientPackets.TalentDraft>(new ClientPackets.TalentDraft
+{
+    ObjectID = 123, Revision = profile.Revision, Spec = CombatSpecialisation.First, ClassPicks = [picked]
+}, true);
+Check(draft.ObjectID == 123 && draft.Revision == 1 && draft.ClassPicks.Single() == picked, "Draft preserves identity and picks");
+var talents = RoundTrip<ServerPackets.TalentState>(new ServerPackets.TalentState
+{
+    ObjectID = 123, Accepted = true, Spec = CombatSpecialisation.First, Profile = profile, ActiveBindings = [new(Spell.ArcaneHammer, 2)]
+}, false);
+Check(talents.Profile.Picks(CombatSpecialisation.Unchosen).Single() == picked && talents.ActiveBindings.Single().Slot == 2 &&
+    talents.Profile.HasBindings(CombatSpecialisation.First), "Talent state includes picks and action slots");
+var proc = RoundTrip<ServerPackets.RotationState>(new ServerPackets.RotationState
+{
+    ObjectID = 123, TargetID = 456, Finisher = Spell.Forgefall, Step = 2, Ready = true, Remaining = 6000
+}, false);
+Check(proc.Ready && proc.Step == 2 && proc.TargetID == 456 && proc.Finisher == Spell.Forgefall && proc.Remaining == 6000,
+    "Proc window preserves stage and target");
 
 Console.WriteLine("Specialisation and combo protocol round-trip tests passed.");

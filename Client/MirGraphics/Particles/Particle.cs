@@ -100,8 +100,9 @@ namespace Client.MirGraphics.Particles
                 return;
             }
 
-            int drawx = (int)Position.X;
-            int drawy = (int)Position.Y;
+            Point offset = GraphicsTuning.Offset(GraphicsLayer.Weather).Pixels;
+            int drawx = (int)Position.X + offset.X;
+            int drawy = (int)Position.Y + offset.Y;
 
             if (Blend)
                 ImageInfo.Library.DrawBlend(ImageInfo.BaseIndex + ImageInfo.CurrentFrame, new Point(drawx, drawy), Color, true, BlendRate);

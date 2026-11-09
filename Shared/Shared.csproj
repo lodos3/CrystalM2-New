@@ -19,4 +19,8 @@
     <NoWarn>1701;1702</NoWarn>
   </PropertyGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Data\TalentTrees.json" LogicalName="Crystal.TalentTrees.json" />
+  </ItemGroup>
+
 </Project>

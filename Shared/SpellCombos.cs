@@ -61,9 +61,14 @@ public struct SpellComboProgress
         return true;
     }
 
-    public bool Spend(long now, uint targetId)
+    public bool Spend(long now, uint targetId, int amount = int.MaxValue)
     {
-        if (Count(now, targetId) == 0) return false;
+        if (Count(now, targetId) == 0 || amount <= 0) return false;
+        if (amount < _stacks)
+        {
+            _stacks -= (byte)amount;
+            return true;
+        }
         _stacks = 0;
         _targetId = 0;
         _expires = 0;

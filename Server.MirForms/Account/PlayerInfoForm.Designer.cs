@@ -905,12 +905,12 @@
             // 
             // MagicLevelHeader
             // 
-            MagicLevelHeader.Text = "Level";
-            MagicLevelHeader.Width = 50;
+            MagicLevelHeader.Text = "Unlock level";
+            MagicLevelHeader.Width = 88;
             // 
             // MagicExperienceHeader
             // 
-            MagicExperienceHeader.Text = "Experience";
+            MagicExperienceHeader.Text = "Perk points";
             MagicExperienceHeader.Width = 150;
             // 
             // Key
@@ -1273,12 +1273,12 @@
             // 
             // columnHeader10
             // 
-            columnHeader10.Text = "Level";
-            columnHeader10.Width = 50;
+            columnHeader10.Text = "Unlock level";
+            columnHeader10.Width = 88;
             // 
             // columnHeader11
             // 
-            columnHeader11.Text = "Experience";
+            columnHeader11.Text = "Perk points";
             columnHeader11.Width = 100;
             // 
             // columnHeader12

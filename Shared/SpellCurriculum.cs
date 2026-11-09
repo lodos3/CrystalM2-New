@@ -20,10 +20,6 @@ public static class SpellCurriculum
 
     private static readonly Spell[] WarriorSpells =
     {
-        Spell.SteelCut,
-        Spell.Notchbreaker,
-        Spell.RedWake,
-        Spell.Interpose,
         Spell.Fencing,
         Spell.Slaying,
         Spell.Thrusting,
@@ -41,13 +37,11 @@ public static class SpellCurriculum
         Spell.SlashingBurst,
         Spell.Fury,
         Spell.ImmortalSkin,
+        Spell.BattleCry,
     };
 
     private static readonly Spell[] WizardSpells =
     {
-        Spell.AshSeal,
-        Spell.GlacialGate,
-        Spell.StormRelay,
         Spell.FireBall,
         Spell.Repulsion,
         Spell.ElectricShock,
@@ -72,14 +66,13 @@ public static class SpellCurriculum
         Spell.MeteorStrike,
         Spell.IceThrust,
         Spell.StormEscape,
+        Spell.Blink,
+        Spell.FireBounce,
+        Spell.MeteorShower,
     };
 
     private static readonly Spell[] TaoistSpells =
     {
-        Spell.SpiritSpark,
-        Spell.LanternLink,
-        Spell.Distil,
-        Spell.SpiritCommand,
         Spell.Healing,
         Spell.SpiritSword,
         Spell.Poisoning,
@@ -109,10 +102,6 @@ public static class SpellCurriculum
 
     private static readonly Spell[] AssassinSpells =
     {
-        Spell.QuickCut,
-        Spell.VeilStrike,
-        Spell.Riposte,
-        Spell.SmokeSnare,
         Spell.FatalSword,
         Spell.DoubleSlash,
         Spell.Haste,
@@ -134,9 +123,6 @@ public static class SpellCurriculum
 
     private static readonly Spell[] ArcherSpells =
     {
-        Spell.Pinpoint,
-        Spell.CinderMine,
-        Spell.PackSignal,
         Spell.Focus,
         Spell.StraightShot,
         Spell.DoubleShot,
@@ -181,7 +167,7 @@ public static class SpellCurriculum
     {
         if (SpecialisationAbilities.TryGet(spell, out var ability)) return ability.UnlockLevel;
 
-        // The starter spells unlock at rank zero; original rank levels remain unchanged.
+        // Every character starts with their class's introductory ability.
         switch (spell)
         {
             case Spell.Fencing:
@@ -189,18 +175,15 @@ public static class SpellCurriculum
             case Spell.Healing:
             case Spell.FatalSword:
             case Spell.StraightShot: return 1;
-            case Spell.Thrusting:
-            case Spell.HalfMoon:
-            case Spell.ProtectionField:
-            case Spell.GreatFireBall:
-            case Spell.FrostCrunch:
-            case Spell.ThunderBolt:
-                return Math.Min((byte)SpecialisationUnlockLevel, rankOneLevel == 0 ? (byte)1 : rankOneLevel);
-            case Spell.MoonLight:
-            case Spell.SummonVampire: return (byte)SpecialisationUnlockLevel;
             default: return rankOneLevel == 0 ? (byte)1 : rankOneLevel;
         }
     }
+
+    public static bool IsRetired(Spell spell) => SpecialisationAbilities.TryGet(spell, out _);
+
+    public static bool CanUseLegacy(MirClass actorClass, Spell spell, ushort level, byte firstLevel, bool equipmentGrant) =>
+        !IsRetired(spell) && (equipmentGrant || !PlayableClasses.Any(@class => Owns(@class, spell)) ||
+            IsUnlocked(actorClass, spell, level, firstLevel));
 
     public static bool IsUnlocked(MirClass actorClass, Spell spell, ushort actorLevel, byte firstRankLevel) =>
         Owns(actorClass, spell) && actorLevel >= UnlockLevel(spell, firstRankLevel);

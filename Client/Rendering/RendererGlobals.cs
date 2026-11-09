@@ -8,5 +8,12 @@ global using DarkFantasyPalette = CrystalM2.Rendering.Core.DarkFantasyPalette;
 
 namespace Client.Rendering;
 
-public enum SpriteBlendMode { Alpha, Additive, InverseLight, Multiply }
-public enum ShaderEffect { Artwork, Normal, Grayscale, Magic, Atmosphere, BloomExtract, BloomBlur, LightComposite, ShadowMask }
+public enum SpriteBlendMode { Alpha, Additive, InverseLight, Multiply, Screen, ArtworkMultiply, Subtractive, Maximum, Minimum }
+public enum TextureFilterMode { Pixel, Smooth, EdgeAware, Hd, Cubic }
+public enum ShaderEffect
+{
+    Artwork, Normal, Grayscale, Magic, Atmosphere, BloomExtract, BloomBlur, LightComposite, ShadowMask, ProjectedShadow,
+    ShapedLight, WeatherGround, SpellArtwork, ConeLight, WeatherOcclusion, WeatherParticle, GaussianLight,
+    MapColourDownsample, MapColourAverage, LightHalo, WeaponSpellMask, ParticleCoverage, WeatherTerrainMask,
+    WeatherSceneryBlur, WeatherMaskView, SpellOcclusion
+}

@@ -4,9 +4,12 @@ public enum AbilityTheme : byte { Steel, Blood, Ward, Flame, Frost, Storm, Spiri
 
 public sealed record SpecialisationAbility(Spell Spell, MirClass Class, CombatSpecialisation Spec,
     string Name, AbilityTarget Target, AbilityTheme Theme, byte Range, byte Mana, ushort Cooldown,
-    ushort Windup, ushort Power, float Scaling, byte Icon, string Description)
+    ushort Windup, ushort Power, float Scaling, byte Icon, string Description, byte RequiredLevel = 0)
 {
-    public byte UnlockLevel => Spec == CombatSpecialisation.Unchosen ? (byte)1 : (byte)SpellCurriculum.SpecialisationUnlockLevel;
+    public byte UnlockLevel => RequiredLevel != 0 ? RequiredLevel :
+        Spec == CombatSpecialisation.Unchosen ? (byte)1 : (byte)SpellCurriculum.SpecialisationUnlockLevel;
+
+    public int CastRecovery => TalentCatalog.Supports(Class) ? Math.Max(600, Windup + 120) : 1800;
 }
 
 public sealed record SpecialisationTrait(string Name, byte Level, string Description);
@@ -46,7 +49,7 @@ public static class SpecialisationAbilities
         new(Spell.Distil, MirClass.Taoist, Second, "Distil", AbilityTarget.Enemy, AbilityTheme.Venom, 7, 13, 7400, 280, 8, 1.05f, 7,
             "Consume your red or green poison on an enemy to deal damage. A fresh poison yields a stronger dose."),
         new(Spell.SpiritCommand, MirClass.Taoist, Third, "Spirit Command", AbilityTarget.Companion, AbilityTheme.Spirit, 8, 12, 9000, 220, 12, .70f, 4,
-            "Mend one owned spirit. Select your spirit to mend it, select an enemy to order focus, or cast without a target to recall."),
+            "Mend one bound spirit. Target an enemy to order focus or cast without an enemy to recall the spirit toward you."),
         new(Spell.VeilStrike, MirClass.Assassin, First, "Veil Strike", AbilityTarget.Enemy, AbilityTheme.Shadow, 2, 13, 7200, 210, 10, 1.25f, 6,
             "Strike an enemy. Attacking from concealment adds damage and opens a short bleed."),
         new(Spell.Riposte, MirClass.Assassin, Second, "Riposte", AbilityTarget.Enemy, AbilityTheme.Steel, 1, 12, 6800, 150, 8, 1.10f, 11,
@@ -58,14 +61,20 @@ public static class SpecialisationAbilities
         new(Spell.CinderMine, MirClass.Archer, Second, "Cinder Mine", AbilityTarget.Ground, AbilityTheme.Flame, 6, 17, 10500, 770, 10, 1.15f, 4,
             "Arm a visible mine. It detonates once when an enemy approaches, then expires if undisturbed."),
         new(Spell.PackSignal, MirClass.Archer, Third, "Pack Signal", AbilityTarget.Companion, AbilityTheme.Spirit, 8, 12, 8500, 220, 9, .65f, 4,
-            "Heal an owned combat beast. Select the beast to mend it, an enemy to focus, or no target to recall it.")
+            "Heal your nearby combat beast. Command it to attack your enemy or call it back to you.")
     };
 
     private static readonly IReadOnlyDictionary<Spell, SpecialisationAbility> BySpell =
         Definitions.ToDictionary(x => x.Spell);
 
     public static IReadOnlyList<SpecialisationAbility> All { get; } = Array.AsReadOnly(Definitions);
-    public static bool TryGet(Spell spell, out SpecialisationAbility ability) => BySpell.TryGetValue(spell, out ability);
+    public static bool TryGet(Spell spell, out SpecialisationAbility ability)
+    {
+        if (BySpell.TryGetValue(spell, out ability)) return true;
+        if (!TalentAbilities.TryGet(spell, out var talent)) return false;
+        ability = talent.Spell;
+        return true;
+    }
 
     public static SpecialisationAbility Signature(MirClass @class, CombatSpecialisation spec) =>
         spec == Core ? null : Array.Find(Definitions, a => a.Class == @class && a.Spec == spec);
@@ -134,7 +143,7 @@ public static class SpecialisationAbilities
 
     public static void ApplyTraitStats(Stats stats, MirClass @class, CombatSpecialisation spec, ushort level)
     {
-        if (level < SpellCurriculum.SpecialisationUnlockLevel) return;
+        if (level < SpellCurriculum.SpecialisationUnlockLevel || TalentCatalog.Supports(@class)) return;
         Spell spell = Signature(@class, spec)?.Spell ?? Spell.None;
         switch (spell)
         {

@@ -16,6 +16,8 @@ namespace Server.MirDatabase
         public string Name;
         public ushort Level;
         public CombatSpecialisation Specialisation;
+        public TalentProfile Talents = new();
+        public SpellPerkProfile SpellPerks = new();
         public MirClass Class;
         public MirGender Gender;
         public byte Hair;
@@ -387,13 +389,22 @@ namespace Server.MirDatabase
 
             if (version > 100)
                 HeroBehaviour = (HeroBehaviour)reader.ReadByte();
-            if (version >= 118)
+            if (HasSavedSpecialisation(version, customVersion))
             {
                 Specialisation = (CombatSpecialisation)reader.ReadByte();
                 if (!SpellCurriculum.IsValid(Specialisation))
                     Specialisation = CombatSpecialisation.Unchosen;
             }
+            if (version >= 121)
+            {
+                Talents = TalentProfile.Read(reader);
+            }
+            if (version >= 122) SpellPerks = SpellPerkProfile.Read(reader);
         }
+
+        // The legacy 119 format predates specialisation. The 118 format on this branch already saved it.
+        protected static bool HasSavedSpecialisation(int version, int customVersion) =>
+            version >= 120 || (version == 118 && customVersion == 0);
 
         public virtual void Save(BinaryWriter writer)
         {
@@ -575,6 +586,8 @@ namespace Server.MirDatabase
             writer.Write(HeroSpawned);
             writer.Write((byte)HeroBehaviour);
             writer.Write((byte)Specialisation);
+            Talents.Write(writer);
+            SpellPerks.Write(writer);
         }
 
         public SelectInfo ToSelectInfo()

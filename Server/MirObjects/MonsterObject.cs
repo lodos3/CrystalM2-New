@@ -642,6 +642,7 @@ namespace Server.MirObjects
                     Envir.Time > MoveTime && 
                     Envir.Time > ActionTime && 
                     Envir.Time > ShockTime &&
+                    (CurrentPoison & TalentMovementLock) == 0 &&
                     (Master == null || Master.PMode == PetMode.MoveOnly || Master.PMode == PetMode.Both || Master.PMode == PetMode.FocusMasterTarget) && 
                     !CurrentPoison.HasFlag(PoisonType.Paralysis) && 
                     !CurrentPoison.HasFlag(PoisonType.LRParalysis) &&
@@ -657,6 +658,7 @@ namespace Server.MirObjects
                     !Dead &&
                     Envir.Time > AttackTime &&
                     Envir.Time > ActionTime &&
+                    !CurrentPoison.HasFlag(PoisonType.TalentStun) &&
                     (Master == null || Master.PMode == PetMode.AttackOnly || Master.PMode == PetMode.Both || Master.PMode == PetMode.FocusMasterTarget) &&
                     !CurrentPoison.HasFlag(PoisonType.Paralysis) &&
                     !CurrentPoison.HasFlag(PoisonType.LRParalysis) &&
@@ -1141,6 +1143,7 @@ namespace Server.MirObjects
                         }
 
                         if (drop.QuestRequired) continue;
+                        if (item.Info.Type == ItemType.Book) continue;
                         if (!DropItem(item)) return;
                     }
                 }
@@ -1380,7 +1383,7 @@ namespace Server.MirObjects
 
             if (target == null || !target.IsAttackTarget(this) || target.CurrentMap != CurrentMap || target.Node == null) return;
 
-            target.Attacked(this, damage, defence);
+            if (target.Attacked(this, damage, defence) > 0 && Master is HumanObject owner) owner.RecordOrdinarySpiritHit(this, target);
         }
 
         protected virtual void CompleteRangeAttack(IList<object> data)
@@ -1391,7 +1394,7 @@ namespace Server.MirObjects
 
             if (target == null || !target.IsAttackTarget(this) || target.CurrentMap != CurrentMap || target.Node == null) return;
 
-            target.Attacked(this, damage, defence);
+            if (target.Attacked(this, damage, defence) > 0 && Master is HumanObject owner) owner.RecordOrdinarySpiritHit(this, target);
         }
 
         protected virtual void CompleteDeath(IList<object> data)
@@ -1490,10 +1493,13 @@ namespace Server.MirObjects
                             AttackTime = Envir.Time + AttackSpeed;
                         }
                         PoisonList.RemoveAt(i);
+                        if (poison.TalentDose && !poison.CopiedDose && poison.PType == PoisonType.Green && poison.Source is HumanObject source)
+                            source.OnTalentDoseExpired(this, poison);
                         continue;
                     }
 
-                    if (poison.PType == PoisonType.Green || poison.PType == PoisonType.Bleeding)
+                    int tickPower = poison.PType is PoisonType.Green or PoisonType.Bleeding ? TakePoisonTickPower(poison) : 0;
+                    if (tickPower > 0)
                     {
                         if (EXPOwner == null || EXPOwner.Dead)
                         {
@@ -1508,9 +1514,8 @@ namespace Server.MirObjects
                             Broadcast(new S.ObjectEffect { ObjectID = ObjectID, Effect = SpellEffect.Bleeding, EffectType = 0 });
                         }
 
-                        //ChangeHP(-poison.Value);
-                        PoisonDamage(-poison.Value, poison.Owner);
-                        BroadcastDamageIndicator(DamageType.Hit, -poison.Value);
+                        PoisonDamage(-tickPower, poison.Owner);
+                        BroadcastDamageIndicator(DamageType.Hit, -tickPower);
                         if (PoisonStopRegen)
                             RegenTime = Envir.Time + RegenDelay;
                         if (poison.Owner != null && Target == null)
@@ -1537,7 +1542,7 @@ namespace Server.MirObjects
                 switch (poison.PType)
                 {
                     case PoisonType.Red:
-                        ArmourRate -= 0.5F;
+                        ArmourRate = Math.Min(ArmourRate, poison.RedStrength == 0 ? 0.50f : 1f - poison.RedStrength / 200f);
                         break;
                     case PoisonType.Stun:
                         DamageRate += 0.5F;
@@ -1617,6 +1622,11 @@ namespace Server.MirObjects
             for (int i = Buffs.Count - 1; i >= 0; i--)
             {
                 Buff buff = Buffs[i];
+                if (IsExpiredTalentStatus(buff))
+                {
+                    buff.FlagForRemoval = true;
+                    buff.NextTime = 0;
+                }
 
                 if (buff.NextTime > Envir.Time) continue;
 
@@ -2119,6 +2129,7 @@ namespace Server.MirObjects
             Direction = dir;
             RemoveObjects(dir, 1);
             CurrentLocation = location;
+            VoluntaryDistance++;
             CurrentMap.GetCell(CurrentLocation).Add(this);
             AddObjects(dir, 1);
 
@@ -2592,6 +2603,8 @@ namespace Server.MirObjects
             if (!hit)
                 return 0;
 
+            damage = ResolveTalentIncoming(attacker, damage, type);
+
             armour = (int)Math.Max(int.MinValue, (Math.Min(int.MaxValue, (decimal)(armour * ArmourRate))));
             damage = (int)Math.Max(int.MinValue, (Math.Min(int.MaxValue, (decimal)(damage * DamageRate))));
 
@@ -2707,6 +2720,8 @@ namespace Server.MirObjects
             if (!hit)
                 return 0;
 
+            damage = ResolveTalentIncoming(attacker, damage, type);
+
             armour = (int)Math.Max(int.MinValue, (Math.Min(int.MaxValue, (decimal)(armour * ArmourRate))));
             damage = (int)Math.Max(int.MinValue, (Math.Min(int.MaxValue, (decimal)(damage * DamageRate))));
 
@@ -2795,6 +2810,7 @@ namespace Server.MirObjects
 
         public override void ApplyPoison(Poison p, MapObject Caster = null, bool NoResist = false, bool ignoreDefence = true)
         {
+            if (!CanReceiveControl(p, Caster)) return;
             if (p.Owner != null && p.Owner.IsAttackTarget(this) && Target == null)
                 Target = p.Owner;
 
@@ -2818,15 +2834,18 @@ namespace Server.MirObjects
 
             for (int i = 0; i < PoisonList.Count; i++)
             {
-                if (PoisonList[i].PType != p.PType) continue;
+                if (!IsSamePoisonSlot(PoisonList[i], p)) continue;
+                if (p.CopiedDose && !PoisonList[i].CopiedDose) return;
                 if ((PoisonList[i].PType == PoisonType.Green) && (PoisonList[i].Value > p.Value)) return;//cant cast weak poison to cancel out strong poison
                 if ((PoisonList[i].PType != PoisonType.Green) && ((PoisonList[i].Duration - PoisonList[i].Time) > p.Duration)) return;//cant cast 1 second poison to make a 1minute poison go away!
                 if (p.PType == PoisonType.DelayedExplosion) return;
                 if ((PoisonList[i].PType == PoisonType.Frozen) || (PoisonList[i].PType == PoisonType.Slow) || (PoisonList[i].PType == PoisonType.Paralysis)|| (PoisonList[i].PType == PoisonType.LRParalysis)) return;//prevents mobs from being perma frozen/slowed
                 PoisonList[i] = p;
+                RecordControl(p, Caster);
                 return;
             }
 
+            if (!CanAddOwnedDose(p)) return;
             if (p.PType == PoisonType.DelayedExplosion)
             {
                 ExplosionInflictedTime = Envir.Time + 4000;
@@ -2847,6 +2866,7 @@ namespace Server.MirObjects
             }
 
             PoisonList.Add(p);
+            RecordControl(p, Caster);
         }
 
         public override Buff AddBuff(BuffType type, MapObject owner, int duration, Stats stats, bool refreshStats = true, bool updateOnly = false, params int[] values)
