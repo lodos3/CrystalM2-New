@@ -1,4 +1,4 @@
-﻿using Client.MirGraphics;
+using Client.MirGraphics;
 using Client.MirScenes;
 using Client.MirSounds;
 using CrystalM2.Rendering.Core;
@@ -244,10 +244,15 @@ namespace Client.MirObjects
                     Destination.Offset(Destination.X - Source.X, Destination.Y - Source.Y);
             }
 
-            var timing = new LegacyProjectileTimeline(Start, Functions.MaxDistance(Source, Destination), Interval);
+            bool authored = Art.IsParticle;
+            var (travelTime, wakeInterval) = authored
+                ? LegacySpellEffects.ProjectileTiming(Art.Visual.Spell)
+                : (LegacyProjectileTimeline.MillisecondsPerCell, 0);
+            var timing = new LegacyProjectileTimeline(Start, Functions.MaxDistance(Source, Destination), Interval)
+                { TravelMillisecondsPerCell = travelTime };
             Duration = timing.Duration;
             Count = timing.Frames;
-            if (!Art.IsParticle)
+            if (!authored)
             {
                 base.Process();
                 return;
@@ -270,7 +275,7 @@ namespace Client.MirObjects
 
             CurrentFrame = timing.Frame(CMain.Time);
             bool wake = CMain.Time >= _nextTrailTime;
-            if (wake) _nextTrailTime = CMain.Time + 24;
+            if (wake) _nextTrailTime = CMain.Time + wakeInterval;
             map.EmitProjectileFrame(Art.Visual.Spell, Source, Destination, timing, wake);
         }
 

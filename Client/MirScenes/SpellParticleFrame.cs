@@ -22,8 +22,13 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
         return value * value * (3 - 2 * value);
     }
 
-    internal static float Envelope(float progress, float fadeStart = .65f, float tail = 0) =>
-        (.61f + .39f * Ease(progress * 8)) * (1 - (1 - tail) * Ease((progress - fadeStart) / (1 - fadeStart)));
+    internal static float Envelope(float progress, float? fadeStart = null, float? tail = null)
+    {
+        var tuning = SpellVfxAssets.Current.Frame.Envelope;
+        float fade = fadeStart ?? tuning.FadeStart;
+        return (tuning.RiseBase + tuning.RiseGain * Ease(progress * tuning.RiseSpeed)) *
+            (1 - (1 - (tail ?? tuning.TailOpacity)) * Ease((progress - fade) / (1 - fade)));
+    }
     internal static Color Tint(int rgb, float opacity) => Color.FromArgb((int)(255 * Math.Clamp(opacity, 0, 1)) << 24 | rgb);
 
     internal float Scale => size / ReferenceSize;
@@ -59,74 +64,79 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
 
     internal void FloorSeal(Vector2 centre, float width, float angle, Shape shape, int colour, float alpha, bool light = false)
     {
+        var tuning = SpellVfxAssets.Current.Frame.FloorSeal;
         alpha *= strength;
         if (alpha < .014f) return;
-        Vector2 right = Ellipse(angle, 1, 1) * (width * Scale * .5f);
+        Vector2 right = Ellipse(angle, 1, 1) * (width * Scale * tuning.Right);
         Vector2 down = new(-right.Y, right.X);
         var quad = new SpriteQuad(ProjectGround(-right - down), ProjectGround(right - down),
             ProjectGround(-right + down), ProjectGround(right + down));
-        pool.TryAdd(new SpellParticle(Place(centre), Vector2.Zero, now, 50, 1, Tint(colour, alpha), shape, 0,
-            Layer: Layer.Floor, CastsLight: light, FrameOnly: true, FieldObjectID: field, Ribbon: quad, AlwaysOnTop: alwaysOnTop,
+        pool.TryAdd(new SpellParticle(Place(centre), Vector2.Zero, now, tuning.SpellParticleDuration, 1, Tint(colour, alpha), shape, 0,
+            Layer: tuning.SpellParticleLayer, CastsLight: light, FrameOnly: true, FieldObjectID: field, Ribbon: quad, AlwaysOnTop: alwaysOnTop,
             OpacityNoiseSeed: opacityNoiseSeed));
     }
 
     internal void Line(Vector2 start, Vector2 end, float width, int colour, float alpha,
         Layer layer = Layer.Emissive, bool light = false)
     {
+        var tuning = SpellVfxAssets.Current.Frame.Line;
         Vector2 delta = end - start;
         if (delta.LengthSquared() < .09f) return;
         bool haze = width > 4;
         if (haze)
-            Sprite(Vector2.Lerp(start, end, .45f), delta.Length() + width * .65f, width * 1.36f, Shape.Wisp,
-                colour, alpha * .88f, layer, MathF.Atan2(delta.Y, delta.X), light);
-        float edge = Math.Min(3.65f, width * .79f);
-        Thread(start, end, edge, edge * .49f, colour, alpha, layer, light: light && !haze);
+            Sprite(Vector2.Lerp(start, end, tuning.Amount), delta.Length() + width * tuning.WispWidth, width * tuning.WispHeight, tuning.WispShape,
+                colour, alpha * tuning.WispAlpha, layer, MathF.Atan2(delta.Y, delta.X), light);
+        float edge = Math.Min(tuning.Edge, width * tuning.Edge2);
+        Thread(start, end, edge, edge * tuning.ThreadEndWidth, colour, alpha, layer, light: light && !haze);
     }
 
     internal void Thread(Vector2 start, Vector2 end, float startWidth, float endWidth, int colour, float alpha,
         Layer layer = Layer.Emissive, bool light = false, float? sortY = null)
     {
+        var tuning = SpellVfxAssets.Current.Frame.Thread;
         alpha *= strength;
         if (alpha < .014f) return;
         (start, end) = (Place(start), Place(end));
         Vector2 delta = end - start;
         float length = delta.Length();
         if (length < .3f) return;
-        Vector2 centre = (start + end) * .5f;
-        Vector2 normal = new Vector2(-delta.Y, delta.X) * (.5f * Scale / length);
-        Vector2 overlap = delta * (Math.Min(.85f, length * .12f) / length);
+        Vector2 centre = (start + end) * tuning.Centre;
+        Vector2 normal = new Vector2(-delta.Y, delta.X) * (tuning.Normal * Scale / length);
+        Vector2 overlap = delta * (Math.Min(tuning.Overlap, length * tuning.Overlap2) / length);
         Vector2 a = start - centre - overlap, b = end - centre + overlap;
         var ribbon = new SpriteQuad(a - normal * startWidth, b - normal * endWidth,
             a + normal * startWidth, b + normal * endWidth);
-        pool.TryAdd(new SpellParticle(centre, Vector2.Zero, now, 50, 1, Tint(colour, alpha), Shape.Filament, 0,
+        pool.TryAdd(new SpellParticle(centre, Vector2.Zero, now, tuning.FilamentDuration, 1, Tint(colour, alpha), tuning.FilamentShape, 0,
             Rotation: MathF.Atan2(delta.Y, delta.X), Layer: layer, CastsLight: light, FrameOnly: true, FieldObjectID: field,
             Ribbon: ribbon, DepthY: sortY ?? depthY ?? pivot.Y, AlwaysOnTop: alwaysOnTop, OpacityNoiseSeed: opacityNoiseSeed));
     }
 
     internal void WindRibbon(SpriteQuad edges, int colour, float alpha)
     {
+        var tuning = SpellVfxAssets.Current.Frame.WindRibbon;
         alpha *= strength;
         if (alpha < .014f) return;
         var (a, b, c, d) = edges;
         (a, b, c, d) = (Place(a), Place(b), Place(c), Place(d));
-        Vector2 centre = (a + b + c + d) * .25f;
-        pool.TryAdd(new SpellParticle(centre, Vector2.Zero, now, 50, 1, Tint(colour, alpha),
-            Shape.WindRibbon, 0, Layer: Layer.Emissive, CastsLight: false, FrameOnly: true, FieldObjectID: field,
+        Vector2 centre = (a + b + c + d) * tuning.Centre;
+        pool.TryAdd(new SpellParticle(centre, Vector2.Zero, now, tuning.WindRibbonDuration, 1, Tint(colour, alpha),
+            tuning.WindRibbonShape, 0, Layer: tuning.WindRibbonLayer, CastsLight: tuning.WindRibbonCastsLight, FrameOnly: true, FieldObjectID: field,
             Ribbon: new SpriteQuad(a - centre, b - centre, c - centre, d - centre), DepthY: depthY ?? pivot.Y,
             AlwaysOnTop: alwaysOnTop, OpacityNoiseSeed: opacityNoiseSeed));
     }
 
     internal void Orbit(Vector2 centre, float x, float y, float angle, float sweep, int colour, float width, float alpha)
     {
-        int segments = Math.Max(4, (int)MathF.Ceiling(sweep * 3.2f));
+        var tuning = SpellVfxAssets.Current.Frame.Orbit;
+        int segments = Math.Max(tuning.Segments, (int)MathF.Ceiling(sweep * tuning.Segments2));
         Vector2 from = centre + Ellipse(angle, x, y);
         for (int i = 1; i <= segments; i++)
         {
             float current = angle + sweep * i / segments;
             Vector2 to = centre + Ellipse(current, x, y);
-            float flicker = .67f + .33f * Unit(i + 130);
-            Line(from, to, width * flicker, colour, alpha * (.74f + flicker * .26f),
-                Depth(current - sweep / (2 * segments)));
+            float flicker = tuning.Flicker + tuning.Flicker2 * Unit(i + 130);
+            Line(from, to, width * flicker, colour, alpha * (tuning.LineAlpha + flicker * tuning.LineAlpha2),
+                Depth(current - sweep / (tuning.Angle * segments)));
             from = to;
         }
     }
@@ -134,17 +144,18 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
     internal void Sparks(Vector2 centre, int count, float rx, float ry, float progress, int tint,
         float rise = 0, Shape shape = Shape.Spark, float? sortY = null)
     {
+        var tuning = SpellVfxAssets.Current.Frame.Sparks;
         for (int i = 0; i < count; i++)
         {
-            float age = Fract(progress + Unit(i + 41) * .81f);
+            float age = Fract(progress + Unit(i + 41) * tuning.Age);
             float angle = (i + Unit(i + 5)) * MathF.Tau / count;
-            Vector2 point = centre + Ellipse(angle, rx, ry) * (.20f + .82f * age) - Vector2.UnitY * (rise * age);
-            float width = 3.1f + Unit(i + 11) * 8.7f;
+            Vector2 point = centre + Ellipse(angle, rx, ry) * (tuning.Point + tuning.Point2 * age) - Vector2.UnitY * (rise * age);
+            float width = tuning.Width + Unit(i + 11) * tuning.Width2;
             bool glint = i % 4 == 0;
-            int colour = glint ? Mix(tint, 0xffffff, .61f) : Mix(tint, 0x243055, Unit(i + 131) * .34f);
-            float fade = (.89f - age * .66f) * (.55f + .45f * Ease(age * 12));
-            Sprite(point, width, width * (shape == Shape.Shard ? 2.2f : 1.46f), shape, colour,
-                fade, glint ? Layer.EmissiveCore : Layer.Emissive, angle + Unit(i + 94) * .88f, sortY: sortY);
+            int colour = glint ? Mix(tint, tuning.ColourColour, tuning.Colour) : Mix(tint, tuning.ColourColour2, Unit(i + 131) * tuning.Colour2);
+            float fade = (tuning.Fade - age * tuning.Fade2) * (tuning.Fade3 + tuning.Fade4 * Ease(age * tuning.Fade5));
+            Sprite(point, width, width * (shape == Shape.Shard ? tuning.ShardHeight : tuning.ShardHeight2), shape, colour,
+                fade, glint ? tuning.ShardLayer : tuning.ShardLayer2, angle + Unit(i + 94) * tuning.ShardRotation, sortY: sortY);
         }
     }
 
@@ -157,12 +168,13 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
     private void Add(Vector2 centre, float width, float height, Shape shape, int colour, float alpha,
         Layer layer, float rotation, bool light, byte animationFrame = 0, float? sortY = null)
     {
+        var tuning = SpellVfxAssets.Current.Frame.Add;
         alpha *= strength;
         if (alpha < .014f || width <= 0 || height <= 0) return;
-        if (light && layer == Layer.Emissive && shape is Shape.Orb or Shape.Wisp) layer = Layer.Glow;
+        if (light && layer == Layer.Emissive && shape is Shape.Orb or Shape.Wisp) layer = tuning.Layer;
         float renderScale = layer is Layer.Ground or Layer.Floor ? 1 : size;
         int pixels = Math.Max(1, (int)MathF.Round(width / renderScale));
-        pool.TryAdd(new SpellParticle(centre, Vector2.Zero, now, 50, pixels, Tint(colour, alpha), shape, 0,
+        pool.TryAdd(new SpellParticle(centre, Vector2.Zero, now, tuning.SpellParticleDuration, pixels, Tint(colour, alpha), shape, 0,
             height / (pixels * renderScale), rotation, Layer: layer, CastsLight: light, FrameOnly: true, FieldObjectID: field,
             Frame: animationFrame, DepthY: sortY ?? depthY ?? pivot.Y, AlwaysOnTop: alwaysOnTop, OpacityNoiseSeed: opacityNoiseSeed));
     }

@@ -11,250 +11,249 @@ internal static partial class TaoistSpellEffects
 {
     private static void Poison(Frame frame, Vector2 feet, float progress, float time, bool prepare)
     {
-        Vector2 body = feet - Vector2.UnitY * (prepare ? 10 + Ease(progress) * 35 : 32);
-        float bloom = .36f + .64f * Ease(progress * 3);
-        int bodyTint = prepare ? 0x867a51 : 0xa5b637;
-        frame.Clip(body, 88 * bloom, 80 * bloom, Shape.SmokeSequence, time * .53f, 0x506431, .71f, Layer.Smoke);
-        frame.Sprite(body, 70 * bloom, 68 * bloom, Shape.Orb, bodyTint, .85f, light: true);
-        for (int i = 0; i < 9; i++)
+        var tuning = SpellVfxAssets.Current.Taoist.Poison;
+        Vector2 body = feet - Vector2.UnitY * (prepare ? tuning.Body + Ease(progress) * tuning.Body2 : tuning.ReleaseBody);
+        float bloom = tuning.Bloom + tuning.Bloom2 * Ease(progress * tuning.Bloom3);
+        int bodyTint = prepare ? tuning.PrepareBodyTintColour : tuning.ReleaseBodyTintColour;
+        frame.Clip(body, tuning.SmokeSequenceWidth * bloom, tuning.SmokeSequenceHeight * bloom, tuning.SmokeSequenceShape, time * tuning.SmokeSequencePhase, tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha, tuning.SmokeSequenceLayer);
+        frame.Sprite(body, tuning.OrbWidth * bloom, tuning.OrbHeight * bloom, tuning.OrbShape, bodyTint, tuning.OrbAlpha, light: tuning.OrbLight);
+        for (int i = 0; i < tuning.WispCount; i++)
         {
-            float age = Fract(progress * .76f + i * .21f);
-            float angle = i * 2.39f + time * 2;
-            Vector2 point = body + Ellipse(angle, 31 * bloom, 20 * bloom) * (.28f + age * .81f) -
-                Vector2.UnitY * (age * 22);
-            frame.Sprite(point, 13 + (1 - age) * 13, 11 + (1 - age) * 13, Shape.Wisp,
-                i % 3 == 0 ? 0xe6d569 : bodyTint, .88f - .57f * age, Depth(angle));
-            if (!prepare) frame.Sprite(point, 5 + frame.Unit(i) * 5, 6, Shape.Spark, Gold, .68f - age * .43f, Layer.EmissiveCore);
+            float age = Fract(progress * tuning.Age + i * tuning.Age2);
+            float angle = i * tuning.Angle + time * tuning.Angle2;
+            Vector2 point = body + Ellipse(angle, tuning.EllipseX * bloom, tuning.EllipseY * bloom) * (tuning.Point + age * tuning.Point2) -
+                Vector2.UnitY * (age * tuning.Point3);
+            frame.Sprite(point, tuning.WispWidth + (1 - age) * tuning.WispWidth2, tuning.WispHeight + (1 - age) * tuning.WispHeight2, tuning.WispShape,
+                i % 3 == 0 ? tuning.WispColour : bodyTint, tuning.WispAlpha - tuning.WispAlpha2 * age, Depth(angle));
+            if (!prepare) frame.Sprite(point, tuning.SparkWidth + frame.Unit(i) * tuning.SparkWidth2, tuning.SparkHeight, tuning.SparkShape, Gold, tuning.SparkAlpha - age * tuning.SparkAlpha2, tuning.SparkLayer);
         }
         if (prepare)
-            frame.Orbit(body, 11 * bloom, 6 * bloom, progress * 7, 4.6f, 0xe5d9a4, 2.1f, .76f);
+            frame.Orbit(body, tuning.OrbitX * bloom, tuning.OrbitY * bloom, progress * tuning.OrbitAngle, tuning.OrbitSweep, tuning.OrbitColour, tuning.OrbitWidth, tuning.OrbitAlpha);
     }
 
-    private static readonly SpellParticleColourCurve PaperFlame = new(
-        (0, 0xff6729), (.32f, 0xfb481c), (.70f, 0xa22618), (1, 0x521b17));
-    private static readonly SpellParticleColourCurve PaperCore = new(
-        (0, 0xfffcf4), (.53f, 0xffffed), (.76f, 0xff9d43), (1, 0xd2451d));
-    private static readonly SpellParticleColourCurve PaperHeat = new(
-        (0, 0xffd65e), (.53f, 0xff9b32), (.77f, 0xe9591e), (1, 0x872d1f));
-    private static readonly SpellParticleColourCurve PaperEmber = new(
-        (0, 0xfff4c4), (.38f, 0xffa130), (.75f, 0xec4c1d), (1, 0x892617));
-    private static readonly SpellParticleColourCurve SoulFlame = new(
-        (0, 0xd5faff), (.36f, 0x51c9ff), (.72f, 0x377bdf), (1, 0x244582));
-    private static readonly SpellParticleColourCurve ArmourFlame = new(
-        (0, 0xffffd2), (.31f, 0xffd054), (.67f, 0xff7823), (1, 0xbc3513));
+    private static SpellParticleColourCurve PaperFlame => SpellVfxAssets.Current.Taoist.Palette.PaperFlame;
+    private static SpellParticleColourCurve PaperCore => SpellVfxAssets.Current.Taoist.Palette.PaperCore;
+    private static SpellParticleColourCurve PaperHeat => SpellVfxAssets.Current.Taoist.Palette.PaperHeat;
+    private static SpellParticleColourCurve PaperEmber => SpellVfxAssets.Current.Taoist.Palette.PaperEmber;
+    private static SpellParticleColourCurve SoulFlame => SpellVfxAssets.Current.Taoist.Palette.SoulFlame;
+    private static SpellParticleColourCurve ArmourFlame => SpellVfxAssets.Current.Taoist.Palette.ArmourFlame;
 
     private static void PaperBurst(Frame frame, Vector2 feet, float progress)
     {
-        Vector2 centre = feet - Vector2.UnitY * 32;
-        float spread = .48f + .52f * Ease(progress * 2.7f);
-        float heat = 1 - Ease((progress - .53f) / .43f);
-        frame.Sprite(feet, 94 * spread, 48 * spread, Shape.Wisp, PaperFlame.Sample(progress),
-            .63f * heat, Layer.Ground, light: true);
-        for (int i = 0; i < 5; i++)
+        var tuning = SpellVfxAssets.Current.Taoist.PaperBurst;
+        Vector2 centre = feet - Vector2.UnitY * tuning.Centre;
+        float spread = tuning.Spread + tuning.Spread2 * Ease(progress * tuning.Spread3);
+        float heat = 1 - Ease((progress - tuning.Heat) / tuning.HeatDivisor);
+        frame.Sprite(feet, tuning.WispWidth * spread, tuning.WispHeight * spread, tuning.WispShape, PaperFlame.Sample(progress),
+            tuning.WispAlpha * heat, tuning.WispLayer, light: tuning.WispLight);
+        for (int i = 0; i < tuning.FireSequenceCount; i++)
         {
-            float angle = i * 2.39996f;
-            Vector2 ray = Ellipse(angle, 34, 37);
-            float age = Math.Clamp(progress * 1.14f - i * .065f, 0, 1);
-            Vector2 lobe = centre + (ray + new Vector2(9, -14 * age)) * spread;
-            float flare = (.58f + .42f * Ease(age * 5)) * (1 - .72f * Ease((age - .57f) / .43f));
-            frame.Clip(lobe, (48 + i * 3) * spread, (69 + i * 4) * spread, Shape.FireSequence,
-                .20f + age * .53f + i * .117f, PaperFlame.Sample(age), .75f * flare, rotation: MathF.Cos(angle) * .46f);
-            frame.Clip(Vector2.Lerp(centre, lobe, .81f), 37 * spread, 57 * spread, Shape.FireSequence,
-                .29f + age * .58f + i * .154f, PaperHeat.Sample(age), .91f * flare, Layer.EmissiveCore, MathF.Sin(angle) * .6f);
-            frame.Sprite(Vector2.Lerp(centre, lobe, .58f), 37 * spread, 59 * spread, Shape.UserFlame,
-                PaperCore.Sample(age), heat * flare * .93f, Layer.EmissiveCore, angle - .5f, light: i % 2 == 0);
-            frame.Clip(lobe + new Vector2(10 + age * 12, -14 - age * 23), 49 * spread, 72 * spread,
-                Shape.SmokeSequence, age * .58f + i * .162f, 0x873d2a, .58f * Ease(age * 2.7f), Layer.Smoke);
+            float angle = i * tuning.Angle;
+            Vector2 ray = Ellipse(angle, tuning.EllipseX, tuning.EllipseY);
+            float age = Math.Clamp(progress * tuning.Age - i * tuning.Age2, 0, 1);
+            Vector2 lobe = centre + (ray + new Vector2(tuning.X, tuning.Y * age)) * spread;
+            float flare = (tuning.Flare + tuning.Flare2 * Ease(age * tuning.Flare3)) * (1 - tuning.Flare4 * Ease((age - tuning.Flare5) / tuning.FlareDivisor));
+            frame.Clip(lobe, (tuning.FireSequenceWidth + i * tuning.FireSequenceWidth2) * spread, (tuning.FireSequenceHeight + i * tuning.FireSequenceHeight2) * spread, tuning.FireSequenceShape,
+                tuning.FireSequencePhase + age * tuning.FireSequencePhase2 + i * tuning.FireSequencePhase3, PaperFlame.Sample(age), tuning.FireSequenceAlpha * flare, rotation: MathF.Cos(angle) * tuning.FireSequenceRotation);
+            frame.Clip(Vector2.Lerp(centre, lobe, tuning.Amount), tuning.FireSequenceWidth3 * spread, tuning.FireSequenceHeight3 * spread, tuning.FireSequenceShape2,
+                tuning.FireSequencePhase4 + age * tuning.FireSequencePhase5 + i * tuning.FireSequencePhase6, PaperHeat.Sample(age), tuning.FireSequenceAlpha2 * flare, tuning.FireSequenceLayer, MathF.Sin(angle) * tuning.FireSequenceRotation2);
+            frame.Sprite(Vector2.Lerp(centre, lobe, tuning.Amount2), tuning.UserFlameWidth * spread, tuning.UserFlameHeight * spread, tuning.UserFlameShape,
+                PaperCore.Sample(age), heat * flare * tuning.UserFlameAlpha, tuning.UserFlameLayer, angle - tuning.UserFlameRotation, light: i % 2 == 0);
+            frame.Clip(lobe + new Vector2(tuning.X2 + age * tuning.X3, tuning.Y2 - age * tuning.Y3), tuning.SmokeSequenceWidth * spread, tuning.SmokeSequenceHeight * spread,
+                tuning.SmokeSequenceShape, age * tuning.SmokeSequencePhase + i * tuning.SmokeSequencePhase2, tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha * Ease(age * tuning.Value), tuning.SmokeSequenceLayer);
         }
-        frame.Clip(centre, 52 * spread, 75 * spread, Shape.FireSequence, .27f + progress * .43f,
-            PaperCore.Sample(progress), heat, Layer.EmissiveCore, light: true);
-        frame.Sprite(centre - Vector2.UnitY * 9, 36 * spread, 50 * spread, Shape.Flash, White,
-            .98f * heat, Layer.EmissiveCore);
-        for (int i = 0; i < 34; i++)
+        frame.Clip(centre, tuning.FireSequenceWidth4 * spread, tuning.FireSequenceHeight4 * spread, tuning.FireSequenceShape3, tuning.FireSequencePhase7 + progress * tuning.FireSequencePhase8,
+            PaperCore.Sample(progress), heat, tuning.FireSequenceLayer2, light: tuning.FireSequenceLight);
+        frame.Sprite(centre - Vector2.UnitY * tuning.FlashOffset, tuning.FlashWidth * spread, tuning.FlashHeight * spread, tuning.FlashShape, White,
+            tuning.FlashAlpha * heat, tuning.FlashLayer);
+        for (int i = 0; i < tuning.UserEmberCount; i++)
         {
-            float birth = frame.Unit(i + 29) * .62f - .09f;
-            float age = (progress - birth) / (.36f + .48f * frame.Unit(i + 83));
+            float birth = frame.Unit(i + 29) * tuning.Birth - tuning.Birth2;
+            float age = (progress - birth) / (tuning.Age3 + tuning.Age4 * frame.Unit(i + 83));
             if (age is < 0 or >= 1) continue;
-            float angle = i * 2.39996f;
-            float reach = .52f + .48f * frame.Unit(i + 16);
-            Vector2 ray = Ellipse(angle, 111 * reach, 76 * reach);
-            Vector2 position = centre + ray * (.25f + .75f * Ease(age * 1.58f)) - Vector2.UnitY * (19 + 30 * reach) * age;
-            float size = 3.2f + 4.1f * frame.Unit(i + 41);
-            float alpha = (.65f + .35f * Ease(age * 8)) * (1 - Ease((age - .63f) / .37f));
-            frame.Sprite(position, size, size * (1.2f + .67f * (1 - age)), Shape.UserEmber, PaperEmber.Sample(age),
-                alpha, Layer.EmissiveCore, angle, light: i % 9 == 0);
+            float angle = i * tuning.Angle2;
+            float reach = tuning.Reach + tuning.Reach2 * frame.Unit(i + 16);
+            Vector2 ray = Ellipse(angle, tuning.EllipseX2 * reach, tuning.EllipseY2 * reach);
+            Vector2 position = centre + ray * (tuning.Position + tuning.Position2 * Ease(age * tuning.Position3)) - Vector2.UnitY * (tuning.Position4 + tuning.Position5 * reach) * age;
+            float size = tuning.Size + tuning.Size2 * frame.Unit(i + 41);
+            float alpha = (tuning.Alpha + tuning.Alpha2 * Ease(age * tuning.Alpha3)) * (1 - Ease((age - tuning.Alpha4) / tuning.AlphaDivisor));
+            frame.Sprite(position, size, size * (tuning.UserEmberHeight + tuning.UserEmberHeight2 * (1 - age)), tuning.UserEmberShape, PaperEmber.Sample(age),
+                alpha, tuning.UserEmberLayer, angle, light: i % 9 == 0);
             if (i % 4 == 0)
             {
-                frame.Sprite(position, size * 2.3f, size * 2.5f, Shape.Flash, 0xff7b25, .51f * alpha, Layer.Glow);
-                frame.Sprite(position, size * .71f, size * 1.18f, Shape.Spark, PaperEmber.Sample(age * .72f),
-                    .91f * alpha, Layer.EmissiveCore, angle);
+                frame.Sprite(position, size * tuning.FlashWidth2, size * tuning.FlashHeight2, tuning.FlashShape2, tuning.FlashColour, tuning.FlashAlpha2 * alpha, tuning.FlashLayer2);
+                frame.Sprite(position, size * tuning.SparkWidth, size * tuning.SparkHeight, tuning.SparkShape, PaperEmber.Sample(age * tuning.Offset),
+                    tuning.SparkAlpha * alpha, tuning.SparkLayer, angle);
             }
         }
     }
 
     private static void SummonStars(Frame frame, Vector2 feet, float progress, bool deva)
     {
-        int dusk = deva ? 0x426d8c : InkBlue, glow = deva ? Mint : Blue;
-        float lift = Ease(progress) * 55;
-        float opening = Ease(progress * 2.4f);
-        float ascension = Ease((progress - .58f) / .21f) * (1 - .64f * Ease((progress - .87f) / .13f));
-        frame.Sprite(feet, 96 + 47 * opening, 44 + 23 * opening, Shape.Halo, dusk,
-            .78f * (1 - Ease((progress - .72f) / .28f)), Layer.Ground, light: true);
-        frame.Sprite(feet, 74, 38, Shape.Wisp, dusk, .86f, Layer.Ground);
-        Vector2 crown = feet - Vector2.UnitY * (64 + lift * .67f);
-        frame.Sprite(crown, 38, 49, Shape.IonCorona, glow, .76f * ascension, Layer.Glow, -.27f);
-        frame.Sprite(crown, 25, 32, Shape.Flash, deva ? Ivory : Ice, .94f * ascension,
-            Layer.EmissiveCore, -.27f, light: true);
-        for (int i = 0; i < (deva ? 5 : 3); i++)
+        var tuning = SpellVfxAssets.Current.Taoist.SummonStars;
+        int dusk = deva ? tuning.DuskColour : InkBlue, glow = deva ? Mint : Blue;
+        float lift = Ease(progress) * tuning.Lift;
+        float opening = Ease(progress * tuning.Opening);
+        float ascension = Ease((progress - tuning.Ascension) / tuning.AscensionDivisor) * (1 - tuning.Ascension2 * Ease((progress - tuning.Ascension3) / tuning.AscensionDivisor2));
+        frame.Sprite(feet, tuning.HaloWidth + tuning.HaloWidth2 * opening, tuning.HaloHeight + tuning.HaloHeight2 * opening, tuning.HaloShape, dusk,
+            tuning.HaloAlpha * (1 - Ease((progress - tuning.Value) / tuning.ValueDivisor)), tuning.HaloLayer, light: tuning.HaloLight);
+        frame.Sprite(feet, tuning.WispWidth, tuning.WispHeight, tuning.WispShape, dusk, tuning.WispAlpha, tuning.WispLayer);
+        Vector2 crown = feet - Vector2.UnitY * (tuning.Crown + lift * tuning.Crown2);
+        frame.Sprite(crown, tuning.IonCoronaWidth, tuning.IonCoronaHeight, tuning.IonCoronaShape, glow, tuning.IonCoronaAlpha * ascension, tuning.IonCoronaLayer, tuning.IonCoronaRotation);
+        frame.Sprite(crown, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, deva ? Ivory : Ice, tuning.FlashAlpha * ascension,
+            tuning.FlashLayer, tuning.FlashRotation, light: tuning.FlashLight);
+        for (int i = 0; i < (deva ? tuning.WispCount : tuning.WispCount2); i++)
         {
-            float t = Math.Clamp(progress * 1.35f - i * .105f, 0, 1);
-            float turn = progress * 8 + i * 2.34f;
-            Vector2 star = feet + Ellipse(turn, 25 + i * 2, 13) - Vector2.UnitY * (10 + lift + i * 6);
-            frame.Sprite(star, 27 + i * 4, 38, Shape.Wisp, i % 2 == 0 ? dusk : Teal, .92f, Depth(turn));
-            float flare = .60f + .40f * MathF.Pow(MathF.Sin(progress * MathF.Tau * 1.7f + i), 2);
-            frame.Sprite(star, 29, 45, Shape.Wisp, glow, .51f * flare, Depth(turn), turn, light: i % 2 == 0);
-            frame.Sprite(star, 23 * (1 - t * .27f), 29, Shape.Flash, i == 0 ? Ice : glow,
-                .92f * flare, Depth(turn), turn);
-            frame.Sprite(star, 11, 11, Shape.Flash, White, .94f, Layer.EmissiveCore, -turn);
+            float t = Math.Clamp(progress * tuning.T - i * tuning.T2, 0, 1);
+            float turn = progress * tuning.Turn + i * tuning.Turn2;
+            Vector2 star = feet + Ellipse(turn, tuning.EllipseX + i * tuning.EllipseX2, tuning.EllipseY) - Vector2.UnitY * (tuning.Star + lift + i * tuning.Star2);
+            frame.Sprite(star, tuning.WispWidth2 + i * tuning.WispWidth3, tuning.WispHeight2, tuning.WispShape2, i % 2 == 0 ? dusk : Teal, tuning.WispAlpha2, Depth(turn));
+            float flare = tuning.Flare + tuning.Flare2 * MathF.Pow(MathF.Sin(progress * MathF.Tau * tuning.Flare3 + i), tuning.Flare4);
+            frame.Sprite(star, tuning.WispWidth4, tuning.WispHeight3, tuning.WispShape3, glow, tuning.WispAlpha3 * flare, Depth(turn), turn, light: i % 2 == 0);
+            frame.Sprite(star, tuning.FlashWidth2 * (1 - t * tuning.FlashWidth3), tuning.FlashHeight2, tuning.FlashShape2, i == 0 ? Ice : glow,
+                tuning.FlashAlpha2 * flare, Depth(turn), turn);
+            frame.Sprite(star, tuning.FlashWidth4, tuning.FlashHeight3, tuning.FlashShape3, White, tuning.FlashAlpha3, tuning.FlashLayer2, -turn);
         }
-        frame.Sparks(feet - Vector2.UnitY * (20 + lift), 20, 43, 22, progress, deva ? Gold : Mint, 27,
-            deva ? Shape.Feather : Shape.Spark);
-        for (int i = 0; i < 10; i++)
+        frame.Sparks(feet - Vector2.UnitY * (tuning.FeatherOffset + lift), tuning.FeatherCount, tuning.FeatherRx, tuning.FeatherRy, progress, deva ? Gold : Mint, tuning.FeatherRise,
+            deva ? tuning.FeatherShape : tuning.FeatherShape2);
+        for (int i = 0; i < tuning.FlashCount; i++)
         {
-            float age = Fract(progress * 1.2f + frame.Unit(i + 173));
-            float turn = i * 2.39996f + progress * 5;
-            Vector2 point = feet + Ellipse(turn, 23 + 13 * age, 12 + 7 * age) -
-                Vector2.UnitY * (age * (34 + lift) + 9);
-            frame.Sprite(point, 3 + frame.Unit(i + 31) * 6, 7 + age * 9,
-                i % 4 == 0 ? Shape.Flash : Shape.Spark, i % 3 == 0 ? Ice : glow,
-                .85f * (1 - age), Layer.EmissiveCore, turn, light: i == 0);
+            float age = Fract(progress * tuning.Age + frame.Unit(i + 173));
+            float turn = i * tuning.Turn3 + progress * tuning.Turn4;
+            Vector2 point = feet + Ellipse(turn, tuning.EllipseX3 + tuning.EllipseX4 * age, tuning.EllipseY2 + tuning.EllipseY3 * age) -
+                Vector2.UnitY * (age * (tuning.Point + lift) + tuning.Point2);
+            frame.Sprite(point, tuning.FlashWidth5 + frame.Unit(i + 31) * tuning.FlashWidth6, tuning.FlashHeight4 + age * tuning.FlashHeight5,
+                i % 4 == 0 ? tuning.FlashShape4 : tuning.FlashShape5, i % 3 == 0 ? Ice : glow,
+                tuning.FlashAlpha4 * (1 - age), tuning.FlashLayer3, turn, light: i == 0);
         }
     }
 
     private static void Veil(Frame frame, Vector2 feet, float progress, float time, bool mass)
     {
-        float width = mass ? 1.65f : 1;
-        int puffs = mass ? 11 : 7;
+        var tuning = SpellVfxAssets.Current.Taoist.Veil;
+        float width = mass ? tuning.Width : 1;
+        int puffs = mass ? tuning.Puffs : tuning.Puffs2;
         for (int i = 0; i < puffs; i++)
         {
-            float age = (progress + .095f - frame.Unit(i + 71) * .21f) / (.48f + frame.Unit(i + 13) * .18f);
-            float hit = Ease((age - .78f) / .62f);
-            float opacity = Ease(age * 4.1f) * (1 - Ease((age - 1.05f) / .60f));
+            float age = (progress + tuning.Age - frame.Unit(i + 71) * tuning.Age2) / (tuning.Age3 + frame.Unit(i + 13) * tuning.Age4);
+            float hit = Ease((age - tuning.Hit) / tuning.HitDivisor);
+            float opacity = Ease(age * tuning.Opacity) * (1 - Ease((age - tuning.Opacity2) / tuning.OpacityDivisor));
             if (opacity < .02f) continue;
-            float turn = i * 2.39996f + .71f * progress;
-            Vector2 basePoint = feet + ProjectGround(Ellipse(turn, 48, 42)) * (width * (.23f + .86f * hit));
-            float lift = (57 + frame.Unit(i) * 56) * (1 - Ease(age)) + 4;
-            Vector2 point = basePoint - Vector2.UnitY * lift + new Vector2(MathF.Sin(age * 4 + i) * (7 + 10 * hit), 0);
-            Layer layer = hit > .70f ? Layer.Floor : MathF.Sin(turn) < 0 ? Layer.Ground : Layer.Smoke;
-            float tilt = MathF.Cos(turn) * (.36f - .19f * hit);
-            int tint = i % 3 == 0 ? 0xe5ecdf : i % 3 == 1 ? 0x9faebb : 0x838396;
-            frame.Clip(point, (31 + frame.Unit(i + 28) * 24 + hit * 46) * width, 29 + frame.Unit(i + 4) * 24 - hit * 18,
-                Shape.SmokeSequence, time * .68f + i * .17f, tint, .89f * opacity, layer, tilt, sortY: basePoint.Y);
-            frame.Clip(point + new Vector2(tilt * 22, -9 * (1 - hit)), 31 + hit * 33, 24 - hit * 12,
-                Shape.SmokeSequence, time * .93f + i * .28f, 0xd3d9d5, .56f * opacity, layer, -tilt, sortY: basePoint.Y);
+            float turn = i * tuning.Turn + tuning.Turn2 * progress;
+            Vector2 basePoint = feet + ProjectGround(Ellipse(turn, tuning.EllipseX, tuning.EllipseY)) * (width * (tuning.BasePoint + tuning.BasePoint2 * hit));
+            float lift = (tuning.Lift + frame.Unit(i) * tuning.Lift2) * (1 - Ease(age)) + tuning.Lift3;
+            Vector2 point = basePoint - Vector2.UnitY * lift + new Vector2(MathF.Sin(age * tuning.Point + i) * (tuning.X + tuning.X2 * hit), 0);
+            Layer layer = hit > .70f ? tuning.Layer : MathF.Sin(turn) < 0 ? tuning.Layer2 : tuning.Layer3;
+            float tilt = MathF.Cos(turn) * (tuning.Tilt - tuning.Tilt2 * hit);
+            int tint = i % 3 == 0 ? tuning.TintColour : i % 3 == 1 ? tuning.TintColour2 : tuning.TintColour3;
+            frame.Clip(point, (tuning.SmokeSequenceWidth + frame.Unit(i + 28) * tuning.SmokeSequenceWidth2 + hit * tuning.SmokeSequenceWidth3) * width, tuning.SmokeSequenceHeight + frame.Unit(i + 4) * tuning.SmokeSequenceHeight2 - hit * tuning.SmokeSequenceHeight3,
+                tuning.SmokeSequenceShape, time * tuning.SmokeSequencePhase + i * tuning.SmokeSequencePhase2, tint, tuning.SmokeSequenceAlpha * opacity, layer, tilt, sortY: basePoint.Y);
+            frame.Clip(point + new Vector2(tilt * tuning.X3, tuning.Y * (1 - hit)), tuning.SmokeSequenceWidth4 + hit * tuning.SmokeSequenceWidth5, tuning.SmokeSequenceHeight4 - hit * tuning.SmokeSequenceHeight5,
+                tuning.SmokeSequenceShape2, time * tuning.SmokeSequencePhase3 + i * tuning.SmokeSequencePhase4, tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha2 * opacity, layer, -tilt, sortY: basePoint.Y);
             if (i % 3 == 0)
-                frame.Sprite(point, 21 + 9 * hit, 30 - hit * 16, Shape.Wisp, 0xbcced6,
-                    .63f * opacity * (1 - hit * .67f), layer == Layer.Smoke ? Layer.Glow : layer, tilt,
-                    light: true, sortY: basePoint.Y);
+                frame.Sprite(point, tuning.WispWidth + tuning.WispWidth2 * hit, tuning.WispHeight - hit * tuning.WispHeight2, tuning.WispShape, tuning.WispColour,
+                    tuning.WispAlpha * opacity * (1 - hit * tuning.WispAlpha2), layer == Layer.Smoke ? tuning.WispLayer : layer, tilt,
+                    light: tuning.WispLight, sortY: basePoint.Y);
         }
         // On reaching the ground the concealment breaks into loose floor-hugging
         // fragments instead of finishing as a spherical cloud.
-        float ground = Ease((progress - .29f) / .44f);
-        float dustFade = 1 - .77f * Ease((progress - .70f) / .30f);
-        for (int i = 0; i < (mass ? 11 : 8); i++)
+        float ground = Ease((progress - tuning.Ground) / tuning.GroundDivisor);
+        float dustFade = 1 - tuning.DustFade * Ease((progress - tuning.DustFade2) / tuning.DustFadeDivisor);
+        for (int i = 0; i < (mass ? tuning.WispCount : tuning.WispCount2); i++)
         {
-            float turn = i * 2.39996f + frame.Unit(i + 205) * .55f;
-            float age = Fract(progress * .91f + frame.Unit(i + 113));
-            Vector2 point = feet + ProjectGround(Ellipse(turn, (18 + i * 3.2f) * width * ground,
-                (14 + i * 2.8f) * width * ground));
-            frame.Sprite(point, (24 + age * 23) * width, 8 + age * 7, Shape.Wisp,
-                i % 3 == 0 ? 0xd8ddd9 : 0x879caa, .36f * ground * dustFade * (1 - age * .45f),
-                Layer.Floor, turn * .23f);
+            float turn = i * tuning.Turn3 + frame.Unit(i + 205) * tuning.Turn4;
+            float age = Fract(progress * tuning.Age5 + frame.Unit(i + 113));
+            Vector2 point = feet + ProjectGround(Ellipse(turn, (tuning.EllipseX2 + i * tuning.EllipseX3) * width * ground,
+                (tuning.EllipseY2 + i * tuning.EllipseY3) * width * ground));
+            frame.Sprite(point, (tuning.WispWidth3 + age * tuning.WispWidth4) * width, tuning.WispHeight3 + age * tuning.WispHeight4, tuning.WispShape2,
+                i % 3 == 0 ? tuning.WispColour2 : tuning.WispColour3, tuning.WispAlpha3 * ground * dustFade * (1 - age * tuning.WispAlpha4),
+                tuning.WispLayer2, turn * tuning.WispRotation);
             if (i % 3 == 0)
-                frame.Sprite(point - Vector2.UnitY * (2 + age * 5), 4 + age * 4, 6,
-                    Shape.Spark, 0xe5e9e6, .47f * dustFade * ground, Layer.Emissive);
+                frame.Sprite(point - Vector2.UnitY * (tuning.SparkOffset + age * tuning.SparkOffset2), tuning.SparkWidth + age * tuning.SparkWidth2, tuning.SparkHeight,
+                    tuning.SparkShape, tuning.SparkColour, tuning.SparkAlpha * dustFade * ground, tuning.SparkLayer);
         }
     }
 
     private static void BurningWard(Frame frame, Vector2 feet, float progress, Shape glyph)
     {
+        var tuning = SpellVfxAssets.Current.Taoist.BurningWard;
         bool armour = glyph == Shape.ArmourGlyph;
-        float width = armour ? 295 : 327, height = armour ? 219 : 255;
+        float width = armour ? tuning.ArmourWidth : tuning.SoulShieldWidth, height = armour ? tuning.ArmourHeight : tuning.SoulShieldHeight;
         var flame = armour ? ArmourFlame : SoulFlame;
-        int glow = armour ? 0xe45717 : 0x367de4;
-        Vector2 centre = feet + (armour ? new Vector2(7, -11) : new Vector2(0, -28));
-        Vector2 scale = new(width * .5f, height * .5f);
-        float front = armour ? .16f + progress * 1.88f : .25f + progress * 1.65f;
-        float formed = Ease((front - .86f) / .15f);
-        float settling = Ease((progress - .59f) / .40f);
+        int glow = armour ? tuning.ArmourGlowColour : tuning.SoulShieldGlowColour;
+        Vector2 centre = feet + (armour ? new Vector2(tuning.X, tuning.Y) : new Vector2(0, tuning.Y2));
+        Vector2 scale = new(width * tuning.Scale, height * tuning.Scale2);
+        float front = armour ? tuning.Front + progress * tuning.Front2 : tuning.Front3 + progress * tuning.Front4;
+        float formed = Ease((front - tuning.Formed) / tuning.FormedDivisor);
+        float settling = Ease((progress - tuning.Settling) / tuning.SettlingDivisor);
         // The rune forms behind its fire, then burns away while the remaining
         // smoke continues rising off the same fixed brush-stroke positions.
-        float dissipation = 1 - Ease((progress - .66f) / .29f);
-        frame.Sprite(centre, width * 1.025f, height * 1.03f, glyph, armour ? 0xdd591f : 0x4c89ef,
-            formed * dissipation * .65f, Layer.Glow);
-        frame.Sprite(centre, width, height, glyph, armour ? 0xf97026 : 0x4ea9ff,
-            formed * dissipation * (.56f + .36f * settling));
-        frame.Sprite(centre, width, height, glyph, armour ? 0xff982f : 0xa9e2ff,
-            formed * dissipation * (.33f + .30f * settling), Layer.EmissiveCore);
+        float dissipation = 1 - Ease((progress - tuning.DissipationStart) / tuning.DissipationDuration);
+        frame.Sprite(centre, width * tuning.SpriteWidth, height * tuning.SpriteHeight, glyph, armour ? tuning.ArmourSpriteColour : tuning.SoulShieldSpriteColour,
+            formed * dissipation * tuning.SpriteAlpha, tuning.SpriteLayer);
+        frame.Sprite(centre, width, height, glyph, armour ? tuning.ArmourSpriteColour2 : tuning.SoulShieldSpriteColour2,
+            formed * dissipation * (tuning.SpriteAlpha2 + tuning.SpriteAlpha3 * settling));
+        frame.Sprite(centre, width, height, glyph, armour ? tuning.ArmourSpriteColour3 : tuning.SoulShieldSpriteColour3,
+            formed * dissipation * (tuning.SpriteAlpha4 + tuning.SpriteAlpha5 * settling), tuning.SpriteLayer2);
         if (armour)
         {
-            float spark = 1 - Ease(progress / .27f);
-            Vector2 source = feet - Vector2.UnitY * (87 + 34 * progress);
-            frame.Sprite(source, 46, 52, Shape.Wisp, 0xf57b29, .92f * spark, Layer.Glow);
-            frame.Sprite(source, 27, 39, Shape.UserFlame, Amber, .93f * spark, Layer.EmissiveCore, light: true);
-            frame.Sprite(source, 20, 26, Shape.Flash, Ivory, .98f * spark, Layer.EmissiveCore);
+            float spark = 1 - Ease(progress / tuning.SparkDivisor);
+            Vector2 source = feet - Vector2.UnitY * (tuning.Source + tuning.Source2 * progress);
+            frame.Sprite(source, tuning.WispWidth, tuning.WispHeight, tuning.WispShape, tuning.WispColour, tuning.WispAlpha * spark, tuning.WispLayer);
+            frame.Sprite(source, tuning.UserFlameWidth, tuning.UserFlameHeight, tuning.UserFlameShape, Amber, tuning.UserFlameAlpha * spark, tuning.UserFlameLayer, light: tuning.UserFlameLight);
+            frame.Sprite(source, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, Ivory, tuning.FlashAlpha * spark, tuning.FlashLayer);
         }
 
         for (int stroke = 0; stroke < TaoistRuneBrush.StrokeCount(glyph); stroke++)
         {
             ReadOnlySpan<Vector3> points = TaoistRuneBrush.Stroke(glyph, stroke);
-            for (int i = 0; i < points.Length; i += 2)
+            for (int i = 0; i < points.Length; i += tuning.BrushKnotStride)
             {
                 Vector3 knot = points[i];
-                int salt = stroke * 109 + i * 17;
-                float ignition = .5f + .23f * knot.X + .28f * knot.Y + .025f * frame.Unit(salt);
+                int salt = stroke * tuning.StrokeSeedStride + i * tuning.KnotSeedStride;
+                float ignition = tuning.Ignition + tuning.Ignition2 * knot.X + tuning.Ignition3 * knot.Y + tuning.Ignition4 * frame.Unit(salt);
                 if (front < ignition) continue;
                 Vector2 root = centre + new Vector2(knot.X, knot.Y) * scale;
-                float age = Fract(progress * (2.1f + frame.Unit(salt + 3)) + frame.Unit(salt + 17));
-                float press = Math.Clamp(knot.Z / 5, 0, armour ? 1.35f : 1);
-                float size = 9 + (armour ? 25 : 20) * press;
-                float lift = (17 + (armour ? 43 : 38) * press) * (1 - settling * .55f);
-                float rise = (8 + (armour ? 38 : 34) * press) * age;
-                float tilt = .23f * MathF.Sin(age * MathF.Tau + salt);
-                float alpha = (.69f + .31f * MathF.Sin(age * MathF.PI)) *
-                    (1 - settling * (armour ? .81f : .61f)) * (.48f + .52f * dissipation);
-                frame.Clip(root - Vector2.UnitY * (lift * .23f + rise * .25f), size, lift, Shape.FlameSequence, age,
-                    flame.Sample(.33f + age * .50f), .85f * alpha, Layer.Emissive, tilt);
-                frame.Sprite(root - Vector2.UnitY * (lift * .12f + rise * .62f), size * .8f, lift * .91f, Shape.UserFlame,
-                    flame.Sample(age * .55f), alpha, Layer.EmissiveCore, -tilt, light: i % 6 == 0);
-                frame.Sprite(root - Vector2.UnitY * (lift * .30f + rise), size * .56f, lift, Shape.FlameTongue,
-                    flame.Sample(age * .48f), .74f * alpha, Layer.EmissiveCore, tilt);
+                float age = Fract(progress * (tuning.Age + frame.Unit(salt + 3)) + frame.Unit(salt + 17));
+                float press = Math.Clamp(knot.Z / tuning.PressDivisor, 0, armour ? 1.35f : 1);
+                float size = tuning.Size + (armour ? tuning.ArmourSize : tuning.SoulShieldSize) * press;
+                float lift = (tuning.Lift + (armour ? tuning.ArmourLift : tuning.SoulShieldLift) * press) * (1 - settling * tuning.Lift2);
+                float rise = (tuning.Rise + (armour ? tuning.ArmourRise : tuning.SoulShieldRise) * press) * age;
+                float tilt = tuning.Tilt * MathF.Sin(age * MathF.Tau + salt);
+                float alpha = (tuning.Alpha + tuning.Alpha2 * MathF.Sin(age * MathF.PI)) *
+                    (1 - settling * (armour ? tuning.ArmourAlpha : tuning.SoulShieldAlpha)) * (tuning.Alpha3 + tuning.Alpha4 * dissipation);
+                frame.Clip(root - Vector2.UnitY * (lift * tuning.FlameSequenceOffset + rise * tuning.FlameSequenceOffset2), size, lift, tuning.FlameSequenceShape, age,
+                    flame.Sample(tuning.Offset + age * tuning.Offset2), tuning.FlameSequenceAlpha * alpha, tuning.FlameSequenceLayer, tilt);
+                frame.Sprite(root - Vector2.UnitY * (lift * tuning.UserFlameOffset + rise * tuning.UserFlameOffset2), size * tuning.UserFlameWidth2, lift * tuning.UserFlameHeight2, tuning.UserFlameShape2,
+                    flame.Sample(age * tuning.Offset3), alpha, tuning.UserFlameLayer2, -tilt, light: i % 6 == 0);
+                frame.Sprite(root - Vector2.UnitY * (lift * tuning.FlameTongueOffset + rise), size * tuning.FlameTongueWidth, lift, tuning.FlameTongueShape,
+                    flame.Sample(age * tuning.Offset4), tuning.FlameTongueAlpha * alpha, tuning.FlameTongueLayer, tilt);
                 if (armour && i % 4 == 0)
-                    frame.Clip(root + new Vector2(tilt * 21, -lift * .34f), size * 1.18f, lift * 1.19f,
-                        Shape.FlameSequence, age + .36f, flame.Sample(age * .29f), .90f * alpha, Layer.EmissiveCore, tilt);
+                    frame.Clip(root + new Vector2(tilt * tuning.X2, -lift * tuning.Y3), size * tuning.FlameSequenceWidth, lift * tuning.FlameSequenceHeight,
+                        tuning.FlameSequenceShape2, age + tuning.FlameSequencePhase, flame.Sample(age * tuning.Offset5), tuning.FlameSequenceAlpha2 * alpha, tuning.FlameSequenceLayer2, tilt);
                 if (i % 4 == 0)
                 {
                     // Thin, independently phased smoke plumes peel upwards and
                     // drift sideways. Keep these attached to actual glyph knots,
                     // rather than introducing a backdrop billboard or ellipse.
-                    float release = Ease((progress - .31f) / .48f);
+                    float release = Ease((progress - tuning.SmokeReleaseStart) / tuning.SmokeReleaseDuration);
                     if (release > .014f)
                     {
-                        float smokeAge = Fract(progress * (1.13f + frame.Unit(salt + 75) * .45f) +
+                        float smokeAge = Fract(progress * (tuning.SmokeAge + frame.Unit(salt + 75) * tuning.SmokeAge2) +
                             frame.Unit(salt + 76));
-                        float sideways = (frame.Unit(salt + 78) * 2 - 1) * (6 + 13 * smokeAge);
-                        Vector2 plume = root + new Vector2(sideways, -9 - (25 + 20 * press) * smokeAge);
-                        float opacity = (.17f + .45f * release) * (1 - .62f * smokeAge) *
-                            (.7f + .3f * settling);
-                        frame.Clip(plume, 10 + 11 * smokeAge, 19 + 17 * smokeAge, Shape.SmokeSequence,
-                            smokeAge + .12f, armour ? 0x675249 : 0x526875, opacity, Layer.Smoke, tilt * .38f);
+                        float sideways = (frame.Unit(salt + 78) * tuning.Sideways - 1) * (tuning.Sideways2 + tuning.Sideways3 * smokeAge);
+                        Vector2 plume = root + new Vector2(sideways, tuning.SmokeBaseOffsetY - (tuning.SmokeBaseRise + tuning.SmokePressureRise * press) * smokeAge);
+                        float opacity = (tuning.SmokeBaseOpacity + tuning.SmokeReleaseOpacity * release) * (1 - tuning.SmokeAgeFade * smokeAge) *
+                            (tuning.SmokeEarlyOpacity + tuning.SmokeSettlingOpacity * settling);
+                        frame.Clip(plume, tuning.SmokeSequenceWidth + tuning.SmokeSequenceWidth2 * smokeAge, tuning.SmokeSequenceHeight + tuning.SmokeSequenceHeight2 * smokeAge, tuning.SmokeSequenceShape,
+                            smokeAge + tuning.SmokeSequencePhase, armour ? tuning.ArmourSmokeSequenceColour : tuning.SoulShieldSmokeSequenceColour, opacity, tuning.SmokeSequenceLayer, tilt * tuning.SmokeSequenceRotation);
                     }
-                    frame.Sprite(root, Math.Min(65, size * (armour ? 1.8f : 1.33f)), lift * .69f,
-                        Shape.Wisp, glow, .65f * alpha, Layer.Glow);
-                    frame.Sprite(root - Vector2.UnitY * (6 + lift * age), 4, 7, Shape.UserEmber,
-                        flame.Sample(age), .76f * alpha, Layer.EmissiveCore, tilt);
+                    frame.Sprite(root, Math.Min(tuning.KnotGlowMaxWidth, size * (armour ? tuning.ArmourKnotGlowWidthScale : tuning.SoulShieldKnotGlowWidthScale)), lift * tuning.WispHeight2,
+                        tuning.WispShape2, glow, tuning.WispAlpha2 * alpha, tuning.WispLayer2);
+                    frame.Sprite(root - Vector2.UnitY * (tuning.UserEmberOffset + lift * age), tuning.UserEmberWidth, tuning.UserEmberHeight, tuning.UserEmberShape,
+                        flame.Sample(age), tuning.UserEmberAlpha * alpha, tuning.UserEmberLayer, tilt);
                     if (i % 8 == 0)
-                        frame.Sprite(root, size * .69f, lift * .58f, Shape.Flash, armour ? Gold : Ice, .39f * alpha, Layer.EmissiveCore);
+                        frame.Sprite(root, size * tuning.FlashWidth2, lift * tuning.FlashHeight2, tuning.FlashShape2, armour ? Gold : Ice, tuning.FlashAlpha2 * alpha, tuning.FlashLayer2);
                 }
             }
         }
@@ -262,181 +261,187 @@ internal static partial class TaoistSpellEffects
 
     private static void CurseRune(Frame frame, Vector2 feet, float progress)
     {
-        const float width = 299, height = 221;
-        Vector2 centre = feet - Vector2.UnitY * 15;
-        Vector2 scale = new(width * .5f, height * .5f);
-        float surge = Ease((progress - .12f) / .30f) * (1 - Ease((progress - .58f) / .24f));
-        float breaking = Ease((progress - .63f) / .32f);
+        var tuning = SpellVfxAssets.Current.Taoist.CurseRune;
+        float width = tuning.Width, height = tuning.Height;
+        Vector2 centre = feet - Vector2.UnitY * tuning.Centre;
+        Vector2 scale = new(width * tuning.Scale, height * tuning.Scale2);
+        float surge = Ease((progress - tuning.Surge) / tuning.SurgeDivisor) * (1 - Ease((progress - tuning.Surge2) / tuning.SurgeDivisor2));
+        float breaking = Ease((progress - tuning.Breaking) / tuning.BreakingDivisor);
         float visible = 1 - breaking;
-        frame.Sprite(centre, width * 1.04f, height * 1.06f, Shape.CurseGlyph, 0x82b48d,
-            visible * (.61f + .30f * surge), Layer.Glow);
-        frame.Sprite(centre, width, height, Shape.CurseGlyph, 0x93b99b,
-            visible * (.53f + .39f * surge), Layer.Emissive, light: true);
-        frame.Sprite(centre, width, height, Shape.CurseGlyph, 0xe5ffea,
-            visible * (.24f + .71f * surge), Layer.EmissiveCore);
+        frame.Sprite(centre, width * tuning.CurseGlyphWidth, height * tuning.CurseGlyphHeight, tuning.CurseGlyphShape, tuning.CurseGlyphColour,
+            visible * (tuning.CurseGlyphAlpha + tuning.CurseGlyphAlpha2 * surge), tuning.CurseGlyphLayer);
+        frame.Sprite(centre, width, height, tuning.CurseGlyphShape2, tuning.CurseGlyphColour2,
+            visible * (tuning.CurseGlyphAlpha3 + tuning.CurseGlyphAlpha4 * surge), tuning.CurseGlyphLayer2, light: tuning.CurseGlyphLight);
+        frame.Sprite(centre, width, height, tuning.CurseGlyphShape3, tuning.CurseGlyphColour3,
+            visible * (tuning.CurseGlyphAlpha5 + tuning.CurseGlyphAlpha6 * surge), tuning.CurseGlyphLayer3);
 
-        for (int stroke = 0; stroke < TaoistRuneBrush.StrokeCount(Shape.CurseGlyph); stroke++)
+        for (int stroke = 0; stroke < TaoistRuneBrush.StrokeCount(tuning.BrushShape); stroke++)
         {
-            ReadOnlySpan<Vector3> points = TaoistRuneBrush.Stroke(Shape.CurseGlyph, stroke);
-            for (int i = 0; i < points.Length; i += 3)
+            ReadOnlySpan<Vector3> points = TaoistRuneBrush.Stroke(tuning.BrushShape, stroke);
+            for (int i = 0; i < points.Length; i += tuning.BrushKnotStride)
             {
                 Vector3 knot = points[i];
                 int seed = 97 * stroke + i * 23;
                 Vector2 root = centre + new Vector2(knot.X, knot.Y) * scale;
-                float flicker = .64f + .36f * MathF.Sin(progress * 18 + frame.Unit(seed) * MathF.Tau);
-                float pressure = Math.Clamp(knot.Z / 5, 0, 1);
-                float flare = visible * flicker * (.34f + .66f * surge);
-                frame.Sprite(root, 21 + 24 * pressure, 23 + 19 * pressure, Shape.Wisp, 0x7ab592,
-                    .87f * flare, Layer.Glow, light: i % 6 == 0);
-                frame.Sprite(root + Ellipse(frame.Unit(seed + 12) * MathF.Tau, 11, 9),
-                    4 + 8 * pressure, 7 + 8 * pressure, Shape.Flash, i % 2 == 0 ? 0xe7fff1 : Mint,
-                    .76f * flare, Layer.EmissiveCore, seed);
+                float flicker = tuning.Flicker + tuning.Flicker2 * MathF.Sin(progress * tuning.Flicker3 + frame.Unit(seed) * MathF.Tau);
+                float pressure = Math.Clamp(knot.Z / tuning.PressureDivisor, 0, 1);
+                float flare = visible * flicker * (tuning.Flare + tuning.Flare2 * surge);
+                frame.Sprite(root, tuning.WispWidth + tuning.WispWidth2 * pressure, tuning.WispHeight + tuning.WispHeight2 * pressure, tuning.WispShape, tuning.WispColour,
+                    tuning.WispAlpha * flare, tuning.WispLayer, light: i % 6 == 0);
+                frame.Sprite(root + Ellipse(frame.Unit(seed + 12) * MathF.Tau, tuning.EllipseX, tuning.EllipseY),
+                    tuning.FlashWidth + tuning.FlashWidth2 * pressure, tuning.FlashHeight + tuning.FlashHeight2 * pressure, tuning.FlashShape, i % 2 == 0 ? tuning.FlashColour : Mint,
+                    tuning.FlashAlpha * flare, tuning.FlashLayer, seed);
 
                 if (i % 6 == 0 && pressure > .40f && surge > .025f)
                 {
-                    frame.Clip(root - Vector2.UnitY * 7, 29, 37, Shape.SmokeSequence,
-                        frame.Unit(seed + 18) + progress * .58f, 0x738c7c, .49f * flare, Layer.Smoke);
-                    Vector2 ray = Vector2.Normalize(new Vector2(knot.X * (.30f + frame.Unit(seed + 28) * .50f), -1));
-                    float length = (93 + 88 * frame.Unit(seed + 29)) * (.56f + .44f * surge);
+                    frame.Clip(root - Vector2.UnitY * tuning.SmokeSequenceOffset, tuning.SmokeSequenceWidth, tuning.SmokeSequenceHeight, tuning.SmokeSequenceShape,
+                        frame.Unit(seed + 18) + progress * tuning.SmokeSequencePhase, tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha * flare, tuning.SmokeSequenceLayer);
+                    Vector2 ray = Vector2.Normalize(new Vector2(knot.X * (tuning.X + frame.Unit(seed + 28) * tuning.X2), -1));
+                    float length = (tuning.Length + tuning.Length2 * frame.Unit(seed + 29)) * (tuning.Length3 + tuning.Length4 * surge);
                     float angle = MathF.Atan2(ray.Y, ray.X);
-                    frame.Sprite(root + ray * length * .42f, 22 + 24 * pressure, length, Shape.Pillar,
-                        0xa0caa7, .67f * flare * surge, Layer.Glow, angle + MathF.PI * .5f);
-                    frame.Sprite(root + ray * length * .42f, length, 13 + 16 * pressure, Shape.MistFilament, 0x91c9a2,
-                        .70f * flare * surge, Layer.Glow, angle);
-                    frame.Sprite(root + ray * length * .25f, length * .70f, 5 + 7 * pressure, Shape.MistFilament, 0xdbf7de,
-                        .62f * flare * surge, Layer.EmissiveCore, angle);
+                    frame.Sprite(root + ray * length * tuning.PillarOffset, tuning.PillarWidth + tuning.PillarWidth2 * pressure, length, tuning.PillarShape,
+                        tuning.PillarColour, tuning.PillarAlpha * flare * surge, tuning.PillarLayer, angle + MathF.PI * tuning.PillarRotation);
+                    frame.Sprite(root + ray * length * tuning.MistFilamentOffset, length, tuning.MistFilamentHeight + tuning.MistFilamentHeight2 * pressure, tuning.MistFilamentShape, tuning.MistFilamentColour,
+                        tuning.MistFilamentAlpha * flare * surge, tuning.MistFilamentLayer, angle);
+                    frame.Sprite(root + ray * length * tuning.MistFilamentOffset2, length * tuning.MistFilamentWidth, tuning.MistFilamentHeight3 + tuning.MistFilamentHeight4 * pressure, tuning.MistFilamentShape2, tuning.MistFilamentColour2,
+                        tuning.MistFilamentAlpha2 * flare * surge, tuning.MistFilamentLayer2, angle);
                 }
 
-                float age = Math.Clamp((progress - .57f - frame.Unit(seed + 51) * .22f) * 2.7f, 0, 1);
+                float age = Math.Clamp((progress - tuning.Age - frame.Unit(seed + 51) * tuning.Age2) * tuning.Age3, 0, 1);
                 if (age <= 0) continue;
-                Vector2 fragment = root + Ellipse(frame.Unit(seed + 60) * MathF.Tau, 26, 21) * age;
-                float remnant = Ease(age * 5) * (1 - .69f * Ease((age - .65f) / .35f));
-                frame.Clip(fragment, 11 + 15 * age, 15 + 14 * age, Shape.SmokeSequence, frame.Unit(seed + 62) + age * .69f,
-                    i % 2 == 0 ? 0x99a3b2 : 0x52677b, remnant, Layer.Emissive, age * 1.2f);
-                frame.Sprite(fragment, 9 + 10 * pressure, 7 + 6 * age, Shape.MistFilament, 0x919cad,
-                    .66f * remnant, Layer.Emissive, seed + age * 2);
-                frame.Sprite(fragment, 3 + 4 * pressure, 6, Shape.Spark, 0xa1b8b1,
-                    .61f * remnant * (1 - age), Layer.EmissiveCore);
+                Vector2 fragment = root + Ellipse(frame.Unit(seed + 60) * MathF.Tau, tuning.EllipseX2, tuning.EllipseY2) * age;
+                float remnant = Ease(age * tuning.Remnant) * (1 - tuning.Remnant2 * Ease((age - tuning.Remnant3) / tuning.RemnantDivisor));
+                frame.Clip(fragment, tuning.SmokeSequenceWidth2 + tuning.SmokeSequenceWidth3 * age, tuning.SmokeSequenceHeight2 + tuning.SmokeSequenceHeight3 * age, tuning.SmokeSequenceShape2, frame.Unit(seed + 62) + age * tuning.SmokeSequencePhase2,
+                    i % 2 == 0 ? tuning.SmokeSequenceColour2 : tuning.SmokeSequenceColour3, remnant, tuning.SmokeSequenceLayer2, age * tuning.SmokeSequenceRotation);
+                frame.Sprite(fragment, tuning.MistFilamentWidth2 + tuning.MistFilamentWidth3 * pressure, tuning.MistFilamentHeight5 + tuning.MistFilamentHeight6 * age, tuning.MistFilamentShape3, tuning.MistFilamentColour3,
+                    tuning.MistFilamentAlpha3 * remnant, tuning.MistFilamentLayer3, seed + age * tuning.MistFilamentRotation);
+                frame.Sprite(fragment, tuning.SparkWidth + tuning.SparkWidth2 * pressure, tuning.SparkHeight, tuning.SparkShape, tuning.SparkColour,
+                    tuning.SparkAlpha * remnant * (1 - age), tuning.SparkLayer);
             }
         }
-        Vector2 escape = centre + new Vector2(-82 - 15 * breaking, -52 - 19 * breaking);
-        frame.Sprite(escape, 25, 28, Shape.IonCorona, 0x80c4a5, .79f * breaking, Layer.Emissive, -.15f);
-        frame.Sprite(escape, 34, 36, Shape.Wisp, 0x6fbd9e, .88f * breaking, Layer.Glow, light: true);
-        frame.Sprite(escape, 12, 14, Shape.Flash, Mint, .91f * breaking, Layer.EmissiveCore);
+        Vector2 escape = centre + new Vector2(tuning.X3 - tuning.X4 * breaking, tuning.Y - tuning.Y2 * breaking);
+        frame.Sprite(escape, tuning.IonCoronaWidth, tuning.IonCoronaHeight, tuning.IonCoronaShape, tuning.IonCoronaColour, tuning.IonCoronaAlpha * breaking, tuning.IonCoronaLayer, tuning.IonCoronaRotation);
+        frame.Sprite(escape, tuning.WispWidth3, tuning.WispHeight3, tuning.WispShape2, tuning.WispColour2, tuning.WispAlpha2 * breaking, tuning.WispLayer2, light: tuning.WispLight);
+        frame.Sprite(escape, tuning.FlashWidth3, tuning.FlashHeight3, tuning.FlashShape2, Mint, tuning.FlashAlpha2 * breaking, tuning.FlashLayer2);
     }
 
     private static void Reveal(Frame frame, Vector2 feet, float progress, float time, bool prepare)
     {
-        Vector2 centre = feet - Vector2.UnitY * (53 + MathF.Sin(time * 4) * 5);
-        float growth = .44f + .56f * Ease(progress * 3);
-        int tint = prepare ? Jade : 0x54cbff;
-        frame.Sprite(centre, 80 * growth, 76 * growth, Shape.Orb, Teal, .76f, light: true);
-        frame.Sprite(centre, 50 * growth, 44 * growth, Shape.Orb, tint, .92f);
-        frame.Sprite(centre + new Vector2(0, 3), 62 * growth, 30 * growth, Shape.SigilEye,
-            prepare && progress > .58f ? Ice : Gold, .91f, Layer.Emissive, .08f * MathF.Sin(time * 8));
-        frame.Sprite(centre - new Vector2(5, 6), 19 * growth, 18 * growth, Shape.Flash, White, .91f, Layer.EmissiveCore);
-        for (int i = 0; i < 8; i++)
+        var tuning = SpellVfxAssets.Current.Taoist.Reveal;
+        Vector2 centre = feet - Vector2.UnitY * (tuning.Centre + MathF.Sin(time * tuning.Centre2) * tuning.Centre3);
+        float growth = tuning.Growth + tuning.Growth2 * Ease(progress * tuning.Growth3);
+        int tint = prepare ? Jade : tuning.ReleaseTintColour;
+        frame.Sprite(centre, tuning.OrbWidth * growth, tuning.OrbHeight * growth, tuning.OrbShape, Teal, tuning.OrbAlpha, light: tuning.OrbLight);
+        frame.Sprite(centre, tuning.OrbWidth2 * growth, tuning.OrbHeight2 * growth, tuning.OrbShape2, tint, tuning.OrbAlpha2);
+        frame.Sprite(centre + new Vector2(0, tuning.Y), tuning.SigilEyeWidth * growth, tuning.SigilEyeHeight * growth, tuning.SigilEyeShape,
+            prepare && progress > .58f ? Ice : Gold, tuning.SigilEyeAlpha, tuning.SigilEyeLayer, tuning.SigilEyeRotation * MathF.Sin(time * tuning.X));
+        frame.Sprite(centre - new Vector2(tuning.X2, tuning.Y2), tuning.FlashWidth * growth, tuning.FlashHeight * growth, tuning.FlashShape, White, tuning.FlashAlpha, tuning.FlashLayer);
+        for (int i = 0; i < tuning.SparkCount; i++)
         {
-            float angle = time * 7 + i * .83f;
-            Vector2 point = centre + Ellipse(angle, 39 * growth, 29 * growth);
-            frame.Thread(point, point + Ellipse(angle + 1.1f, 10, 13), 2.7f, .55f, prepare ? InkBlue : 0xdc6cf4, .84f, Depth(angle));
-            frame.Sprite(point, 6, 9, Shape.Spark, i % 2 == 0 ? Ice : Mint, .81f);
+            float angle = time * tuning.Angle + i * tuning.Angle2;
+            Vector2 point = centre + Ellipse(angle, tuning.EllipseX * growth, tuning.EllipseY * growth);
+            frame.Thread(point, point + Ellipse(angle + tuning.EllipseAngle, tuning.EllipseX2, tuning.EllipseY2), tuning.ThreadStartWidth, tuning.ThreadEndWidth, prepare ? InkBlue : tuning.ReleaseThreadColour, tuning.ThreadAlpha, Depth(angle));
+            frame.Sprite(point, tuning.SparkWidth, tuning.SparkHeight, tuning.SparkShape, i % 2 == 0 ? Ice : Mint, tuning.SparkAlpha);
         }
     }
 
     private static void Repulse(Frame frame, Vector2 feet, float progress)
     {
-        float open = Ease(progress * 1.45f);
-        Vector2 body = feet - Vector2.UnitY * 35;
-        frame.Sprite(feet, 87 + open * 61, 36, Shape.Orb, 0x687f85, .58f, Layer.Ground, light: true);
-        for (int i = 0; i < 3; i++)
+        var tuning = SpellVfxAssets.Current.Taoist.Repulse;
+        float open = Ease(progress * tuning.Open);
+        Vector2 body = feet - Vector2.UnitY * tuning.Body;
+        frame.Sprite(feet, tuning.OrbWidth + open * tuning.OrbWidth2, tuning.OrbHeight, tuning.OrbShape, tuning.OrbColour, tuning.OrbAlpha, tuning.OrbLayer, light: tuning.OrbLight);
+        for (int i = 0; i < tuning.WardBackCount; i++)
         {
-            float wave = Math.Clamp(open * 1.28f - i * .13f, 0, 1);
-            float width = 32 + wave * 122;
-            float height = 51 + wave * 60;
-            frame.Sprite(body, width, height, Shape.WardBack, 0x526976, .43f, Layer.Ground);
-            frame.Sprite(body, width, height, Shape.WardFront, 0xdce5e5, .76f - wave * .23f);
+            float wave = Math.Clamp(open * tuning.Wave - i * tuning.Wave2, 0, 1);
+            float width = tuning.Width + wave * tuning.Width2;
+            float height = tuning.Height + wave * tuning.Height2;
+            frame.Sprite(body, width, height, tuning.WardBackShape, tuning.WardBackColour, tuning.WardBackAlpha, tuning.WardBackLayer);
+            frame.Sprite(body, width, height, tuning.WardFrontShape, tuning.WardFrontColour, tuning.WardFrontAlpha - wave * tuning.WardFrontAlpha2);
         }
-        frame.Sparks(body, 12, 40 + open * 35, 31, progress, Ice, 4);
+        frame.Sparks(body, tuning.SparksCount, tuning.SparksRx + open * tuning.SparksRx2, tuning.SparksRy, progress, Ice, tuning.SparksRise);
     }
 
     private static void Cleanse(Frame frame, Vector2 feet, float progress, bool prepare)
     {
+        var tuning = SpellVfxAssets.Current.Taoist.Cleanse;
         float travel = Ease(progress);
-        Vector2 head = feet - Vector2.UnitY * (prepare ? 20 + travel * 87 : 13 + (1 - travel) * 103);
-        frame.Sprite(feet, 95, 47, Shape.Orb, InkBlue, .55f, Layer.Ground);
-        frame.Sprite(head, 49, 62, Shape.Orb, Blue, .82f, light: true);
-        frame.Sprite(head, 23, 26, Shape.Orb, White, .96f, Layer.EmissiveCore);
-        for (int i = 0; i < 17; i++)
+        Vector2 head = feet - Vector2.UnitY * (prepare ? tuning.Head + travel * tuning.Head2 : tuning.Head3 + (1 - travel) * tuning.Head4);
+        frame.Sprite(feet, tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, InkBlue, tuning.OrbAlpha, tuning.OrbLayer);
+        frame.Sprite(head, tuning.OrbWidth2, tuning.OrbHeight2, tuning.OrbShape2, Blue, tuning.OrbAlpha2, light: tuning.OrbLight);
+        frame.Sprite(head, tuning.OrbWidth3, tuning.OrbHeight3, tuning.OrbShape3, White, tuning.OrbAlpha3, tuning.OrbLayer2);
+        for (int i = 0; i < tuning.ParticleCount; i++)
         {
-            float age = Fract(progress * 1.3f + frame.Unit(i));
-            float offset = (frame.Unit(i + 7) - .5f) * (20 + age * 16);
-            Vector2 point = head + new Vector2(offset, 9 + (prepare ? 1 : -1) * age * 54);
-            frame.Thread(point, point + new Vector2(-offset * .28f, prepare ? 15 : -18), 2.2f, .38f,
-                i % 3 == 0 ? Mint : Blue, .86f - age * .44f);
+            float age = Fract(progress * tuning.Age + frame.Unit(i));
+            float offset = (frame.Unit(i + 7) - tuning.Offset) * (tuning.Offset2 + age * tuning.Offset3);
+            Vector2 point = head + new Vector2(offset, tuning.Y + (prepare ? 1 : -1) * age * tuning.Y2);
+            frame.Thread(point, point + new Vector2(-offset * tuning.X, prepare ? tuning.PrepareY : tuning.ReleaseY), tuning.ThreadStartWidth, tuning.ThreadEndWidth,
+                i % 3 == 0 ? Mint : Blue, tuning.ThreadAlpha - age * tuning.ThreadAlpha2);
         }
-        frame.Sparks(feet - Vector2.UnitY * 7, 10, 40 * travel, 23 * travel, progress, Ice, 28);
+        frame.Sparks(feet - Vector2.UnitY * tuning.SparksOffset, tuning.SparksCount, tuning.SparksRx * travel, tuning.SparksRy * travel, progress, Ice, tuning.SparksRise);
         if (prepare) return;
-        for (int i = 0; i < 7; i++)
+        for (int i = 0; i < tuning.WispCount; i++)
         {
-            float turn = i * MathF.Tau / 7 + progress * 3.2f;
-            Vector2 root = feet + Ellipse(turn, 25, 14);
-            Vector2 top = Vector2.Lerp(root, head, .81f) + Vector2.UnitX * (MathF.Cos(turn) * 12);
-            Vector2 edge = root + new Vector2(MathF.Sin(turn) * 5, -39 - frame.Unit(i) * 21);
-            frame.Thread(root, edge, 3.1f, 1.4f, Blue, .84f, Depth(turn));
-            frame.Thread(edge, top, 1.4f, .37f, Mint, .80f * (1 - progress), Depth(turn));
-            frame.Sprite(edge, 14, 29, Shape.Wisp, Blue, .55f, Depth(turn), turn * .2f);
+            float turn = i * MathF.Tau / tuning.TurnDivisor + progress * tuning.Turn;
+            Vector2 root = feet + Ellipse(turn, tuning.EllipseX, tuning.EllipseY);
+            Vector2 top = Vector2.Lerp(root, head, tuning.Top) + Vector2.UnitX * (MathF.Cos(turn) * tuning.Top2);
+            Vector2 edge = root + new Vector2(MathF.Sin(turn) * tuning.X2, tuning.Y3 - frame.Unit(i) * tuning.Y4);
+            frame.Thread(root, edge, tuning.ThreadStartWidth2, tuning.ThreadEndWidth2, Blue, tuning.ThreadAlpha3, Depth(turn));
+            frame.Thread(edge, top, tuning.ThreadStartWidth3, tuning.ThreadEndWidth3, Mint, tuning.ThreadAlpha4 * (1 - progress), Depth(turn));
+            frame.Sprite(edge, tuning.WispWidth, tuning.WispHeight, tuning.WispShape, Blue, tuning.WispAlpha, Depth(turn), turn * tuning.WispRotation);
         }
     }
 
     private static void MassHeal(Frame frame, Vector2 feet, float progress, bool prepare)
     {
-        float bloom = .44f + .56f * Ease(progress * 2.6f);
-        float radius = (prepare ? 46 : 77) * bloom;
-        Vector2 centre = feet - Vector2.UnitY * (13 + (prepare ? 48 : 15) * Ease(progress));
-        frame.Sprite(feet, radius * 2.45f, radius * 1.44f, Shape.Orb, Teal, .51f, Layer.Ground);
-        frame.Sprite(centre, radius * 2.05f, radius * 1.55f, Shape.Wisp, Jade,
-            .27f * (1 - Ease((progress - .72f) / .28f)), Layer.Glow, light: true);
-        HealMotes(frame, centre, radius * 1.05f, progress, prepare ? 50 : 84);
-        for (int i = 0; i < 4; i++)
+        var tuning = SpellVfxAssets.Current.Taoist.MassHeal;
+        float bloom = tuning.Bloom + tuning.Bloom2 * Ease(progress * tuning.Bloom3);
+        float radius = (prepare ? tuning.PrepareRadius : tuning.ReleaseRadius) * bloom;
+        Vector2 centre = feet - Vector2.UnitY * (tuning.Centre + (prepare ? tuning.PrepareCentre : tuning.ReleaseCentre) * Ease(progress));
+        frame.Sprite(feet, radius * tuning.OrbWidth, radius * tuning.OrbHeight, tuning.OrbShape, Teal, tuning.OrbAlpha, tuning.OrbLayer);
+        frame.Sprite(centre, radius * tuning.WispWidth, radius * tuning.WispHeight, tuning.WispShape, Jade,
+            tuning.WispAlpha * (1 - Ease((progress - tuning.Value) / tuning.ValueDivisor)), tuning.WispLayer, light: tuning.WispLight);
+        HealMotes(frame, centre, radius * tuning.Radius, progress, prepare ? tuning.PrepareCount : tuning.ReleaseCount);
+        for (int i = 0; i < tuning.WispCount; i++)
         {
-            float angle = i * MathF.PI * .5f + progress * 4;
+            float angle = i * MathF.PI * tuning.Angle + progress * tuning.Angle2;
             Vector2 node = centre + Ellipse(angle, radius, radius * GroundAspect);
             Layer depth = Depth(angle);
-            frame.Sprite(node, 43, 38, Shape.Wisp, i % 2 == 0 ? Jade : Gold, .78f, depth, angle, light: true);
-            float flare = .67f + .33f * MathF.Pow(MathF.Sin(progress * MathF.Tau * 2 + i * .7f), 2);
-            frame.Sprite(node, 51, 34, Shape.Wisp, i % 2 == 0 ? 0x44a4a5 : Amber,
-                .52f * flare, depth, angle + MathF.PI * .5f, light: true);
-            frame.Sprite(node, 24, 23, Shape.Flash, Ivory, .98f, depth == Layer.Ground ? depth : Layer.EmissiveCore, angle);
-            for (int j = 0; j < 14; j++)
+            frame.Sprite(node, tuning.WispWidth2, tuning.WispHeight2, tuning.WispShape2, i % 2 == 0 ? Jade : Gold, tuning.WispAlpha2, depth, angle, light: tuning.WispLight2);
+            float flare = tuning.Flare + tuning.Flare2 * MathF.Pow(MathF.Sin(progress * MathF.Tau * tuning.Flare3 + i * tuning.Flare4), tuning.Flare5);
+            frame.Sprite(node, tuning.WispWidth3, tuning.WispHeight3, tuning.WispShape3, i % 2 == 0 ? tuning.WispColour : Amber,
+                tuning.WispAlpha3 * flare, depth, angle + MathF.PI * tuning.WispRotation, light: tuning.WispLight3);
+            frame.Sprite(node, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, Ivory, tuning.FlashAlpha, depth == Layer.Ground ? depth : tuning.FlashLayer, angle);
+            for (int j = 0; j < tuning.SparkCount; j++)
             {
                 int seed = i * 14 + j;
-                float trail = angle - j * .093f;
-                float spread = radius + (frame.Unit(seed + 62) - .5f) * (12 + j * 1.4f);
-                Vector2 point = centre + Ellipse(trail, spread, spread * GroundAspect) - Vector2.UnitY * (frame.Unit(seed) * 19);
-                frame.Sprite(point, 3 + frame.Unit(seed + 45) * 8, 7, Shape.Spark,
-                    j % 3 == 0 ? Ice : j % 4 == 0 ? Gold : Mint, .94f - j * .046f, Depth(trail), trail + j * .7f);
+                float trail = angle - j * tuning.Trail;
+                float spread = radius + (frame.Unit(seed + 62) - tuning.Spread) * (tuning.Spread2 + j * tuning.Spread3);
+                Vector2 point = centre + Ellipse(trail, spread, spread * GroundAspect) - Vector2.UnitY * (frame.Unit(seed) * tuning.Point);
+                frame.Sprite(point, tuning.SparkWidth + frame.Unit(seed + 45) * tuning.SparkWidth2, tuning.SparkHeight, tuning.SparkShape,
+                    j % 3 == 0 ? Ice : j % 4 == 0 ? Gold : Mint, tuning.SparkAlpha - j * tuning.SparkAlpha2, Depth(trail), trail + j * tuning.SparkRotation);
             }
         }
     }
 
     private static void HealMotes(Frame frame, Vector2 centre, float radius, float progress, int count)
     {
+        var tuning = SpellVfxAssets.Current.Taoist.HealMotes;
         for (int i = 0; i < count; i++)
         {
-            float age = Fract(progress * 1.24f + frame.Unit(i + 271));
-            float turn = i * 2.39996f + progress * (3.6f + 2.1f * frame.Unit(i + 71));
-            float spread = radius * (.48f + frame.Unit(i + 113) * .62f + age * .19f);
+            float age = Fract(progress * tuning.Age + frame.Unit(i + 271));
+            float turn = i * tuning.Turn + progress * (tuning.Turn2 + tuning.Turn3 * frame.Unit(i + 71));
+            float spread = radius * (tuning.Spread + frame.Unit(i + 113) * tuning.Spread2 + age * tuning.Spread3);
             Vector2 root = centre + ProjectGround(Ellipse(turn, spread, spread));
-            Vector2 point = root - Vector2.UnitY * (age * (12 + 24 * frame.Unit(i + 31)));
-            float size = 1.6f + 3.7f * frame.Unit(i + 173);
-            float shimmer = MathF.Sin(age * MathF.PI) * (.56f + .44f * MathF.Pow(MathF.Sin(age * 8 + i), 2));
+            Vector2 point = root - Vector2.UnitY * (age * (tuning.Point + tuning.Point2 * frame.Unit(i + 31)));
+            float size = tuning.Size + tuning.Size2 * frame.Unit(i + 173);
+            float shimmer = MathF.Sin(age * MathF.PI) * (tuning.Shimmer + tuning.Shimmer2 * MathF.Pow(MathF.Sin(age * tuning.Shimmer3 + i), tuning.Shimmer4));
             Layer depth = Depth(turn);
             int tint = i % 5 == 0 ? Gold : i % 2 == 0 ? Mint : Ice;
-            frame.Sprite(point, size, size * 1.19f, i % 6 == 0 ? Shape.Flash : Shape.Spark, tint,
-                .98f * shimmer, depth == Layer.Ground ? depth : Layer.EmissiveCore, turn);
+            frame.Sprite(point, size, size * tuning.FlashHeight, i % 6 == 0 ? tuning.FlashShape : tuning.FlashShape2, tint,
+                tuning.FlashAlpha * shimmer, depth == Layer.Ground ? depth : tuning.FlashLayer, turn);
             if (i % 7 == 0)
-                frame.Sprite(point, size * 4.6f, size * 3.5f, Shape.Orb, tint, .44f * shimmer, depth, light: true);
+                frame.Sprite(point, size * tuning.OrbWidth, size * tuning.OrbHeight, tuning.OrbShape, tint, tuning.OrbAlpha * shimmer, depth, light: tuning.OrbLight);
         }
     }
 }

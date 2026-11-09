@@ -9,29 +9,45 @@ namespace Client.MirScenes;
 
 internal static partial class TaoistSpellEffects
 {
-    private const int White = 0xf6fffa, Jade = 0x38e49e, Teal = 0x137a73, Mint = 0xacf9d8;
-    private const int InkBlue = 0x224c9f, Blue = 0x46a9f5, Ice = 0xbceaff, Violet = 0x8177c4;
-    private const int Ochre = 0x8b492b, Amber = 0xf89738, Gold = 0xffd26b, Ivory = 0xfff0be;
+    private static int White => SpellVfxAssets.Current.Taoist.Palette.White;
+    private static int Jade => SpellVfxAssets.Current.Taoist.Palette.Jade;
+    private static int Teal => SpellVfxAssets.Current.Taoist.Palette.Teal;
+    private static int Mint => SpellVfxAssets.Current.Taoist.Palette.Mint;
+    private static int InkBlue => SpellVfxAssets.Current.Taoist.Palette.InkBlue;
+    private static int Blue => SpellVfxAssets.Current.Taoist.Palette.Blue;
+    private static int Ice => SpellVfxAssets.Current.Taoist.Palette.Ice;
+    private static int Violet => SpellVfxAssets.Current.Taoist.Palette.Violet;
+    private static int Ochre => SpellVfxAssets.Current.Taoist.Palette.Ochre;
+    private static int Amber => SpellVfxAssets.Current.Taoist.Palette.Amber;
+    private static int Gold => SpellVfxAssets.Current.Taoist.Palette.Gold;
+    private static int Ivory => SpellVfxAssets.Current.Taoist.Palette.Ivory;
 
     internal static bool HasArt(Spell spell) => SpellCurriculum.Owns(MirClass.Taoist, spell);
 
-    internal static int PacketDuration(SpellVisual visual) => visual.Spell switch
+    internal static int PacketDuration(SpellVisual visual)
     {
-        Spell.SoulFireBall => 600,
-        Spell.Healing or Spell.Purification or Spell.MassHiding => 800,
-        Spell.SoulShield or Spell.BlessedArmour => 1600,
-        Spell.HealingCircle or Spell.Plague => 1200,
-        Spell.Curse or Spell.Reincarnation => 2000,
-        Spell.EnergyShield => visual.Phase == SpellVisualPhase.Aura ? 800 : 900,
-        Spell.PetEnhancer => visual.Phase == SpellVisualPhase.Aura ? 1200 : 800,
-        Spell.Revelation when visual.Phase == SpellVisualPhase.Prepare => 1200,
-        _ => 1000
-    };
+        using var vfxScope = SpellVfxAssets.For(visual.Spell);
+        var tuning = SpellVfxAssets.Current.Taoist.PacketDuration;
+        return visual.Spell switch
+        {
+            Spell.SoulFireBall => tuning.SoulFireBallDurationMs,
+            Spell.Healing or Spell.Purification or Spell.MassHiding => tuning.HealingDurationMs,
+            Spell.SoulShield or Spell.BlessedArmour => tuning.SoulShieldDurationMs,
+            Spell.HealingCircle or Spell.Plague => tuning.HealingCircleDurationMs,
+            Spell.Curse or Spell.Reincarnation => tuning.CurseDurationMs,
+            Spell.EnergyShield => visual.Phase == SpellVisualPhase.Aura ? tuning.EnergyShieldAuraDurationMs : tuning.EnergyShieldImpactDurationMs,
+            Spell.PetEnhancer => visual.Phase == SpellVisualPhase.Aura ? tuning.PetEnhancerAuraDurationMs : tuning.PetEnhancerImpactDurationMs,
+            Spell.Revelation when visual.Phase == SpellVisualPhase.Prepare => tuning.RevelationDurationMs,
+            _ => tuning.DefaultDurationMs
+        };
+    }
 
     internal static void DrawFrame(SpellParticlePool pool, SpellVisual visual, Vector2 feet, Vector2 facing,
         long now, long start, int duration, float size = Frame.ReferenceSize, uint seed = 0, uint field = 0,
-        float fieldSize = 354)
+        float? fieldSize = null)
     {
+        using var vfxScope = SpellVfxAssets.For(visual.Spell);
+        var tuning = SpellVfxAssets.Current.Taoist.DrawFrame;
         if (duration <= 0 || now < start || now - start >= duration) return;
         float elapsed = (now - start) / 1000f;
         float progress = (now - start) / (float)duration;
@@ -44,11 +60,11 @@ internal static partial class TaoistSpellEffects
             Spell.Hiding or Spell.MassHiding or Spell.SummonHolyDeva or Spell.SummonSkeleton or Spell.SummonShinsu;
         float strength = aura || ground ? 1 : visual.Spell switch
         {
-            Spell.SoulShield => Envelope(progress, .83f, .65f),
-            Spell.BlessedArmour => Envelope(progress, .83f, .53f),
-            Spell.Curse => Envelope(progress, .78f, .52f),
-            Spell.SoulFireBall => Envelope(progress, .76f, .46f),
-            _ => sustained ? Envelope(progress, .81f, .11f) : Envelope(progress)
+            Spell.SoulShield => Envelope(progress, tuning.SoulShieldEnvelopeFadeStart, tuning.SoulShieldEnvelopeTail),
+            Spell.BlessedArmour => Envelope(progress, tuning.BlessedArmourEnvelopeFadeStart, tuning.BlessedArmourEnvelopeTail),
+            Spell.Curse => Envelope(progress, tuning.CurseEnvelopeFadeStart, tuning.CurseEnvelopeTail),
+            Spell.SoulFireBall => Envelope(progress, tuning.SoulFireBallEnvelopeFadeStart, tuning.SoulFireBallEnvelopeTail),
+            _ => sustained ? Envelope(progress, tuning.EnvelopeFadeStart, tuning.EnvelopeTail) : Envelope(progress)
         };
         uint artSeed = seed ^ (uint)visual.Spell * 0x2d5bu;
         bool isRune = visual.Spell is Spell.SoulShield or Spell.BlessedArmour or Spell.Curse;
@@ -57,7 +73,7 @@ internal static partial class TaoistSpellEffects
             alwaysOnTop: isRune, opacityNoiseSeed: opacityNoiseSeed);
         if (visual.Phase == SpellVisualPhase.Expire)
         {
-            frame.Sparks(feet, 8, 25, 13, progress, Ice, 23);
+            frame.Sparks(feet, tuning.SparksCount, tuning.SparksRx, tuning.SparksRy, progress, Ice, tuning.SparksRise);
             return;
         }
 
@@ -70,9 +86,9 @@ internal static partial class TaoistSpellEffects
             case Spell.SummonSkeleton: SummonStars(frame, feet, progress, deva: false); break;
             case Spell.Hiding: Veil(frame, feet, progress, elapsed, mass: false); break;
             case Spell.MassHiding: Veil(frame, feet, progress, elapsed, mass: !hit); break;
-            case Spell.SoulShield: BurningWard(frame, feet, progress, Shape.SoulGlyph); break;
+            case Spell.SoulShield: BurningWard(frame, feet, progress, tuning.SoulShieldShape); break;
             case Spell.Revelation: Reveal(frame, feet, progress, elapsed, prepare); break;
-            case Spell.BlessedArmour: BurningWard(frame, feet, progress, Shape.ArmourGlyph); break;
+            case Spell.BlessedArmour: BurningWard(frame, feet, progress, tuning.BlessedArmourShape); break;
             case Spell.EnergyRepulsor: Repulse(frame, feet, progress); break;
             case Spell.TrapHexagon: Trap(frame, feet, prepare ? progress : Fract(elapsed), prepare); break;
             case Spell.Purification: Cleanse(frame, feet, progress, prepare); break;
@@ -87,22 +103,24 @@ internal static partial class TaoistSpellEffects
             case Spell.SummonHolyDeva: SummonStars(frame, feet, progress, deva: true); break;
             case Spell.Curse: CurseRune(frame, feet, progress); break;
             case Spell.Plague: Plague(frame, feet, progress, elapsed); break;
-            case Spell.PoisonCloud: Cloud(frame, feet, ground ? elapsed : progress * 2.4f); break;
+            case Spell.PoisonCloud: Cloud(frame, feet, ground ? elapsed : progress * tuning.PoisonCloudTime); break;
             case Spell.EnergyShield: Shield(frame, feet, progress, aura); break;
             case Spell.PetEnhancer: Pet(frame, feet, progress, elapsed, aura); break;
-            case Spell.HealingCircle: HealingCircle(frame, feet, progress, elapsed, ground, fieldSize); break;
+            case Spell.HealingCircle: HealingCircle(frame, feet, progress, elapsed, ground, fieldSize ?? tuning.HealingCircleDiameter); break;
         }
     }
 
     internal static bool DrawProjectile(SpellParticlePool pool, Spell spell, Vector2 head, Vector2 heading,
         long now, int frameIndex, int remaining, bool leaveWake, float size)
     {
+        using var vfxScope = SpellVfxAssets.For(spell);
+        var tuning = SpellVfxAssets.Current.Taoist.DrawProjectile;
         if (spell is not (Spell.SoulFireBall or Spell.MassHiding or Spell.SoulShield or Spell.BlessedArmour or
             Spell.Curse or Spell.Hallucination or Spell.Plague or Spell.PoisonCloud)) return false;
         if (remaining <= 0) return true;
-        var frame = new Frame(pool, head, now, 1, size, (uint)(spell.GetHashCode() * 719 + frameIndex), depthY: head.Y + 36);
+        var frame = new Frame(pool, head, now, 1, size, (uint)(spell.GetHashCode() * 719 + frameIndex), depthY: head.Y + tuning.DepthY);
         Vector2 side = new(-heading.Y, heading.X);
-        float angle = MathF.Atan2(heading.Y, heading.X) + MathF.Sin(frameIndex * 1.2f) * .2f;
+        float angle = MathF.Atan2(heading.Y, heading.X) + MathF.Sin(frameIndex * tuning.Angle) * tuning.Angle2;
         int accent = spell switch
         {
             Spell.SoulShield or Spell.Plague => Blue,
@@ -110,80 +128,82 @@ internal static partial class TaoistSpellEffects
             Spell.Hallucination or Spell.MassHiding => Violet,
             _ => Amber
         };
-        frame.Sprite(head - heading * 5, 39, 23, Shape.MistFilament, accent, .61f, Layer.Glow, angle, light: true);
-        frame.Sprite(head, 32, 20, Shape.Talisman, Amber, .98f, rotation: angle);
-        frame.Sprite(head + heading * 5, 9, 9, Shape.Flash, Ivory, .88f, Layer.EmissiveCore, angle);
-        for (int i = 0; i < 5; i++)
+        frame.Sprite(head - heading * tuning.MistFilamentOffset, tuning.MistFilamentWidth, tuning.MistFilamentHeight, tuning.MistFilamentShape, accent, tuning.MistFilamentAlpha, tuning.MistFilamentLayer, angle, light: tuning.MistFilamentLight);
+        frame.Sprite(head, tuning.TalismanWidth, tuning.TalismanHeight, tuning.TalismanShape, Amber, tuning.TalismanAlpha, rotation: angle);
+        frame.Sprite(head + heading * tuning.FlashOffset, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, Ivory, tuning.FlashAlpha, tuning.FlashLayer, angle);
+        for (int i = 0; i < tuning.MistFilamentCount; i++)
         {
-            float drift = MathF.Sin(frameIndex * .67f - i * .8f);
-            Vector2 point = head - heading * (13 + i * 7) + side * drift * (3 + i);
-            frame.Sprite(point, 22 - i * 3, 14 - i * 2, Shape.MistFilament, i % 2 == 0 ? accent : Amber,
-                .77f - i * .12f, rotation: angle + drift * .3f);
-            frame.Sprite(point + side * (i % 2 == 0 ? -5 : 5), 4 + i % 3, 4, Shape.Spark,
-                i % 2 == 0 ? Gold : Ice, .94f - i * .09f, Layer.EmissiveCore, angle);
+            float drift = MathF.Sin(frameIndex * tuning.Drift - i * tuning.Drift2);
+            Vector2 point = head - heading * (tuning.Point + i * tuning.Point2) + side * drift * (tuning.Point3 + i);
+            frame.Sprite(point, tuning.MistFilamentWidth2 - i * tuning.MistFilamentWidth3, tuning.MistFilamentHeight2 - i * tuning.MistFilamentHeight3, tuning.MistFilamentShape2, i % 2 == 0 ? accent : Amber,
+                tuning.MistFilamentAlpha2 - i * tuning.MistFilamentAlpha3, rotation: angle + drift * tuning.MistFilamentRotation);
+            frame.Sprite(point + side * (i % 2 == 0 ? tuning.SparkOffset : tuning.SparkOffset2), tuning.SparkWidth + i % 3, tuning.SparkHeight, tuning.SparkShape,
+                i % 2 == 0 ? Gold : Ice, tuning.SparkAlpha - i * tuning.SparkAlpha2, tuning.SparkLayer, angle);
         }
         if (leaveWake)
         {
-            int life = Math.Min(remaining, 112);
-            Vector2 point = head - heading * 31;
-            pool.TryAdd(new SpellParticle(point, -heading * 13 + side * MathF.Sin(frameIndex) * 6, now, life, 18,
-                Tint(accent, .45f), Shape.Wisp, 0, .8f, angle, -.31f, Layer.Emissive, CastsLight: false, DepthY: head.Y + 36));
+            int life = Math.Min(remaining, tuning.Life);
+            Vector2 point = head - heading * tuning.Point4;
+            pool.TryAdd(new SpellParticle(point, -heading * tuning.WispVelocity + side * MathF.Sin(frameIndex) * tuning.WispVelocity2, now, life, tuning.WispSize,
+                Tint(accent, tuning.Opacity), tuning.WispShape, 0, tuning.WispAspect, angle, tuning.WispGrowth, tuning.WispLayer, CastsLight: tuning.WispCastsLight, DepthY: head.Y + tuning.WispDepthY));
         }
         return true;
     }
 
     private static void Heal(Frame frame, Vector2 feet, float progress, bool prepare)
     {
-        Vector2 body = feet - Vector2.UnitY * 36;
+        var tuning = SpellVfxAssets.Current.Taoist.Heal;
+        Vector2 body = feet - Vector2.UnitY * tuning.Body;
         float travel = Ease(progress);
-        float phase = progress * (prepare ? 3.1f : MathF.Tau * 1.35f);
-        Vector2 head = prepare ? feet - Vector2.UnitY * (14 + travel * 80) :
-            body + Ellipse(phase - .55f, 36, 22);
-        frame.Sprite(feet, 83, 43, Shape.Wisp, Teal, .84f, Layer.Ground);
-        frame.Sprite(body, 105, 104, Shape.Wisp, Jade, .35f, Layer.Glow, light: true);
-        HealMotes(frame, body, 33, progress, 56);
-        float trailAngle = prepare ? MathF.PI * .5f : phase + MathF.PI * .5f;
-        frame.Sprite(head, 78, 48, Shape.Wisp, prepare ? Blue : Jade, .57f, Layer.Glow, trailAngle, light: true);
-        frame.Sprite(head, 38, 24, Shape.Wisp, prepare ? Ice : Mint, .77f, Layer.Glow, trailAngle, light: true);
-        frame.Sprite(head, 16, 20, Shape.Flash, White, .98f, Layer.EmissiveCore, phase * .37f);
-        for (int i = 0; i < 28; i++)
+        float phase = progress * (prepare ? tuning.PreparePhase : MathF.Tau * tuning.Phase);
+        Vector2 head = prepare ? feet - Vector2.UnitY * (tuning.Head + travel * tuning.Head2) :
+            body + Ellipse(phase - tuning.EllipseAngle, tuning.EllipseX, tuning.EllipseY);
+        frame.Sprite(feet, tuning.WispWidth, tuning.WispHeight, tuning.WispShape, Teal, tuning.WispAlpha, tuning.WispLayer);
+        frame.Sprite(body, tuning.WispWidth2, tuning.WispHeight2, tuning.WispShape2, Jade, tuning.WispAlpha2, tuning.WispLayer2, light: tuning.WispLight);
+        HealMotes(frame, body, tuning.Radius, progress, tuning.Count);
+        float trailAngle = prepare ? MathF.PI * tuning.TrailAngle : phase + MathF.PI * tuning.TrailAngle2;
+        frame.Sprite(head, tuning.WispWidth3, tuning.WispHeight3, tuning.WispShape3, prepare ? Blue : Jade, tuning.WispAlpha3, tuning.WispLayer3, trailAngle, light: tuning.WispLight2);
+        frame.Sprite(head, tuning.WispWidth4, tuning.WispHeight4, tuning.WispShape4, prepare ? Ice : Mint, tuning.WispAlpha4, tuning.WispLayer4, trailAngle, light: tuning.WispLight3);
+        frame.Sprite(head, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, White, tuning.FlashAlpha, tuning.FlashLayer, phase * tuning.FlashRotation);
+        for (int i = 0; i < tuning.SparkCount; i++)
         {
-            float age = i / 28f;
-            float turn = phase - age * 2.45f;
-            Vector2 point = prepare ? head + new Vector2(MathF.Sin(turn * 3 + i * 1.8f) * (3 + age * 11), age * (13 + travel * 58)) :
-                body + Ellipse(turn - .55f, 36 - age * 5, 22 + age * 4) + new Vector2((frame.Unit(i) - .5f) * 15, age * 12);
-            Layer depth = prepare ? Layer.Emissive : Depth(turn - .55f);
-            frame.Sprite(point, 4 + 8 * frame.Unit(i + 7), 5 + 7 * frame.Unit(i + 1), Shape.Spark,
-                i % 5 == 0 ? Ice : i % 2 == 0 ? Mint : Jade, .86f - age * .58f, depth, turn);
+            float age = i / tuning.AgeDivisor;
+            float turn = phase - age * tuning.Turn;
+            Vector2 point = prepare ? head + new Vector2(MathF.Sin(turn * tuning.Point + i * tuning.Point2) * (tuning.X + age * tuning.X2), age * (tuning.Y + travel * tuning.Y2)) :
+                body + Ellipse(turn - tuning.EllipseAngle2, tuning.EllipseX2 - age * tuning.EllipseX3, tuning.EllipseY2 + age * tuning.EllipseY3) + new Vector2((frame.Unit(i) - tuning.X3) * tuning.X4, age * tuning.Y3);
+            Layer depth = prepare ? tuning.PrepareDepth : Depth(turn - tuning.Depth);
+            frame.Sprite(point, tuning.SparkWidth + tuning.SparkWidth2 * frame.Unit(i + 7), tuning.SparkHeight + tuning.SparkHeight2 * frame.Unit(i + 1), tuning.SparkShape,
+                i % 5 == 0 ? Ice : i % 2 == 0 ? Mint : Jade, tuning.SparkAlpha - age * tuning.SparkAlpha2, depth, turn);
         }
         // Fine sparks rise through the larger healing ribbons. Each has its own
         // deterministic phase so they glitter instead of moving as one ring.
-        for (int i = 0; i < 22; i++)
+        for (int i = 0; i < tuning.FlashCount; i++)
         {
-            float age = Fract(progress * 1.53f + frame.Unit(i + 261));
-            float turn = i * 2.39996f + age * 2.1f;
-            Vector2 point = body + Ellipse(turn, 16 + 21 * frame.Unit(i + 17),
-                16 + 12 * frame.Unit(i + 63)) - Vector2.UnitY * (age * (28 + 20 * frame.Unit(i + 111)));
+            float age = Fract(progress * tuning.Age + frame.Unit(i + 261));
+            float turn = i * tuning.Turn2 + age * tuning.Turn3;
+            Vector2 point = body + Ellipse(turn, tuning.EllipseX4 + tuning.EllipseX5 * frame.Unit(i + 17),
+                tuning.EllipseY4 + tuning.EllipseY5 * frame.Unit(i + 63)) - Vector2.UnitY * (age * (tuning.Point3 + tuning.Point4 * frame.Unit(i + 111)));
             float twinkle = MathF.Sin(age * MathF.PI);
             int colour = i % 5 == 0 ? Ivory : i % 2 == 0 ? Mint : Ice;
-            frame.Sprite(point, 2 + frame.Unit(i + 35) * 4, 3 + frame.Unit(i + 83) * 6,
-                i % 6 == 0 ? Shape.Flash : Shape.Spark, colour, .89f * twinkle,
-                Layer.EmissiveCore, turn, light: i % 9 == 0);
+            frame.Sprite(point, tuning.FlashWidth2 + frame.Unit(i + 35) * tuning.FlashWidth3, tuning.FlashHeight2 + frame.Unit(i + 83) * tuning.FlashHeight3,
+                i % 6 == 0 ? tuning.FlashShape2 : tuning.FlashShape3, colour, tuning.FlashAlpha2 * twinkle,
+                tuning.FlashLayer2, turn, light: i % 9 == 0);
             if (i % 8 == 0)
-                frame.Sprite(point, 17, 18, Shape.Orb, Jade, .27f * twinkle,
-                    Layer.Glow, light: true);
+                frame.Sprite(point, tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, Jade, tuning.OrbAlpha * twinkle,
+                    tuning.OrbLayer, light: tuning.OrbLight);
         }
     }
 
     private static void SpiritEdge(Frame frame, Vector2 feet, Vector2 facing, float progress)
     {
-        Vector2 centre = feet + facing * 22 - Vector2.UnitY * 29;
-        frame.Sprite(centre, 39, 27, Shape.Orb, Teal, .65f, light: true);
-        for (int i = 0; i < 4; i++)
+        var tuning = SpellVfxAssets.Current.Taoist.SpiritEdge;
+        Vector2 centre = feet + facing * tuning.Centre - Vector2.UnitY * tuning.Centre2;
+        frame.Sprite(centre, tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, Teal, tuning.OrbAlpha, light: tuning.OrbLight);
+        for (int i = 0; i < tuning.ParticleCount; i++)
         {
-            Vector2 point = centre + facing * (i * 8) + new Vector2(0, (frame.Unit(i) - .5f) * 19);
-            frame.Thread(point, point + facing * (8 + 8 * progress), 2.6f, .42f, i % 2 == 0 ? Ice : Jade, .88f);
+            Vector2 point = centre + facing * (i * tuning.Point) + new Vector2(0, (frame.Unit(i) - tuning.Y) * tuning.Y2);
+            frame.Thread(point, point + facing * (tuning.ThreadEnd + tuning.ThreadEnd2 * progress), tuning.ThreadStartWidth, tuning.ThreadEndWidth, i % 2 == 0 ? Ice : Jade, tuning.ThreadAlpha);
         }
-        frame.Sparks(centre, 5, 21, 10, progress, Mint, 11);
+        frame.Sparks(centre, tuning.SparksCount, tuning.SparksRx, tuning.SparksRy, progress, Mint, tuning.SparksRise);
     }
 }

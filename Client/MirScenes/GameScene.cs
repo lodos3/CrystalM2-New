@@ -1,4 +1,4 @@
-﻿using Client.MirControls;
+using Client.MirControls;
 using Client.MirGraphics;
 using Client.MirNetwork;
 using Client.MirObjects;
@@ -3867,12 +3867,14 @@ namespace Client.MirScenes
                         ob.Dead = true;
                         break;
                     case 1:
-                        MapControl.Effects.Add(new Effect(new SpellVisual(Spell.Mirroring, SpellVisualPhase.Expire), 1000, ob.CurrentLocation));
+                        MapControl.Effects.Add(new Effect(new SpellVisual(Spell.Mirroring, SpellVisualPhase.Expire),
+                            SpellVfxAssets.CueDuration(Spell.Mirroring, static cue => cue.MirroringExpireDurationMs), ob.CurrentLocation));
                         ob.Remove();
                         break;
                     case 2:
                         SoundManager.PlaySound(20000 + (ushort)Spell.DarkBody * 10 + 1);
-                        MapControl.Effects.Add(new Effect(new SpellVisual(Spell.DarkBody), 1200, ob.CurrentLocation));
+                        MapControl.Effects.Add(new Effect(new SpellVisual(Spell.DarkBody),
+                            SpellVfxAssets.CueDuration(Spell.DarkBody, static cue => cue.DarkBodyImpactDurationMs), ob.CurrentLocation));
                         ob.Remove();
                         break;
                 }
@@ -4089,7 +4091,8 @@ namespace Client.MirScenes
                 {
                     case 1: //Yimoogi
                         {
-                            effect = new Effect(new SpellVisual(Spell.Teleport, SpellVisualPhase.Departure), 500, ob.CurrentLocation);
+                            effect = new Effect(new SpellVisual(Spell.Teleport, SpellVisualPhase.Departure),
+                                SpellVfxAssets.CueDuration(Spell.Teleport, static cue => cue.TeleportDepartureDurationMs), ob.CurrentLocation);
                             break;
                         }
                     case 2: //RedFoxman
@@ -4154,7 +4157,8 @@ namespace Client.MirScenes
                         }
                     default:
                         {
-                            effect = new Effect(new SpellVisual(Spell.Teleport, SpellVisualPhase.Departure), 500, ob.CurrentLocation);
+                            effect = new Effect(new SpellVisual(Spell.Teleport, SpellVisualPhase.Departure),
+                                SpellVfxAssets.CueDuration(Spell.Teleport, static cue => cue.TeleportDepartureDurationMs), ob.CurrentLocation);
                             break;
                         }
                 }
@@ -4175,7 +4179,8 @@ namespace Client.MirScenes
                 {
                     case 1: //Yimoogi
                         {
-                            ob.Effects.Add(new Effect(new SpellVisual(Spell.Teleport, SpellVisualPhase.Arrival), 500, ob));
+                            ob.Effects.Add(new Effect(new SpellVisual(Spell.Teleport, SpellVisualPhase.Arrival),
+                                SpellVfxAssets.CueDuration(Spell.Teleport, static cue => cue.TeleportArrivalDurationMs), ob));
                             break;
                         }
                     case 2: //RedFoxman
@@ -4239,7 +4244,8 @@ namespace Client.MirScenes
                         }
                     default:
                         {
-                            ob.Effects.Add(new Effect(new SpellVisual(Spell.Teleport, SpellVisualPhase.Arrival), 500, ob));
+                            ob.Effects.Add(new Effect(new SpellVisual(Spell.Teleport, SpellVisualPhase.Arrival),
+                                SpellVfxAssets.CueDuration(Spell.Teleport, static cue => cue.TeleportArrivalDurationMs), ob));
                             break;
                         }
                 }
@@ -4254,7 +4260,8 @@ namespace Client.MirScenes
 
         private void TeleportIn()
         {
-            User.Effects.Add(new Effect(new SpellVisual(Spell.Teleport, SpellVisualPhase.Arrival), 500, User));
+            User.Effects.Add(new Effect(new SpellVisual(Spell.Teleport, SpellVisualPhase.Arrival),
+                SpellVfxAssets.CueDuration(Spell.Teleport, static cue => cue.TeleportArrivalDurationMs), User));
             SoundManager.PlaySound(SoundList.Teleport);
         }
         private void NPCGoods(S.NPCGoods p)
@@ -4785,7 +4792,8 @@ namespace Client.MirScenes
                                 var sender = (Missile)o;
 
                                 if (sender.Target.CurrentAction == MirAction.Dead) return;
-                                sender.Target.Effects.Add(new Effect(new SpellVisual(Spell.FireBounce), 600, sender.Target));
+                                sender.Target.Effects.Add(new Effect(new SpellVisual(Spell.FireBounce),
+                                    SpellVfxAssets.CueDuration(Spell.FireBounce, static cue => cue.FireBounceImpactDurationMs), sender.Target));
                                 SoundManager.PlaySound(20000 + (ushort)Spell.GreatFireBall * 10 + 2);
                             };
                         }
@@ -4807,40 +4815,49 @@ namespace Client.MirScenes
                         SoundManager.PlaySound(20000 + (ushort)Spell.FatalSword * 10);
                         break;
                     case SpellEffect.FatalSword:
-                        ob.Effects.Add(new Effect(new SpellVisual(Spell.FatalSword), 400, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.FatalSword),
+                            SpellVfxAssets.CueDuration(Spell.FatalSword, static cue => cue.FatalSwordImpactDurationMs), ob));
                         SoundManager.PlaySound(20000 + (ushort)Spell.FatalSword * 10);
                         break;
                     case SpellEffect.StormEscape:
-                        ob.Effects.Add(new Effect(new SpellVisual(Spell.StormEscape), 600, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.StormEscape),
+                            SpellVfxAssets.CueDuration(Spell.StormEscape, static cue => cue.StormEscapeImpactDurationMs), ob));
                         SoundManager.PlaySound(SoundList.Teleport);
                         break;
                     case SpellEffect.Teleport:
-                        ob.Effects.Add(new Effect(new SpellVisual(Spell.Blink, SpellVisualPhase.Arrival), 600, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.Blink, SpellVisualPhase.Arrival),
+                            SpellVfxAssets.CueDuration(Spell.Blink, static cue => cue.BlinkArrivalDurationMs), ob));
                         SoundManager.PlaySound(SoundList.Teleport);
                         break;
                     case SpellEffect.Healing:
                         SoundManager.PlaySound(20000 + (ushort)Spell.Healing * 10 + 1);
-                        ob.Effects.Add(new Effect(new SpellVisual(Spell.Healing), 800, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.Healing),
+                            SpellVfxAssets.CueDuration(Spell.Healing, static cue => cue.HealingImpactDurationMs), ob));
                         break;
                     case SpellEffect.RedMoonEvil:
                         ob.Effects.Add(new Effect(Libraries.Monsters[(ushort)Monster.RedMoonEvil], 32, 6, 400, ob) { Blend = false });
                         break;
                     case SpellEffect.TwinDrakeBlade:
-                        ob.Effects.Add(new Effect(new SpellVisual(Spell.TwinDrakeBlade), 800, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.TwinDrakeBlade),
+                            SpellVfxAssets.CueDuration(Spell.TwinDrakeBlade, static cue => cue.TwinDrakeBladeImpactDurationMs), ob));
                         break;
                     case SpellEffect.MPEater:
                         if (MapControl.Objects.TryGetValue(p.EffectType, out var ob2))
-                            ob2.Effects.Add(new Effect(new SpellVisual(Spell.MPEater), 1900, ob2));
+                            ob2.Effects.Add(new Effect(new SpellVisual(Spell.MPEater),
+                                SpellVfxAssets.CueDuration(Spell.MPEater, static cue => cue.MPEaterImpactLongDurationMs), ob2));
 
-                        ob.Effects.Add(new Effect(new SpellVisual(Spell.MPEater), 900, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.MPEater),
+                            SpellVfxAssets.CueDuration(Spell.MPEater, static cue => cue.MPEaterImpactShortDurationMs), ob));
                         SoundManager.PlaySound(20000 + (ushort)Spell.FatalSword * 10);
                         break;
                     case SpellEffect.Bleeding:
-                        ob.Effects.Add(new Effect(new SpellVisual(Spell.Hemorrhage), 400, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.Hemorrhage),
+                            SpellVfxAssets.CueDuration(Spell.Hemorrhage, static cue => cue.HemorrhageImpactDurationMs), ob));
                         break;
                     case SpellEffect.Hemorrhage:
                         SoundManager.PlaySound(20000 + (ushort)Spell.Hemorrhage * 10);
-                        ob.Effects.Add(new Effect(new SpellVisual(Spell.Hemorrhage), 400, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.Hemorrhage),
+                            SpellVfxAssets.CueDuration(Spell.Hemorrhage, static cue => cue.HemorrhageImpactDurationMs), ob));
                         break;
                     case SpellEffect.MagicShieldUp:
                         if (ob.Race != ObjectType.Player && ob.Race != ObjectType.Hero) return;
@@ -4851,7 +4868,8 @@ namespace Client.MirScenes
                             player.ShieldEffect.Remove();
                         }
                         player.MagicShield = true;
-                        player.Effects.Add(player.ShieldEffect = new Effect(new SpellVisual(Spell.MagicShield), 600, ob) { Repeat = true });
+                        player.Effects.Add(player.ShieldEffect = new Effect(new SpellVisual(Spell.MagicShield),
+                            SpellVfxAssets.CueDuration(Spell.MagicShield, static cue => cue.MagicShieldImpactDurationMs), ob) { Repeat = true });
                         break;
                     case SpellEffect.MagicShieldDown:
                         if (ob.Race != ObjectType.Player && ob.Race != ObjectType.Hero) return;
@@ -4869,7 +4887,8 @@ namespace Client.MirScenes
                         SoundManager.PlaySound(((ushort)Monster.GreatFoxSpirit * 10) + 5);
                         break;
                     case SpellEffect.Entrapment:
-                        ob.Effects.Add(new Effect(new SpellVisual(Spell.Entrapment), 1500, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.Entrapment),
+                            SpellVfxAssets.CueDuration(Spell.Entrapment, static cue => cue.EntrapmentImpactDurationMs), ob));
                         break;
                     case SpellEffect.Critical:
                         //ob.Effects.Add(new Effect(Libraries.CustomEffects, 0, 12, 60, ob));
@@ -4887,7 +4906,8 @@ namespace Client.MirScenes
                         }
 
                         player.ElementalBarrier = true;
-                        player.Effects.Add(player.ElementalBarrierEffect = new Effect(new SpellVisual(Spell.ElementalBarrier), 2000, ob) { Repeat = true });
+                        player.Effects.Add(player.ElementalBarrierEffect = new Effect(new SpellVisual(Spell.ElementalBarrier),
+                            SpellVfxAssets.CueDuration(Spell.ElementalBarrier, static cue => cue.ElementalBarrierImpactMediumDurationMs), ob) { Repeat = true });
                         break;
                     case SpellEffect.ElementalBarrierDown:
                         if (ob.Race != ObjectType.Player) return;
@@ -4899,7 +4919,8 @@ namespace Client.MirScenes
                         }
                         player.ElementalBarrierEffect = null;
                         player.ElementalBarrier = false;
-                        player.Effects.Add(player.ElementalBarrierEffect = new Effect(new SpellVisual(Spell.ElementalBarrier, SpellVisualPhase.Expire), 1400, ob));
+                        player.Effects.Add(player.ElementalBarrierEffect = new Effect(new SpellVisual(Spell.ElementalBarrier, SpellVisualPhase.Expire),
+                            SpellVfxAssets.CueDuration(Spell.ElementalBarrier, static cue => cue.ElementalBarrierExpireDurationMs), ob));
                         SoundManager.PlaySound(20000 + 131 * 10 + 5);
                         break;
                     case SpellEffect.DelayedExplosion:
@@ -4991,7 +5012,8 @@ namespace Client.MirScenes
                         ob.Effects.Add(new Effect(Libraries.Monsters[(ushort)Monster.DeathCrawler], 272 + ((int)ob.Direction * 4), 4, 400, ob) { Blend = true });
                         break;
                     case SpellEffect.MoonMist:
-                        ob.Effects.Add(new Effect(new SpellVisual(Spell.MoonMist), 800, ob));
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.MoonMist),
+                            SpellVfxAssets.CueDuration(Spell.MoonMist, static cue => cue.MoonMistImpactShortDurationMs), ob));
                         break;
                 }
             }
@@ -5105,7 +5127,8 @@ namespace Client.MirScenes
         {
             User.SetAction();
             User.Dead = false;
-            User.Effects.Add(new Effect(new SpellVisual(Spell.Reincarnation), 2000, User));
+            User.Effects.Add(new Effect(new SpellVisual(Spell.Reincarnation),
+                SpellVfxAssets.CueDuration(Spell.Reincarnation, static cue => cue.ReincarnationImpactDurationMs), User));
             SoundManager.PlaySound(SoundList.Revive);
         }
         private void ObjectRevived(S.ObjectRevived p)
@@ -5114,7 +5137,8 @@ namespace Client.MirScenes
             {
                 if (p.Effect)
                 {
-                    ob.Effects.Add(new Effect(new SpellVisual(Spell.Reincarnation), 2000, ob));
+                    ob.Effects.Add(new Effect(new SpellVisual(Spell.Reincarnation),
+                        SpellVfxAssets.CueDuration(Spell.Reincarnation, static cue => cue.ReincarnationImpactDurationMs), ob));
                     SoundManager.PlaySound(SoundList.Revive);
                 }
                 ob.Dead = false;

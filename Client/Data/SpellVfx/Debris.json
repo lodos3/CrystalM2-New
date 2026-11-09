@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "nodes": {
+    "Emit": {
+      "FlamingSwordShape": "UserEmber",
+      "FlamingSwordShape2": "Spark",
+      "FlamingSwordHot": "#FFDA8A",
+      "FlamingSwordCool": "#C24E24",
+      "FlamingSwordSpeed": 102,
+      "FlamingSwordLift": 145,
+      "FlamingSwordEnergy": 0.42,
+      "ThunderBoltShape": "Spark",
+      "ThunderBoltShape2": "Flash",
+      "ThunderBoltHot": "#EAF6FF",
+      "ThunderBoltCool": "#5281EB",
+      "ThunderBoltSpeed": 140,
+      "ThunderBoltLift": 112,
+      "ThunderBoltEnergy": 0.34,
+      "IceStormShape": "FrostCore",
+      "IceStormShape2": "Wisp",
+      "IceStormHot": "#DEEFFF",
+      "IceStormCool": "#709DC6",
+      "IceStormSpeed": 83,
+      "IceStormLift": 87,
+      "IceStormEnergy": 0.16,
+      "PlagueShape": "UserEmber",
+      "PlagueShape2": "Wisp",
+      "PlagueHot": "#9DE9FF",
+      "PlagueCool": "#314CBF",
+      "PlagueSpeed": 74,
+      "PlagueLift": 129,
+      "PlagueEnergy": 0.22,
+      "Count": 7,
+      "CountDivisor": 100,
+      "Root": 4,
+      "Root2": 13,
+      "Drift": 0.21,
+      "Drift2": 0.32,
+      "Drift3": 0.68,
+      "Lift": 0.61,
+      "Lift2": 0.51,
+      "Wind": 0.62,
+      "Height": 5,
+      "Height2": 9,
+      "Gravity": 520,
+      "Spin": 0.5,
+      "Spin2": 12,
+      "Birth": 17,
+      "SpellParticleDuration": 100,
+      "SpellParticleSize": 4,
+      "SpellParticleSize2": 8,
+      "Particle": 0.89,
+      "SpellParticleAspect": 1.28,
+      "SpellParticleGrowth": -0.26,
+      "SpellParticleLayer": "EmissiveCore",
+      "SpellParticleLayer2": "Emissive",
+      "SpellParticleImpactCount": 2,
+      "SpellParticleImpactSize": 8,
+      "SpellParticleImpactDuration": 165,
+      "SpellParticleImpactDuration2": 7,
+      "SpellParticleImpactScatter": 43,
+      "SpellParticleColourCurveFullSpeed": 175
+    },
+    "Palette": {
+      "SoulEmber": [
+        {
+          "position": 0,
+          "colour": "#87251B"
+        },
+        {
+          "position": 0.32,
+          "colour": "#CC361D"
+        },
+        {
+          "position": 0.66,
+          "colour": "#FF8545"
+        },
+        {
+          "position": 1,
+          "colour": "#FFF9DE"
+        }
+      ]
+    }
+  }
+}

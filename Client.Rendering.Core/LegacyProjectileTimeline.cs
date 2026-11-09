@@ -5,7 +5,8 @@ namespace CrystalM2.Rendering.Core;
 public readonly record struct LegacyProjectileTimeline(long Launch, int CellDistance, int FrameInterval)
 {
     public const int MillisecondsPerCell = 50;
-    public int Duration => Math.Max(1, CellDistance * MillisecondsPerCell);
+    public int TravelMillisecondsPerCell { get; init; } = MillisecondsPerCell;
+    public int Duration => Math.Max(1, CellDistance * TravelMillisecondsPerCell);
     public long Impact => Launch + Duration;
     public int Frames => Math.Max(1, Duration / Math.Max(1, FrameInterval));
 

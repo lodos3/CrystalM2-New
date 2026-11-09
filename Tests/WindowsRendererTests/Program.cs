@@ -7,8 +7,11 @@ using Vortice.Direct3D;
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
+        SpellVfxAssetChecks.Run();
+        if (args is ["--spell-vfx-assets"]) return;
+
         // Real Microsoft D3D11 software device, using production source and
         // shaders. These small pixel inputs are test data, not game artwork.
         using var window = new Form { ClientSize = new Size(64, 64) };
@@ -617,8 +620,8 @@ internal static class Program
             Check(heights.Min() > 10 && heights.Max() < 95 &&
                   heights.Max() - heights.Min() > 8,
                 $"{name} must arch through real height rather than drawing a flat ellipse.");
-            float rearBrightness = body.Where(p => p.Ground).Average(p => p.Colour.R + p.Colour.G + p.Colour.B);
-            float frontBrightness = body.Where(p => !p.Ground).Average(p => p.Colour.R + p.Colour.G + p.Colour.B);
+            double rearBrightness = body.Where(p => p.Ground).Average(p => p.Colour.R + p.Colour.G + p.Colour.B);
+            double frontBrightness = body.Where(p => !p.Ground).Average(p => p.Colour.R + p.Colour.G + p.Colour.B);
             Check(frontBrightness > rearBrightness + 45,
                 $"{name} front-facing blade must read brighter than its recessed rear.");
             var motes = particles.Where(p => p.Shape == SpellParticleShape.WarriorSpark &&
@@ -878,7 +881,7 @@ internal static class Program
                         animated++;
                 }
                 Check(visible > 150 && animated > 30,
-                    $\"{shape} should have moving internal sheen across a persistent slash silhouette. Changed: {animated}.\");
+                    $"{shape} should have moving internal sheen across a persistent slash silhouette. Changed: {animated}.");
             }
 
             Bitmap Render(SpellParticleShape shape, long now)

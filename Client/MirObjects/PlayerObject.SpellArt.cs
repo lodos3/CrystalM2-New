@@ -143,17 +143,33 @@ public partial class PlayerObject
     {
         float intensity = DXManager.Opacity * Settings.SpellBlendIntensityPercent / 100f;
         if ((_bodyCoat & BodyCoat.Protection) != 0)
-            library.DrawSpellMask(index, DrawLocation, Color.FromArgb(0x31, 0x51, 0xc6), Color.FromArgb(0xb7, 0xed, 0xff),
-                intensity * .52f, SpellMaskStyle.Storm);
+        {
+            using var vfxScope = SpellVfxAssets.For(Spell.ProtectionField);
+            var tuning = SpellVfxAssets.Current.Warrior.ActorMasks;
+            library.DrawSpellMask(index, DrawLocation, tuning.ProtectionFieldColour, tuning.ProtectionFieldCore,
+                intensity * tuning.ProtectionFieldIntensity, SpellMaskStyle.Storm);
+        }
         if ((_bodyCoat & BodyCoat.ImmortalSkin) != 0)
-            library.DrawSpellMask(index, DrawLocation, Color.FromArgb(0x89, 0xb8, 0x49), Color.FromArgb(0xff, 0xeb, 0x8f),
-                intensity * .54f, SpellMaskStyle.Frost);
+        {
+            using var vfxScope = SpellVfxAssets.For(Spell.ImmortalSkin);
+            var tuning = SpellVfxAssets.Current.Warrior.ActorMasks;
+            library.DrawSpellMask(index, DrawLocation, tuning.ImmortalSkinColour, tuning.ImmortalSkinCore,
+                intensity * tuning.ImmortalSkinIntensity, SpellMaskStyle.Frost);
+        }
         if ((_bodyCoat & BodyCoat.Rage) != 0)
-            library.DrawSpellMask(index, DrawLocation, Color.FromArgb(0xf4, 0x42, 0x22), Color.FromArgb(0xff, 0xca, 0x68),
-                intensity * .57f, SpellMaskStyle.Fire);
+        {
+            using var vfxScope = SpellVfxAssets.For(Spell.Rage);
+            var tuning = SpellVfxAssets.Current.Warrior.ActorMasks;
+            library.DrawSpellMask(index, DrawLocation, tuning.RageColour, tuning.RageCore,
+                intensity * tuning.RageIntensity, SpellMaskStyle.Fire);
+        }
         if ((_bodyCoat & BodyCoat.Fury) != 0)
-            library.DrawSpellMask(index, DrawLocation, Color.FromArgb(0x99, 0x25, 0x16), Color.FromArgb(0xff, 0xe6, 0x98),
-                intensity * .52f, SpellMaskStyle.Sweep);
+        {
+            using var vfxScope = SpellVfxAssets.For(Spell.Fury);
+            var tuning = SpellVfxAssets.Current.Warrior.ActorMasks;
+            library.DrawSpellMask(index, DrawLocation, tuning.FuryColour, tuning.FuryCore,
+                intensity * tuning.FuryIntensity, SpellMaskStyle.Sweep);
+        }
     }
 
     private void DrawWeaponSpellVisual(int index)
@@ -165,7 +181,9 @@ public partial class PlayerObject
         if (spell == Spell.None) return;
         var (colour, core) = LegacySpellEffects.WeaponColours(spell);
         float phase = Frame == null ? .5f : (FrameIndex + .5f) / Math.Max(1, Frame.Count);
-        float pulse = spell == swing ? .29f + .59f * MathF.Sin(MathF.PI * phase) : .64f;
+        using var vfxScope = SpellVfxAssets.For(spell);
+        var tuning = SpellVfxAssets.Current.Warrior.ActorMasks;
+        float pulse = spell == swing ? tuning.SwingPulseBase + tuning.SwingPulseGain * MathF.Sin(MathF.PI * phase) : tuning.ReadyIntensity;
         SpellMaskStyle style = spell switch
         {
             Spell.FlamingSword => SpellMaskStyle.Fire,

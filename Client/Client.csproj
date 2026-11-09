@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -35,6 +35,8 @@
     <None Include="..\.editorconfig" Link=".editorconfig" />
     <None Update="Data\Shaders\World.hlsl" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Update="Data\ParticleCredits.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="Data\SpellVfx\**\*.json" CopyToOutputDirectory="Always" CopyToPublishDirectory="Always" />
+    <EmbeddedResource Include="Data\SpellVfx\*.json" LogicalName="SpellVfx.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

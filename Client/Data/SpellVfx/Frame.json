@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "nodes": {
+    "Add": {
+      "Layer": "Glow",
+      "SpellParticleDuration": 50
+    },
+    "Envelope": {
+      "RiseBase": 0.61,
+      "RiseGain": 0.39,
+      "RiseSpeed": 8,
+      "FadeStart": 0.65,
+      "TailOpacity": 0
+    },
+    "FloorSeal": {
+      "Right": 0.5,
+      "SpellParticleDuration": 50,
+      "SpellParticleLayer": "Floor"
+    },
+    "Line": {
+      "Amount": 0.45,
+      "WispWidth": 0.65,
+      "WispHeight": 1.36,
+      "WispShape": "Wisp",
+      "WispAlpha": 0.88,
+      "Edge": 3.65,
+      "Edge2": 0.79,
+      "ThreadEndWidth": 0.49
+    },
+    "Orbit": {
+      "Segments": 4,
+      "Segments2": 3.2,
+      "Flicker": 0.67,
+      "Flicker2": 0.33,
+      "LineAlpha": 0.74,
+      "LineAlpha2": 0.26,
+      "Angle": 2
+    },
+    "Sparks": {
+      "Age": 0.81,
+      "Point": 0.2,
+      "Point2": 0.82,
+      "Width": 3.1,
+      "Width2": 8.7,
+      "ColourColour": "#FFFFFF",
+      "Colour": 0.61,
+      "ColourColour2": "#243055",
+      "Colour2": 0.34,
+      "Fade": 0.89,
+      "Fade2": 0.66,
+      "Fade3": 0.55,
+      "Fade4": 0.45,
+      "Fade5": 12,
+      "ShardHeight": 2.2,
+      "ShardHeight2": 1.46,
+      "ShardLayer": "EmissiveCore",
+      "ShardLayer2": "Emissive",
+      "ShardRotation": 0.88
+    },
+    "Thread": {
+      "Centre": 0.5,
+      "Normal": 0.5,
+      "Overlap": 0.85,
+      "Overlap2": 0.12,
+      "FilamentDuration": 50,
+      "FilamentShape": "Filament"
+    },
+    "WindRibbon": {
+      "Centre": 0.25,
+      "WindRibbonDuration": 50,
+      "WindRibbonShape": "WindRibbon",
+      "WindRibbonLayer": "Emissive",
+      "WindRibbonCastsLight": false
+    }
+  }
+}

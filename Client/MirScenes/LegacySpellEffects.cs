@@ -24,24 +24,26 @@ internal static class LegacySpellEffects
 
     internal static WindupCue Windup(Spell spell, int frames, int interval)
     {
+        using var vfxScope = SpellVfxAssets.For(spell);
+        var tuning = SpellVfxAssets.Current.Legacy.Windup;
         int cast = frames * interval;
         return spell switch
         {
-            Spell.ThunderBolt => new(SpellVisualPhase.Prepare, 300),
-            Spell.Revelation => new(SpellVisualPhase.Prepare, 1200),
-            Spell.LionRoar or Spell.BattleCry => new(SpellVisualPhase.Impact, 1200),
-            Spell.FlameField => new(SpellVisualPhase.Impact, 1800, AtCell: true),
+            Spell.ThunderBolt => new(SpellVisualPhase.Prepare, tuning.ThunderBoltDuration),
+            Spell.Revelation => new(SpellVisualPhase.Prepare, tuning.RevelationDuration),
+            Spell.LionRoar or Spell.BattleCry => new(SpellVisualPhase.Impact, tuning.LionRoarDuration),
+            Spell.FlameField => new(SpellVisualPhase.Impact, tuning.FlameFieldDuration, AtCell: true),
             Spell.ThunderStorm => new(SpellVisualPhase.Impact, cast, AtCell: true),
-            Spell.Fury => new(SpellVisualPhase.Impact, 10 * interval),
-            Spell.ImmortalSkin => new(SpellVisualPhase.Impact, cast * 4),
-            Spell.UltimateEnhancer => new(SpellVisualPhase.Prepare, 1000),
-            Spell.MagicBooster => new(SpellVisualPhase.Impact, 9 * interval),
-            Spell.PetEnhancer => new(SpellVisualPhase.Prepare, 8 * interval),
-            Spell.TwinDrakeBlade => new(SpellVisualPhase.Prepare, 500),
-            Spell.Thrusting => new(SpellVisualPhase.Swing, (frames - frames / 2) * interval, frames / 2 * interval),
-            Spell.BladeAvalanche => new(SpellVisualPhase.Swing, 15 * interval, AtCell: true),
-            Spell.SlashingBurst => new(SpellVisualPhase.Swing, 9 * interval, 300, AtCell: true),
-            Spell.CounterAttack => new(SpellVisualPhase.Swing, 10 * interval),
+            Spell.Fury => new(SpellVisualPhase.Impact, tuning.FuryDuration * interval),
+            Spell.ImmortalSkin => new(SpellVisualPhase.Impact, cast * tuning.ImmortalSkinDuration),
+            Spell.UltimateEnhancer => new(SpellVisualPhase.Prepare, tuning.UltimateEnhancerDuration),
+            Spell.MagicBooster => new(SpellVisualPhase.Impact, tuning.MagicBoosterDuration * interval),
+            Spell.PetEnhancer => new(SpellVisualPhase.Prepare, tuning.PetEnhancerDuration * interval),
+            Spell.TwinDrakeBlade => new(SpellVisualPhase.Prepare, tuning.TwinDrakeBladeDuration),
+            Spell.Thrusting => new(SpellVisualPhase.Swing, (frames - frames / tuning.ThrustingDurationDivisor) * interval, frames / tuning.ThrustingDelayDivisor * interval),
+            Spell.BladeAvalanche => new(SpellVisualPhase.Swing, tuning.BladeAvalancheDuration * interval, AtCell: true),
+            Spell.SlashingBurst => new(SpellVisualPhase.Swing, tuning.SlashingBurstDuration * interval, tuning.SlashingBurstDelay, AtCell: true),
+            Spell.CounterAttack => new(SpellVisualPhase.Swing, tuning.CounterAttackDuration * interval),
             Spell.Repulsion or Spell.EnergyRepulsor or Spell.Rage or Spell.ProtectionField or Spell.Hiding
                 => new(SpellVisualPhase.Impact, cast),
             Spell.FireBall or Spell.GreatFireBall or Spell.FrostCrunch or Spell.Healing or Spell.ElectricShock or
@@ -54,59 +56,69 @@ internal static class LegacySpellEffects
         };
     }
 
-    internal static int FieldInterval(Spell spell) => spell switch
+    internal static int FieldInterval(Spell spell)
     {
-        Spell.HealingCircle => 80,
-        Spell.FireWall or Spell.PoisonCloud => 120,
-        _ => 100
-    };
+        using var vfxScope = SpellVfxAssets.For(spell);
+        var tuning = SpellVfxAssets.Current.Legacy.FieldInterval;
+        return spell switch
+        {
+            Spell.HealingCircle => tuning.HealingCircleIntervalMs,
+            Spell.FireWall or Spell.PoisonCloud => tuning.FireWallIntervalMs,
+            _ => tuning.DefaultIntervalMs
+        };
+    }
 
     private static Look Art(Form form, Shape shape, int size, int colour, int core) =>
         new(form, shape, size, Color.FromArgb(unchecked((int)0xff000000) | colour),
             Color.FromArgb(unchecked((int)0xff000000) | core));
 
-    private static Look Profile(Spell spell) => spell switch
+    private static Look Profile(Spell spell)
     {
-        // Warrior. Use the angle and length of the hit to identify each weapon technique.
-        Spell.Fencing => Art(Form.Cut, Shape.Spark, 32, 0xadc7d2, 0xf4f6ee),
-        Spell.Slaying => Art(Form.Cut, Shape.Slash, 76, 0x5886ff, 0xebf6ff),
-        Spell.Thrusting => Art(Form.Cut, Shape.Bolt, 118, 0x84d3ff, 0xe8f8ff),
-        Spell.HalfMoon => Art(Form.Cleave, Shape.Slash, 134, 0x74d4f5, 0xe5fcff),
-        Spell.ShoulderDash => Art(Form.Rush, Shape.Bolt, 100, 0xcb9f67, 0xffecb9),
-        Spell.TwinDrakeBlade => Art(Form.Cleave, Shape.Claw, 132, 0x385dc9, 0xf2fbff),
-        Spell.Entrapment => Art(Form.Bind, Shape.Bolt, 84, 0xd9af69, 0xffebbe),
-        Spell.FlamingSword => Art(Form.Cleave, Shape.Slash, 126, 0xff7829, 0xffef84),
-        Spell.LionRoar => Art(Form.Break, Shape.Halo, 186, 0xeeb054, 0xffe2a6),
-        Spell.CrossHalfMoon => Art(Form.Cleave, Shape.Slash, 138, 0x8ec7ff, 0xf1faff),
-        Spell.BladeAvalanche => Art(Form.Cleave, Shape.Shard, 128, 0xb0d6fa, 0xf5fcff),
-        Spell.ProtectionField => Art(Form.Ward, Shape.Shield, 90, 0x77d0a9, 0xf4ffcf),
-        Spell.Rage => Art(Form.Eruption, Shape.Claw, 93, 0xe74233, 0xffc37e),
-        Spell.CounterAttack => Art(Form.Cut, Shape.Shield, 87, 0xff6330, 0xffe3a3),
-        Spell.SlashingBurst => Art(Form.Cleave, Shape.Slash, 156, 0xff722a, 0xffedab),
-        Spell.Fury => Art(Form.Eruption, Shape.Pillar, 110, 0xf25b30, 0xffe4a6),
-        Spell.ImmortalSkin => Art(Form.Ward, Shape.Prism, 106, 0xf0be69, 0xfff6d6),
-        Spell.BattleCry => Art(Form.Break, Shape.Banner, 119, 0xe2ab52, 0xffeabd),
+        using var vfxScope = SpellVfxAssets.For(spell);
+        var tuning = SpellVfxAssets.Current.Legacy.Profile;
+        return spell switch
+        {
+            // Warrior. Use the angle and length of the hit to identify each weapon technique.
+            Spell.Fencing => Art(tuning.FencingForm, tuning.FencingShape, tuning.FencingSize, tuning.FencingColour, tuning.FencingCore),
+            Spell.Slaying => Art(tuning.SlayingForm, tuning.SlayingShape, tuning.SlayingSize, tuning.SlayingColour, tuning.SlayingCore),
+            Spell.Thrusting => Art(tuning.ThrustingForm, tuning.ThrustingShape, tuning.ThrustingSize, tuning.ThrustingColour, tuning.ThrustingCore),
+            Spell.HalfMoon => Art(tuning.HalfMoonForm, tuning.HalfMoonShape, tuning.HalfMoonSize, tuning.HalfMoonColour, tuning.HalfMoonCore),
+            Spell.ShoulderDash => Art(tuning.ShoulderDashForm, tuning.ShoulderDashShape, tuning.ShoulderDashSize, tuning.ShoulderDashColour, tuning.ShoulderDashCore),
+            Spell.TwinDrakeBlade => Art(tuning.TwinDrakeBladeForm, tuning.TwinDrakeBladeShape, tuning.TwinDrakeBladeSize, tuning.TwinDrakeBladeColour, tuning.TwinDrakeBladeCore),
+            Spell.Entrapment => Art(tuning.EntrapmentForm, tuning.EntrapmentShape, tuning.EntrapmentSize, tuning.EntrapmentColour, tuning.EntrapmentCore),
+            Spell.FlamingSword => Art(tuning.FlamingSwordForm, tuning.FlamingSwordShape, tuning.FlamingSwordSize, tuning.FlamingSwordColour, tuning.FlamingSwordCore),
+            Spell.LionRoar => Art(tuning.LionRoarForm, tuning.LionRoarShape, tuning.LionRoarSize, tuning.LionRoarColour, tuning.LionRoarCore),
+            Spell.CrossHalfMoon => Art(tuning.CrossHalfMoonForm, tuning.CrossHalfMoonShape, tuning.CrossHalfMoonSize, tuning.CrossHalfMoonColour, tuning.CrossHalfMoonCore),
+            Spell.BladeAvalanche => Art(tuning.BladeAvalancheForm, tuning.BladeAvalancheShape, tuning.BladeAvalancheSize, tuning.BladeAvalancheColour, tuning.BladeAvalancheCore),
+            Spell.ProtectionField => Art(tuning.ProtectionFieldForm, tuning.ProtectionFieldShape, tuning.ProtectionFieldSize, tuning.ProtectionFieldColour, tuning.ProtectionFieldCore),
+            Spell.Rage => Art(tuning.RageForm, tuning.RageShape, tuning.RageSize, tuning.RageColour, tuning.RageCore),
+            Spell.CounterAttack => Art(tuning.CounterAttackForm, tuning.CounterAttackShape, tuning.CounterAttackSize, tuning.CounterAttackColour, tuning.CounterAttackCore),
+            Spell.SlashingBurst => Art(tuning.SlashingBurstForm, tuning.SlashingBurstShape, tuning.SlashingBurstSize, tuning.SlashingBurstColour, tuning.SlashingBurstCore),
+            Spell.Fury => Art(tuning.FuryForm, tuning.FuryShape, tuning.FurySize, tuning.FuryColour, tuning.FuryCore),
+            Spell.ImmortalSkin => Art(tuning.ImmortalSkinForm, tuning.ImmortalSkinShape, tuning.ImmortalSkinSize, tuning.ImmortalSkinColour, tuning.ImmortalSkinCore),
+            Spell.BattleCry => Art(tuning.BattleCryForm, tuning.BattleCryShape, tuning.BattleCrySize, tuning.BattleCryColour, tuning.BattleCryCore),
 
-        // Shared animations that previously used the same combat libraries.
-        Spell.FatalSword or Spell.DoubleSlash or Spell.HeavenlySword or Spell.CrescentSlash or Spell.FlashDash
-            => Art(Form.Cut, Shape.Slash, 86, 0xe4a0d0, 0xffe8ed),
-        Spell.PoisonSword or Spell.PoisonShot or Spell.SummonSnakes => Art(Form.Veil, Shape.Claw, 72, 0x8ac154, 0xe1ffb3),
-        Spell.Hemorrhage or Spell.VampireShot or Spell.SummonVampire or Spell.MPEater
-            => Art(Form.Bolt, Shape.Shard, 70, 0xdc587c, 0xffc6d0),
-        Spell.NapalmShot or Spell.ExplosiveTrap or Spell.DelayedExplosion or Spell.FireBurst
-            => Art(Form.Eruption, Shape.Flash, 87, 0xff7a36, 0xffe586),
-        Spell.ElementalBarrier or Spell.OneWithNature or Spell.ElementalShot
-            => Art(Form.Ward, Shape.Prism, 82, 0x82e3b9, 0xe1ffeb),
-        Spell.Trap or Spell.Stonetrap or Spell.BindingShot or Spell.CrippleShot or Spell.CatTongue
-            => Art(Form.Bind, Shape.Glyph, 71, 0xc8a177, 0xffe8b1),
-        Spell.MoonLight or Spell.MoonMist or Spell.DarkBody or Spell.Portal
-            => Art(Form.Veil, Shape.Wisp, 93, 0xa38ad4, 0xe9deff),
-        Spell.SummonToad => Art(Form.Totem, Shape.Wisp, 85, 0x78bc7d, 0xdbffd4),
-        Spell.Haste or Spell.LightBody or Spell.SwiftFeet => Art(Form.Rush, Shape.Feather, 70, 0xa3e2d2, 0xf2fff0),
-        Spell.Concentration or Spell.Focus => Art(Form.Ward, Shape.Glyph, 70, 0x8bccd5, 0xe6fcff),
-        Spell.StraightShot or Spell.DoubleShot => Art(Form.Bolt, Shape.Bolt, 57, 0xceb283, 0xffedbf),
-        _ => default
-    };
+            // Shared animations that previously used the same combat libraries.
+            Spell.FatalSword or Spell.DoubleSlash or Spell.HeavenlySword or Spell.CrescentSlash or Spell.FlashDash
+                => Art(tuning.FatalSwordForm, tuning.FatalSwordShape, tuning.FatalSwordSize, tuning.FatalSwordColour, tuning.FatalSwordCore),
+            Spell.PoisonSword or Spell.PoisonShot or Spell.SummonSnakes => Art(tuning.PoisonSwordForm, tuning.PoisonSwordShape, tuning.PoisonSwordSize, tuning.PoisonSwordColour, tuning.PoisonSwordCore),
+            Spell.Hemorrhage or Spell.VampireShot or Spell.SummonVampire or Spell.MPEater
+                => Art(tuning.HemorrhageForm, tuning.HemorrhageShape, tuning.HemorrhageSize, tuning.HemorrhageColour, tuning.HemorrhageCore),
+            Spell.NapalmShot or Spell.ExplosiveTrap or Spell.DelayedExplosion or Spell.FireBurst
+                => Art(tuning.NapalmShotForm, tuning.NapalmShotShape, tuning.NapalmShotSize, tuning.NapalmShotColour, tuning.NapalmShotCore),
+            Spell.ElementalBarrier or Spell.OneWithNature or Spell.ElementalShot
+                => Art(tuning.ElementalBarrierForm, tuning.ElementalBarrierShape, tuning.ElementalBarrierSize, tuning.ElementalBarrierColour, tuning.ElementalBarrierCore),
+            Spell.Trap or Spell.Stonetrap or Spell.BindingShot or Spell.CrippleShot or Spell.CatTongue
+                => Art(tuning.TrapForm, tuning.TrapShape, tuning.TrapSize, tuning.TrapColour, tuning.TrapCore),
+            Spell.MoonLight or Spell.MoonMist or Spell.DarkBody or Spell.Portal
+                => Art(tuning.MoonLightForm, tuning.MoonLightShape, tuning.MoonLightSize, tuning.MoonLightColour, tuning.MoonLightCore),
+            Spell.SummonToad => Art(tuning.SummonToadForm, tuning.SummonToadShape, tuning.SummonToadSize, tuning.SummonToadColour, tuning.SummonToadCore),
+            Spell.Haste or Spell.LightBody or Spell.SwiftFeet => Art(tuning.HasteForm, tuning.HasteShape, tuning.HasteSize, tuning.HasteColour, tuning.HasteCore),
+            Spell.Concentration or Spell.Focus => Art(tuning.ConcentrationForm, tuning.ConcentrationShape, tuning.ConcentrationSize, tuning.ConcentrationColour, tuning.ConcentrationCore),
+            Spell.StraightShot or Spell.DoubleShot => Art(tuning.StraightShotForm, tuning.StraightShotShape, tuning.StraightShotSize, tuning.StraightShotColour, tuning.StraightShotCore),
+            _ => default
+        };
+    }
 
     internal static bool HasLiveArt(Spell spell) =>
         WizardSpellEffects.HasArt(spell) || WarriorSpellEffects.HasArt(spell) || TaoistSpellEffects.HasArt(spell);
@@ -133,62 +145,78 @@ internal static class LegacySpellEffects
         long now, int remaining, int interval, Vector2 facing = default, float progress = .58f,
         Vector2? feet = null, float previousProgress = 0, bool followThrough = false)
     {
+        using var vfxScope = SpellVfxAssets.For(spell);
+        var tuning = SpellVfxAssets.Current.Legacy.WeaponSweep;
         if (remaining <= 0) return;
         var look = Profile(spell);
         if (look.Size == 0) return;
         if (WarriorSpellEffects.UsesWeaponArt(spell))
         {
             WarriorSpellEffects.WeaponSweep(pool, spell, look, pose, last, facing,
-                feet ?? pose.Hilt + Vector2.UnitY * 40, now, remaining, interval, progress, previousProgress, followThrough);
+                feet ?? pose.Hilt + Vector2.UnitY * tuning.Offset, now, remaining, interval, progress, previousProgress, followThrough);
             return;
         }
         var effect = new Effect(pool, look, now);
-        int life = Math.Min(remaining, Math.Clamp(interval * 2, 65, 210));
+        int life = Math.Min(remaining, Math.Clamp(interval * tuning.Life, 65, 210));
         Vector2 blade = pose.Tip - pose.Hilt;
-        Vector2 drift = last is { } previous ? pose.Tip - previous.Tip : blade * .2f;
+        Vector2 drift = last is { } previous ? pose.Tip - previous.Tip : blade * tuning.Drift;
         if (last is { } old && drift.LengthSquared() is > 4 and < 16000)
         {
             // Several tapered samples fill the area swept between the two real weapon poses.
-            int pieces = Math.Clamp((int)drift.Length() / 9, 2, 7);
+            int pieces = Math.Clamp((int)drift.Length() / tuning.PiecesDivisor, 2, 7);
             for (int i = 0; i < pieces; i++)
             {
                 float phase = (i + 1f) / pieces;
                 Vector2 hilt = Vector2.Lerp(old.Hilt, pose.Hilt, phase);
                 Vector2 tip = Vector2.Lerp(old.Tip, pose.Tip, phase);
                 Vector2 edge = tip - hilt;
-                int span = Math.Max(5, (int)edge.Length() + 8);
-                effect.Add(hilt + edge * .58f, Vector2.Zero, Shape.BladeEdge, span, life, Layer.Emissive,
-                    aspect: 26f / span, rotation: MathF.Atan2(edge.Y, edge.X),
-                    alpha: (int)(92 + phase * 120));
+                int span = Math.Max(tuning.Span, (int)edge.Length() + tuning.Span2);
+                effect.Add(hilt + edge * tuning.BladeEdgeOffset, Vector2.Zero, tuning.BladeEdgeShape, span, life, tuning.BladeEdgeLayer,
+                    aspect: tuning.BladeEdgeAspect / span, rotation: MathF.Atan2(edge.Y, edge.X),
+                    alpha: (int)(tuning.BladeEdgeAlpha + phase * tuning.BladeEdgeAlpha2));
             }
 
-            int tipSpan = (int)drift.Length() + 9;
-            effect.Add((old.Tip + pose.Tip) * .5f, Vector2.Zero, Shape.BladeEdge, tipSpan, life,
-                Layer.Emissive, aspect: 17f / tipSpan,
-                rotation: MathF.Atan2(drift.Y, drift.X), core: true, alpha: 206);
+            int tipSpan = (int)drift.Length() + tuning.TipSpan;
+            effect.Add((old.Tip + pose.Tip) * tuning.BladeEdgeOffset2, Vector2.Zero, tuning.BladeEdgeShape2, tipSpan, life,
+                tuning.BladeEdgeLayer2, aspect: tuning.BladeEdgeAspect2 / tipSpan,
+                rotation: MathF.Atan2(drift.Y, drift.X), core: tuning.BladeEdgeCore, alpha: tuning.BladeEdgeAlpha3);
         }
 
-        effect.Add(pose.Tip, drift * .16f, Shape.Flash, 23, life, Layer.Emissive, core: true);
+        effect.Add(pose.Tip, drift * tuning.FlashVelocity, tuning.FlashShape, tuning.FlashSize, life, tuning.FlashLayer, core: tuning.FlashCore);
     }
 
-    internal static Vector2 ProjectileAnchor(Spell spell, Vector2 cell) => spell switch
+    internal static Vector2 ProjectileAnchor(Spell spell, Vector2 cell)
     {
-        Spell.FireBall or Spell.GreatFireBall or Spell.FireBounce or Spell.MeteorShower or Spell.FrostCrunch => cell - new Vector2(0, 47),
-        Spell.SoulFireBall or Spell.SoulShield or Spell.BlessedArmour or Spell.MassHiding or
-            Spell.Curse or Spell.Hallucination or Spell.Plague or Spell.PoisonCloud => cell - new Vector2(0, 36),
-        _ => cell - new Vector2(0, 24)
-    };
+        using var vfxScope = SpellVfxAssets.For(spell);
+        var tuning = SpellVfxAssets.Current.Legacy.ProjectileAnchor;
+        return spell switch
+        {
+            Spell.FireBall or Spell.GreatFireBall or Spell.FireBounce or Spell.MeteorShower or Spell.FrostCrunch => cell - new Vector2(0, tuning.FireBallY),
+            Spell.SoulFireBall or Spell.SoulShield or Spell.BlessedArmour or Spell.MassHiding or
+                Spell.Curse or Spell.Hallucination or Spell.Plague or Spell.PoisonCloud => cell - new Vector2(0, tuning.SoulFireBallY),
+            _ => cell - new Vector2(0, tuning.Y)
+        };
+    }
+
+    internal static (int TravelPerCellMs, int WakeIntervalMs) ProjectileTiming(Spell spell)
+    {
+        using var vfxScope = SpellVfxAssets.For(spell);
+        var tuning = SpellVfxAssets.Current.Legacy.ProjectileTiming;
+        return (tuning.TravelPerCellMs, tuning.WakeIntervalMs);
+    }
 
     internal static void ProjectileFrame(SpellParticlePool pool, Spell spell, Vector2 head, Vector2 heading,
         long now, int frame, int remaining, bool leaveWake, float size = WizardSpellEffects.DefaultSize)
     {
+        using var vfxScope = SpellVfxAssets.For(spell);
+        var tuning = SpellVfxAssets.Current.Legacy.ProjectileFrame;
         if (WizardSpellEffects.DrawProjectile(pool, spell, head, heading, now, frame, remaining, leaveWake, size)) return;
         if (TaoistSpellEffects.DrawProjectile(pool, spell, head, heading, now, frame, remaining, leaveWake, size)) return;
         var look = Profile(spell);
         if (look.Size == 0 || remaining <= 0) return;
 
         float angle = MathF.Atan2(heading.Y, heading.X);
-        float turn = frame * .29f;
+        float turn = frame * tuning.Turn;
         var effect = new Effect(pool, look, now, frameOnly: true);
         switch (spell)
         {
@@ -197,65 +225,71 @@ internal static class LegacySpellEffects
             case Spell.NapalmShot:
             case Spell.ElementalShot:
             case Spell.CatTongue:
-                effect.Add(head, Vector2.Zero, Shape.BladeEdge, look.Size, remaining, Layer.Emissive,
-                    aspect: .57f, rotation: angle, core: true);
+                effect.Add(head, Vector2.Zero, tuning.CatTongueBladeEdgeShape, look.Size, remaining, tuning.CatTongueBladeEdgeLayer,
+                    aspect: tuning.CatTongueBladeEdgeAspect, rotation: angle, core: tuning.CatTongueBladeEdgeCore);
                 break;
             default:
-                effect.Add(head, Vector2.Zero, Shape.Orb, look.Size * 4 / 5, remaining, Layer.Emissive, alpha: 135);
-                effect.Add(head, Vector2.Zero, look.Shape, look.Size * 3 / 5, remaining,
-                    Layer.Emissive, aspect: .86f, rotation: angle + turn, core: true);
+                effect.Add(head, Vector2.Zero, tuning.OrbShape, look.Size * tuning.OrbSize / tuning.OrbSizeDivisor, remaining, tuning.OrbLayer, alpha: tuning.OrbAlpha);
+                effect.Add(head, Vector2.Zero, look.Shape, look.Size * tuning.AddSize / tuning.AddSizeDivisor, remaining,
+                    tuning.AddLayer, aspect: tuning.AddAspect, rotation: angle + turn, core: tuning.AddCore);
                 break;
         }
 
         if (!leaveWake) return;
         var wake = new Effect(pool, look, now);
         Vector2 side = new(-heading.Y, heading.X);
-        float drift = (frame % 3 - 1) * 9;
-        wake.Add(head - heading * 17 + side * drift, -heading * 10 + side * drift * .6f,
-            Shape.Orb, look.Size / 2, Math.Min(remaining, 106), Layer.Emissive,
-            aspect: .72f, rotation: angle, growth: -.29f, alpha: 96);
-        wake.Add(head - heading * 22, -heading * 18 + side * drift, Shape.Spark, 16,
-            Math.Min(remaining, 135), Layer.Emissive, rotation: angle + turn, core: true);
+        float drift = (frame % 3 - 1) * tuning.Drift;
+        wake.Add(head - heading * tuning.OrbOffset + side * drift, -heading * tuning.OrbVelocity + side * drift * tuning.OrbVelocity2,
+            tuning.OrbShape2, look.Size / 2, Math.Min(remaining, tuning.Val2), tuning.OrbLayer2,
+            aspect: tuning.OrbAspect, rotation: angle, growth: tuning.OrbGrowth, alpha: tuning.OrbAlpha2);
+        wake.Add(head - heading * tuning.SparkOffset, -heading * tuning.SparkVelocity + side * drift, tuning.SparkShape, tuning.SparkSize,
+            Math.Min(remaining, tuning.Val22), tuning.SparkLayer, rotation: angle + turn, core: tuning.SparkCore);
     }
 
-    private static Look Profile(SpellVisual visual) => visual.Motif switch
+    private static Look Profile(SpellVisual visual)
     {
-        ParticleMotif.Celebration => Art(Form.Heal, Shape.Banner, 115, 0xe3b04b, 0xfff7ba),
-        ParticleMotif.Radiance => Art(Form.Ward, Shape.Feather, 115, 0x9dc4ff, 0xfff2d5),
-        ParticleMotif.CraftSuccess => Art(Form.Eruption, Shape.Shard, 87, 0xffb34c, 0xffec9d),
-        ParticleMotif.CraftFail => Art(Form.Veil, Shape.Wisp, 66, 0x937179, 0xffb0aa),
-        ParticleMotif.Click => Art(Form.Bind, Shape.Halo, 38, 0xa8d99e, 0xeaffd9),
-        _ => Profile(visual.Spell)
-    };
+        var tuning = SpellVfxAssets.Current.Legacy.MotifProfile;
+        return visual.Motif switch
+        {
+            ParticleMotif.Celebration => Art(tuning.CelebrationForm, tuning.CelebrationShape, tuning.CelebrationSize, tuning.CelebrationColour, tuning.CelebrationCore),
+            ParticleMotif.Radiance => Art(tuning.RadianceForm, tuning.RadianceShape, tuning.RadianceSize, tuning.RadianceColour, tuning.RadianceCore),
+            ParticleMotif.CraftSuccess => Art(tuning.CraftSuccessForm, tuning.CraftSuccessShape, tuning.CraftSuccessSize, tuning.CraftSuccessColour, tuning.CraftSuccessCore),
+            ParticleMotif.CraftFail => Art(tuning.CraftFailForm, tuning.CraftFailShape, tuning.CraftFailSize, tuning.CraftFailColour, tuning.CraftFailCore),
+            ParticleMotif.Click => Art(tuning.ClickForm, tuning.ClickShape, tuning.ClickSize, tuning.ClickColour, tuning.ClickCore),
+            _ => Profile(visual.Spell)
+        };
+    }
 
     internal static void Emit(SpellParticlePool pool, SpellVisual visual, Vector2 feet, Vector2 facing, long now,
         int duration = 0, long? sampleTime = null, uint fieldObjectID = 0)
     {
+        using var vfxScope = SpellVfxAssets.For(visual.Spell);
+        var tuning = SpellVfxAssets.Current.Legacy.Emit;
         var look = Profile(visual);
         if (look.Size == 0) return;
 
         int reference = visual.Phase switch
         {
-            SpellVisualPhase.Prepare => 480,
-            SpellVisualPhase.Aura => 520,
-            SpellVisualPhase.Burn => 800,
-            SpellVisualPhase.Swing or SpellVisualPhase.FollowThrough => 437,
-            _ => 620
+            SpellVisualPhase.Prepare => tuning.PrepareFactor,
+            SpellVisualPhase.Aura => tuning.AuraFactor,
+            SpellVisualPhase.Burn => tuning.BurnFactor,
+            SpellVisualPhase.Swing or SpellVisualPhase.FollowThrough => tuning.SwingFactor,
+            _ => tuning.Factor
         };
         var effect = new Effect(pool, look, now, castsLight: visual.Motif == ParticleMotif.None,
             window: duration, referenceDuration: reference, sampleTime: sampleTime, fieldObjectID: fieldObjectID);
-        Vector2 body = feet - Vector2.UnitY * 22;
+        Vector2 body = feet - Vector2.UnitY * tuning.Body;
         float angle = MathF.Atan2(facing.Y, facing.X);
         switch (visual.Phase)
         {
             case SpellVisualPhase.Prepare:
-                Prepare(effect, look, body + facing * 14, angle);
+                Prepare(effect, look, body + facing * tuning.PrepareHand, angle);
                 break;
             case SpellVisualPhase.Flight:
-                effect.Add(body, facing * 8, Shape.Orb, look.Size * 3 / 4, 160, Layer.Emissive,
-                    aspect: .84f, alpha: 139);
-                effect.Add(body + facing * 6, facing * 9, look.Shape, look.Size / 2, 125, Layer.Emissive,
-                    aspect: .84f, rotation: angle, core: true);
+                effect.Add(body, facing * tuning.FlightOrbVelocity, tuning.FlightOrbShape, look.Size * tuning.FlightOrbSize / 4, tuning.FlightOrbDuration, tuning.FlightOrbLayer,
+                    aspect: tuning.FlightOrbAspect, alpha: tuning.FlightOrbAlpha);
+                effect.Add(body + facing * tuning.FlightAddOffset, facing * tuning.FlightAddVelocity, look.Shape, look.Size / 2, tuning.FlightAddDuration, tuning.FlightAddLayer,
+                    aspect: tuning.FlightAddAspect, rotation: angle, core: tuning.FlightAddCore);
                 break;
             case SpellVisualPhase.Swing:
             case SpellVisualPhase.FollowThrough:
@@ -268,18 +302,18 @@ internal static class LegacySpellEffects
                 Field(effect, look, visual.Spell, feet, body, now);
                 break;
             case SpellVisualPhase.Expire:
-                effect.Scatter(body, 6, Shape.Shard, 55, 400);
+                effect.Scatter(body, tuning.ExpireShardCount, tuning.ExpireShardShape, tuning.ExpireShardSpread, tuning.ExpireShardDuration);
                 break;
             case SpellVisualPhase.Burn:
-                effect.Add(feet, Vector2.Zero, Shape.Halo, 63, 760, Layer.Ground, aspect: .55f, alpha: 160);
-                effect.Add(body + new Vector2(-9, 9), new Vector2(5, -41), Shape.Wisp, 51, 780,
-                    Layer.Emissive, aspect: 1.28f, growth: .25f);
-                effect.Scatter(feet, 6, Shape.Spark, 28, 710, rise: true);
+                effect.Add(feet, Vector2.Zero, tuning.BurnHaloShape, tuning.BurnHaloSize, tuning.BurnHaloDuration, tuning.BurnHaloLayer, aspect: tuning.BurnHaloAspect, alpha: tuning.BurnHaloAlpha);
+                effect.Add(body + new Vector2(tuning.BurnX, tuning.BurnY), new Vector2(tuning.BurnX2, tuning.BurnY2), tuning.BurnWispShape, tuning.BurnWispSize, tuning.BurnWispDuration,
+                    tuning.BurnWispLayer, aspect: tuning.BurnWispAspect, growth: tuning.BurnWispGrowth);
+                effect.Scatter(feet, tuning.BurnSparkCount, tuning.BurnSparkShape, tuning.BurnSparkSpread, tuning.BurnSparkDuration, rise: true);
                 break;
             case SpellVisualPhase.Ward:
-                effect.Ring(feet, look.Size, 650);
-                effect.Add(body, -Vector2.UnitY * 8, Shape.Shield, 77, 570, Layer.Emissive,
-                    aspect: 1.2f, growth: .18f, alpha: 182);
+                effect.Ring(feet, look.Size, tuning.WardRingDuration);
+                effect.Add(body, -Vector2.UnitY * tuning.WardShieldVelocity, tuning.WardShieldShape, tuning.WardShieldSize, tuning.WardShieldDuration, tuning.WardShieldLayer,
+                    aspect: tuning.WardShieldAspect, growth: tuning.WardShieldGrowth, alpha: tuning.WardShieldAlpha);
                 break;
             default:
                 Impact(effect, look, visual.Spell, feet, body, facing, angle);
@@ -289,85 +323,89 @@ internal static class LegacySpellEffects
 
     private static void Prepare(Effect effect, Look look, Vector2 hand, float angle)
     {
-        effect.Add(hand, -Vector2.UnitY * 13, look.Shape, Math.Max(40, look.Size * 2 / 3),
-            480, Layer.Emissive, aspect: .85f, rotation: angle * .3f, growth: .19f, alpha: 204);
-        effect.Add(hand, Vector2.Zero, Shape.Orb, Math.Max(22, look.Size / 4), 240,
-            Layer.Emissive, delay: 110, core: true);
-        effect.Scatter(hand, 5, Shape.Spark, 28, 360, rise: true);
+        var tuning = SpellVfxAssets.Current.Legacy.Prepare;
+        effect.Add(hand, -Vector2.UnitY * tuning.AddVelocity, look.Shape, Math.Max(tuning.Val1, look.Size * tuning.Val2 / 3),
+            tuning.AddDuration, tuning.AddLayer, aspect: tuning.AddAspect, rotation: angle * tuning.AddRotation, growth: tuning.AddGrowth, alpha: tuning.AddAlpha);
+        effect.Add(hand, Vector2.Zero, tuning.OrbShape, Math.Max(tuning.Val12, look.Size / 4), tuning.OrbDuration,
+            tuning.OrbLayer, delay: tuning.OrbDelay, core: tuning.OrbCore);
+        effect.Scatter(hand, tuning.SparkCount, tuning.SparkShape, tuning.SparkSpread, tuning.SparkDuration, rise: true);
     }
 
     private static void Swing(Effect effect, Look look, SpellVisual visual, Vector2 feet, Vector2 body,
         Vector2 facing, float angle)
     {
+        var tuning = SpellVfxAssets.Current.Legacy.Swing;
         bool follow = visual.Phase == SpellVisualPhase.FollowThrough;
         if (visual.Spell == Spell.Thrusting)
         {
-            effect.Add(body + facing * 53, facing * 28, Shape.Bolt, look.Size, 255, Layer.Emissive,
-                aspect: .21f, rotation: angle, core: true);
-            effect.Scatter(body + facing * 92, 6, Shape.Spark, 30, 380);
+            effect.Add(body + facing * tuning.BoltOffset, facing * tuning.BoltVelocity, tuning.BoltShape, look.Size, tuning.BoltDuration, tuning.BoltLayer,
+                aspect: tuning.BoltAspect, rotation: angle, core: tuning.BoltCore);
+            effect.Scatter(body + facing * tuning.SparkOffset, tuning.SparkCount, tuning.SparkShape, tuning.SparkSpread, tuning.SparkDuration);
             return;
         }
 
         if (visual.Spell == Spell.BladeAvalanche)
         {
-            for (int i = 0; i < 4; i++)
-                effect.Add(body + facing * (28 + i * 35), facing * 16, Shape.Shard, 42 + i * 5, 400, Layer.Emissive,
-                    aspect: 1.6f, rotation: angle + .45f, delay: i * 34, core: i % 2 == 0);
+            for (int i = 0; i < tuning.ShardCount; i++)
+                effect.Add(body + facing * (tuning.ShardOffset + i * tuning.ShardOffset2), facing * tuning.ShardVelocity, tuning.ShardShape, tuning.ShardSize + i * tuning.ShardSize2, tuning.ShardDuration, tuning.ShardLayer,
+                    aspect: tuning.ShardAspect, rotation: angle + tuning.ShardRotation, delay: i * tuning.ShardDelay, core: i % 2 == 0);
             return;
         }
 
-        int cuts = visual.Spell switch { Spell.CrossHalfMoon => 4, Spell.TwinDrakeBlade => 2, _ => 1 };
+        int cuts = visual.Spell switch { Spell.CrossHalfMoon => tuning.CrossHalfMoonFactor, Spell.TwinDrakeBlade => tuning.TwinDrakeBladeFactor, _ => 1 };
         for (int i = 0; i < cuts; i++)
         {
-            float direction = angle + i * (visual.Spell == Spell.CrossHalfMoon ? MathF.PI / 2 : .45f) + (follow ? .57f : -.2f);
+            float direction = angle + i * (visual.Spell == Spell.CrossHalfMoon ? MathF.PI / 2 : tuning.Direction) + (follow ? tuning.Direction2 : tuning.Direction3);
             Vector2 travel = new(MathF.Cos(direction), MathF.Sin(direction));
-            effect.Add(body + travel * 28, travel * 23, look.Shape, look.Size, 280, Layer.Emissive,
-                aspect: .58f, rotation: direction, delay: i * 42, core: follow || i == 1);
+            effect.Add(body + travel * tuning.AddOffset, travel * tuning.AddVelocity, look.Shape, look.Size, tuning.AddDuration, tuning.AddLayer,
+                aspect: tuning.AddAspect, rotation: direction, delay: i * tuning.AddDelay, core: follow || i == 1);
         }
         if (visual.Spell is Spell.HalfMoon or Spell.CrossHalfMoon or Spell.SlashingBurst)
-            effect.Ring(feet, look.Size, 380);
+            effect.Ring(feet, look.Size, tuning.RingDuration);
         if (visual.Spell == Spell.FlamingSword)
-            effect.Add(body + facing * 34, facing * 11 - Vector2.UnitY * 30, Shape.Wisp, 70, 470, Layer.Emissive, growth: .37f);
-        effect.Scatter(body + facing * 24, 7, Shape.Spark, look.Size * .45f, 410);
+            effect.Add(body + facing * tuning.WispOffset, facing * tuning.WispVelocity - Vector2.UnitY * tuning.WispVelocity2, tuning.WispShape, tuning.WispSize, tuning.WispDuration, tuning.WispLayer, growth: tuning.WispGrowth);
+        effect.Scatter(body + facing * tuning.SparkOffset2, tuning.SparkCount2, tuning.SparkShape2, look.Size * tuning.SparkSpread2, tuning.SparkDuration2);
     }
 
     private static void Aura(Effect effect, Look look, Spell spell, Vector2 feet, Vector2 body)
     {
+        var tuning = SpellVfxAssets.Current.Legacy.Aura;
         if (spell is Spell.Poisoning or Spell.Plague or Spell.Curse or Spell.Hiding)
         {
-            effect.Add(body, -Vector2.UnitY * 12, look.Shape, look.Size * 2 / 3, 500, Layer.World, alpha: 126, growth: .19f);
-            effect.Add(feet, -Vector2.UnitY * 17, Shape.Spark, 17, 490, Layer.Emissive, core: true);
+            effect.Add(body, -Vector2.UnitY * tuning.AddVelocity, look.Shape, look.Size * tuning.AddSize / 3, tuning.AddDuration, tuning.AddLayer, alpha: tuning.AddAlpha, growth: tuning.AddGrowth);
+            effect.Add(feet, -Vector2.UnitY * tuning.SparkVelocity, tuning.SparkShape, tuning.SparkSize, tuning.SparkDuration, tuning.SparkLayer, core: tuning.SparkCore);
             return;
         }
 
-        effect.Add(feet, Vector2.Zero, Shape.Halo, look.Size, 510, Layer.Ground, aspect: .48f, alpha: 170);
-        effect.Add(body, -Vector2.UnitY * 4, look.Shape, look.Size * 3 / 4, 520, Layer.Emissive,
-            aspect: 1.22f, alpha: 159);
-        effect.Add(body + new Vector2(17, -12), new Vector2(-9, -16), Shape.Spark, 19, 460,
-            Layer.Emissive, core: true);
+        effect.Add(feet, Vector2.Zero, tuning.HaloShape, look.Size, tuning.HaloDuration, tuning.HaloLayer, aspect: tuning.HaloAspect, alpha: tuning.HaloAlpha);
+        effect.Add(body, -Vector2.UnitY * tuning.AddVelocity2, look.Shape, look.Size * tuning.AddSize2 / 4, tuning.AddDuration2, tuning.AddLayer2,
+            aspect: tuning.AddAspect, alpha: tuning.AddAlpha2);
+        effect.Add(body + new Vector2(tuning.X, tuning.Y), new Vector2(tuning.X2, tuning.Y2), tuning.SparkShape2, tuning.SparkSize2, tuning.SparkDuration2,
+            tuning.SparkLayer2, core: tuning.SparkCore2);
     }
 
     private static void Field(Effect effect, Look look, Spell spell, Vector2 feet, Vector2 body, long now)
     {
-        float drift = MathF.Sin(feet.X * .054f + feet.Y * .037f + now % 4096 * .008f) * 17;
+        var tuning = SpellVfxAssets.Current.Legacy.Field;
+        float drift = MathF.Sin(feet.X * tuning.Drift + feet.Y * tuning.Drift2 + now % 4096 * tuning.Drift3) * tuning.Drift4;
         switch (spell)
         {
             case Spell.PoisonCloud:
-                effect.Add(feet + new Vector2(drift, -13), new Vector2(15, -8), Shape.Wisp, 89, 810,
-                    Layer.World, aspect: .52f, alpha: 151, growth: .19f);
-                effect.Add(feet + new Vector2(-drift, -6), new Vector2(-16, -6), Shape.Wisp, 72, 700,
-                    Layer.Emissive, aspect: .45f, alpha: 122, growth: .3f);
+                effect.Add(feet + new Vector2(drift, tuning.PoisonCloudY), new Vector2(tuning.PoisonCloudX, tuning.PoisonCloudY2), tuning.PoisonCloudWispShape, tuning.PoisonCloudWispSize, tuning.PoisonCloudWispDuration,
+                    tuning.PoisonCloudWispLayer, aspect: tuning.PoisonCloudWispAspect, alpha: tuning.PoisonCloudWispAlpha, growth: tuning.PoisonCloudWispGrowth);
+                effect.Add(feet + new Vector2(-drift, tuning.PoisonCloudY3), new Vector2(tuning.PoisonCloudX2, tuning.PoisonCloudY4), tuning.PoisonCloudWispShape2, tuning.PoisonCloudWispSize2, tuning.PoisonCloudWispDuration2,
+                    tuning.PoisonCloudWispLayer2, aspect: tuning.PoisonCloudWispAspect2, alpha: tuning.PoisonCloudWispAlpha2, growth: tuning.PoisonCloudWispGrowth2);
                 break;
             case Spell.TrapHexagon:
-                for (int i = 0; i < 6; i++)
+                for (int i = 0; i < tuning.TrapHexagonBoltCount; i++)
                 {
                     float angle = i * MathF.PI / 3;
                     float next = angle + MathF.PI / 3;
-                    Vector2 point = new(MathF.Cos(angle) * 29, MathF.Sin(angle) * 16);
-                    Vector2 end = new(MathF.Cos(next) * 29, MathF.Sin(next) * 16);
+                    Vector2 point = new(MathF.Cos(angle) * tuning.TrapHexagonPoint, MathF.Sin(angle) * tuning.TrapHexagonPoint2);
+                    Vector2 end = new(MathF.Cos(next) * tuning.TrapHexagonEnd, MathF.Sin(next) * tuning.TrapHexagonEnd2);
                     Vector2 edge = end - point;
-                    effect.Add(feet + (point + end) * .5f, Vector2.Zero, Shape.Bolt, (int)edge.Length() + 8,
-                        520, Layer.Ground, aspect: .25f, rotation: MathF.Atan2(edge.Y, edge.X), alpha: 210);
+                    effect.Add(feet + (point + end) * tuning.TrapHexagonBoltOffset, Vector2.Zero, tuning.TrapHexagonBoltShape, (int)edge.Length() + tuning.TrapHexagonBoltSize,
+                        tuning.TrapHexagonBoltDuration, tuning.TrapHexagonBoltLayer, aspect: tuning.TrapHexagonBoltAspect, rotation: MathF.Atan2(edge.Y, edge.X), alpha: tuning.TrapHexagonBoltAlpha);
                 }
                 break;
             default:
@@ -379,62 +417,63 @@ internal static class LegacySpellEffects
     private static void Impact(Effect effect, Look look, Spell spell, Vector2 feet, Vector2 body,
         Vector2 facing, float angle)
     {
+        var tuning = SpellVfxAssets.Current.Legacy.Impact;
         switch (look.Form)
         {
             case Form.Cut:
             case Form.Cleave:
-                effect.Add(body, facing * 10, look.Shape, Math.Max(23, look.Size / 2), 230, Layer.Emissive,
-                    aspect: .78f, rotation: angle - .28f, core: true);
+                effect.Add(body, facing * tuning.CleaveAddVelocity, look.Shape, Math.Max(tuning.CleaveVal1, look.Size / 2), tuning.CleaveAddDuration, tuning.CleaveAddLayer,
+                    aspect: tuning.CleaveAddAspect, rotation: angle - tuning.CleaveAddRotation, core: tuning.CleaveAddCore);
                 if (spell is not (Spell.Fencing or Spell.SpiritSword))
-                    effect.Scatter(body, 5, Shape.Spark, 29, 380);
+                    effect.Scatter(body, tuning.CleaveSparkCount, tuning.CleaveSparkShape, tuning.CleaveSparkSpread, tuning.CleaveSparkDuration);
                 break;
             case Form.Rush:
-                effect.Add(body, facing * 35, Shape.Bolt, look.Size, 270, Layer.Emissive, aspect: .42f, rotation: angle);
-                effect.Add(feet, facing * 20, Shape.Wisp, 64, 450, Layer.Ground, alpha: 156);
-                effect.Scatter(body, 6, Shape.Shard, 35, 360);
+                effect.Add(body, facing * tuning.RushBoltVelocity, tuning.RushBoltShape, look.Size, tuning.RushBoltDuration, tuning.RushBoltLayer, aspect: tuning.RushBoltAspect, rotation: angle);
+                effect.Add(feet, facing * tuning.RushWispVelocity, tuning.RushWispShape, tuning.RushWispSize, tuning.RushWispDuration, tuning.RushWispLayer, alpha: tuning.RushWispAlpha);
+                effect.Scatter(body, tuning.RushShardCount, tuning.RushShardShape, tuning.RushShardSpread, tuning.RushShardDuration);
                 break;
             case Form.Heal:
             case Form.Totem:
             case Form.Ward:
-                effect.Ring(feet, look.Size, 650);
-                effect.Add(body, -Vector2.UnitY * 27, look.Shape, look.Size * 3 / 4, 540,
-                    Layer.Emissive, aspect: 1.12f, growth: .12f);
-                effect.Add(body, -Vector2.UnitY * 21, Shape.Flash, look.Size / 2, 235, Layer.Emissive, core: true);
-                effect.Scatter(body, 7, look.Form == Form.Totem ? look.Shape : Shape.Feather, look.Size * .42f, 590, rise: true);
+                effect.Ring(feet, look.Size, tuning.WardRingDuration);
+                effect.Add(body, -Vector2.UnitY * tuning.WardAddVelocity, look.Shape, look.Size * tuning.WardAddSize / 4, tuning.WardAddDuration,
+                    tuning.WardAddLayer, aspect: tuning.WardAddAspect, growth: tuning.WardAddGrowth);
+                effect.Add(body, -Vector2.UnitY * tuning.WardFlashVelocity, tuning.WardFlashShape, look.Size / 2, tuning.WardFlashDuration, tuning.WardFlashLayer, core: tuning.WardFlashCore);
+                effect.Scatter(body, tuning.WardFeatherCount, look.Form == Form.Totem ? look.Shape : tuning.WardFeatherShape, look.Size * tuning.WardFeatherSpread, tuning.WardFeatherDuration, rise: true);
                 break;
             case Form.Bind:
-                effect.Ring(feet, look.Size, 640);
+                effect.Ring(feet, look.Size, tuning.BindRingDuration);
                 if (spell == Spell.Entrapment)
                 {
-                    for (int i = 0; i < 3; i++)
-                        effect.Add(body + new Vector2(0, i * 12 - 12), Vector2.Zero, Shape.Bolt, 55, 560,
-                            Layer.Emissive, aspect: .23f, rotation: i == 1 ? -.45f : .45f, delay: i * 45, core: i == 1);
+                    for (int i = 0; i < tuning.BindBoltCount; i++)
+                        effect.Add(body + new Vector2(0, i * tuning.BindY - tuning.BindY2), Vector2.Zero, tuning.BindBoltShape, tuning.BindBoltSize, tuning.BindBoltDuration,
+                            tuning.BindBoltLayer, aspect: tuning.BindBoltAspect, rotation: i == 1 ? tuning.BindBoltRotation : tuning.BindBoltRotation2, delay: i * tuning.BindBoltDelay, core: i == 1);
                 }
                 else
                 {
-                    effect.Add(body, -Vector2.UnitY * 18, look.Shape, look.Size * 3 / 4, 540,
-                        Layer.Emissive, core: true);
+                    effect.Add(body, -Vector2.UnitY * tuning.BindAddVelocity, look.Shape, look.Size * tuning.BindAddSize / 4, tuning.BindAddDuration,
+                        tuning.BindAddLayer, core: tuning.BindAddCore);
                 }
                 break;
             case Form.Veil:
-                effect.Ring(feet, look.Size, 520);
-                for (int i = -1; i <= 1; i++)
-                    effect.Add(body + new Vector2(i * 22, 7), new Vector2(i * 13, -19), Shape.Wisp, look.Size * 3 / 4,
-                        650, Layer.World, growth: .38f, alpha: 182);
-                effect.Add(body, -Vector2.UnitY * 15, look.Shape, look.Size / 2, 360, Layer.Emissive, core: true);
+                effect.Ring(feet, look.Size, tuning.VeilRingDuration);
+                for (int i = -1; i <= tuning.VeilWispCount; i++)
+                    effect.Add(body + new Vector2(i * tuning.VeilX, tuning.VeilY), new Vector2(i * tuning.VeilX2, tuning.VeilY2), tuning.VeilWispShape, look.Size * tuning.VeilWispSize / 4,
+                        tuning.VeilWispDuration, tuning.VeilWispLayer, growth: tuning.VeilWispGrowth, alpha: tuning.VeilWispAlpha);
+                effect.Add(body, -Vector2.UnitY * tuning.VeilAddVelocity, look.Shape, look.Size / 2, tuning.VeilAddDuration, tuning.VeilAddLayer, core: tuning.VeilAddCore);
                 break;
             case Form.Break:
-                effect.Ring(feet, look.Size, 530);
-                effect.Add(body, Vector2.Zero, look.Shape, look.Size, 410, Layer.Emissive,
-                    aspect: .72f, growth: .56f, alpha: 188, core: true);
-                effect.Scatter(body, 9, Shape.Feather, look.Size * .55f, 490);
+                effect.Ring(feet, look.Size, tuning.BreakRingDuration);
+                effect.Add(body, Vector2.Zero, look.Shape, look.Size, tuning.BreakAddDuration, tuning.BreakAddLayer,
+                    aspect: tuning.BreakAddAspect, growth: tuning.BreakAddGrowth, alpha: tuning.BreakAddAlpha, core: tuning.BreakAddCore);
+                effect.Scatter(body, tuning.BreakFeatherCount, tuning.BreakFeatherShape, look.Size * tuning.BreakFeatherSpread, tuning.BreakFeatherDuration);
                 break;
             default:
-                if (look.Form is Form.Eruption or Form.Hammer) effect.Ring(feet, look.Size, 510);
-                effect.Add(body, -Vector2.UnitY * 26, look.Shape, look.Size * 3 / 4, 390, Layer.Emissive,
-                    aspect: look.Shape == Shape.Pillar ? 1.55f : .93f, growth: .27f);
-                effect.Add(body, -Vector2.UnitY * 12, Shape.Flash, look.Size * 2 / 3, 230, Layer.Emissive, core: true);
-                effect.Scatter(body, 8, Shape.Spark, look.Size * .59f, 485);
+                if (look.Form is Form.Eruption or Form.Hammer) effect.Ring(feet, look.Size, tuning.RingDuration);
+                effect.Add(body, -Vector2.UnitY * tuning.PillarVelocity, look.Shape, look.Size * tuning.PillarSize / 4, tuning.PillarDuration, tuning.PillarLayer,
+                    aspect: look.Shape == Shape.Pillar ? tuning.PillarAspect : tuning.PillarAspect2, growth: tuning.PillarGrowth);
+                effect.Add(body, -Vector2.UnitY * tuning.FlashVelocity, tuning.FlashShape, look.Size * tuning.FlashSize / 3, tuning.FlashDuration, tuning.FlashLayer, core: tuning.FlashCore);
+                effect.Scatter(body, tuning.SparkCount, tuning.SparkShape, look.Size * tuning.SparkSpread, tuning.SparkDuration);
                 break;
         }
     }

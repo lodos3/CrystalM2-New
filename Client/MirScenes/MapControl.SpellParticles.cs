@@ -51,7 +51,7 @@ public sealed partial class MapControl
         if (SpecialisationAbilities.TryGet(spell, out var ability))
             SignatureSpellEffects.RelayArc(_spellParticles, ability, SpellWorldPoint(from), SpellWorldPoint(to), CMain.Time);
         else if (spell is Spell.Lightning or Spell.ThunderBolt or Spell.Vampirism)
-            AddWizardArc(new WizardArc(spell, from, to, CMain.Time, spell == Spell.Vampirism ? 350 : 440));
+            AddWizardArc(new WizardArc(spell, from, to, CMain.Time, WizardSpellEffects.RelayDuration(spell)));
         TextureValid = false;
     }
 

@@ -1,4 +1,4 @@
-﻿using Client.MirGraphics;
+using Client.MirGraphics;
 using Client.MirScenes;
 using Client.MirSounds;
 using S = ServerPackets;
@@ -2417,7 +2417,8 @@ namespace Client.MirObjects
                                                 ob = MapControl.GetObject(TargetID);
                                                 if (ob != null)
                                                 {
-                                                    ob.Effects.Add(new Effect(new SpellVisual(Spell.TrapHexagon), 400, ob));
+                                                    ob.Effects.Add(new Effect(new SpellVisual(Spell.TrapHexagon),
+                                                        SpellVfxAssets.CueDuration(Spell.TrapHexagon, static cue => cue.TrapHexagonImpactDurationMs), ob));
                                                     SoundManager.PlaySound(BaseSound + 6);
                                                 }
                                                 break;
@@ -2574,7 +2575,8 @@ namespace Client.MirObjects
                                                 ob = MapControl.GetObject(TargetID);
                                                 if (ob != null)
                                                 {
-                                                    ob.Effects.Add(new Effect(new SpellVisual(Spell.ThunderBolt), 300, ob));
+                                                    ob.Effects.Add(new Effect(new SpellVisual(Spell.ThunderBolt),
+                                                        SpellVfxAssets.CueDuration(Spell.ThunderBolt, static cue => cue.ThunderBoltImpactShortDurationMs), ob));
                                                 }
                                                 break;
                                             case Monster.LeftGuard:
@@ -2614,7 +2616,8 @@ namespace Client.MirObjects
                                                 ob = MapControl.GetObject(TargetID);
                                                 if (ob != null)
                                                 {
-                                                    ob.Effects.Add(new Effect(new SpellVisual(Spell.Poisoning), 1000, ob));
+                                                    ob.Effects.Add(new Effect(new SpellVisual(Spell.Poisoning),
+                                                        SpellVfxAssets.CueDuration(Spell.Poisoning, static cue => cue.PoisoningImpactDurationMs), ob));
                                                     SoundManager.PlaySound(BaseSound + 6);
                                                 }
                                                 break;
@@ -2622,7 +2625,8 @@ namespace Client.MirObjects
                                                 ob = MapControl.GetObject(TargetID);
                                                 if (ob != null)
                                                 {
-                                                    ob.Effects.Add(new Effect(new SpellVisual(Spell.ThunderBolt), 300, ob));
+                                                    ob.Effects.Add(new Effect(new SpellVisual(Spell.ThunderBolt),
+                                                        SpellVfxAssets.CueDuration(Spell.ThunderBolt, static cue => cue.ThunderBoltImpactShortDurationMs), ob));
                                                     SoundManager.PlaySound(BaseSound + 6);
                                                 }
                                                 break;
