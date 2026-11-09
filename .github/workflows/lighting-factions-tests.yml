@@ -96,6 +96,8 @@ jobs:
         run: dotnet restore Client/Client.csproj
       - name: Compile the sole Vortice D3D11 game client
         run: dotnet build Client/Client.csproj --configuration Release --no-restore
+      - name: Validate authored Taoist ward particles without GPU
+        run: dotnet run --project Tests/TaoistParticleTests/TaoistParticleTests.csproj --configuration Release
       - name: Validate production D3D11 shaders and compositor on real WARP
         run: dotnet run --project Tests/WindowsRendererTests/WindowsRendererTests.csproj --configuration Release
       - name: Publish the sole Windows x64 client
