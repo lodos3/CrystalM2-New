@@ -325,43 +325,75 @@ internal static partial class WizardSpellEffects
 
     private static void IceStorm(Frame frame, Vector2 feet, float progress, bool prepare)
     {
-        float spread = (prepare ? .36f : .74f) + (prepare ? .13f : .26f) * Ease(progress * 2.7f);
-        float wind = progress * (prepare ? 4.9f : 8.8f);
-        frame.Sprite(feet, 276 * spread, 169 * spread, Shape.Orb, Ice, .42f, Layer.Ground, light: true);
-        if (prepare)
-            frame.Sprite(feet, 239 * spread, 159 * spread, Shape.SigilDisc, IceWhite, .76f, Layer.Ground);
-        for (int i = 0; i < 12; i++)
-        {
-            float radius = (.52f + .48f * frame.Unit(i + 51)) * spread;
-            float angle = (i + frame.Unit(i + 11) * .5f) * MathF.Tau / 12 + wind * (.81f + frame.Unit(i) * .36f);
-            float height = (8 + frame.Unit(i + 14) * 69) * spread;
-            Vector2 root = feet + ProjectGround(Ellipse(angle, 109, 109) * radius);
-            Vector2 centre = root - Vector2.UnitY * height;
-            Vector2 tangent = ProjectGround(Ellipse(angle + MathF.PI / 2, 1, 1));
-            float rotation = MathF.Atan2(tangent.Y, tangent.X) - .18f;
-            frame.Clip(centre, (91 + 46 * frame.Unit(i + 9)) * spread, (23 + frame.Unit(i + 31) * 29) * spread,
-                Shape.SmokeSequence, progress * .86f + i * .17f, i % 3 == 0 ? IceWhite : i % 3 == 1 ? PaleBlue : 0x638dba, .74f,
-                Depth(angle), rotation, light: i % 4 == 0, sortY: root.Y);
-            if (i % 2 == 0)
-                frame.Clip(centre - tangent * 19, 104 * spread, 25 * spread, Shape.SmokeSequence,
-                    progress * .84f + i * .26f, IceWhite, .71f, Depth(angle), rotation + .19f, sortY: root.Y);
-        }
+        // Both cast and contact carry the same detailed runic seal, while
+        // irregular spinning cold ribbons breathe small > large > small.
+        float spread = prepare ? .62f : .90f;
+        float wind = progress * (prepare ? 7.1f : 11.4f);
+        float runeFade = prepare ? .74f : .57f * (1f - Ease((progress - .67f) / .33f));
+        frame.Sprite(feet, 208 * spread, 133 * spread,
+            Shape.SigilDisc, IceWhite, runeFade, Layer.Ground,
+            rotation: progress * .31f, light: true, sortY: feet.Y);
 
-        int count = prepare ? 18 : 94;
-        for (int i = 0; i < count; i++)
+        int ribbons = prepare ? 16 : 23;
+        for (int i = 0; i < ribbons; i++)
         {
-            float fall = Fract(progress * 1.57f + frame.Unit(i + 82));
-            float angle = frame.Unit(i + 65) * MathF.Tau + wind * (.70f + .56f * frame.Unit(i + 21));
-            float radius = (.28f + frame.Unit(i + 44) * .82f) * spread;
-            float height = (37 + frame.Unit(i + 117) * 101) * spread * (1 - fall);
-            Vector2 root = feet + ProjectGround(Ellipse(angle, 114, 114) * radius);
-            Vector2 point = root - Vector2.UnitY * height;
-            float width = 2 + frame.Unit(i + 115) * 4.5f;
-            frame.Sprite(point, width, width * 1.2f, Shape.Orb, i % 4 == 0 ? Ice : IceWhite,
-                .86f * MathF.Sin(fall * MathF.PI), Depth(angle), sortY: root.Y);
-            if (i % 6 == 0)
-                frame.Sprite(point, width * 2.1f, width * 1.6f, Shape.Wisp, PaleBlue, .72f * fall,
-                    Depth(angle), wind + angle, sortY: root.Y);
+            int seed = 83 + i * 31;
+            float age = Fract(progress * (1.02f + frame.Unit(seed + 3) * .73f) +
+                frame.Unit(seed + 7));
+            float lifeCurve = MathF.Sin(age * MathF.PI);
+            if (lifeCurve < .02f) continue;
+            float angle = frame.Unit(seed + 11) * MathF.Tau +
+                wind * (.66f + frame.Unit(seed + 13) * .74f);
+            float radius = (36 + 78 * frame.Unit(seed + 17)) * spread;
+            Vector2 root = feet + ProjectGround(Ellipse(angle, radius, radius));
+            float height = (20 + 55 * frame.Unit(seed + 19)) * spread;
+            Vector2 centre = root - Vector2.UnitY * (height + age * 17);
+            Vector2 tangent = ProjectGround(Ellipse(angle + MathF.PI / 2, 1, 1));
+            float orientation = MathF.Atan2(tangent.Y, tangent.X) +
+                progress * (i % 2 == 0 ? 2.7f : -2.2f);
+            float width = (6 + 42 * lifeCurve) * spread;
+            float thickness = (3 + 14 * lifeCurve) * spread;
+            float alpha = .78f * lifeCurve;
+            frame.Sprite(centre, width, thickness,
+                Shape.UserSlash, i % 5 == 0 ? IceWhite : i % 2 == 0 ? PaleBlue : Ice,
+                alpha, Depth(angle), orientation, light: i % 9 == 0, sortY: root.Y);
+            frame.Clip(centre - tangent * 5, width * .89f, thickness * 1.35f,
+                Shape.SmokeSequence, progress * 1.47f + frame.Unit(seed + 27),
+                0x82aabd, .39f * lifeCurve,
+                Depth(angle), orientation + .17f, sortY: root.Y);
+
+            // Snow is born on each swirling ribbon, travels briefly and fades.
+            for (int snow = 0; snow < 4; snow++)
+            {
+                int flake = seed + snow * 29;
+                float driftAge = Fract(age * 1.29f + frame.Unit(flake + 33));
+                Vector2 point = centre + tangent *
+                    ((frame.Unit(flake + 37) - .5f) * width * .75f) +
+                    new Vector2((frame.Unit(flake + 41) - .5f) * driftAge * 12,
+                        -driftAge * (7 + frame.Unit(flake + 43) * 19));
+                frame.Sprite(point, 1.8f + frame.Unit(flake + 47) * 2.6f,
+                    2.1f + frame.Unit(flake + 49) * 2.1f,
+                    Shape.Spark, snow % 3 == 0 ? IceWhite : PaleBlue,
+                    lifeCurve * (1 - driftAge) * .80f, Depth(angle),
+                    orientation, sortY: root.Y);
+            }
+        }
+        int dust = prepare ? 34 : 80;
+        for (int i = 0; i < dust; i++)
+        {
+            int seed = i * 37 + 511;
+            float age = Fract(progress * 1.71f + frame.Unit(seed + 3));
+            float angle = frame.Unit(seed + 7) * MathF.Tau +
+                wind * (.71f + frame.Unit(seed + 9) * .42f);
+            float radius = (17 + frame.Unit(seed + 11) * 109) * spread;
+            Vector2 root = feet + ProjectGround(Ellipse(angle, radius, radius));
+            Vector2 point = root - Vector2.UnitY *
+                ((13 + frame.Unit(seed + 13) * 114) * (1 - age));
+            frame.Sprite(point, 1.5f + frame.Unit(seed + 17) * 2.8f,
+                1.8f + frame.Unit(seed + 19) * 2.6f, Shape.Spark,
+                i % 5 == 0 ? IceWhite : i % 2 == 0 ? PaleBlue : Ice,
+                .78f * MathF.Sin(age * MathF.PI), Depth(angle),
+                wind * .13f, sortY: root.Y);
         }
     }
 

@@ -50,7 +50,12 @@ internal static partial class WizardSpellEffects
         {
             if (visual.Spell is Spell.IceThrust or Spell.IceStorm)
             {
-                SnowContact(frame, feet, progress, visual.Spell == Spell.IceThrust);
+                // Ice Storm's contact must retain the runic seal and swirling
+                // wind/ice; SnowContact is the separate Ice Thrust impact.
+                if (visual.Spell == Spell.IceStorm)
+                    IceStorm(frame, feet, progress, prepare: false);
+                else
+                    SnowContact(frame, feet, progress, true);
                 return;
             }
             bool cold = visual.Spell == Spell.ThunderStorm;
