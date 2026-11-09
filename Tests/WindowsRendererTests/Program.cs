@@ -198,6 +198,7 @@ internal static class Program
             Near(Color.Red, image.GetPixel(0, 0), "Existing textures must survive swapchain resize.");
         }
         TestParticleCoverageSampling(device);
+        TestSlashRibbonShader(device);
         TestSignatureSpellEffects(device);
         TestLegacySpellEffects(device);
         TestWizardProjection();
@@ -758,6 +759,51 @@ internal static class Program
         Check(!pool.Active.IsEmpty && pool.Active.ToArray().All(particle => particle.FieldObjectID == 102),
             "Field expiry clears the removed field's art while preserving other fields.");
         device.SetRenderTarget(original);
+    }
+
+    private static void TestSlashRibbonShader(RendererDevice device)
+    {
+        // Keep age/colour/geometry identical: any changed pixels must come
+        // from the animated crescent/slash shader, not particle fade.
+        using var texture = new Texture(device, 192, 160, true);
+        using var surface = texture.GetSurface();
+        using var original = device.GetBackBuffer();
+        device.SetRenderTarget(surface);
+        try
+        {
+            foreach (var shape in new[] { SpellParticleShape.MoonRibbon, SpellParticleShape.BladeRibbon })
+            {
+                using Bitmap early = Render(1100);
+                using Bitmap late = Render(1380);
+                int visible = 0, animated = 0;
+                for (int y = 65; y < 91; y++)
+                for (int x = 35; x < 155; x++)
+                {
+                    Color a = early.GetPixel(x, y), b = late.GetPixel(x, y);
+                    if (Math.Max(a.R, Math.Max(a.G, a.B)) > 30) visible++;
+                    if (Math.Abs(a.R - b.R) + Math.Abs(a.G - b.G) + Math.Abs(a.B - b.B) > 7)
+                        animated++;
+                }
+                Check(visible > 150 && animated > 30,
+                    $\"{shape} should have moving internal sheen across a persistent slash silhouette. Changed: {animated}.\");
+            }
+
+            Bitmap Render(long now)
+            {
+                var quad = new SpriteQuad(new(-60, -14), new(60, -14), new(-60, 15), new(60, 15));
+                var ribbon = new SpellParticle(new Vector2(95, 77), Vector2.Zero,
+                    now - 65, 700, 1, Color.FromArgb(235, 135, 192, 245),
+                    shape, 0, Layer: SpellParticleLayer.Emissive, CastsLight: false, Ribbon: quad);
+                device.Clear(Color.Black);
+                device.SpellParticles.Draw([ribbon], Vector2.Zero, now, ground: false,
+                    emissiveOverlay: true);
+                return device.Capture(surface);
+            }
+        }
+        finally
+        {
+            device.SetRenderTarget(original);
+        }
     }
 
     private static void TestWeaponSpellMask(RendererDevice device)
