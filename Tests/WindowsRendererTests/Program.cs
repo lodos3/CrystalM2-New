@@ -485,11 +485,31 @@ internal static class Program
             iceNorth.Any(p => p.Ground && p.Origin.Y < feet.Y - 111) &&
             iceNorth.All(p => p.Shape != SpellParticleShape.IceSpire),
             "Ice Thrust begins at the chest and extends into a projected area along the chosen heading.");
-        SpellParticle[] storm = Sample(Spell.IceStorm, SpellVisualPhase.Impact, 510, feet);
-        Check(storm.Count(p => p.Shape == SpellParticleShape.Orb && p.Size < 14) > 23 &&
-            storm.Any(p => p.Shape == SpellParticleShape.SmokeSequence) &&
-            storm.All(p => p.Shape is not (SpellParticleShape.Shard or SpellParticleShape.IceSpire)),
-            "Ice Storm is made of blowing snow and wind layers.");
+        // Ice Storm keeps the original floor rune during both the opening
+        // and the impact/contact; wind particles must be animated rather than
+        // large static sprites, and each ribbon sheds tiny snow particles.
+        foreach (SpellVisualPhase phase in new[] { SpellVisualPhase.Prepare, SpellVisualPhase.Impact, SpellVisualPhase.Contact })
+        {
+            SpellParticle[] storm = Sample(Spell.IceStorm, phase, 510, feet);
+            SpellParticle[] windIce = storm.Where(p => p.Shape == SpellParticleShape.UserSlash).ToArray();
+            SpellParticle[] snow = storm.Where(p => p.Shape == SpellParticleShape.Spark && p.Size <= 6).ToArray();
+            Check(storm.Any(p => p.Shape == SpellParticleShape.SigilDisc && p.Ground && p.Origin == feet),
+                $"Ice Storm {phase} must preserve its ground rune circle.");
+            Check(windIce.Length >= 10 && windIce.Select(p => MathF.Round(p.Rotation, 1)).Distinct().Count() >= 8 &&
+                  windIce.Select(p => p.Size).Distinct().Count() >= 6,
+                $"Ice Storm {phase} must use individually spinning ribbons of varied, life-shaped sizes.");
+            Check(snow.Length >= 40 && storm.Any(p => p.Shape == SpellParticleShape.SmokeSequence) &&
+                  !storm.Any(p => p.Shape == SpellParticleShape.IceSpire || p.Shape == SpellParticleShape.Shard),
+                $"Ice Storm {phase} must sub-emit many tiny snow dots within translucent wind/ice.");
+        }
+        SpellParticle[] stormEarlier = Sample(Spell.IceStorm, SpellVisualPhase.Impact, 280, feet);
+        SpellParticle[] stormLater = Sample(Spell.IceStorm, SpellVisualPhase.Impact, 510, feet);
+        var windEarlier = stormEarlier.Where(p => p.Shape == SpellParticleShape.UserSlash).ToArray();
+        var windLater = stormLater.Where(p => p.Shape == SpellParticleShape.UserSlash).ToArray();
+        Check(windEarlier.Length >= 10 && windLater.Length >= 10 &&
+              windEarlier.Zip(windLater).Any(p => MathF.Abs(p.First.Rotation - p.Second.Rotation) > .3f) &&
+              windEarlier.Zip(windLater).Any(p => p.First.Size != p.Second.Size),
+            "Ice Storm ribbons must rotate and breathe across successive frames, not freeze in place.");
 
         pool.Clear();
         Vector2 to = feet + new Vector2(288, 192);
