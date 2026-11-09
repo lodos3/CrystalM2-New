@@ -27,15 +27,26 @@ internal static partial class WarriorSpellEffects
         var effect = new Effect(pool, look, now, window: life, referenceDuration: life, depthY: feet.Y);
         if (spell == Spell.TwinDrakeBlade && followThrough && previousProgress == 0)
         {
-            Vector2 contact = pose.Hilt + blade * .78f;
+            // Releasing the stored charge: several short, hairline arcs peel
+            // from the blade itself, rather than one huge 67px lightning card.
             var returnCut = new Frame(pool, feet, now, 1, Frame.ReferenceSize, (uint)now,
                 scalePositions: false, depthY: feet.Y);
-            WizardSpellEffects.Channel(returnCut, contact, contact + facing * 29 - Vector2.UnitY * 62,
-                22, 2.8f, .92f, now / 1000f, 4, 211, colours: WizardSpellEffects.DrakeColours);
-            effect.Add(contact, -Vector2.UnitY * 10, Shape.UserLightning, 67, life, Layer.Emissive,
-                aspect: 1.3f, rotation: angle + .27f, alpha: 188);
-            effect.Add(contact, Vector2.Zero, Shape.Flash, 28, life, Layer.EmissiveCore, core: true, alpha: 218);
-            effect.Scatter(contact, 8, Shape.WarriorSpark, 43, life, rise: true);
+            Vector2 normal = Vector2.Normalize(new Vector2(-blade.Y, blade.X));
+            for (int i = 0; i < 12; i++)
+            {
+                float along = .12f + i * .078f;
+                Vector2 root = pose.Hilt + blade * along;
+                Vector2 end = root + facing * (8 + returnCut.Unit(i + 19) * 16) +
+                    normal * ((returnCut.Unit(i + 41) - .5f) * 17);
+                bool rear = i % 4 == 0;
+                Layer layer = rear ? Layer.Ground : Layer.EmissiveCore;
+                float groundY = feet.Y + (rear ? -8 : 8);
+                returnCut.Thread(root, end, .71f, .22f, i % 3 == 0 ? White : Ice,
+                    .75f, layer, sortY: groundY);
+                returnCut.Sprite(root, 3 + returnCut.Unit(i + 61) * 3,
+                    4 + returnCut.Unit(i + 63) * 4, Shape.Spark,
+                    i % 3 == 0 ? White : Ice, .79f, layer, sortY: groundY);
+            }
         }
         bool heavy = spell is Spell.FlamingSword or Spell.CrossHalfMoon or Spell.BladeAvalanche or Spell.SlashingBurst;
         bool moon = spell is Spell.HalfMoon or Spell.CrossHalfMoon;
@@ -49,10 +60,16 @@ internal static partial class WarriorSpellEffects
                 float outer = moon || spell == Spell.TwinDrakeBlade ? 1.07f : heavy ? 1.21f : 1.13f;
                 Layer depth = facing.Y < -.27f && (old.Tip.Y + pose.Tip.Y) * .5f < pose.Hilt.Y - 9
                     ? Layer.Ground : Layer.Emissive;
-                SweepRibbon(pool, old, pose, inner, outer, depth, feet.Y, look.Colour, now, life, moon ? 123 : heavy ? 220 : 175);
-                if (!moon && (heavy || spell == Spell.TwinDrakeBlade))
-                    SweepRibbon(pool, old, pose, spell == Spell.TwinDrakeBlade ? .91f : .74f,
-                        spell == Spell.TwinDrakeBlade ? 1.02f : 1.14f, depth, feet.Y, look.Core, now, Math.Min(life, 98), 184);
+                if (spell == Spell.TwinDrakeBlade)
+                    DrakeEdgeSweep(pool, old, pose, feet.Y, now, life);
+                else
+                {
+                    SweepRibbon(pool, old, pose, inner, outer, depth, feet.Y, look.Colour,
+                        now, life, moon ? 123 : heavy ? 220 : 175);
+                    if (!moon && heavy)
+                        SweepRibbon(pool, old, pose, .74f, 1.14f, depth, feet.Y, look.Core,
+                            now, Math.Min(life, 98), 184);
+                }
             }
         }
 
@@ -77,20 +94,32 @@ internal static partial class WarriorSpellEffects
                     Layer.Emissive, aspect: .86f, rotation: angle, core: true, alpha: 157);
                 break;
             case Spell.TwinDrakeBlade when cut:
-                // The old double crescent read as expanding rings. The hit is
-                // now a jagged electric discharge anchored to the real blade.
+                // The attack peak is a fragmented electrical cut throughout
+                // the moving weapon's length. Fine tendrils keep its outline
+                // without solid lines, rings or a tip-only lightning blob.
                 var strike = new Frame(pool, feet, now, 1, Frame.ReferenceSize, (uint)now,
                     scalePositions: false, depthY: feet.Y);
-                WizardSpellEffects.Channel(strike, pose.Hilt + blade * .16f,
-                    forwardTip + facing * 27 - Vector2.UnitY * 10,
-                    21, 3.0f, .96f, now / 1000f, 4, 113,
-                    colours: WizardSpellEffects.DrakeColours);
-                WizardSpellEffects.Channel(strike, pose.Tip,
-                    pose.Tip + facing * 43 - Vector2.UnitY * 20,
-                    17, 2.4f, .87f, now / 1000f + .05f, 3, 239,
-                    colours: WizardSpellEffects.DrakeColours);
-                effect.Add(pose.Hilt - Vector2.UnitY * 9, Vector2.Zero, Shape.Flash, 32, life,
-                    Layer.EmissiveCore, aspect: 1.21f, rotation: angle, core: true, alpha: 213);
+                Vector2 bladeNormal = Vector2.Normalize(new Vector2(-blade.Y, blade.X));
+                for (int i = 0; i < 14; i++)
+                {
+                    float along = .10f + .88f * i / 13;
+                    Vector2 root = pose.Hilt + blade * along;
+                    Vector2 tendril = root + facing * (7 + strike.Unit(i + 13) * 13) +
+                        bladeNormal * ((strike.Unit(i + 29) - .5f) * 18);
+                    bool rear = i % 4 == 0;
+                    Layer layer = rear ? Layer.Ground : Layer.EmissiveCore;
+                    float groundY = feet.Y + (rear ? -7 : 7);
+                    strike.Thread(root, tendril, .88f, .20f,
+                        i % 4 == 0 ? White : Ice, .87f, layer,
+                        light: i == 7, sortY: groundY);
+                    if (i % 2 == 0)
+                    {
+                        float rotation = MathF.Atan2(tendril.Y - root.Y, tendril.X - root.X);
+                        strike.Sprite(Vector2.Lerp(root, tendril, .58f), 10, 3.4f,
+                            Shape.UserLightning, White, .61f, layer,
+                            rotation, sortY: groundY);
+                    }
+                }
                 break;
             case Spell.FlamingSword:
                 AddBladeFire(pool, pose, look, now, life, progress, feet.Y);
@@ -278,6 +307,59 @@ internal static partial class WarriorSpellEffects
         }
     }
 
+    // Swept electrical cuts follow the *whole* moving blade, from near the
+    // handle to the tip, using both real weapon poses. Two narrow depth
+    // planes retain a sense of volume without a solid BladeRibbon curtain.
+    private static void DrakeEdgeSweep(SpellParticlePool pool, WeaponMaskTrace from,
+        WeaponMaskTrace to, float feetY, long now, int life)
+    {
+        Vector2 previousBlade = from.Tip - from.Hilt;
+        Vector2 currentBlade = to.Tip - to.Hilt;
+        if (previousBlade.LengthSquared() < 9 || currentBlade.LengthSquared() < 9) return;
+        Vector2 normal = Vector2.Normalize(new Vector2(-currentBlade.Y, currentBlade.X));
+        var frame = new Frame(pool, to.Hilt, now, 1, Frame.ReferenceSize, (uint)(now / 73),
+            scalePositions: false, depthY: feetY);
+        for (int plane = 0; plane < 2; plane++)
+        {
+            bool behind = plane == 0;
+            Layer layer = behind ? Layer.Ground : Layer.EmissiveCore;
+            float groundY = feetY + (behind ? -8 : 8);
+            Vector2 previousPoint = Vector2.Zero;
+            for (int i = 0; i <= 14; i++)
+            {
+                float along = .10f + .88f * i / 14;
+                Vector2 oldPoint = from.Hilt + previousBlade * along;
+                Vector2 currentPoint = to.Hilt + currentBlade * along;
+                float offset = (frame.Unit(plane * 283 + i * 29 + 15) - .5f) *
+                    (behind ? 3.1f : 4.6f);
+                Vector2 point = currentPoint + normal * (offset + (behind ? -1.7f : 1.4f));
+                oldPoint += normal * ((behind ? -1.7f : 1.4f) + offset * .40f);
+                int tint = i % 4 == 0 ? White : Ice;
+                if (i > 0)
+                    frame.Thread(previousPoint, point, .78f, .46f, tint,
+                        behind ? .53f : .84f, layer, sortY: groundY);
+                frame.Thread(oldPoint, point, .71f, .22f,
+                    i % 3 == 0 ? White : Steel,
+                    behind ? .47f : .72f, layer,
+                    light: !behind && i == 7, sortY: groundY);
+                if (i % 3 == 1)
+                {
+                    Vector2 delta = point - oldPoint;
+                    frame.Sprite((oldPoint + point) * .5f,
+                        5 + delta.Length(), 2.9f, Shape.UserLightning,
+                        tint, behind ? .37f : .62f, layer,
+                        MathF.Atan2(delta.Y, delta.X), sortY: groundY);
+                }
+                if (i % 4 == 0)
+                    frame.Sprite(point, 2.8f + frame.Unit(i + 53) * 2.2f,
+                        3.2f + frame.Unit(i + 57) * 3.5f,
+                        Shape.Spark, White, behind ? .44f : .81f,
+                        layer, sortY: groundY);
+                previousPoint = point;
+            }
+        }
+    }
+
     private static void SweepRibbon(SpellParticlePool pool, WeaponMaskTrace from, WeaponMaskTrace to, float inner, float outer,
         Layer layer, float depthY, Color colour, long now, int duration, int alpha)
     {
@@ -342,38 +424,84 @@ internal static partial class WarriorSpellEffects
             return;
         }
 
-        Vector2 bladeRoot = pose.Hilt + blade * .23f;
-        var colours = WizardSpellEffects.DrakeColours;
-        // Electricity is shaped by the blade, without a large oval behind it.
-        WizardSpellEffects.Channel(frame, bladeRoot, pose.Tip, striking ? 13 : 7, striking ? 3.2f : 1.85f,
-            striking ? .98f : .73f, time, striking ? 3 : 1, 17, colours: colours);
-        for (int i = 0; i < (striking ? 11 : 5); i++)
+        // Continuous charge runs from the handle along the entire blade.
+        // The two near-parallel, irregular circuits are not broad glowing
+        // plates. The rear one sorts behind the player; the bright edge is
+        // a foreground contour with only a few selectively lit micro-motes.
+        float groundBase = feetY ?? pose.Hilt.Y + 36;
+        Vector2 normal = Vector2.Normalize(new Vector2(-blade.Y, blade.X));
+        int segments = striking ? 16 : 12;
+        for (int plane = 0; plane < 2; plane++)
         {
-            float age = Fract(time * 1.7f + frame.Unit(i + 107));
-            Vector2 point = pose.Hilt + blade * (.28f + frame.Unit(i + 33) * .69f) +
-                new Vector2((frame.Unit(i + 41) - .5f) * 8, -age * (8 + frame.Unit(i + 57) * 22));
-            frame.Sprite(point, 3 + frame.Unit(i + 71) * 4, 7 + frame.Unit(i + 79) * 8,
-                Shape.WarriorSpark, i % 3 == 0 ? White : Ice, .79f * (1 - age * .57f),
-                Layer.EmissiveCore, light: i % 5 == 0);
+            bool behind = plane == 0;
+            Layer layer = behind ? Layer.Ground : Layer.EmissiveCore;
+            float depth = groundBase + (behind ? -8 : 8);
+            Vector2 previous = pose.Hilt + blade * .10f +
+                normal * (behind ? -1.6f : 1.3f);
+            for (int step = 1; step <= segments; step++)
+            {
+                float along = .10f + .89f * step / segments;
+                float jitter = (frame.Unit(plane * 311 + step * 23 + 617) - .5f) *
+                    (striking ? 5.0f : 3.7f);
+                Vector2 point = pose.Hilt + blade * along +
+                    normal * (jitter + (behind ? -1.6f : 1.3f));
+                int colour = step % 4 == 0 ? White : Ice;
+                frame.Thread(previous, point, .80f, .42f, colour,
+                    behind ? .57f : .88f, layer,
+                    light: !behind && step == segments / 2, sortY: depth);
+                if (step % 3 == 1)
+                {
+                    Vector2 delta = point - previous;
+                    frame.Sprite((point + previous) * .5f, 5 + delta.Length(),
+                        2.9f, Shape.UserLightning,
+                        colour, behind ? .37f : .64f, layer,
+                        MathF.Atan2(delta.Y, delta.X), sortY: depth);
+                }
+                previous = point;
+            }
         }
+
+        for (int i = 0; i < (striking ? 30 : 22); i++)
+        {
+            int sample = 113 + i * 29;
+            float age = Fract(time * (1.31f + frame.Unit(sample + 3) * .89f) +
+                frame.Unit(sample + 7));
+            float along = .10f + frame.Unit(sample + 11) * .89f;
+            Vector2 root = pose.Hilt + blade * along;
+            Vector2 point = root + normal *
+                ((frame.Unit(sample + 13) - .5f) * 8) -
+                Vector2.UnitY * (age * (6 + frame.Unit(sample + 17) * 13));
+            bool behind = i % 4 == 0;
+            float depth = groundBase + (behind ? -8 : 8);
+            Layer layer = behind ? Layer.Ground : Layer.EmissiveCore;
+            float fade = .83f * (1 - age * .65f);
+            frame.Sprite(point, 2.6f + frame.Unit(sample + 19) * 3,
+                3.2f + frame.Unit(sample + 23) * 4.1f, Shape.Spark,
+                i % 3 == 0 ? White : Ice, fade, layer,
+                sortY: depth);
+            if (i % 9 == 0)
+                frame.Sprite(root, 12, 6, Shape.Wisp, 0x467bd9,
+                    .19f * fade, Layer.Glow, sortY: depth);
+        }
+
         if (!striking) return;
-        Vector2 edge = Vector2.Dot(blade, facing) >= 0 ? pose.Tip : pose.Hilt;
-        Vector2 end = edge + facing * 49 - Vector2.UnitY * 28;
-        WizardSpellEffects.Channel(frame, edge, end, 22, 2.9f, .94f, time + .12f, 3, 93, colours: colours);
-        WizardSpellEffects.Channel(frame, pose.Hilt + blade * .61f, end - Vector2.UnitY * 21 - facing * 11,
-            17, 2.15f, .84f, time + .07f, 2, 181, colours: colours);
-        Vector2 ground = pose.Hilt + facing * 18 + Vector2.UnitY * (feetY.GetValueOrDefault(pose.Hilt.Y + 36) - pose.Hilt.Y);
-        WizardSpellEffects.Channel(frame, pose.Hilt, ground, 10, 2.5f, .93f, time, 2, 238, colours: colours);
-        for (int i = 0; i < 9; i++)
+        // The impact-follow-through energy peels off every portion of the
+        // blade rather than emitting one solitary lightning bolt at the tip.
+        for (int i = 0; i < 12; i++)
         {
-            float age = Fract(time * 2.9f + frame.Unit(i + 271));
-            Vector2 point = Vector2.Lerp(pose.Hilt, ground, frame.Unit(i + 304)) +
-                new Vector2((frame.Unit(i + 319) - .5f) * 11, -age * 16);
-            frame.Sprite(point, 4 + frame.Unit(i + 336) * 4, 9,
-                Shape.WarriorSpark, White, .77f * (1 - age * .64f),
-                Layer.EmissiveCore);
+            int sample = 511 + i * 23;
+            float along = .12f + i * .077f;
+            Vector2 root = pose.Hilt + blade * along;
+            Vector2 flick = root + normal *
+                ((frame.Unit(sample + 5) - .5f) * 22) -
+                Vector2.UnitY * (3 + frame.Unit(sample + 7) * 9);
+            bool behind = i % 5 == 0;
+            Layer layer = behind ? Layer.Ground : Layer.EmissiveCore;
+            float depth = groundBase + (behind ? -8 : 8);
+            frame.Thread(root, flick, .82f, .22f,
+                i % 3 == 0 ? White : Ice, .68f,
+                layer, sortY: depth);
         }
-        frame.Sprite(end - facing * 12, 23, 32, Shape.Flash, White, .83f, Layer.EmissiveCore, time * .7f);
     }
 
     private static void AddBladeFire(SpellParticlePool pool, WeaponMaskTrace pose, Look look,
