@@ -71,8 +71,8 @@ internal static partial class WarriorSpellEffects
                 ProjectCrescent(pool, look, feet, facing, 0, 30, 97, 29, now, life);
                 break;
             case Spell.CrossHalfMoon when cut:
-                ProjectCrescent(pool, look, feet, facing, -.28f, 24, 119, 42, now, life, sweep: 3.25f);
-                ProjectCrescent(pool, look, feet, facing, MathF.PI - .17f, 32, 111, 38, now, life, sweep: 3.32f);
+                ProjectCrescent(pool, look, feet, facing, -.28f, 24, 119, 42, now, life, sweep: 3.25f, stacked: true);
+                ProjectCrescent(pool, look, feet, facing, MathF.PI - .17f, 32, 111, 38, now, life, sweep: 3.32f, stacked: true);
                 effect.Add(feet + facing * 73 - Vector2.UnitY * 33, facing * 12, Shape.WarriorSpark, 33, life,
                     Layer.Emissive, aspect: .86f, rotation: angle, core: true, alpha: 157);
                 break;
@@ -109,7 +109,8 @@ internal static partial class WarriorSpellEffects
     }
 
     private static void ProjectCrescent(SpellParticlePool pool, Look look, Vector2 feet, Vector2 facing,
-        float yaw, float lift, float radius, float width, long now, int life, float sweep = 2.65f)
+        float yaw, float lift, float radius, float width, long now, int life, float sweep = 2.65f,
+        bool stacked = false)
     {
         Vector2 forward = GroundHeading(facing);
         float heading = MathF.Atan2(forward.Y, forward.X);
@@ -205,6 +206,45 @@ internal static partial class WarriorSpellEffects
                 Shape.Wisp, 0, Aspect: 1.9f,
                 Rotation: MathF.Atan2(tangent.Y, tangent.X), Layer: layer,
                 CastsLight: false, DepthY: depth));
+        }
+
+        if (stacked)
+        {
+            // Cross Half Moon has multiple short cutting strokes at different
+            // elevations instead of a single uniformly flat crescent sheet.
+            // Reuse the same projected arc so every stroke inherits the right
+            // front/back row; Half Moon keeps its original single-volume cut.
+            for (int i = 2; i < segments - 2; i += 5)
+            {
+                float t = (i + .35f) / segments;
+                var (innerA, outerA, depthA) = Edge(t);
+                var (innerB, outerB, depthB) = Edge(MathF.Min(1, t + .05f));
+                Vector2 centreStroke = (innerA + outerA + innerB + outerB) * .25f;
+                Vector2 tangent = (innerB + outerB - innerA - outerA) * .5f;
+                if (tangent.LengthSquared() < .01f) continue;
+                Vector2 normal = Vector2.Normalize(new Vector2(-tangent.Y, tangent.X));
+                float orientation = MathF.Atan2(tangent.Y, tangent.X);
+                float depth = (depthA + depthB) * .5f;
+                for (int tier = 0; tier < 3; tier++)
+                {
+                    float vertical = tier switch { 0 => -15f, 1 => 0f, _ => 12f };
+                    float lateral = (tier - 1) * 7f + ((i % 3) - 1) * 2f;
+                    Vector2 point = centreStroke + Vector2.UnitY * vertical +
+                        normal * lateral + tangent * ((tier - 1) * 2f);
+                    float strokeDepth = depth + (tier - 1) * 2.5f;
+                    bool rear = strokeDepth < feet.Y;
+                    float length = 12 + tier * 3 + 7 * MathF.Sin(t * MathF.PI);
+                    int alpha = tier == 1 ? 190 : rear ? 104 : 145;
+                    pool.TryAdd(new SpellParticle(point,
+                        tangent * (.09f + tier * .035f), now, Math.Min(life, 128),
+                        (int)MathF.Round(length), Color.FromArgb(alpha,
+                            tier == 1 ? look.Core : look.Colour),
+                        Shape.UserSlash, 0, Aspect: tier == 1 ? .27f : .22f,
+                        Rotation: orientation + (tier - 1) * .075f,
+                        Layer: rear ? Layer.Ground : Layer.EmissiveCore,
+                        CastsLight: false, DepthY: strokeDepth));
+                }
+            }
         }
 
         (Vector2 Inner, Vector2 Outer, float GroundDepth) Edge(float t)
