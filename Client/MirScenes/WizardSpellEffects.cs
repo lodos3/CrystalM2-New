@@ -216,6 +216,35 @@ internal static partial class WizardSpellEffects
             Layer.EmissiveCore, angle - MathF.PI / 2, light: true);
         if (frost)
         {
+            // The moving projectile needs a luminous spherical icefire head
+            // in front of its existing cool-flame trail and snow wake.
+            // Small independent textures overlap; no giant opaque orb.
+            for (int i = 0; i < 22; i++)
+            {
+                int seed = 839 + i * 31;
+                float theta = frame.Unit(seed) * MathF.Tau +
+                    phase * (1.4f + frame.Unit(seed + 3) * 1.7f);
+                float radius = 6 + frame.Unit(seed + 5) * 12;
+                Vector2 point = head + Ellipse(theta, radius, radius * .86f);
+                float pulse = .84f + .16f *
+                    MathF.Sin(phase * 2.3f + frame.Unit(seed + 9) * MathF.Tau);
+                frame.Sprite(point, 6 + frame.Unit(seed + 11) * 7,
+                    8 + frame.Unit(seed + 13) * 9,
+                    i % 3 == 0 ? Shape.FrostCore : Shape.UserFlame,
+                    i % 5 == 0 ? IceWhite : i % 2 == 0 ? PaleBlue : Ice,
+                    .83f * pulse,
+                    i % 3 == 0 ? Layer.EmissiveCore : Layer.Emissive,
+                    angle - MathF.PI / 2, light: i % 11 == 0);
+                if (i % 4 == 0)
+                    frame.Sprite(point, 6 + frame.Unit(seed + 15) * 4,
+                        7 + frame.Unit(seed + 17) * 6,
+                        Shape.FrostCore, IceWhite, .9f * pulse,
+                        Layer.EmissiveCore, light: i % 8 == 0);
+            }
+            frame.Sprite(head, 22, 22, Shape.FrostCore, PaleBlue,
+                .93f, Layer.EmissiveCore, light: true);
+            frame.Sprite(head - Vector2.UnitY * 2, 14, 16, Shape.Flash,
+                IceWhite, .94f, Layer.EmissiveCore, light: true);
             SnowballWake(frame, pool, head, heading, now, frameIndex, remaining, wake);
             return true;
         }
