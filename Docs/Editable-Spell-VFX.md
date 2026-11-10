@@ -66,6 +66,15 @@ map lights, and depth masking.
 A regular client build or publish also includes the saved authoring files. The
 local apply step is for testing an edit with an existing compatible client.
 
+## Inspector modules
+
+Select a spell stage to see the effect nodes sampled by that preview. The
+inspector groups settings by timing, emission, shape, velocity, size and
+rotation, colour and opacity, collision, and renderer. Settings unique to a
+procedural effect appear under Procedural. Enable **Advanced** to see the
+original JSON keys and inactive settings. The JSON format and existing spell
+overrides use the same keys in both views.
+
 ## Studio integration
 
 Use `SpellVfxCatalogue.All` for the catalogue generated from the curriculum,

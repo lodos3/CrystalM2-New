@@ -25,25 +25,26 @@ internal static class LegacySpellEffects
     internal static WindupCue Windup(Spell spell, int frames, int interval)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.Windup);
+        var tuning = SpellVfxAssets.Current.Legacy.Windup;
+        var fields = SpellVfxAssets.Fields("Legacy", "Windup");
         int cast = frames * interval;
         return spell switch
         {
-            Spell.ThunderBolt => new(SpellVisualPhase.Prepare, tuning.ThunderBoltDuration),
-            Spell.Revelation => new(SpellVisualPhase.Prepare, tuning.RevelationDuration),
-            Spell.LionRoar or Spell.BattleCry => new(SpellVisualPhase.Impact, tuning.LionRoarDuration),
-            Spell.FlameField => new(SpellVisualPhase.Impact, tuning.FlameFieldDuration, AtCell: true),
+            Spell.ThunderBolt => new(SpellVisualPhase.Prepare, fields.Read(tuning.ThunderBoltDuration)),
+            Spell.Revelation => new(SpellVisualPhase.Prepare, fields.Read(tuning.RevelationDuration)),
+            Spell.LionRoar or Spell.BattleCry => new(SpellVisualPhase.Impact, fields.Read(tuning.LionRoarDuration)),
+            Spell.FlameField => new(SpellVisualPhase.Impact, fields.Read(tuning.FlameFieldDuration), AtCell: true),
             Spell.ThunderStorm => new(SpellVisualPhase.Impact, cast, AtCell: true),
-            Spell.Fury => new(SpellVisualPhase.Impact, tuning.FuryDuration * interval),
-            Spell.ImmortalSkin => new(SpellVisualPhase.Impact, cast * tuning.ImmortalSkinDuration),
-            Spell.UltimateEnhancer => new(SpellVisualPhase.Prepare, tuning.UltimateEnhancerDuration),
-            Spell.MagicBooster => new(SpellVisualPhase.Impact, tuning.MagicBoosterDuration * interval),
-            Spell.PetEnhancer => new(SpellVisualPhase.Prepare, tuning.PetEnhancerDuration * interval),
-            Spell.TwinDrakeBlade => new(SpellVisualPhase.Prepare, tuning.TwinDrakeBladeDuration),
-            Spell.Thrusting => new(SpellVisualPhase.Swing, (frames - frames / tuning.ThrustingDurationDivisor) * interval, frames / tuning.ThrustingDelayDivisor * interval),
-            Spell.BladeAvalanche => new(SpellVisualPhase.Swing, tuning.BladeAvalancheDuration * interval, AtCell: true),
-            Spell.SlashingBurst => new(SpellVisualPhase.Swing, tuning.SlashingBurstDuration * interval, tuning.SlashingBurstDelay, AtCell: true),
-            Spell.CounterAttack => new(SpellVisualPhase.Swing, tuning.CounterAttackDuration * interval),
+            Spell.Fury => new(SpellVisualPhase.Impact, fields.Read(tuning.FuryDuration) * interval),
+            Spell.ImmortalSkin => new(SpellVisualPhase.Impact, cast * fields.Read(tuning.ImmortalSkinDuration)),
+            Spell.UltimateEnhancer => new(SpellVisualPhase.Prepare, fields.Read(tuning.UltimateEnhancerDuration)),
+            Spell.MagicBooster => new(SpellVisualPhase.Impact, fields.Read(tuning.MagicBoosterDuration) * interval),
+            Spell.PetEnhancer => new(SpellVisualPhase.Prepare, fields.Read(tuning.PetEnhancerDuration) * interval),
+            Spell.TwinDrakeBlade => new(SpellVisualPhase.Prepare, fields.Read(tuning.TwinDrakeBladeDuration)),
+            Spell.Thrusting => new(SpellVisualPhase.Swing, (frames - frames / fields.Read(tuning.ThrustingDurationDivisor)) * interval, frames / fields.Read(tuning.ThrustingDelayDivisor) * interval),
+            Spell.BladeAvalanche => new(SpellVisualPhase.Swing, fields.Read(tuning.BladeAvalancheDuration) * interval, AtCell: true),
+            Spell.SlashingBurst => new(SpellVisualPhase.Swing, fields.Read(tuning.SlashingBurstDuration) * interval, fields.Read(tuning.SlashingBurstDelay), AtCell: true),
+            Spell.CounterAttack => new(SpellVisualPhase.Swing, fields.Read(tuning.CounterAttackDuration) * interval),
             Spell.Repulsion or Spell.EnergyRepulsor or Spell.Rage or Spell.ProtectionField or Spell.Hiding
                 => new(SpellVisualPhase.Impact, cast),
             Spell.FireBall or Spell.GreatFireBall or Spell.FrostCrunch or Spell.Healing or Spell.ElectricShock or
@@ -59,12 +60,13 @@ internal static class LegacySpellEffects
     internal static int FieldInterval(Spell spell)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.FieldInterval);
+        var tuning = SpellVfxAssets.Current.Legacy.FieldInterval;
+        var fields = SpellVfxAssets.Fields("Legacy", "FieldInterval");
         return spell switch
         {
-            Spell.HealingCircle => tuning.HealingCircleIntervalMs,
-            Spell.FireWall or Spell.PoisonCloud => tuning.FireWallIntervalMs,
-            _ => tuning.DefaultIntervalMs
+            Spell.HealingCircle => fields.Read(tuning.HealingCircleIntervalMs),
+            Spell.FireWall or Spell.PoisonCloud => fields.Read(tuning.FireWallIntervalMs),
+            _ => fields.Read(tuning.DefaultIntervalMs)
         };
     }
 
@@ -75,47 +77,48 @@ internal static class LegacySpellEffects
     private static Look Profile(Spell spell)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.Profile);
+        var tuning = SpellVfxAssets.Current.Legacy.Profile;
+        var fields = SpellVfxAssets.Fields("Legacy", "Profile");
         return spell switch
         {
             // Warrior. Use the angle and length of the hit to identify each weapon technique.
-            Spell.Fencing => Art(tuning.FencingForm, tuning.FencingShape, tuning.FencingSize, tuning.FencingColour, tuning.FencingCore),
-            Spell.Slaying => Art(tuning.SlayingForm, tuning.SlayingShape, tuning.SlayingSize, tuning.SlayingColour, tuning.SlayingCore),
-            Spell.Thrusting => Art(tuning.ThrustingForm, tuning.ThrustingShape, tuning.ThrustingSize, tuning.ThrustingColour, tuning.ThrustingCore),
-            Spell.HalfMoon => Art(tuning.HalfMoonForm, tuning.HalfMoonShape, tuning.HalfMoonSize, tuning.HalfMoonColour, tuning.HalfMoonCore),
-            Spell.ShoulderDash => Art(tuning.ShoulderDashForm, tuning.ShoulderDashShape, tuning.ShoulderDashSize, tuning.ShoulderDashColour, tuning.ShoulderDashCore),
-            Spell.TwinDrakeBlade => Art(tuning.TwinDrakeBladeForm, tuning.TwinDrakeBladeShape, tuning.TwinDrakeBladeSize, tuning.TwinDrakeBladeColour, tuning.TwinDrakeBladeCore),
-            Spell.Entrapment => Art(tuning.EntrapmentForm, tuning.EntrapmentShape, tuning.EntrapmentSize, tuning.EntrapmentColour, tuning.EntrapmentCore),
-            Spell.FlamingSword => Art(tuning.FlamingSwordForm, tuning.FlamingSwordShape, tuning.FlamingSwordSize, tuning.FlamingSwordColour, tuning.FlamingSwordCore),
-            Spell.LionRoar => Art(tuning.LionRoarForm, tuning.LionRoarShape, tuning.LionRoarSize, tuning.LionRoarColour, tuning.LionRoarCore),
-            Spell.CrossHalfMoon => Art(tuning.CrossHalfMoonForm, tuning.CrossHalfMoonShape, tuning.CrossHalfMoonSize, tuning.CrossHalfMoonColour, tuning.CrossHalfMoonCore),
-            Spell.BladeAvalanche => Art(tuning.BladeAvalancheForm, tuning.BladeAvalancheShape, tuning.BladeAvalancheSize, tuning.BladeAvalancheColour, tuning.BladeAvalancheCore),
-            Spell.ProtectionField => Art(tuning.ProtectionFieldForm, tuning.ProtectionFieldShape, tuning.ProtectionFieldSize, tuning.ProtectionFieldColour, tuning.ProtectionFieldCore),
-            Spell.Rage => Art(tuning.RageForm, tuning.RageShape, tuning.RageSize, tuning.RageColour, tuning.RageCore),
-            Spell.CounterAttack => Art(tuning.CounterAttackForm, tuning.CounterAttackShape, tuning.CounterAttackSize, tuning.CounterAttackColour, tuning.CounterAttackCore),
-            Spell.SlashingBurst => Art(tuning.SlashingBurstForm, tuning.SlashingBurstShape, tuning.SlashingBurstSize, tuning.SlashingBurstColour, tuning.SlashingBurstCore),
-            Spell.Fury => Art(tuning.FuryForm, tuning.FuryShape, tuning.FurySize, tuning.FuryColour, tuning.FuryCore),
-            Spell.ImmortalSkin => Art(tuning.ImmortalSkinForm, tuning.ImmortalSkinShape, tuning.ImmortalSkinSize, tuning.ImmortalSkinColour, tuning.ImmortalSkinCore),
-            Spell.BattleCry => Art(tuning.BattleCryForm, tuning.BattleCryShape, tuning.BattleCrySize, tuning.BattleCryColour, tuning.BattleCryCore),
+            Spell.Fencing => Art(fields.Read(tuning.FencingForm), fields.Read(tuning.FencingShape), fields.Read(tuning.FencingSize), fields.Read(tuning.FencingColour), fields.Read(tuning.FencingCore)),
+            Spell.Slaying => Art(fields.Read(tuning.SlayingForm), fields.Read(tuning.SlayingShape), fields.Read(tuning.SlayingSize), fields.Read(tuning.SlayingColour), fields.Read(tuning.SlayingCore)),
+            Spell.Thrusting => Art(fields.Read(tuning.ThrustingForm), fields.Read(tuning.ThrustingShape), fields.Read(tuning.ThrustingSize), fields.Read(tuning.ThrustingColour), fields.Read(tuning.ThrustingCore)),
+            Spell.HalfMoon => Art(fields.Read(tuning.HalfMoonForm), fields.Read(tuning.HalfMoonShape), fields.Read(tuning.HalfMoonSize), fields.Read(tuning.HalfMoonColour), fields.Read(tuning.HalfMoonCore)),
+            Spell.ShoulderDash => Art(fields.Read(tuning.ShoulderDashForm), fields.Read(tuning.ShoulderDashShape), fields.Read(tuning.ShoulderDashSize), fields.Read(tuning.ShoulderDashColour), fields.Read(tuning.ShoulderDashCore)),
+            Spell.TwinDrakeBlade => Art(fields.Read(tuning.TwinDrakeBladeForm), fields.Read(tuning.TwinDrakeBladeShape), fields.Read(tuning.TwinDrakeBladeSize), fields.Read(tuning.TwinDrakeBladeColour), fields.Read(tuning.TwinDrakeBladeCore)),
+            Spell.Entrapment => Art(fields.Read(tuning.EntrapmentForm), fields.Read(tuning.EntrapmentShape), fields.Read(tuning.EntrapmentSize), fields.Read(tuning.EntrapmentColour), fields.Read(tuning.EntrapmentCore)),
+            Spell.FlamingSword => Art(fields.Read(tuning.FlamingSwordForm), fields.Read(tuning.FlamingSwordShape), fields.Read(tuning.FlamingSwordSize), fields.Read(tuning.FlamingSwordColour), fields.Read(tuning.FlamingSwordCore)),
+            Spell.LionRoar => Art(fields.Read(tuning.LionRoarForm), fields.Read(tuning.LionRoarShape), fields.Read(tuning.LionRoarSize), fields.Read(tuning.LionRoarColour), fields.Read(tuning.LionRoarCore)),
+            Spell.CrossHalfMoon => Art(fields.Read(tuning.CrossHalfMoonForm), fields.Read(tuning.CrossHalfMoonShape), fields.Read(tuning.CrossHalfMoonSize), fields.Read(tuning.CrossHalfMoonColour), fields.Read(tuning.CrossHalfMoonCore)),
+            Spell.BladeAvalanche => Art(fields.Read(tuning.BladeAvalancheForm), fields.Read(tuning.BladeAvalancheShape), fields.Read(tuning.BladeAvalancheSize), fields.Read(tuning.BladeAvalancheColour), fields.Read(tuning.BladeAvalancheCore)),
+            Spell.ProtectionField => Art(fields.Read(tuning.ProtectionFieldForm), fields.Read(tuning.ProtectionFieldShape), fields.Read(tuning.ProtectionFieldSize), fields.Read(tuning.ProtectionFieldColour), fields.Read(tuning.ProtectionFieldCore)),
+            Spell.Rage => Art(fields.Read(tuning.RageForm), fields.Read(tuning.RageShape), fields.Read(tuning.RageSize), fields.Read(tuning.RageColour), fields.Read(tuning.RageCore)),
+            Spell.CounterAttack => Art(fields.Read(tuning.CounterAttackForm), fields.Read(tuning.CounterAttackShape), fields.Read(tuning.CounterAttackSize), fields.Read(tuning.CounterAttackColour), fields.Read(tuning.CounterAttackCore)),
+            Spell.SlashingBurst => Art(fields.Read(tuning.SlashingBurstForm), fields.Read(tuning.SlashingBurstShape), fields.Read(tuning.SlashingBurstSize), fields.Read(tuning.SlashingBurstColour), fields.Read(tuning.SlashingBurstCore)),
+            Spell.Fury => Art(fields.Read(tuning.FuryForm), fields.Read(tuning.FuryShape), fields.Read(tuning.FurySize), fields.Read(tuning.FuryColour), fields.Read(tuning.FuryCore)),
+            Spell.ImmortalSkin => Art(fields.Read(tuning.ImmortalSkinForm), fields.Read(tuning.ImmortalSkinShape), fields.Read(tuning.ImmortalSkinSize), fields.Read(tuning.ImmortalSkinColour), fields.Read(tuning.ImmortalSkinCore)),
+            Spell.BattleCry => Art(fields.Read(tuning.BattleCryForm), fields.Read(tuning.BattleCryShape), fields.Read(tuning.BattleCrySize), fields.Read(tuning.BattleCryColour), fields.Read(tuning.BattleCryCore)),
 
             // Shared animations that previously used the same combat libraries.
             Spell.FatalSword or Spell.DoubleSlash or Spell.HeavenlySword or Spell.CrescentSlash or Spell.FlashDash
-                => Art(tuning.FatalSwordForm, tuning.FatalSwordShape, tuning.FatalSwordSize, tuning.FatalSwordColour, tuning.FatalSwordCore),
-            Spell.PoisonSword or Spell.PoisonShot or Spell.SummonSnakes => Art(tuning.PoisonSwordForm, tuning.PoisonSwordShape, tuning.PoisonSwordSize, tuning.PoisonSwordColour, tuning.PoisonSwordCore),
+                => Art(fields.Read(tuning.FatalSwordForm), fields.Read(tuning.FatalSwordShape), fields.Read(tuning.FatalSwordSize), fields.Read(tuning.FatalSwordColour), fields.Read(tuning.FatalSwordCore)),
+            Spell.PoisonSword or Spell.PoisonShot or Spell.SummonSnakes => Art(fields.Read(tuning.PoisonSwordForm), fields.Read(tuning.PoisonSwordShape), fields.Read(tuning.PoisonSwordSize), fields.Read(tuning.PoisonSwordColour), fields.Read(tuning.PoisonSwordCore)),
             Spell.Hemorrhage or Spell.VampireShot or Spell.SummonVampire or Spell.MPEater
-                => Art(tuning.HemorrhageForm, tuning.HemorrhageShape, tuning.HemorrhageSize, tuning.HemorrhageColour, tuning.HemorrhageCore),
+                => Art(fields.Read(tuning.HemorrhageForm), fields.Read(tuning.HemorrhageShape), fields.Read(tuning.HemorrhageSize), fields.Read(tuning.HemorrhageColour), fields.Read(tuning.HemorrhageCore)),
             Spell.NapalmShot or Spell.ExplosiveTrap or Spell.DelayedExplosion or Spell.FireBurst
-                => Art(tuning.NapalmShotForm, tuning.NapalmShotShape, tuning.NapalmShotSize, tuning.NapalmShotColour, tuning.NapalmShotCore),
+                => Art(fields.Read(tuning.NapalmShotForm), fields.Read(tuning.NapalmShotShape), fields.Read(tuning.NapalmShotSize), fields.Read(tuning.NapalmShotColour), fields.Read(tuning.NapalmShotCore)),
             Spell.ElementalBarrier or Spell.OneWithNature or Spell.ElementalShot
-                => Art(tuning.ElementalBarrierForm, tuning.ElementalBarrierShape, tuning.ElementalBarrierSize, tuning.ElementalBarrierColour, tuning.ElementalBarrierCore),
+                => Art(fields.Read(tuning.ElementalBarrierForm), fields.Read(tuning.ElementalBarrierShape), fields.Read(tuning.ElementalBarrierSize), fields.Read(tuning.ElementalBarrierColour), fields.Read(tuning.ElementalBarrierCore)),
             Spell.Trap or Spell.Stonetrap or Spell.BindingShot or Spell.CrippleShot or Spell.CatTongue
-                => Art(tuning.TrapForm, tuning.TrapShape, tuning.TrapSize, tuning.TrapColour, tuning.TrapCore),
+                => Art(fields.Read(tuning.TrapForm), fields.Read(tuning.TrapShape), fields.Read(tuning.TrapSize), fields.Read(tuning.TrapColour), fields.Read(tuning.TrapCore)),
             Spell.MoonLight or Spell.MoonMist or Spell.DarkBody or Spell.Portal
-                => Art(tuning.MoonLightForm, tuning.MoonLightShape, tuning.MoonLightSize, tuning.MoonLightColour, tuning.MoonLightCore),
-            Spell.SummonToad => Art(tuning.SummonToadForm, tuning.SummonToadShape, tuning.SummonToadSize, tuning.SummonToadColour, tuning.SummonToadCore),
-            Spell.Haste or Spell.LightBody or Spell.SwiftFeet => Art(tuning.HasteForm, tuning.HasteShape, tuning.HasteSize, tuning.HasteColour, tuning.HasteCore),
-            Spell.Concentration or Spell.Focus => Art(tuning.ConcentrationForm, tuning.ConcentrationShape, tuning.ConcentrationSize, tuning.ConcentrationColour, tuning.ConcentrationCore),
-            Spell.StraightShot or Spell.DoubleShot => Art(tuning.StraightShotForm, tuning.StraightShotShape, tuning.StraightShotSize, tuning.StraightShotColour, tuning.StraightShotCore),
+                => Art(fields.Read(tuning.MoonLightForm), fields.Read(tuning.MoonLightShape), fields.Read(tuning.MoonLightSize), fields.Read(tuning.MoonLightColour), fields.Read(tuning.MoonLightCore)),
+            Spell.SummonToad => Art(fields.Read(tuning.SummonToadForm), fields.Read(tuning.SummonToadShape), fields.Read(tuning.SummonToadSize), fields.Read(tuning.SummonToadColour), fields.Read(tuning.SummonToadCore)),
+            Spell.Haste or Spell.LightBody or Spell.SwiftFeet => Art(fields.Read(tuning.HasteForm), fields.Read(tuning.HasteShape), fields.Read(tuning.HasteSize), fields.Read(tuning.HasteColour), fields.Read(tuning.HasteCore)),
+            Spell.Concentration or Spell.Focus => Art(fields.Read(tuning.ConcentrationForm), fields.Read(tuning.ConcentrationShape), fields.Read(tuning.ConcentrationSize), fields.Read(tuning.ConcentrationColour), fields.Read(tuning.ConcentrationCore)),
+            Spell.StraightShot or Spell.DoubleShot => Art(fields.Read(tuning.StraightShotForm), fields.Read(tuning.StraightShotShape), fields.Read(tuning.StraightShotSize), fields.Read(tuning.StraightShotColour), fields.Read(tuning.StraightShotCore)),
             _ => default
         };
     }
@@ -154,55 +157,57 @@ internal static class LegacySpellEffects
         Vector2? feet = null, float previousProgress = 0, bool followThrough = false)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.WeaponSweep);
+        var tuning = SpellVfxAssets.Current.Legacy.WeaponSweep;
+        var fields = SpellVfxAssets.Fields("Legacy", "WeaponSweep");
         if (remaining <= 0) return;
         var look = Profile(spell);
         if (look.Size == 0) return;
         if (WarriorSpellEffects.UsesWeaponArt(spell))
         {
             WarriorSpellEffects.WeaponSweep(pool, spell, look, pose, last, facing,
-                feet ?? pose.Hilt + Vector2.UnitY * tuning.Offset, now, remaining, interval, progress, previousProgress, followThrough);
+                feet ?? pose.Hilt + Vector2.UnitY * fields.Read(tuning.Offset), now, remaining, interval, progress, previousProgress, followThrough);
             return;
         }
         var effect = new Effect(pool, look, now);
-        int life = Math.Min(remaining, Math.Clamp(interval * tuning.Life, 65, 210));
+        int life = Math.Min(remaining, Math.Clamp(interval * fields.Read(tuning.Life), 65, 210));
         Vector2 blade = pose.Tip - pose.Hilt;
-        Vector2 drift = last is { } previous ? pose.Tip - previous.Tip : blade * tuning.Drift;
+        Vector2 drift = last is { } previous ? pose.Tip - previous.Tip : blade * fields.Read(tuning.Drift);
         if (last is { } old && drift.LengthSquared() is > 4 and < 16000)
         {
             // Several tapered samples fill the area swept between the two real weapon poses.
-            int pieces = Math.Clamp((int)drift.Length() / tuning.PiecesDivisor, 2, 7);
+            int pieces = Math.Clamp((int)drift.Length() / fields.Read(tuning.PiecesDivisor), 2, 7);
             for (int i = 0; i < pieces; i++)
             {
                 float phase = (i + 1f) / pieces;
                 Vector2 hilt = Vector2.Lerp(old.Hilt, pose.Hilt, phase);
                 Vector2 tip = Vector2.Lerp(old.Tip, pose.Tip, phase);
                 Vector2 edge = tip - hilt;
-                int span = Math.Max(tuning.Span, (int)edge.Length() + tuning.Span2);
-                effect.Add(hilt + edge * tuning.BladeEdgeOffset, Vector2.Zero, tuning.BladeEdgeShape, span, life, tuning.BladeEdgeLayer,
-                    aspect: tuning.BladeEdgeAspect / span, rotation: MathF.Atan2(edge.Y, edge.X),
-                    alpha: (int)(tuning.BladeEdgeAlpha + phase * tuning.BladeEdgeAlpha2));
+                int span = Math.Max(fields.Read(tuning.Span), (int)edge.Length() + fields.Read(tuning.Span2));
+                effect.Add(hilt + edge * fields.Read(tuning.BladeEdgeOffset), Vector2.Zero, fields.Read(tuning.BladeEdgeShape), span, life, fields.Read(tuning.BladeEdgeLayer),
+                    aspect: fields.Read(tuning.BladeEdgeAspect) / span, rotation: MathF.Atan2(edge.Y, edge.X),
+                    alpha: (int)(fields.Read(tuning.BladeEdgeAlpha) + phase * fields.Read(tuning.BladeEdgeAlpha2)));
             }
 
-            int tipSpan = (int)drift.Length() + tuning.TipSpan;
-            effect.Add((old.Tip + pose.Tip) * tuning.BladeEdgeOffset2, Vector2.Zero, tuning.BladeEdgeShape2, tipSpan, life,
-                tuning.BladeEdgeLayer2, aspect: tuning.BladeEdgeAspect2 / tipSpan,
-                rotation: MathF.Atan2(drift.Y, drift.X), core: tuning.BladeEdgeCore, alpha: tuning.BladeEdgeAlpha3);
+            int tipSpan = (int)drift.Length() + fields.Read(tuning.TipSpan);
+            effect.Add((old.Tip + pose.Tip) * fields.Read(tuning.BladeEdgeOffset2), Vector2.Zero, fields.Read(tuning.BladeEdgeShape2), tipSpan, life,
+                fields.Read(tuning.BladeEdgeLayer2), aspect: fields.Read(tuning.BladeEdgeAspect2) / tipSpan,
+                rotation: MathF.Atan2(drift.Y, drift.X), core: fields.Read(tuning.BladeEdgeCore), alpha: fields.Read(tuning.BladeEdgeAlpha3));
         }
 
-        effect.Add(pose.Tip, drift * tuning.FlashVelocity, tuning.FlashShape, tuning.FlashSize, life, tuning.FlashLayer, core: tuning.FlashCore);
+        effect.Add(pose.Tip, drift * fields.Read(tuning.FlashVelocity), fields.Read(tuning.FlashShape), fields.Read(tuning.FlashSize), life, fields.Read(tuning.FlashLayer), core: fields.Read(tuning.FlashCore));
     }
 
     internal static Vector2 ProjectileAnchor(Spell spell, Vector2 cell)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.ProjectileAnchor);
+        var tuning = SpellVfxAssets.Current.Legacy.ProjectileAnchor;
+        var fields = SpellVfxAssets.Fields("Legacy", "ProjectileAnchor");
         return spell switch
         {
-            Spell.FireBall or Spell.GreatFireBall or Spell.FireBounce or Spell.MeteorShower or Spell.FrostCrunch => cell - new Vector2(0, tuning.FireBallY),
+            Spell.FireBall or Spell.GreatFireBall or Spell.FireBounce or Spell.MeteorShower or Spell.FrostCrunch => cell - new Vector2(0, fields.Read(tuning.FireBallY)),
             Spell.SoulFireBall or Spell.SoulShield or Spell.BlessedArmour or Spell.MassHiding or
-                Spell.Curse or Spell.Hallucination or Spell.Plague or Spell.PoisonCloud => cell - new Vector2(0, tuning.SoulFireBallY),
-            _ => cell - new Vector2(0, tuning.Y)
+                Spell.Curse or Spell.Hallucination or Spell.Plague or Spell.PoisonCloud => cell - new Vector2(0, fields.Read(tuning.SoulFireBallY)),
+            _ => cell - new Vector2(0, fields.Read(tuning.Y))
         };
     }
 
@@ -272,32 +277,33 @@ internal static class LegacySpellEffects
         int duration = 0, long? sampleTime = null, uint fieldObjectID = 0)
     {
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
-        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.Emit);
+        var tuning = SpellVfxAssets.Current.Legacy.Emit;
+        var fields = SpellVfxAssets.Fields("Legacy", "Emit");
         var look = Profile(visual);
         if (look.Size == 0) return;
 
         int reference = visual.Phase switch
         {
-            SpellVisualPhase.Prepare => tuning.PrepareFactor,
-            SpellVisualPhase.Aura => tuning.AuraFactor,
-            SpellVisualPhase.Burn => tuning.BurnFactor,
-            SpellVisualPhase.Swing or SpellVisualPhase.FollowThrough => tuning.SwingFactor,
-            _ => tuning.Factor
+            SpellVisualPhase.Prepare => fields.Read(tuning.PrepareFactor),
+            SpellVisualPhase.Aura => fields.Read(tuning.AuraFactor),
+            SpellVisualPhase.Burn => fields.Read(tuning.BurnFactor),
+            SpellVisualPhase.Swing or SpellVisualPhase.FollowThrough => fields.Read(tuning.SwingFactor),
+            _ => fields.Read(tuning.Factor)
         };
         var effect = new Effect(pool, look, now, castsLight: visual.Motif == ParticleMotif.None,
             window: duration, referenceDuration: reference, sampleTime: sampleTime, fieldObjectID: fieldObjectID);
-        Vector2 body = feet - Vector2.UnitY * tuning.Body;
+        Vector2 body = feet - Vector2.UnitY * fields.Read(tuning.Body);
         float angle = MathF.Atan2(facing.Y, facing.X);
         switch (visual.Phase)
         {
             case SpellVisualPhase.Prepare:
-                Prepare(effect, look, body + facing * tuning.PrepareHand, angle);
+                Prepare(effect, look, body + facing * fields.Read(tuning.PrepareHand), angle);
                 break;
             case SpellVisualPhase.Flight:
-                effect.Add(body, facing * tuning.FlightOrbVelocity, tuning.FlightOrbShape, look.Size * tuning.FlightOrbSize / 4, tuning.FlightOrbDuration, tuning.FlightOrbLayer,
-                    aspect: tuning.FlightOrbAspect, alpha: tuning.FlightOrbAlpha);
-                effect.Add(body + facing * tuning.FlightAddOffset, facing * tuning.FlightAddVelocity, look.Shape, look.Size / 2, tuning.FlightAddDuration, tuning.FlightAddLayer,
-                    aspect: tuning.FlightAddAspect, rotation: angle, core: tuning.FlightAddCore);
+                effect.Add(body, facing * fields.Read(tuning.FlightOrbVelocity), fields.Read(tuning.FlightOrbShape), look.Size * fields.Read(tuning.FlightOrbSize) / 4, fields.Read(tuning.FlightOrbDuration), fields.Read(tuning.FlightOrbLayer),
+                    aspect: fields.Read(tuning.FlightOrbAspect), alpha: fields.Read(tuning.FlightOrbAlpha));
+                effect.Add(body + facing * fields.Read(tuning.FlightAddOffset), facing * fields.Read(tuning.FlightAddVelocity), look.Shape, look.Size / 2, fields.Read(tuning.FlightAddDuration), fields.Read(tuning.FlightAddLayer),
+                    aspect: fields.Read(tuning.FlightAddAspect), rotation: angle, core: fields.Read(tuning.FlightAddCore));
                 break;
             case SpellVisualPhase.Swing:
             case SpellVisualPhase.FollowThrough:
@@ -310,18 +316,18 @@ internal static class LegacySpellEffects
                 Field(effect, look, visual.Spell, feet, body, now);
                 break;
             case SpellVisualPhase.Expire:
-                effect.Scatter(body, tuning.ExpireShardCount, tuning.ExpireShardShape, tuning.ExpireShardSpread, tuning.ExpireShardDuration);
+                effect.Scatter(body, fields.Read(tuning.ExpireShardCount), fields.Read(tuning.ExpireShardShape), fields.Read(tuning.ExpireShardSpread), fields.Read(tuning.ExpireShardDuration));
                 break;
             case SpellVisualPhase.Burn:
-                effect.Add(feet, Vector2.Zero, tuning.BurnHaloShape, tuning.BurnHaloSize, tuning.BurnHaloDuration, tuning.BurnHaloLayer, aspect: tuning.BurnHaloAspect, alpha: tuning.BurnHaloAlpha);
-                effect.Add(body + new Vector2(tuning.BurnX, tuning.BurnY), new Vector2(tuning.BurnX2, tuning.BurnY2), tuning.BurnWispShape, tuning.BurnWispSize, tuning.BurnWispDuration,
-                    tuning.BurnWispLayer, aspect: tuning.BurnWispAspect, growth: tuning.BurnWispGrowth);
-                effect.Scatter(feet, tuning.BurnSparkCount, tuning.BurnSparkShape, tuning.BurnSparkSpread, tuning.BurnSparkDuration, rise: true);
+                effect.Add(feet, Vector2.Zero, fields.Read(tuning.BurnHaloShape), fields.Read(tuning.BurnHaloSize), fields.Read(tuning.BurnHaloDuration), fields.Read(tuning.BurnHaloLayer), aspect: fields.Read(tuning.BurnHaloAspect), alpha: fields.Read(tuning.BurnHaloAlpha));
+                effect.Add(body + new Vector2(fields.Read(tuning.BurnX), fields.Read(tuning.BurnY)), new Vector2(fields.Read(tuning.BurnX2), fields.Read(tuning.BurnY2)), fields.Read(tuning.BurnWispShape), fields.Read(tuning.BurnWispSize), fields.Read(tuning.BurnWispDuration),
+                    fields.Read(tuning.BurnWispLayer), aspect: fields.Read(tuning.BurnWispAspect), growth: fields.Read(tuning.BurnWispGrowth));
+                effect.Scatter(feet, fields.Read(tuning.BurnSparkCount), fields.Read(tuning.BurnSparkShape), fields.Read(tuning.BurnSparkSpread), fields.Read(tuning.BurnSparkDuration), rise: true);
                 break;
             case SpellVisualPhase.Ward:
-                effect.Ring(feet, look.Size, tuning.WardRingDuration);
-                effect.Add(body, -Vector2.UnitY * tuning.WardShieldVelocity, tuning.WardShieldShape, tuning.WardShieldSize, tuning.WardShieldDuration, tuning.WardShieldLayer,
-                    aspect: tuning.WardShieldAspect, growth: tuning.WardShieldGrowth, alpha: tuning.WardShieldAlpha);
+                effect.Ring(feet, look.Size, fields.Read(tuning.WardRingDuration));
+                effect.Add(body, -Vector2.UnitY * fields.Read(tuning.WardShieldVelocity), fields.Read(tuning.WardShieldShape), fields.Read(tuning.WardShieldSize), fields.Read(tuning.WardShieldDuration), fields.Read(tuning.WardShieldLayer),
+                    aspect: fields.Read(tuning.WardShieldAspect), growth: fields.Read(tuning.WardShieldGrowth), alpha: fields.Read(tuning.WardShieldAlpha));
                 break;
             default:
                 Impact(effect, look, visual.Spell, feet, body, facing, angle);

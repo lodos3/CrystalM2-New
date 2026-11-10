@@ -42,13 +42,14 @@ internal static partial class WizardSpellEffects
     internal static int PacketDuration(SpellVisual visual)
     {
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
-        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.PacketDuration);
+        var tuning = SpellVfxAssets.Current.Wizard.PacketDuration;
+        var fields = SpellVfxAssets.Fields("Wizard", "PacketDuration");
         return visual.Phase switch
         {
-            SpellVisualPhase.Contact => tuning.ContactDurationMs,
-            SpellVisualPhase.Ward => tuning.WardDurationMs,
-            SpellVisualPhase.Burn => tuning.BurnDurationMs,
-            _ => visual.Spell == Spell.IceThrust ? tuning.IceThrustDurationMs : tuning.DefaultDurationMs
+            SpellVisualPhase.Contact => fields.Read(tuning.ContactDurationMs),
+            SpellVisualPhase.Ward => fields.Read(tuning.WardDurationMs),
+            SpellVisualPhase.Burn => fields.Read(tuning.BurnDurationMs),
+            _ => visual.Spell == Spell.IceThrust ? fields.Read(tuning.IceThrustDurationMs) : fields.Read(tuning.DefaultDurationMs)
         };
     }
 
@@ -58,17 +59,18 @@ internal static partial class WizardSpellEffects
         long now, long start, int duration, float size = DefaultSize, uint seed = 0, uint field = 0)
     {
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
-        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.DrawFrame);
+        var tuning = SpellVfxAssets.Current.Wizard.DrawFrame;
+        var fields = SpellVfxAssets.Fields("Wizard", "DrawFrame");
         if (duration <= 0 || now < start || now - start >= duration) return;
         float progress = (now - start) / (float)duration;
         float time = (now - start) / 1000f;
         float strength = visual.Phase switch
         {
             SpellVisualPhase.Aura or SpellVisualPhase.Field or SpellVisualPhase.Hit => 1,
-            SpellVisualPhase.Prepare => tuning.PrepareFactor + tuning.PrepareFactor2 * Ease(progress * tuning.PrepareValue),
-            _ when visual.Spell == Spell.ThunderBolt => Envelope(progress, tuning.EnvelopeFadeStart, tuning.EnvelopeTail),
+            SpellVisualPhase.Prepare => fields.Read(tuning.PrepareFactor) + fields.Read(tuning.PrepareFactor2) * Ease(progress * fields.Read(tuning.PrepareValue)),
+            _ when visual.Spell == Spell.ThunderBolt => Envelope(progress, fields.Read(tuning.EnvelopeFadeStart), fields.Read(tuning.EnvelopeTail)),
             _ when visual.Spell is Spell.FireBall or Spell.GreatFireBall or Spell.FireBounce or Spell.MeteorShower or
-                Spell.ElectricShock or Spell.FlameField => Envelope(progress, tuning.EnvelopeFadeStart2, tuning.EnvelopeTail2),
+                Spell.ElectricShock or Spell.FlameField => Envelope(progress, fields.Read(tuning.EnvelopeFadeStart2), fields.Read(tuning.EnvelopeTail2)),
             _ => Envelope(progress)
         };
         var frame = new Frame(pool, feet, now, strength, size, seed ^ (uint)visual.Spell * 17191, field);
@@ -87,13 +89,13 @@ internal static partial class WizardSpellEffects
                 return;
             }
             bool cold = visual.Spell == Spell.ThunderStorm;
-            frame.Sprite(feet - Vector2.UnitY * tuning.FlashOffset, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, cold ? IceWhite : Hot, tuning.FlashAlpha, tuning.FlashLayer, light: tuning.FlashLight);
-            frame.Sparks(feet - Vector2.UnitY * tuning.SparksOffset, tuning.SparksCount, tuning.SparksRx, tuning.SparksRy, progress, cold ? Ice : Fire, rise: tuning.SparksRise);
+            frame.Sprite(feet - Vector2.UnitY * fields.Read(tuning.FlashOffset), fields.Read(tuning.FlashWidth), fields.Read(tuning.FlashHeight), fields.Read(tuning.FlashShape), cold ? IceWhite : Hot, fields.Read(tuning.FlashAlpha), fields.Read(tuning.FlashLayer), light: fields.Read(tuning.FlashLight));
+            frame.Sparks(feet - Vector2.UnitY * fields.Read(tuning.SparksOffset), fields.Read(tuning.SparksCount), fields.Read(tuning.SparksRx), fields.Read(tuning.SparksRy), progress, cold ? Ice : Fire, rise: fields.Read(tuning.SparksRise));
             return;
         }
         if (visual.Phase == SpellVisualPhase.Burn)
         {
-            Flames(frame, feet, tuning.Width, tuning.Height, time, tuning.Alpha);
+            Flames(frame, feet, fields.Read(tuning.Width), fields.Read(tuning.Height), time, fields.Read(tuning.Alpha));
             return;
         }
         if (visual.Phase == SpellVisualPhase.Ward && visual.Spell != Spell.MagicShield)
@@ -106,14 +108,14 @@ internal static partial class WizardSpellEffects
         {
             case Spell.FireBall:
                 if (prepare) FireCharge(frame, feet, progress, facing);
-                else FireBurst(frame, feet + new Vector2(tuning.FireBallX, tuning.FireBallY), progress, tuning.FireBallDiameter);
+                else FireBurst(frame, feet + new Vector2(fields.Read(tuning.FireBallX), fields.Read(tuning.FireBallY)), progress, fields.Read(tuning.FireBallDiameter));
                 break;
             case Spell.GreatFireBall:
             case Spell.FireBounce:
             case Spell.MeteorShower:
-                int accent = visual.Spell == Spell.FireBounce ? tuning.MeteorShowerAccentColour : visual.Spell == Spell.MeteorShower ? tuning.MeteorShowerAccentColour2 : Gold;
+                int accent = visual.Spell == Spell.FireBounce ? fields.Read(tuning.MeteorShowerAccentColour) : visual.Spell == Spell.MeteorShower ? fields.Read(tuning.MeteorShowerAccentColour2) : Gold;
                 if (prepare) GreatFireCharge(frame, feet, progress, accent);
-                else SearingImpact(frame, feet - Vector2.UnitY * tuning.MeteorShowerOffset, progress, accent);
+                else SearingImpact(frame, feet - Vector2.UnitY * fields.Read(tuning.MeteorShowerOffset), progress, accent);
                 break;
             case Spell.Repulsion:
                 Repel(frame, feet, progress);
@@ -123,7 +125,7 @@ internal static partial class WizardSpellEffects
                 break;
             case Spell.HellFire:
                 if (prepare) HellfireCharge(frame, feet, progress);
-                else FireBurst(frame, feet + new Vector2(tuning.HellFireX, tuning.HellFireY), progress, tuning.HellFireDiameter, fierce: true);
+                else FireBurst(frame, feet + new Vector2(fields.Read(tuning.HellFireX), fields.Read(tuning.HellFireY)), progress, fields.Read(tuning.HellFireDiameter), fierce: true);
                 break;
             case Spell.ThunderBolt:
                 ThunderStrike(frame, feet, progress, time, prepare);
@@ -140,12 +142,12 @@ internal static partial class WizardSpellEffects
                 else FireWall(frame, feet, time);
                 break;
             case Spell.Lightning:
-                Lightning(frame, feet - Vector2.UnitY * tuning.LightningSource, feet - Vector2.UnitY * tuning.LightningDestination + facing * tuning.LightningDestination2,
-                    time, new(feet.Y, feet.Y + facing.Y * tuning.LightningY));
+                Lightning(frame, feet - Vector2.UnitY * fields.Read(tuning.LightningSource), feet - Vector2.UnitY * fields.Read(tuning.LightningDestination) + facing * fields.Read(tuning.LightningDestination2),
+                    time, new(feet.Y, feet.Y + facing.Y * fields.Read(tuning.LightningY)));
                 break;
             case Spell.FrostCrunch:
                 if (prepare) FrostCharge(frame, feet, progress);
-                else FrostFireImpact(frame, feet - Vector2.UnitY * tuning.FrostCrunchOffset, progress);
+                else FrostFireImpact(frame, feet - Vector2.UnitY * fields.Read(tuning.FrostCrunchOffset), progress);
                 break;
             case Spell.ThunderStorm:
                 ThunderStorm(frame, feet, progress, time);
@@ -172,7 +174,7 @@ internal static partial class WizardSpellEffects
                 FlameField(frame, feet, progress, time);
                 break;
             case Spell.Blizzard:
-                if (prepare) IceBreak(frame, feet - Vector2.UnitY * tuning.BlizzardOffset, progress, tuning.BlizzardRadius, tuning.BlizzardCount);
+                if (prepare) IceBreak(frame, feet - Vector2.UnitY * fields.Read(tuning.BlizzardOffset), progress, fields.Read(tuning.BlizzardRadius), fields.Read(tuning.BlizzardCount));
                 else Blizzard(frame, feet, time);
                 break;
             case Spell.MagicBooster:
@@ -200,92 +202,93 @@ internal static partial class WizardSpellEffects
         long now, int frameIndex, int remaining, bool wake, float size)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.DrawProjectile);
+        var tuning = SpellVfxAssets.Current.Wizard.DrawProjectile;
+        var fields = SpellVfxAssets.Fields("Wizard", "DrawProjectile");
         if (spell is not (Spell.FireBall or Spell.GreatFireBall or Spell.FireBounce or Spell.MeteorShower or Spell.FrostCrunch)) return false;
         if (remaining <= 0) return true;
 
-        var frame = new Frame(pool, head, now, 1, size, (uint)spell, depthY: head.Y + tuning.DepthY);
+        var frame = new Frame(pool, head, now, 1, size, (uint)spell, depthY: head.Y + fields.Read(tuning.DepthY));
         float angle = MathF.Atan2(heading.Y, heading.X);
         Vector2 side = new(-heading.Y, heading.X);
         bool frost = spell == Spell.FrostCrunch;
-        int rim = frost ? tuning.RimColour : spell == Spell.FireBounce ? tuning.RimColour2 : Fire;
-        int mantle = frost ? tuning.MantleColour : spell == Spell.MeteorShower ? tuning.MantleColour2 : Gold;
+        int rim = frost ? fields.Read(tuning.RimColour) : spell == Spell.FireBounce ? fields.Read(tuning.RimColour2) : Fire;
+        int mantle = frost ? fields.Read(tuning.MantleColour) : spell == Spell.MeteorShower ? fields.Read(tuning.MantleColour2) : Gold;
         int core = frost ? IceWhite : Hot;
-        float phase = frameIndex * tuning.Phase;
+        float phase = frameIndex * fields.Read(tuning.Phase);
 
         // The projectile core is made of individual directional flame tongues,
         // never a single 100px orb. Frost Crunch uses the same cold-fire flow.
-        for (int i = 0; i < tuning.UserFlameCount; i++)
+        for (int i = 0; i < fields.Read(tuning.UserFlameCount); i++)
         {
             int seed = i * 37 + 67;
-            float age = Fract(frameIndex * (tuning.Age + frame.Unit(seed + 7) * tuning.Age2) +
+            float age = Fract(frameIndex * (fields.Read(tuning.Age) + frame.Unit(seed + 7) * fields.Read(tuning.Age2)) +
                 frame.Unit(seed + 13));
-            float along = tuning.Along + age * (tuning.Along2 + frame.Unit(seed + 19) * tuning.Along3);
+            float along = fields.Read(tuning.Along) + age * (fields.Read(tuning.Along2) + frame.Unit(seed + 19) * fields.Read(tuning.Along3));
             Vector2 point = head - heading * along +
-                side * ((frame.Unit(seed + 23) - tuning.Point) * (tuning.Point2 + age * tuning.Point3));
+                side * ((frame.Unit(seed + 23) - fields.Read(tuning.Point)) * (fields.Read(tuning.Point2) + age * fields.Read(tuning.Point3)));
             float alive = MathF.Sin(age * MathF.PI);
-            frame.Sprite(point, tuning.UserFlameWidth + frame.Unit(seed + 29) * tuning.UserFlameWidth2,
-                tuning.UserFlameHeight + frame.Unit(seed + 31) * tuning.UserFlameHeight2,
-                tuning.UserFlameShape, i % 5 == 0 ? core : i % 3 == 0 ? mantle : rim,
-                tuning.UserFlameAlpha * alive, i % 6 == 0 ? tuning.UserFlameLayer : tuning.UserFlameLayer2,
-                angle - MathF.PI / 2 + (frame.Unit(seed + 37) - tuning.UserFlameRotation) * tuning.UserFlameRotation2,
+            frame.Sprite(point, fields.Read(tuning.UserFlameWidth) + frame.Unit(seed + 29) * fields.Read(tuning.UserFlameWidth2),
+                fields.Read(tuning.UserFlameHeight) + frame.Unit(seed + 31) * fields.Read(tuning.UserFlameHeight2),
+                fields.Read(tuning.UserFlameShape), i % 5 == 0 ? core : i % 3 == 0 ? mantle : rim,
+                fields.Read(tuning.UserFlameAlpha) * alive, i % 6 == 0 ? fields.Read(tuning.UserFlameLayer) : fields.Read(tuning.UserFlameLayer2),
+                angle - MathF.PI / 2 + (frame.Unit(seed + 37) - fields.Read(tuning.UserFlameRotation)) * fields.Read(tuning.UserFlameRotation2),
                 light: i % 17 == 0);
             if (i % 4 == 0)
-                frame.Sprite(point - heading * tuning.SparkOffset, tuning.SparkWidth + frame.Unit(seed + 41) * tuning.SparkWidth2,
-                    tuning.SparkHeight + frame.Unit(seed + 43) * tuning.SparkHeight2,
-                    frost ? tuning.SparkShape : tuning.SparkShape2,
-                    i % 2 == 0 ? core : mantle, tuning.SparkAlpha * alive, tuning.SparkLayer);
+                frame.Sprite(point - heading * fields.Read(tuning.SparkOffset), fields.Read(tuning.SparkWidth) + frame.Unit(seed + 41) * fields.Read(tuning.SparkWidth2),
+                    fields.Read(tuning.SparkHeight) + frame.Unit(seed + 43) * fields.Read(tuning.SparkHeight2),
+                    frost ? fields.Read(tuning.SparkShape) : fields.Read(tuning.SparkShape2),
+                    i % 2 == 0 ? core : mantle, fields.Read(tuning.SparkAlpha) * alive, fields.Read(tuning.SparkLayer));
             if (i % 7 == 0)
-                frame.Clip(point - heading * tuning.SmokeSequenceOffset, tuning.SmokeSequenceWidth + frame.Unit(seed + 47) * tuning.SmokeSequenceWidth2,
-                    tuning.SmokeSequenceHeight + frame.Unit(seed + 49) * tuning.SmokeSequenceHeight2,
-                    tuning.SmokeSequenceShape, phase + frame.Unit(seed + 51),
-                    frost ? tuning.SmokeSequenceColour : tuning.SmokeSequenceColour2,
-                    tuning.SmokeSequenceAlpha * alive, tuning.SmokeSequenceLayer);
+                frame.Clip(point - heading * fields.Read(tuning.SmokeSequenceOffset), fields.Read(tuning.SmokeSequenceWidth) + frame.Unit(seed + 47) * fields.Read(tuning.SmokeSequenceWidth2),
+                    fields.Read(tuning.SmokeSequenceHeight) + frame.Unit(seed + 49) * fields.Read(tuning.SmokeSequenceHeight2),
+                    fields.Read(tuning.SmokeSequenceShape), phase + frame.Unit(seed + 51),
+                    frost ? fields.Read(tuning.SmokeSequenceColour) : fields.Read(tuning.SmokeSequenceColour2),
+                    fields.Read(tuning.SmokeSequenceAlpha) * alive, fields.Read(tuning.SmokeSequenceLayer));
         }
-        frame.Sprite(head, tuning.UserFlameWidth3, tuning.UserFlameHeight3, tuning.UserFlameShape2, core, tuning.UserFlameAlpha2,
-            tuning.UserFlameLayer3, angle - MathF.PI / 2, light: tuning.UserFlameLight);
+        frame.Sprite(head, fields.Read(tuning.UserFlameWidth3), fields.Read(tuning.UserFlameHeight3), fields.Read(tuning.UserFlameShape2), core, fields.Read(tuning.UserFlameAlpha2),
+            fields.Read(tuning.UserFlameLayer3), angle - MathF.PI / 2, light: fields.Read(tuning.UserFlameLight));
         if (frost)
         {
             // The moving projectile needs a luminous spherical icefire head
             // in front of its existing cool-flame trail and snow wake.
             // Small independent textures overlap; no giant opaque orb.
-            for (int i = 0; i < tuning.FrostCoreCount; i++)
+            for (int i = 0; i < fields.Read(tuning.FrostCoreCount); i++)
             {
                 int seed = 839 + i * 31;
                 float theta = frame.Unit(seed) * MathF.Tau +
-                    phase * (tuning.Theta + frame.Unit(seed + 3) * tuning.Theta2);
-                float radius = tuning.Radius + frame.Unit(seed + 5) * tuning.Radius2;
-                Vector2 point = head + Ellipse(theta, radius, radius * tuning.EllipseY);
-                float pulse = tuning.Pulse + tuning.Pulse2 *
-                    MathF.Sin(phase * tuning.Pulse3 + frame.Unit(seed + 9) * MathF.Tau);
-                frame.Sprite(point, tuning.FrostCoreWidth + frame.Unit(seed + 11) * tuning.FrostCoreWidth2,
-                    tuning.FrostCoreHeight + frame.Unit(seed + 13) * tuning.FrostCoreHeight2,
-                    i % 3 == 0 ? tuning.FrostCoreShape : tuning.FrostCoreShape2,
+                    phase * (fields.Read(tuning.Theta) + frame.Unit(seed + 3) * fields.Read(tuning.Theta2));
+                float radius = fields.Read(tuning.Radius) + frame.Unit(seed + 5) * fields.Read(tuning.Radius2);
+                Vector2 point = head + Ellipse(theta, radius, radius * fields.Read(tuning.EllipseY));
+                float pulse = fields.Read(tuning.Pulse) + fields.Read(tuning.Pulse2) *
+                    MathF.Sin(phase * fields.Read(tuning.Pulse3) + frame.Unit(seed + 9) * MathF.Tau);
+                frame.Sprite(point, fields.Read(tuning.FrostCoreWidth) + frame.Unit(seed + 11) * fields.Read(tuning.FrostCoreWidth2),
+                    fields.Read(tuning.FrostCoreHeight) + frame.Unit(seed + 13) * fields.Read(tuning.FrostCoreHeight2),
+                    i % 3 == 0 ? fields.Read(tuning.FrostCoreShape) : fields.Read(tuning.FrostCoreShape2),
                     i % 5 == 0 ? IceWhite : i % 2 == 0 ? PaleBlue : Ice,
-                    tuning.FrostCoreAlpha * pulse,
-                    i % 3 == 0 ? tuning.FrostCoreLayer : tuning.FrostCoreLayer2,
+                    fields.Read(tuning.FrostCoreAlpha) * pulse,
+                    i % 3 == 0 ? fields.Read(tuning.FrostCoreLayer) : fields.Read(tuning.FrostCoreLayer2),
                     angle - MathF.PI / 2, light: i % 11 == 0);
                 if (i % 4 == 0)
-                    frame.Sprite(point, tuning.FrostCoreWidth3 + frame.Unit(seed + 15) * tuning.FrostCoreWidth4,
-                        tuning.FrostCoreHeight3 + frame.Unit(seed + 17) * tuning.FrostCoreHeight4,
-                        tuning.FrostCoreShape3, IceWhite, tuning.FrostCoreAlpha2 * pulse,
-                        tuning.FrostCoreLayer3, light: i % 8 == 0);
+                    frame.Sprite(point, fields.Read(tuning.FrostCoreWidth3) + frame.Unit(seed + 15) * fields.Read(tuning.FrostCoreWidth4),
+                        fields.Read(tuning.FrostCoreHeight3) + frame.Unit(seed + 17) * fields.Read(tuning.FrostCoreHeight4),
+                        fields.Read(tuning.FrostCoreShape3), IceWhite, fields.Read(tuning.FrostCoreAlpha2) * pulse,
+                        fields.Read(tuning.FrostCoreLayer3), light: i % 8 == 0);
             }
-            frame.Sprite(head, tuning.FrostCoreWidth5, tuning.FrostCoreHeight5, tuning.FrostCoreShape4, PaleBlue,
-                tuning.FrostCoreAlpha3, tuning.FrostCoreLayer4, light: tuning.FrostCoreLight);
-            frame.Sprite(head - Vector2.UnitY * tuning.FlashOffset, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape,
-                IceWhite, tuning.FlashAlpha, tuning.FlashLayer, light: tuning.FlashLight);
+            frame.Sprite(head, fields.Read(tuning.FrostCoreWidth5), fields.Read(tuning.FrostCoreHeight5), fields.Read(tuning.FrostCoreShape4), PaleBlue,
+                fields.Read(tuning.FrostCoreAlpha3), fields.Read(tuning.FrostCoreLayer4), light: fields.Read(tuning.FrostCoreLight));
+            frame.Sprite(head - Vector2.UnitY * fields.Read(tuning.FlashOffset), fields.Read(tuning.FlashWidth), fields.Read(tuning.FlashHeight), fields.Read(tuning.FlashShape),
+                IceWhite, fields.Read(tuning.FlashAlpha), fields.Read(tuning.FlashLayer), light: fields.Read(tuning.FlashLight));
             SnowballWake(frame, pool, head, heading, now, frameIndex, remaining, wake);
             return true;
         }
         if (wake)
         {
-            Vector2 drift = side * (frameIndex % 5 - tuning.Drift) * tuning.Drift2;
-            pool.TryAdd(new SpellParticle(head - heading * tuning.UserEmberOrigin + drift,
-                -heading * tuning.UserEmberVelocity + drift, now, Math.Min(remaining, tuning.Val2), tuning.UserEmberSize,
-                Tint(Gold, tuning.Opacity), tuning.UserEmberShape, 0,
-                Rotation: angle, Growth: tuning.UserEmberGrowth, Layer: tuning.UserEmberLayer,
-                CastsLight: tuning.UserEmberCastsLight, DepthY: head.Y + tuning.UserEmberDepthY));
+            Vector2 drift = side * (frameIndex % 5 - fields.Read(tuning.Drift)) * fields.Read(tuning.Drift2);
+            pool.TryAdd(new SpellParticle(head - heading * fields.Read(tuning.UserEmberOrigin) + drift,
+                -heading * fields.Read(tuning.UserEmberVelocity) + drift, now, Math.Min(remaining, fields.Read(tuning.Val2)), fields.Read(tuning.UserEmberSize),
+                Tint(Gold, fields.Read(tuning.Opacity)), fields.Read(tuning.UserEmberShape), 0,
+                Rotation: angle, Growth: fields.Read(tuning.UserEmberGrowth), Layer: fields.Read(tuning.UserEmberLayer),
+                CastsLight: fields.Read(tuning.UserEmberCastsLight), DepthY: head.Y + fields.Read(tuning.UserEmberDepthY)));
         }
         return true;
     }

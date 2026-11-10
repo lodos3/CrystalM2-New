@@ -1,3 +1,4 @@
+using System.Windows.Data;
 using System.Diagnostics;
 using System.IO;
 using System.Numerics;
@@ -186,25 +187,31 @@ public partial class StudioWindow : Window
         UpdateClock();
     }
 
+    private Dictionary<(string Group, string Node), HashSet<string>> _activeFields = new();
+
     private void RefreshNodes()
     {
         if (_spell == null || _defaults.Count == 0) return;
         var prior = NodePicker.SelectedItem as NodeChoice;
         var nodes = SpellVfxAssets.CollectNodes(() =>
         {
-            _ = new PreviewSequence(_spell);
+            if (StagePicker.SelectedIndex == 0) _ = new PreviewSequence(_spell);
             var pool = new SpellParticlePool(4096);
-            var rig = new PreviewRig(new Vector2(300, 280), Vector2.UnitX, MirDirection.Right);
+            var direction = DirectionPicker.SelectedItem is MirDirection selected ? selected : MirDirection.Right;
+            float angle = ((int)direction - 2) * MathF.PI / 4;
+            var facing = Vector2.Normalize(new Vector2(MathF.Cos(angle), MathF.Sin(angle) * .68f));
+            var rig = new PreviewRig(new Vector2(300, 280), facing, direction);
             foreach (var stage in SelectedStages())
             {
+                stage.InspectTiming?.Invoke();
                 foreach (float fraction in new[] { .08f, .33f, .67f, .92f })
                 {
                     pool.Clear();
                     stage.Sample(pool, rig, (int)(stage.Duration * fraction));
                 }
             }
-        });
-        var items = (AllNodes.IsChecked == true || nodes.Count == 0
+        }, out _activeFields);
+        var items = (AllNodes.IsChecked == true
             ? _defaults.SelectMany(group => group.Value.Select(node => (Group: group.Key, Node: node.Key)))
             : nodes.Where(node => _defaults.TryGetValue(node.Group, out var group) && group.ContainsKey(node.Node)))
             .OrderBy(node => node.Group).ThenBy(node => node.Node)
@@ -233,12 +240,19 @@ public partial class StudioWindow : Window
         }
         var shared = _defaults[choice.Group][choice.Node]!.AsObject();
         var overrides = _drafts[_spell.Spell].Working[choice.Group]?[choice.Node] as JsonObject;
-        Parameters.ItemsSource = shared.Select(item =>
+        var rows = shared.Where(item => AllNodes.IsChecked == true ||
+            !_activeFields.TryGetValue((choice.Group, choice.Node), out var fields) || fields.Contains(item.Key))
+            .Select(item =>
         {
             JsonNode? edit = overrides?[item.Key];
             JsonNode value = edit ?? item.Value!;
-            return new ParameterRow(item.Key, Format(value), edit == null ? "Shared" : "Spell");
-        }).ToArray();
+            var control = ParticleSettings.Describe(choice.Group, choice.Node, item.Key, _spell.Spell);
+            string label = AllNodes.IsChecked == true ? item.Key : control.Label;
+            return new ParameterRow(item.Key, label, control.Module, Format(value), edit == null ? "Default" : "Override");
+        }).OrderBy(row => ParticleSettings.ModuleOrder(row.Module)).ToArray();
+        var view = new ListCollectionView(rows);
+        view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ParameterRow.Module)));
+        Parameters.ItemsSource = view;
     }
 
     private static string Format(JsonNode value) => value.GetValueKind() == JsonValueKind.String
@@ -490,7 +504,9 @@ public partial class StudioWindow : Window
 
     private void ViewChanged(object sender, RoutedEventArgs e)
     {
-        if (_ready) Draw();
+        if (!_ready) return;
+        if (ReferenceEquals(sender, DirectionPicker)) Try(RefreshNodes);
+        Draw();
     }
 
     private void Draw()
@@ -535,12 +551,14 @@ public partial class StudioWindow : Window
 
     private sealed record NodeChoice(string Group, string Node)
     {
-        public override string ToString() => $"{Group} · {Node}";
+        public override string ToString() => ParticleSettings.NodeLabel(Group, Node);
     }
 
-    private sealed class ParameterRow(string name, string text, string source)
+    private sealed class ParameterRow(string name, string label, string module, string text, string source)
     {
         public string Name { get; } = name;
+        public string Label { get; } = label;
+        public string Module { get; } = module;
         public string Text { get; set; } = text;
         public string Source { get; } = source;
     }

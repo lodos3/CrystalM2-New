@@ -22,7 +22,7 @@ internal readonly record struct PreviewRig(Vector2 Centre, Vector2 Facing, MirDi
 }
 
 internal sealed record PreviewStage(string Name, int Duration, int Delay,
-    Action<SpellParticlePool, PreviewRig, int> Sample, MirAction ActorAction);
+    Action<SpellParticlePool, PreviewRig, int> Sample, MirAction ActorAction, Action? InspectTiming);
 
 internal sealed class PreviewSequence
 {
@@ -152,7 +152,7 @@ internal sealed class PreviewSequence
             SpellVisualPhase.Prepare => MirAction.Spell,
             SpellVisualPhase.Swing => MirAction.Attack1,
             _ => MirAction.Standing
-        });
+        }, duration == null ? () => LegacySpellEffects.PacketDuration(visual) : null);
     }
 
     private void SampleWeapon(SpellParticlePool pool, PreviewRig rig, int elapsed, bool followThrough)
@@ -196,9 +196,9 @@ internal sealed class PreviewSequence
     }
 
     private void Add(string name, int duration, Action<SpellParticlePool, PreviewRig, int> sample,
-        int delay = 0, MirAction action = MirAction.Standing)
+        int delay = 0, MirAction action = MirAction.Standing, Action? inspectTiming = null)
     {
-        if (duration > 0) _stages.Add(new PreviewStage(name, duration, Math.Max(0, delay), sample, action));
+        if (duration > 0) _stages.Add(new PreviewStage(name, duration, Math.Max(0, delay), sample, action, inspectTiming));
     }
 
     private static bool HasProjectile(Spell spell) => spell is

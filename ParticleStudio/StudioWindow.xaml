@@ -182,8 +182,8 @@
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top">
                         <DockPanel LastChildFill="True">
-                            <CheckBox x:Name="AllNodes" DockPanel.Dock="Right" Content="All nodes" Checked="NodesChanged" Unchecked="NodesChanged"
-                                      ToolTip="Include shared nodes outside the selected stage" />
+                            <CheckBox x:Name="AllNodes" DockPanel.Dock="Right" Content="Advanced" Checked="NodesChanged" Unchecked="NodesChanged"
+                                      ToolTip="Show all source nodes and settings, including inactive branches" />
                             <TextBlock Text="Effect settings" FontSize="16" FontWeight="SemiBold" />
                         </DockPanel>
                         <ComboBox x:Name="NodePicker" Margin="0,11,0,7" SelectionChanged="NodeChanged"
@@ -199,8 +199,17 @@
                               CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="None"
                               SelectionMode="Single" SelectionUnit="FullRow" CellEditEnding="ParameterEdited"
                               EnableRowVirtualization="True" AutomationProperties.Name="Effect parameters">
+                        <DataGrid.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.HeaderTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Name}" Foreground="#E5BA78" FontWeight="SemiBold" Margin="7,9,3,3" />
+                                    </DataTemplate>
+                                </GroupStyle.HeaderTemplate>
+                            </GroupStyle>
+                        </DataGrid.GroupStyle>
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Setting" Binding="{Binding Name}" IsReadOnly="True" Width="1.25*" />
+                            <DataGridTextColumn Header="Setting" Binding="{Binding Label}" IsReadOnly="True" Width="1.25*" />
                             <DataGridTextColumn Header="Value" Binding="{Binding Text, UpdateSourceTrigger=Explicit}" Width="*" />
                             <DataGridTextColumn Header="Source" Binding="{Binding Source}" IsReadOnly="True" Width="69" />
                         </DataGrid.Columns>

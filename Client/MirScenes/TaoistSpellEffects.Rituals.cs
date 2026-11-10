@@ -176,84 +176,85 @@ internal static partial class TaoistSpellEffects
 
     private static void BurningWard(Frame frame, Vector2 feet, float progress, Shape glyph)
     {
-        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.BurningWard);
+        var tuning = SpellVfxAssets.Current.Taoist.BurningWard;
+        var fields = SpellVfxAssets.Fields("Taoist", "BurningWard");
         bool armour = glyph == Shape.ArmourGlyph;
-        float width = armour ? tuning.ArmourWidth : tuning.SoulShieldWidth, height = armour ? tuning.ArmourHeight : tuning.SoulShieldHeight;
+        float width = armour ? fields.Read(tuning.ArmourWidth) : fields.Read(tuning.SoulShieldWidth), height = armour ? fields.Read(tuning.ArmourHeight) : fields.Read(tuning.SoulShieldHeight);
         var flame = armour ? ArmourFlame : SoulFlame;
-        int glow = armour ? tuning.ArmourGlowColour : tuning.SoulShieldGlowColour;
-        Vector2 centre = feet + (armour ? new Vector2(tuning.X, tuning.Y) : new Vector2(0, tuning.Y2));
-        Vector2 scale = new(width * tuning.Scale, height * tuning.Scale2);
-        float front = armour ? tuning.Front + progress * tuning.Front2 : tuning.Front3 + progress * tuning.Front4;
-        float formed = Ease((front - tuning.Formed) / tuning.FormedDivisor);
-        float settling = Ease((progress - tuning.Settling) / tuning.SettlingDivisor);
+        int glow = armour ? fields.Read(tuning.ArmourGlowColour) : fields.Read(tuning.SoulShieldGlowColour);
+        Vector2 centre = feet + (armour ? new Vector2(fields.Read(tuning.X), fields.Read(tuning.Y)) : new Vector2(0, fields.Read(tuning.Y2)));
+        Vector2 scale = new(width * fields.Read(tuning.Scale), height * fields.Read(tuning.Scale2));
+        float front = armour ? fields.Read(tuning.Front) + progress * fields.Read(tuning.Front2) : fields.Read(tuning.Front3) + progress * fields.Read(tuning.Front4);
+        float formed = Ease((front - fields.Read(tuning.Formed)) / fields.Read(tuning.FormedDivisor));
+        float settling = Ease((progress - fields.Read(tuning.Settling)) / fields.Read(tuning.SettlingDivisor));
         // The rune forms behind its fire, then burns away while the remaining
         // smoke continues rising off the same fixed brush-stroke positions.
-        float dissipation = 1 - Ease((progress - tuning.DissipationStart) / tuning.DissipationDuration);
-        frame.Sprite(centre, width * tuning.SpriteWidth, height * tuning.SpriteHeight, glyph, armour ? tuning.ArmourSpriteColour : tuning.SoulShieldSpriteColour,
-            formed * dissipation * tuning.SpriteAlpha, tuning.SpriteLayer);
-        frame.Sprite(centre, width, height, glyph, armour ? tuning.ArmourSpriteColour2 : tuning.SoulShieldSpriteColour2,
-            formed * dissipation * (tuning.SpriteAlpha2 + tuning.SpriteAlpha3 * settling));
-        frame.Sprite(centre, width, height, glyph, armour ? tuning.ArmourSpriteColour3 : tuning.SoulShieldSpriteColour3,
-            formed * dissipation * (tuning.SpriteAlpha4 + tuning.SpriteAlpha5 * settling), tuning.SpriteLayer2);
+        float dissipation = 1 - Ease((progress - fields.Read(tuning.DissipationStart)) / fields.Read(tuning.DissipationDuration));
+        frame.Sprite(centre, width * fields.Read(tuning.SpriteWidth), height * fields.Read(tuning.SpriteHeight), glyph, armour ? fields.Read(tuning.ArmourSpriteColour) : fields.Read(tuning.SoulShieldSpriteColour),
+            formed * dissipation * fields.Read(tuning.SpriteAlpha), fields.Read(tuning.SpriteLayer));
+        frame.Sprite(centre, width, height, glyph, armour ? fields.Read(tuning.ArmourSpriteColour2) : fields.Read(tuning.SoulShieldSpriteColour2),
+            formed * dissipation * (fields.Read(tuning.SpriteAlpha2) + fields.Read(tuning.SpriteAlpha3) * settling));
+        frame.Sprite(centre, width, height, glyph, armour ? fields.Read(tuning.ArmourSpriteColour3) : fields.Read(tuning.SoulShieldSpriteColour3),
+            formed * dissipation * (fields.Read(tuning.SpriteAlpha4) + fields.Read(tuning.SpriteAlpha5) * settling), fields.Read(tuning.SpriteLayer2));
         if (armour)
         {
-            float spark = 1 - Ease(progress / tuning.SparkDivisor);
-            Vector2 source = feet - Vector2.UnitY * (tuning.Source + tuning.Source2 * progress);
-            frame.Sprite(source, tuning.WispWidth, tuning.WispHeight, tuning.WispShape, tuning.WispColour, tuning.WispAlpha * spark, tuning.WispLayer);
-            frame.Sprite(source, tuning.UserFlameWidth, tuning.UserFlameHeight, tuning.UserFlameShape, Amber, tuning.UserFlameAlpha * spark, tuning.UserFlameLayer, light: tuning.UserFlameLight);
-            frame.Sprite(source, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, Ivory, tuning.FlashAlpha * spark, tuning.FlashLayer);
+            float spark = 1 - Ease(progress / fields.Read(tuning.SparkDivisor));
+            Vector2 source = feet - Vector2.UnitY * (fields.Read(tuning.Source) + fields.Read(tuning.Source2) * progress);
+            frame.Sprite(source, fields.Read(tuning.WispWidth), fields.Read(tuning.WispHeight), fields.Read(tuning.WispShape), fields.Read(tuning.WispColour), fields.Read(tuning.WispAlpha) * spark, fields.Read(tuning.WispLayer));
+            frame.Sprite(source, fields.Read(tuning.UserFlameWidth), fields.Read(tuning.UserFlameHeight), fields.Read(tuning.UserFlameShape), Amber, fields.Read(tuning.UserFlameAlpha) * spark, fields.Read(tuning.UserFlameLayer), light: fields.Read(tuning.UserFlameLight));
+            frame.Sprite(source, fields.Read(tuning.FlashWidth), fields.Read(tuning.FlashHeight), fields.Read(tuning.FlashShape), Ivory, fields.Read(tuning.FlashAlpha) * spark, fields.Read(tuning.FlashLayer));
         }
 
         for (int stroke = 0; stroke < TaoistRuneBrush.StrokeCount(glyph); stroke++)
         {
             ReadOnlySpan<Vector3> points = TaoistRuneBrush.Stroke(glyph, stroke);
-            for (int i = 0; i < points.Length; i += tuning.BrushKnotStride)
+            for (int i = 0; i < points.Length; i += fields.Read(tuning.BrushKnotStride))
             {
                 Vector3 knot = points[i];
-                int salt = stroke * tuning.StrokeSeedStride + i * tuning.KnotSeedStride;
-                float ignition = tuning.Ignition + tuning.Ignition2 * knot.X + tuning.Ignition3 * knot.Y + tuning.Ignition4 * frame.Unit(salt);
+                int salt = stroke * fields.Read(tuning.StrokeSeedStride) + i * fields.Read(tuning.KnotSeedStride);
+                float ignition = fields.Read(tuning.Ignition) + fields.Read(tuning.Ignition2) * knot.X + fields.Read(tuning.Ignition3) * knot.Y + fields.Read(tuning.Ignition4) * frame.Unit(salt);
                 if (front < ignition) continue;
                 Vector2 root = centre + new Vector2(knot.X, knot.Y) * scale;
-                float age = Fract(progress * (tuning.Age + frame.Unit(salt + 3)) + frame.Unit(salt + 17));
-                float press = Math.Clamp(knot.Z / tuning.PressDivisor, 0, armour ? 1.35f : 1);
-                float size = tuning.Size + (armour ? tuning.ArmourSize : tuning.SoulShieldSize) * press;
-                float lift = (tuning.Lift + (armour ? tuning.ArmourLift : tuning.SoulShieldLift) * press) * (1 - settling * tuning.Lift2);
-                float rise = (tuning.Rise + (armour ? tuning.ArmourRise : tuning.SoulShieldRise) * press) * age;
-                float tilt = tuning.Tilt * MathF.Sin(age * MathF.Tau + salt);
-                float alpha = (tuning.Alpha + tuning.Alpha2 * MathF.Sin(age * MathF.PI)) *
-                    (1 - settling * (armour ? tuning.ArmourAlpha : tuning.SoulShieldAlpha)) * (tuning.Alpha3 + tuning.Alpha4 * dissipation);
-                frame.Clip(root - Vector2.UnitY * (lift * tuning.FlameSequenceOffset + rise * tuning.FlameSequenceOffset2), size, lift, tuning.FlameSequenceShape, age,
-                    flame.Sample(tuning.Offset + age * tuning.Offset2), tuning.FlameSequenceAlpha * alpha, tuning.FlameSequenceLayer, tilt);
-                frame.Sprite(root - Vector2.UnitY * (lift * tuning.UserFlameOffset + rise * tuning.UserFlameOffset2), size * tuning.UserFlameWidth2, lift * tuning.UserFlameHeight2, tuning.UserFlameShape2,
-                    flame.Sample(age * tuning.Offset3), alpha, tuning.UserFlameLayer2, -tilt, light: i % 6 == 0);
-                frame.Sprite(root - Vector2.UnitY * (lift * tuning.FlameTongueOffset + rise), size * tuning.FlameTongueWidth, lift, tuning.FlameTongueShape,
-                    flame.Sample(age * tuning.Offset4), tuning.FlameTongueAlpha * alpha, tuning.FlameTongueLayer, tilt);
+                float age = Fract(progress * (fields.Read(tuning.Age) + frame.Unit(salt + 3)) + frame.Unit(salt + 17));
+                float press = Math.Clamp(knot.Z / fields.Read(tuning.PressDivisor), 0, armour ? 1.35f : 1);
+                float size = fields.Read(tuning.Size) + (armour ? fields.Read(tuning.ArmourSize) : fields.Read(tuning.SoulShieldSize)) * press;
+                float lift = (fields.Read(tuning.Lift) + (armour ? fields.Read(tuning.ArmourLift) : fields.Read(tuning.SoulShieldLift)) * press) * (1 - settling * fields.Read(tuning.Lift2));
+                float rise = (fields.Read(tuning.Rise) + (armour ? fields.Read(tuning.ArmourRise) : fields.Read(tuning.SoulShieldRise)) * press) * age;
+                float tilt = fields.Read(tuning.Tilt) * MathF.Sin(age * MathF.Tau + salt);
+                float alpha = (fields.Read(tuning.Alpha) + fields.Read(tuning.Alpha2) * MathF.Sin(age * MathF.PI)) *
+                    (1 - settling * (armour ? fields.Read(tuning.ArmourAlpha) : fields.Read(tuning.SoulShieldAlpha))) * (fields.Read(tuning.Alpha3) + fields.Read(tuning.Alpha4) * dissipation);
+                frame.Clip(root - Vector2.UnitY * (lift * fields.Read(tuning.FlameSequenceOffset) + rise * fields.Read(tuning.FlameSequenceOffset2)), size, lift, fields.Read(tuning.FlameSequenceShape), age,
+                    flame.Sample(fields.Read(tuning.Offset) + age * fields.Read(tuning.Offset2)), fields.Read(tuning.FlameSequenceAlpha) * alpha, fields.Read(tuning.FlameSequenceLayer), tilt);
+                frame.Sprite(root - Vector2.UnitY * (lift * fields.Read(tuning.UserFlameOffset) + rise * fields.Read(tuning.UserFlameOffset2)), size * fields.Read(tuning.UserFlameWidth2), lift * fields.Read(tuning.UserFlameHeight2), fields.Read(tuning.UserFlameShape2),
+                    flame.Sample(age * fields.Read(tuning.Offset3)), alpha, fields.Read(tuning.UserFlameLayer2), -tilt, light: i % 6 == 0);
+                frame.Sprite(root - Vector2.UnitY * (lift * fields.Read(tuning.FlameTongueOffset) + rise), size * fields.Read(tuning.FlameTongueWidth), lift, fields.Read(tuning.FlameTongueShape),
+                    flame.Sample(age * fields.Read(tuning.Offset4)), fields.Read(tuning.FlameTongueAlpha) * alpha, fields.Read(tuning.FlameTongueLayer), tilt);
                 if (armour && i % 4 == 0)
-                    frame.Clip(root + new Vector2(tilt * tuning.X2, -lift * tuning.Y3), size * tuning.FlameSequenceWidth, lift * tuning.FlameSequenceHeight,
-                        tuning.FlameSequenceShape2, age + tuning.FlameSequencePhase, flame.Sample(age * tuning.Offset5), tuning.FlameSequenceAlpha2 * alpha, tuning.FlameSequenceLayer2, tilt);
+                    frame.Clip(root + new Vector2(tilt * fields.Read(tuning.X2), -lift * fields.Read(tuning.Y3)), size * fields.Read(tuning.FlameSequenceWidth), lift * fields.Read(tuning.FlameSequenceHeight),
+                        fields.Read(tuning.FlameSequenceShape2), age + fields.Read(tuning.FlameSequencePhase), flame.Sample(age * fields.Read(tuning.Offset5)), fields.Read(tuning.FlameSequenceAlpha2) * alpha, fields.Read(tuning.FlameSequenceLayer2), tilt);
                 if (i % 4 == 0)
                 {
                     // Thin, independently phased smoke plumes peel upwards and
                     // drift sideways. Keep these attached to actual glyph knots,
                     // rather than introducing a backdrop billboard or ellipse.
-                    float release = Ease((progress - tuning.SmokeReleaseStart) / tuning.SmokeReleaseDuration);
+                    float release = Ease((progress - fields.Read(tuning.SmokeReleaseStart)) / fields.Read(tuning.SmokeReleaseDuration));
                     if (release > .014f)
                     {
-                        float smokeAge = Fract(progress * (tuning.SmokeAge + frame.Unit(salt + 75) * tuning.SmokeAge2) +
+                        float smokeAge = Fract(progress * (fields.Read(tuning.SmokeAge) + frame.Unit(salt + 75) * fields.Read(tuning.SmokeAge2)) +
                             frame.Unit(salt + 76));
-                        float sideways = (frame.Unit(salt + 78) * tuning.Sideways - 1) * (tuning.Sideways2 + tuning.Sideways3 * smokeAge);
-                        Vector2 plume = root + new Vector2(sideways, tuning.SmokeBaseOffsetY - (tuning.SmokeBaseRise + tuning.SmokePressureRise * press) * smokeAge);
-                        float opacity = (tuning.SmokeBaseOpacity + tuning.SmokeReleaseOpacity * release) * (1 - tuning.SmokeAgeFade * smokeAge) *
-                            (tuning.SmokeEarlyOpacity + tuning.SmokeSettlingOpacity * settling);
-                        frame.Clip(plume, tuning.SmokeSequenceWidth + tuning.SmokeSequenceWidth2 * smokeAge, tuning.SmokeSequenceHeight + tuning.SmokeSequenceHeight2 * smokeAge, tuning.SmokeSequenceShape,
-                            smokeAge + tuning.SmokeSequencePhase, armour ? tuning.ArmourSmokeSequenceColour : tuning.SoulShieldSmokeSequenceColour, opacity, tuning.SmokeSequenceLayer, tilt * tuning.SmokeSequenceRotation);
+                        float sideways = (frame.Unit(salt + 78) * fields.Read(tuning.Sideways) - 1) * (fields.Read(tuning.Sideways2) + fields.Read(tuning.Sideways3) * smokeAge);
+                        Vector2 plume = root + new Vector2(sideways, fields.Read(tuning.SmokeBaseOffsetY) - (fields.Read(tuning.SmokeBaseRise) + fields.Read(tuning.SmokePressureRise) * press) * smokeAge);
+                        float opacity = (fields.Read(tuning.SmokeBaseOpacity) + fields.Read(tuning.SmokeReleaseOpacity) * release) * (1 - fields.Read(tuning.SmokeAgeFade) * smokeAge) *
+                            (fields.Read(tuning.SmokeEarlyOpacity) + fields.Read(tuning.SmokeSettlingOpacity) * settling);
+                        frame.Clip(plume, fields.Read(tuning.SmokeSequenceWidth) + fields.Read(tuning.SmokeSequenceWidth2) * smokeAge, fields.Read(tuning.SmokeSequenceHeight) + fields.Read(tuning.SmokeSequenceHeight2) * smokeAge, fields.Read(tuning.SmokeSequenceShape),
+                            smokeAge + fields.Read(tuning.SmokeSequencePhase), armour ? fields.Read(tuning.ArmourSmokeSequenceColour) : fields.Read(tuning.SoulShieldSmokeSequenceColour), opacity, fields.Read(tuning.SmokeSequenceLayer), tilt * fields.Read(tuning.SmokeSequenceRotation));
                     }
-                    frame.Sprite(root, Math.Min(tuning.KnotGlowMaxWidth, size * (armour ? tuning.ArmourKnotGlowWidthScale : tuning.SoulShieldKnotGlowWidthScale)), lift * tuning.WispHeight2,
-                        tuning.WispShape2, glow, tuning.WispAlpha2 * alpha, tuning.WispLayer2);
-                    frame.Sprite(root - Vector2.UnitY * (tuning.UserEmberOffset + lift * age), tuning.UserEmberWidth, tuning.UserEmberHeight, tuning.UserEmberShape,
-                        flame.Sample(age), tuning.UserEmberAlpha * alpha, tuning.UserEmberLayer, tilt);
+                    frame.Sprite(root, Math.Min(fields.Read(tuning.KnotGlowMaxWidth), size * (armour ? fields.Read(tuning.ArmourKnotGlowWidthScale) : fields.Read(tuning.SoulShieldKnotGlowWidthScale))), lift * fields.Read(tuning.WispHeight2),
+                        fields.Read(tuning.WispShape2), glow, fields.Read(tuning.WispAlpha2) * alpha, fields.Read(tuning.WispLayer2));
+                    frame.Sprite(root - Vector2.UnitY * (fields.Read(tuning.UserEmberOffset) + lift * age), fields.Read(tuning.UserEmberWidth), fields.Read(tuning.UserEmberHeight), fields.Read(tuning.UserEmberShape),
+                        flame.Sample(age), fields.Read(tuning.UserEmberAlpha) * alpha, fields.Read(tuning.UserEmberLayer), tilt);
                     if (i % 8 == 0)
-                        frame.Sprite(root, size * tuning.FlashWidth2, lift * tuning.FlashHeight2, tuning.FlashShape2, armour ? Gold : Ice, tuning.FlashAlpha2 * alpha, tuning.FlashLayer2);
+                        frame.Sprite(root, size * fields.Read(tuning.FlashWidth2), lift * fields.Read(tuning.FlashHeight2), fields.Read(tuning.FlashShape2), armour ? Gold : Ice, fields.Read(tuning.FlashAlpha2) * alpha, fields.Read(tuning.FlashLayer2));
                 }
             }
         }

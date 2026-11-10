@@ -27,18 +27,19 @@ internal static partial class TaoistSpellEffects
     internal static int PacketDuration(SpellVisual visual)
     {
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
-        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.PacketDuration);
+        var tuning = SpellVfxAssets.Current.Taoist.PacketDuration;
+        var fields = SpellVfxAssets.Fields("Taoist", "PacketDuration");
         return visual.Spell switch
         {
-            Spell.SoulFireBall => tuning.SoulFireBallDurationMs,
-            Spell.Healing or Spell.Purification or Spell.MassHiding => tuning.HealingDurationMs,
-            Spell.SoulShield or Spell.BlessedArmour => tuning.SoulShieldDurationMs,
-            Spell.HealingCircle or Spell.Plague => tuning.HealingCircleDurationMs,
-            Spell.Curse or Spell.Reincarnation => tuning.CurseDurationMs,
-            Spell.EnergyShield => visual.Phase == SpellVisualPhase.Aura ? tuning.EnergyShieldAuraDurationMs : tuning.EnergyShieldImpactDurationMs,
-            Spell.PetEnhancer => visual.Phase == SpellVisualPhase.Aura ? tuning.PetEnhancerAuraDurationMs : tuning.PetEnhancerImpactDurationMs,
-            Spell.Revelation when visual.Phase == SpellVisualPhase.Prepare => tuning.RevelationDurationMs,
-            _ => tuning.DefaultDurationMs
+            Spell.SoulFireBall => fields.Read(tuning.SoulFireBallDurationMs),
+            Spell.Healing or Spell.Purification or Spell.MassHiding => fields.Read(tuning.HealingDurationMs),
+            Spell.SoulShield or Spell.BlessedArmour => fields.Read(tuning.SoulShieldDurationMs),
+            Spell.HealingCircle or Spell.Plague => fields.Read(tuning.HealingCircleDurationMs),
+            Spell.Curse or Spell.Reincarnation => fields.Read(tuning.CurseDurationMs),
+            Spell.EnergyShield => visual.Phase == SpellVisualPhase.Aura ? fields.Read(tuning.EnergyShieldAuraDurationMs) : fields.Read(tuning.EnergyShieldImpactDurationMs),
+            Spell.PetEnhancer => visual.Phase == SpellVisualPhase.Aura ? fields.Read(tuning.PetEnhancerAuraDurationMs) : fields.Read(tuning.PetEnhancerImpactDurationMs),
+            Spell.Revelation when visual.Phase == SpellVisualPhase.Prepare => fields.Read(tuning.RevelationDurationMs),
+            _ => fields.Read(tuning.DefaultDurationMs)
         };
     }
 
@@ -47,7 +48,8 @@ internal static partial class TaoistSpellEffects
         float? fieldSize = null)
     {
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
-        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.DrawFrame);
+        var tuning = SpellVfxAssets.Current.Taoist.DrawFrame;
+        var fields = SpellVfxAssets.Fields("Taoist", "DrawFrame");
         if (duration <= 0 || now < start || now - start >= duration) return;
         float elapsed = (now - start) / 1000f;
         float progress = (now - start) / (float)duration;
@@ -60,11 +62,11 @@ internal static partial class TaoistSpellEffects
             Spell.Hiding or Spell.MassHiding or Spell.SummonHolyDeva or Spell.SummonSkeleton or Spell.SummonShinsu;
         float strength = aura || ground ? 1 : visual.Spell switch
         {
-            Spell.SoulShield => Envelope(progress, tuning.SoulShieldEnvelopeFadeStart, tuning.SoulShieldEnvelopeTail),
-            Spell.BlessedArmour => Envelope(progress, tuning.BlessedArmourEnvelopeFadeStart, tuning.BlessedArmourEnvelopeTail),
-            Spell.Curse => Envelope(progress, tuning.CurseEnvelopeFadeStart, tuning.CurseEnvelopeTail),
-            Spell.SoulFireBall => Envelope(progress, tuning.SoulFireBallEnvelopeFadeStart, tuning.SoulFireBallEnvelopeTail),
-            _ => sustained ? Envelope(progress, tuning.EnvelopeFadeStart, tuning.EnvelopeTail) : Envelope(progress)
+            Spell.SoulShield => Envelope(progress, fields.Read(tuning.SoulShieldEnvelopeFadeStart), fields.Read(tuning.SoulShieldEnvelopeTail)),
+            Spell.BlessedArmour => Envelope(progress, fields.Read(tuning.BlessedArmourEnvelopeFadeStart), fields.Read(tuning.BlessedArmourEnvelopeTail)),
+            Spell.Curse => Envelope(progress, fields.Read(tuning.CurseEnvelopeFadeStart), fields.Read(tuning.CurseEnvelopeTail)),
+            Spell.SoulFireBall => Envelope(progress, fields.Read(tuning.SoulFireBallEnvelopeFadeStart), fields.Read(tuning.SoulFireBallEnvelopeTail)),
+            _ => sustained ? Envelope(progress, fields.Read(tuning.EnvelopeFadeStart), fields.Read(tuning.EnvelopeTail)) : Envelope(progress)
         };
         uint artSeed = seed ^ (uint)visual.Spell * 0x2d5bu;
         bool isRune = visual.Spell is Spell.SoulShield or Spell.BlessedArmour or Spell.Curse;
@@ -73,7 +75,7 @@ internal static partial class TaoistSpellEffects
             alwaysOnTop: isRune, opacityNoiseSeed: opacityNoiseSeed);
         if (visual.Phase == SpellVisualPhase.Expire)
         {
-            frame.Sparks(feet, tuning.SparksCount, tuning.SparksRx, tuning.SparksRy, progress, Ice, tuning.SparksRise);
+            frame.Sparks(feet, fields.Read(tuning.SparksCount), fields.Read(tuning.SparksRx), fields.Read(tuning.SparksRy), progress, Ice, fields.Read(tuning.SparksRise));
             return;
         }
 
@@ -86,9 +88,9 @@ internal static partial class TaoistSpellEffects
             case Spell.SummonSkeleton: SummonStars(frame, feet, progress, deva: false); break;
             case Spell.Hiding: Veil(frame, feet, progress, elapsed, mass: false); break;
             case Spell.MassHiding: Veil(frame, feet, progress, elapsed, mass: !hit); break;
-            case Spell.SoulShield: BurningWard(frame, feet, progress, tuning.SoulShieldShape); break;
+            case Spell.SoulShield: BurningWard(frame, feet, progress, fields.Read(tuning.SoulShieldShape)); break;
             case Spell.Revelation: Reveal(frame, feet, progress, elapsed, prepare); break;
-            case Spell.BlessedArmour: BurningWard(frame, feet, progress, tuning.BlessedArmourShape); break;
+            case Spell.BlessedArmour: BurningWard(frame, feet, progress, fields.Read(tuning.BlessedArmourShape)); break;
             case Spell.EnergyRepulsor: Repulse(frame, feet, progress); break;
             case Spell.TrapHexagon: Trap(frame, feet, prepare ? progress : Fract(elapsed), prepare); break;
             case Spell.Purification: Cleanse(frame, feet, progress, prepare); break;
@@ -103,10 +105,10 @@ internal static partial class TaoistSpellEffects
             case Spell.SummonHolyDeva: SummonStars(frame, feet, progress, deva: true); break;
             case Spell.Curse: CurseRune(frame, feet, progress); break;
             case Spell.Plague: Plague(frame, feet, progress, elapsed); break;
-            case Spell.PoisonCloud: Cloud(frame, feet, ground ? elapsed : progress * tuning.PoisonCloudTime); break;
+            case Spell.PoisonCloud: Cloud(frame, feet, ground ? elapsed : progress * fields.Read(tuning.PoisonCloudTime)); break;
             case Spell.EnergyShield: Shield(frame, feet, progress, aura); break;
             case Spell.PetEnhancer: Pet(frame, feet, progress, elapsed, aura); break;
-            case Spell.HealingCircle: HealingCircle(frame, feet, progress, elapsed, ground, fieldSize ?? tuning.HealingCircleDiameter); break;
+            case Spell.HealingCircle: HealingCircle(frame, feet, progress, elapsed, ground, fieldSize ?? fields.Read(tuning.HealingCircleDiameter)); break;
         }
     }
 
@@ -114,13 +116,14 @@ internal static partial class TaoistSpellEffects
         long now, int frameIndex, int remaining, bool leaveWake, float size)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.DrawProjectile);
+        var tuning = SpellVfxAssets.Current.Taoist.DrawProjectile;
+        var fields = SpellVfxAssets.Fields("Taoist", "DrawProjectile");
         if (spell is not (Spell.SoulFireBall or Spell.MassHiding or Spell.SoulShield or Spell.BlessedArmour or
             Spell.Curse or Spell.Hallucination or Spell.Plague or Spell.PoisonCloud)) return false;
         if (remaining <= 0) return true;
-        var frame = new Frame(pool, head, now, 1, size, (uint)(spell.GetHashCode() * 719 + frameIndex), depthY: head.Y + tuning.DepthY);
+        var frame = new Frame(pool, head, now, 1, size, (uint)(spell.GetHashCode() * 719 + frameIndex), depthY: head.Y + fields.Read(tuning.DepthY));
         Vector2 side = new(-heading.Y, heading.X);
-        float angle = MathF.Atan2(heading.Y, heading.X) + MathF.Sin(frameIndex * tuning.Angle) * tuning.Angle2;
+        float angle = MathF.Atan2(heading.Y, heading.X) + MathF.Sin(frameIndex * fields.Read(tuning.Angle)) * fields.Read(tuning.Angle2);
         int accent = spell switch
         {
             Spell.SoulShield or Spell.Plague => Blue,
@@ -128,24 +131,24 @@ internal static partial class TaoistSpellEffects
             Spell.Hallucination or Spell.MassHiding => Violet,
             _ => Amber
         };
-        frame.Sprite(head - heading * tuning.MistFilamentOffset, tuning.MistFilamentWidth, tuning.MistFilamentHeight, tuning.MistFilamentShape, accent, tuning.MistFilamentAlpha, tuning.MistFilamentLayer, angle, light: tuning.MistFilamentLight);
-        frame.Sprite(head, tuning.TalismanWidth, tuning.TalismanHeight, tuning.TalismanShape, Amber, tuning.TalismanAlpha, rotation: angle);
-        frame.Sprite(head + heading * tuning.FlashOffset, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, Ivory, tuning.FlashAlpha, tuning.FlashLayer, angle);
-        for (int i = 0; i < tuning.MistFilamentCount; i++)
+        frame.Sprite(head - heading * fields.Read(tuning.MistFilamentOffset), fields.Read(tuning.MistFilamentWidth), fields.Read(tuning.MistFilamentHeight), fields.Read(tuning.MistFilamentShape), accent, fields.Read(tuning.MistFilamentAlpha), fields.Read(tuning.MistFilamentLayer), angle, light: fields.Read(tuning.MistFilamentLight));
+        frame.Sprite(head, fields.Read(tuning.TalismanWidth), fields.Read(tuning.TalismanHeight), fields.Read(tuning.TalismanShape), Amber, fields.Read(tuning.TalismanAlpha), rotation: angle);
+        frame.Sprite(head + heading * fields.Read(tuning.FlashOffset), fields.Read(tuning.FlashWidth), fields.Read(tuning.FlashHeight), fields.Read(tuning.FlashShape), Ivory, fields.Read(tuning.FlashAlpha), fields.Read(tuning.FlashLayer), angle);
+        for (int i = 0; i < fields.Read(tuning.MistFilamentCount); i++)
         {
-            float drift = MathF.Sin(frameIndex * tuning.Drift - i * tuning.Drift2);
-            Vector2 point = head - heading * (tuning.Point + i * tuning.Point2) + side * drift * (tuning.Point3 + i);
-            frame.Sprite(point, tuning.MistFilamentWidth2 - i * tuning.MistFilamentWidth3, tuning.MistFilamentHeight2 - i * tuning.MistFilamentHeight3, tuning.MistFilamentShape2, i % 2 == 0 ? accent : Amber,
-                tuning.MistFilamentAlpha2 - i * tuning.MistFilamentAlpha3, rotation: angle + drift * tuning.MistFilamentRotation);
-            frame.Sprite(point + side * (i % 2 == 0 ? tuning.SparkOffset : tuning.SparkOffset2), tuning.SparkWidth + i % 3, tuning.SparkHeight, tuning.SparkShape,
-                i % 2 == 0 ? Gold : Ice, tuning.SparkAlpha - i * tuning.SparkAlpha2, tuning.SparkLayer, angle);
+            float drift = MathF.Sin(frameIndex * fields.Read(tuning.Drift) - i * fields.Read(tuning.Drift2));
+            Vector2 point = head - heading * (fields.Read(tuning.Point) + i * fields.Read(tuning.Point2)) + side * drift * (fields.Read(tuning.Point3) + i);
+            frame.Sprite(point, fields.Read(tuning.MistFilamentWidth2) - i * fields.Read(tuning.MistFilamentWidth3), fields.Read(tuning.MistFilamentHeight2) - i * fields.Read(tuning.MistFilamentHeight3), fields.Read(tuning.MistFilamentShape2), i % 2 == 0 ? accent : Amber,
+                fields.Read(tuning.MistFilamentAlpha2) - i * fields.Read(tuning.MistFilamentAlpha3), rotation: angle + drift * fields.Read(tuning.MistFilamentRotation));
+            frame.Sprite(point + side * (i % 2 == 0 ? fields.Read(tuning.SparkOffset) : fields.Read(tuning.SparkOffset2)), fields.Read(tuning.SparkWidth) + i % 3, fields.Read(tuning.SparkHeight), fields.Read(tuning.SparkShape),
+                i % 2 == 0 ? Gold : Ice, fields.Read(tuning.SparkAlpha) - i * fields.Read(tuning.SparkAlpha2), fields.Read(tuning.SparkLayer), angle);
         }
         if (leaveWake)
         {
-            int life = Math.Min(remaining, tuning.Life);
-            Vector2 point = head - heading * tuning.Point4;
-            pool.TryAdd(new SpellParticle(point, -heading * tuning.WispVelocity + side * MathF.Sin(frameIndex) * tuning.WispVelocity2, now, life, tuning.WispSize,
-                Tint(accent, tuning.Opacity), tuning.WispShape, 0, tuning.WispAspect, angle, tuning.WispGrowth, tuning.WispLayer, CastsLight: tuning.WispCastsLight, DepthY: head.Y + tuning.WispDepthY));
+            int life = Math.Min(remaining, fields.Read(tuning.Life));
+            Vector2 point = head - heading * fields.Read(tuning.Point4);
+            pool.TryAdd(new SpellParticle(point, -heading * fields.Read(tuning.WispVelocity) + side * MathF.Sin(frameIndex) * fields.Read(tuning.WispVelocity2), now, life, fields.Read(tuning.WispSize),
+                Tint(accent, fields.Read(tuning.Opacity)), fields.Read(tuning.WispShape), 0, fields.Read(tuning.WispAspect), angle, fields.Read(tuning.WispGrowth), fields.Read(tuning.WispLayer), CastsLight: fields.Read(tuning.WispCastsLight), DepthY: head.Y + fields.Read(tuning.WispDepthY)));
         }
         return true;
     }

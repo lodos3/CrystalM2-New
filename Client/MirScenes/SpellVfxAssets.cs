@@ -51,14 +51,39 @@ public static class SpellVfxAssets
         Volatile.Write(ref _active, new Snapshot(settings, new Dictionary<Spell, SpellVfxData> { [spell] = draft }));
     }
 
-    internal static HashSet<(string Group, string Node)> CollectNodes(Action sample)
+    [ThreadStatic] private static Dictionary<(string Group, string Node), HashSet<string>> _observedFields;
+
+    internal static HashSet<(string Group, string Node)> CollectNodes(Action sample) =>
+        CollectNodes(sample, out _);
+
+    internal static HashSet<(string Group, string Node)> CollectNodes(Action sample,
+        out Dictionary<(string Group, string Node), HashSet<string>> fields)
     {
         var previous = _observedNodes;
+        var previousFields = _observedFields;
         var result = new HashSet<(string Group, string Node)>();
+        fields = new();
         _observedNodes = result;
+        _observedFields = fields;
         try { sample(); }
-        finally { _observedNodes = previous; }
+        finally { (_observedNodes, _observedFields) = (previous, previousFields); }
         return result;
+    }
+
+    internal static FieldProbe Fields(string group, string node) => new(group, node);
+
+    internal readonly struct FieldProbe(string group, string node)
+    {
+        internal T Read<T>(T value, [CallerArgumentExpression(nameof(value))] string expression = null)
+        {
+            if (_observedFields == null) return value;
+            var key = (group, node);
+            _observedNodes.Add(key);
+            if (!_observedFields.TryGetValue(key, out var fields))
+                _observedFields[key] = fields = new(StringComparer.Ordinal);
+            fields.Add(expression["tuning.".Length..]);
+            return value;
+        }
     }
 
     internal static T Observe<T>(T node, [CallerArgumentExpression(nameof(node))] string path = null)

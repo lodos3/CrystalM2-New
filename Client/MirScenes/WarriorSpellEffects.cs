@@ -25,15 +25,16 @@ internal static partial class WarriorSpellEffects
     internal static int PacketDuration(SpellVisual visual)
     {
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
-        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.PacketDuration);
+        var tuning = SpellVfxAssets.Current.Warrior.PacketDuration;
+        var fields = SpellVfxAssets.Fields("Warrior", "PacketDuration");
         return visual.Phase switch
         {
-            SpellVisualPhase.Prepare => tuning.PrepareDurationMs,
-            SpellVisualPhase.Burn => tuning.BurnDurationMs,
-            SpellVisualPhase.Ward => tuning.WardDurationMs,
-            _ when visual.Spell == Spell.FlamingSword => tuning.FlamingSwordDurationMs,
-            _ when visual.Spell == Spell.TwinDrakeBlade => tuning.TwinDrakeBladeDurationMs,
-            _ => visual.Spell is Spell.Fencing or Spell.ShoulderDash ? tuning.FencingOrDashDurationMs : tuning.DefaultDurationMs
+            SpellVisualPhase.Prepare => fields.Read(tuning.PrepareDurationMs),
+            SpellVisualPhase.Burn => fields.Read(tuning.BurnDurationMs),
+            SpellVisualPhase.Ward => fields.Read(tuning.WardDurationMs),
+            _ when visual.Spell == Spell.FlamingSword => fields.Read(tuning.FlamingSwordDurationMs),
+            _ when visual.Spell == Spell.TwinDrakeBlade => fields.Read(tuning.TwinDrakeBladeDurationMs),
+            _ => visual.Spell is Spell.Fencing or Spell.ShoulderDash ? fields.Read(tuning.FencingOrDashDurationMs) : fields.Read(tuning.DefaultDurationMs)
         };
     }
 
@@ -41,13 +42,14 @@ internal static partial class WarriorSpellEffects
         long now, long start, int duration, float size = ReferenceSize, uint seed = 0, Vector2? weaponTip = null)
     {
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
-        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.DrawFrame);
+        var tuning = SpellVfxAssets.Current.Warrior.DrawFrame;
+        var fields = SpellVfxAssets.Fields("Warrior", "DrawFrame");
         if (duration <= 0 || now < start || now - start >= duration) return;
         float progress = (now - start) / (float)duration;
         if (visual is { Spell: Spell.Thrusting, Phase: SpellVisualPhase.Swing })
         {
             // Keep the source and reach in world pixels as the artwork size is adjusted.
-            float windStrength = (tuning.WindStrength + tuning.WindStrength2 * Ease(progress * tuning.WindStrength3)) * (1 - tuning.WindStrength4 * Ease((progress - tuning.WindStrength5) / tuning.WindStrengthDivisor));
+            float windStrength = (fields.Read(tuning.WindStrength) + fields.Read(tuning.WindStrength2) * Ease(progress * fields.Read(tuning.WindStrength3))) * (1 - fields.Read(tuning.WindStrength4) * Ease((progress - fields.Read(tuning.WindStrength5)) / fields.Read(tuning.WindStrengthDivisor)));
             var wind = new Frame(pool, feet, now, windStrength, size, seed, scalePositions: false);
             ThrustWind(wind, feet, facing, progress, visual.ExtraReach);
             return;
@@ -55,7 +57,7 @@ internal static partial class WarriorSpellEffects
         bool aura = visual.Phase == SpellVisualPhase.Aura;
         float cycle = aura ? now % duration / (float)duration : progress;
         float strength = aura ? 1 : visual.Spell is Spell.BladeAvalanche or Spell.Entrapment or Spell.TwinDrakeBlade
-            ? Envelope(progress, tuning.EnvelopeFadeStart, tuning.EnvelopeTail) : Envelope(progress);
+            ? Envelope(progress, fields.Read(tuning.EnvelopeFadeStart), fields.Read(tuning.EnvelopeTail)) : Envelope(progress);
         var frame = new Frame(pool, feet, now, strength, size, seed ^ (uint)visual.Spell * 34763);
 
         switch (visual.Phase)
@@ -67,7 +69,7 @@ internal static partial class WarriorSpellEffects
                 else Strike(frame, visual.Spell, feet, facing, progress);
                 return;
             case SpellVisualPhase.Burn:
-                BladeFlame(frame, feet - Vector2.UnitY * tuning.BurnOffset, progress, tuning.BurnWidth);
+                BladeFlame(frame, feet - Vector2.UnitY * fields.Read(tuning.BurnOffset), progress, fields.Read(tuning.BurnWidth));
                 return;
             case SpellVisualPhase.Ward:
                 Skin(frame, feet, cycle, aura: true);
@@ -77,15 +79,15 @@ internal static partial class WarriorSpellEffects
         switch (visual.Spell)
         {
             case Spell.FlamingSword when visual.Phase == SpellVisualPhase.Prepare:
-                Vector2 tip = weaponTip ?? feet + facing * tuning.FlamingSwordTip - Vector2.UnitY * tuning.FlamingSwordTip2;
+                Vector2 tip = weaponTip ?? feet + facing * fields.Read(tuning.FlamingSwordTip) - Vector2.UnitY * fields.Read(tuning.FlamingSwordTip2);
                 var blade = new Frame(pool, tip, now, Envelope(progress), size, seed, depthY: feet.Y);
-                BladeFlame(blade, tip, progress, tuning.FlamingSwordWidth);
+                BladeFlame(blade, tip, progress, fields.Read(tuning.FlamingSwordWidth));
                 break;
             case Spell.FlamingSword:
                 Engulf(frame, feet, progress, (now - start) / 1000f);
                 break;
             case Spell.TwinDrakeBlade when visual.Phase == SpellVisualPhase.Prepare:
-                DrakeCharge(frame, feet, weaponTip ?? feet + facing * tuning.TwinDrakeBladeHand - Vector2.UnitY * tuning.TwinDrakeBladeHand2,
+                DrakeCharge(frame, feet, weaponTip ?? feet + facing * fields.Read(tuning.TwinDrakeBladeHand) - Vector2.UnitY * fields.Read(tuning.TwinDrakeBladeHand2),
                     progress, (now - start) / 1000f);
                 break;
             case Spell.TwinDrakeBlade:

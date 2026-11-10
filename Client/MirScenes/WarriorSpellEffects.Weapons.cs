@@ -19,8 +19,9 @@ internal static partial class WarriorSpellEffects
         bool followThrough)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.WeaponSweep);
-        int life = Math.Min(remaining, Math.Clamp(interval * tuning.Life, 55, 190));
+        var tuning = SpellVfxAssets.Current.Warrior.WeaponSweep;
+        var fields = SpellVfxAssets.Fields("Warrior", "WeaponSweep");
+        int life = Math.Min(remaining, Math.Clamp(interval * fields.Read(tuning.Life), 55, 190));
         if (life <= 0) return;
         Vector2 blade = pose.Tip - pose.Hilt;
         if (blade.LengthSquared() < 9) return;
@@ -34,20 +35,20 @@ internal static partial class WarriorSpellEffects
             var returnCut = new Frame(pool, feet, now, 1, Frame.ReferenceSize, (uint)now,
                 scalePositions: false, depthY: feet.Y);
             Vector2 normal = Vector2.Normalize(new Vector2(-blade.Y, blade.X));
-            for (int i = 0; i < tuning.SparkCount; i++)
+            for (int i = 0; i < fields.Read(tuning.SparkCount); i++)
             {
-                float along = tuning.Along + i * tuning.Along2;
+                float along = fields.Read(tuning.Along) + i * fields.Read(tuning.Along2);
                 Vector2 root = pose.Hilt + blade * along;
-                Vector2 end = root + facing * (tuning.End + returnCut.Unit(i + 19) * tuning.End2) +
-                    normal * ((returnCut.Unit(i + 41) - tuning.End3) * tuning.End4);
+                Vector2 end = root + facing * (fields.Read(tuning.End) + returnCut.Unit(i + 19) * fields.Read(tuning.End2)) +
+                    normal * ((returnCut.Unit(i + 41) - fields.Read(tuning.End3)) * fields.Read(tuning.End4));
                 bool rear = i % 4 == 0;
-                Layer layer = rear ? tuning.Layer : tuning.Layer2;
-                float groundY = feet.Y + (rear ? tuning.GroundY : tuning.GroundY2);
-                returnCut.Thread(root, end, tuning.ThreadStartWidth, tuning.ThreadEndWidth, i % 3 == 0 ? White : Ice,
-                    tuning.ThreadAlpha, layer, sortY: groundY);
-                returnCut.Sprite(root, tuning.SparkWidth + returnCut.Unit(i + 61) * tuning.SparkWidth2,
-                    tuning.SparkHeight + returnCut.Unit(i + 63) * tuning.SparkHeight2, tuning.SparkShape,
-                    i % 3 == 0 ? White : Ice, tuning.SparkAlpha, layer, sortY: groundY);
+                Layer layer = rear ? fields.Read(tuning.Layer) : fields.Read(tuning.Layer2);
+                float groundY = feet.Y + (rear ? fields.Read(tuning.GroundY) : fields.Read(tuning.GroundY2));
+                returnCut.Thread(root, end, fields.Read(tuning.ThreadStartWidth), fields.Read(tuning.ThreadEndWidth), i % 3 == 0 ? White : Ice,
+                    fields.Read(tuning.ThreadAlpha), layer, sortY: groundY);
+                returnCut.Sprite(root, fields.Read(tuning.SparkWidth) + returnCut.Unit(i + 61) * fields.Read(tuning.SparkWidth2),
+                    fields.Read(tuning.SparkHeight) + returnCut.Unit(i + 63) * fields.Read(tuning.SparkHeight2), fields.Read(tuning.SparkShape),
+                    i % 3 == 0 ? White : Ice, fields.Read(tuning.SparkAlpha), layer, sortY: groundY);
             }
         }
         bool heavy = spell is Spell.FlamingSword or Spell.CrossHalfMoon or Spell.BladeAvalanche or Spell.SlashingBurst;
@@ -57,43 +58,43 @@ internal static partial class WarriorSpellEffects
             Vector2 delta = pose.Tip - old.Tip;
             if (delta.LengthSquared() is > 3 and < 19600 && Vector2.DistanceSquared(old.Hilt, pose.Hilt) < 3600)
             {
-                float inner = moon ? tuning.Inner : spell == Spell.TwinDrakeBlade ? tuning.Inner2 :
-                    spell is Spell.Slaying or Spell.Thrusting ? tuning.Inner3 : tuning.Inner4;
-                float outer = moon || spell == Spell.TwinDrakeBlade ? tuning.Outer : heavy ? tuning.Outer2 : tuning.Outer3;
-                Layer depth = facing.Y < -.27f && (old.Tip.Y + pose.Tip.Y) * tuning.Depth < pose.Hilt.Y - tuning.Depth2
-                    ? tuning.Depth3 : tuning.Depth4;
+                float inner = moon ? fields.Read(tuning.Inner) : spell == Spell.TwinDrakeBlade ? fields.Read(tuning.Inner2) :
+                    spell is Spell.Slaying or Spell.Thrusting ? fields.Read(tuning.Inner3) : fields.Read(tuning.Inner4);
+                float outer = moon || spell == Spell.TwinDrakeBlade ? fields.Read(tuning.Outer) : heavy ? fields.Read(tuning.Outer2) : fields.Read(tuning.Outer3);
+                Layer depth = facing.Y < -.27f && (old.Tip.Y + pose.Tip.Y) * fields.Read(tuning.Depth) < pose.Hilt.Y - fields.Read(tuning.Depth2)
+                    ? fields.Read(tuning.Depth3) : fields.Read(tuning.Depth4);
                 if (spell == Spell.TwinDrakeBlade)
                     DrakeEdgeSweep(pool, old, pose, feet.Y, now, life);
                 else
                 {
                     SweepRibbon(pool, old, pose, inner, outer, depth, feet.Y, look.Colour,
-                        now, life, moon ? tuning.Alpha : heavy ? tuning.Alpha2 : tuning.Alpha3);
+                        now, life, moon ? fields.Read(tuning.Alpha) : heavy ? fields.Read(tuning.Alpha2) : fields.Read(tuning.Alpha3));
                     if (!moon && heavy)
-                        SweepRibbon(pool, old, pose, tuning.Inner5, tuning.Outer4, depth, feet.Y, look.Core,
-                            now, Math.Min(life, tuning.Val2), tuning.Alpha4);
+                        SweepRibbon(pool, old, pose, fields.Read(tuning.Inner5), fields.Read(tuning.Outer4), depth, feet.Y, look.Core,
+                            now, Math.Min(life, fields.Read(tuning.Val2)), fields.Read(tuning.Alpha4));
                 }
             }
         }
 
         if (progress < .23f || progress > .87f) return;
         bool cut = previousProgress < .38f && progress >= .38f;
-        Vector2 forwardTip = pose.Hilt + facing * MathF.Max(tuning.ForwardTip, Vector2.Dot(blade, facing));
+        Vector2 forwardTip = pose.Hilt + facing * MathF.Max(fields.Read(tuning.ForwardTip), Vector2.Dot(blade, facing));
         switch (spell)
         {
             case Spell.Slaying:
-                effect.Add(forwardTip, facing * tuning.SlayingOrbVelocity, tuning.SlayingOrbShape, tuning.SlayingOrbSize, life, tuning.SlayingOrbLayer, aspect: tuning.SlayingOrbAspect, alpha: tuning.SlayingOrbAlpha);
-                effect.Add(forwardTip + facing * tuning.SlayingWarriorTripleCutOffset, facing * tuning.SlayingWarriorTripleCutVelocity, tuning.SlayingWarriorTripleCutShape, tuning.SlayingWarriorTripleCutSize, life,
-                    tuning.SlayingWarriorTripleCutLayer, aspect: tuning.SlayingWarriorTripleCutAspect, rotation: angle + tuning.SlayingWarriorTripleCutRotation, core: tuning.SlayingWarriorTripleCutCore, alpha: tuning.SlayingWarriorTripleCutAlpha);
-                effect.Scatter(forwardTip, tuning.SlayingSparkCount, tuning.SlayingSparkShape, tuning.SlayingSparkSpread, life);
+                effect.Add(forwardTip, facing * fields.Read(tuning.SlayingOrbVelocity), fields.Read(tuning.SlayingOrbShape), fields.Read(tuning.SlayingOrbSize), life, fields.Read(tuning.SlayingOrbLayer), aspect: fields.Read(tuning.SlayingOrbAspect), alpha: fields.Read(tuning.SlayingOrbAlpha));
+                effect.Add(forwardTip + facing * fields.Read(tuning.SlayingWarriorTripleCutOffset), facing * fields.Read(tuning.SlayingWarriorTripleCutVelocity), fields.Read(tuning.SlayingWarriorTripleCutShape), fields.Read(tuning.SlayingWarriorTripleCutSize), life,
+                    fields.Read(tuning.SlayingWarriorTripleCutLayer), aspect: fields.Read(tuning.SlayingWarriorTripleCutAspect), rotation: angle + fields.Read(tuning.SlayingWarriorTripleCutRotation), core: fields.Read(tuning.SlayingWarriorTripleCutCore), alpha: fields.Read(tuning.SlayingWarriorTripleCutAlpha));
+                effect.Scatter(forwardTip, fields.Read(tuning.SlayingSparkCount), fields.Read(tuning.SlayingSparkShape), fields.Read(tuning.SlayingSparkSpread), life);
                 break;
             case Spell.HalfMoon when cut:
-                ProjectCrescent(pool, look, feet, facing, 0, tuning.HalfMoonLift, tuning.HalfMoonRadius, tuning.HalfMoonWidth, now, life);
+                ProjectCrescent(pool, look, feet, facing, 0, fields.Read(tuning.HalfMoonLift), fields.Read(tuning.HalfMoonRadius), fields.Read(tuning.HalfMoonWidth), now, life);
                 break;
             case Spell.CrossHalfMoon when cut:
-                ProjectCrescent(pool, look, feet, facing, tuning.CrossHalfMoonYaw, tuning.CrossHalfMoonLift, tuning.CrossHalfMoonRadius, tuning.CrossHalfMoonWidth, now, life, sweep: tuning.CrossHalfMoonSweep, stacked: true);
-                ProjectCrescent(pool, look, feet, facing, MathF.PI - tuning.CrossHalfMoonYaw2, tuning.CrossHalfMoonLift2, tuning.CrossHalfMoonRadius2, tuning.CrossHalfMoonWidth2, now, life, sweep: tuning.CrossHalfMoonSweep2, stacked: true);
-                effect.Add(feet + facing * tuning.CrossHalfMoonWarriorSparkOffset - Vector2.UnitY * tuning.CrossHalfMoonWarriorSparkOffset2, facing * tuning.CrossHalfMoonWarriorSparkVelocity, tuning.CrossHalfMoonWarriorSparkShape, tuning.CrossHalfMoonWarriorSparkSize, life,
-                    tuning.CrossHalfMoonWarriorSparkLayer, aspect: tuning.CrossHalfMoonWarriorSparkAspect, rotation: angle, core: tuning.CrossHalfMoonWarriorSparkCore, alpha: tuning.CrossHalfMoonWarriorSparkAlpha);
+                ProjectCrescent(pool, look, feet, facing, fields.Read(tuning.CrossHalfMoonYaw), fields.Read(tuning.CrossHalfMoonLift), fields.Read(tuning.CrossHalfMoonRadius), fields.Read(tuning.CrossHalfMoonWidth), now, life, sweep: fields.Read(tuning.CrossHalfMoonSweep), stacked: true);
+                ProjectCrescent(pool, look, feet, facing, MathF.PI - fields.Read(tuning.CrossHalfMoonYaw2), fields.Read(tuning.CrossHalfMoonLift2), fields.Read(tuning.CrossHalfMoonRadius2), fields.Read(tuning.CrossHalfMoonWidth2), now, life, sweep: fields.Read(tuning.CrossHalfMoonSweep2), stacked: true);
+                effect.Add(feet + facing * fields.Read(tuning.CrossHalfMoonWarriorSparkOffset) - Vector2.UnitY * fields.Read(tuning.CrossHalfMoonWarriorSparkOffset2), facing * fields.Read(tuning.CrossHalfMoonWarriorSparkVelocity), fields.Read(tuning.CrossHalfMoonWarriorSparkShape), fields.Read(tuning.CrossHalfMoonWarriorSparkSize), life,
+                    fields.Read(tuning.CrossHalfMoonWarriorSparkLayer), aspect: fields.Read(tuning.CrossHalfMoonWarriorSparkAspect), rotation: angle, core: fields.Read(tuning.CrossHalfMoonWarriorSparkCore), alpha: fields.Read(tuning.CrossHalfMoonWarriorSparkAlpha));
                 break;
             case Spell.TwinDrakeBlade when cut:
                 // The attack peak is a fragmented electrical cut throughout
@@ -102,23 +103,23 @@ internal static partial class WarriorSpellEffects
                 var strike = new Frame(pool, feet, now, 1, Frame.ReferenceSize, (uint)now,
                     scalePositions: false, depthY: feet.Y);
                 Vector2 bladeNormal = Vector2.Normalize(new Vector2(-blade.Y, blade.X));
-                for (int i = 0; i < tuning.TwinDrakeBladeUserLightningCount; i++)
+                for (int i = 0; i < fields.Read(tuning.TwinDrakeBladeUserLightningCount); i++)
                 {
-                    float along = tuning.TwinDrakeBladeAlong + tuning.TwinDrakeBladeAlong2 * i / tuning.TwinDrakeBladeAlongDivisor;
+                    float along = fields.Read(tuning.TwinDrakeBladeAlong) + fields.Read(tuning.TwinDrakeBladeAlong2) * i / fields.Read(tuning.TwinDrakeBladeAlongDivisor);
                     Vector2 root = pose.Hilt + blade * along;
-                    Vector2 tendril = root + facing * (tuning.TwinDrakeBladeTendril + strike.Unit(i + 13) * tuning.TwinDrakeBladeTendril2) +
-                        bladeNormal * ((strike.Unit(i + 29) - tuning.TwinDrakeBladeTendril3) * tuning.TwinDrakeBladeTendril4);
+                    Vector2 tendril = root + facing * (fields.Read(tuning.TwinDrakeBladeTendril) + strike.Unit(i + 13) * fields.Read(tuning.TwinDrakeBladeTendril2)) +
+                        bladeNormal * ((strike.Unit(i + 29) - fields.Read(tuning.TwinDrakeBladeTendril3)) * fields.Read(tuning.TwinDrakeBladeTendril4));
                     bool rear = i % 4 == 0;
-                    Layer layer = rear ? tuning.TwinDrakeBladeLayer : tuning.TwinDrakeBladeLayer2;
-                    float groundY = feet.Y + (rear ? tuning.TwinDrakeBladeGroundY : tuning.TwinDrakeBladeGroundY2);
-                    strike.Thread(root, tendril, tuning.TwinDrakeBladeThreadStartWidth, tuning.TwinDrakeBladeThreadEndWidth,
-                        i % 4 == 0 ? White : Ice, tuning.TwinDrakeBladeThreadAlpha, layer,
+                    Layer layer = rear ? fields.Read(tuning.TwinDrakeBladeLayer) : fields.Read(tuning.TwinDrakeBladeLayer2);
+                    float groundY = feet.Y + (rear ? fields.Read(tuning.TwinDrakeBladeGroundY) : fields.Read(tuning.TwinDrakeBladeGroundY2));
+                    strike.Thread(root, tendril, fields.Read(tuning.TwinDrakeBladeThreadStartWidth), fields.Read(tuning.TwinDrakeBladeThreadEndWidth),
+                        i % 4 == 0 ? White : Ice, fields.Read(tuning.TwinDrakeBladeThreadAlpha), layer,
                         light: i == 7, sortY: groundY);
                     if (i % 2 == 0)
                     {
                         float rotation = MathF.Atan2(tendril.Y - root.Y, tendril.X - root.X);
-                        strike.Sprite(Vector2.Lerp(root, tendril, tuning.TwinDrakeBladeAmount), tuning.TwinDrakeBladeUserLightningWidth, tuning.TwinDrakeBladeUserLightningHeight,
-                            tuning.TwinDrakeBladeUserLightningShape, White, tuning.TwinDrakeBladeUserLightningAlpha, layer,
+                        strike.Sprite(Vector2.Lerp(root, tendril, fields.Read(tuning.TwinDrakeBladeAmount)), fields.Read(tuning.TwinDrakeBladeUserLightningWidth), fields.Read(tuning.TwinDrakeBladeUserLightningHeight),
+                            fields.Read(tuning.TwinDrakeBladeUserLightningShape), White, fields.Read(tuning.TwinDrakeBladeUserLightningAlpha), layer,
                             rotation, sortY: groundY);
                     }
                 }
@@ -129,14 +130,14 @@ internal static partial class WarriorSpellEffects
                 // tongues and smoke fragments. Do not add a second 128px blob.
                 break;
             case Spell.CounterAttack:
-                effect.Add(pose.Tip, facing * tuning.CounterAttackWarriorCrescentVelocity, tuning.CounterAttackWarriorCrescentShape, tuning.CounterAttackWarriorCrescentSize, life,
-                    tuning.CounterAttackWarriorCrescentLayer, aspect: tuning.CounterAttackWarriorCrescentAspect, rotation: angle - tuning.CounterAttackWarriorCrescentRotation, core: tuning.CounterAttackWarriorCrescentCore, alpha: tuning.CounterAttackWarriorCrescentAlpha);
+                effect.Add(pose.Tip, facing * fields.Read(tuning.CounterAttackWarriorCrescentVelocity), fields.Read(tuning.CounterAttackWarriorCrescentShape), fields.Read(tuning.CounterAttackWarriorCrescentSize), life,
+                    fields.Read(tuning.CounterAttackWarriorCrescentLayer), aspect: fields.Read(tuning.CounterAttackWarriorCrescentAspect), rotation: angle - fields.Read(tuning.CounterAttackWarriorCrescentRotation), core: fields.Read(tuning.CounterAttackWarriorCrescentCore), alpha: fields.Read(tuning.CounterAttackWarriorCrescentAlpha));
                 break;
         }
 
         if (spell != Spell.Thrusting)
-            effect.Add(pose.Tip, facing * tuning.WarriorSparkVelocity, tuning.WarriorSparkShape, heavy ? tuning.WarriorSparkSize : tuning.WarriorSparkSize2, Math.Min(life, tuning.Val22),
-                tuning.WarriorSparkLayer, aspect: tuning.WarriorSparkAspect, rotation: angle, alpha: tuning.WarriorSparkAlpha, core: tuning.WarriorSparkCore);
+            effect.Add(pose.Tip, facing * fields.Read(tuning.WarriorSparkVelocity), fields.Read(tuning.WarriorSparkShape), heavy ? fields.Read(tuning.WarriorSparkSize) : fields.Read(tuning.WarriorSparkSize2), Math.Min(life, fields.Read(tuning.Val22)),
+                fields.Read(tuning.WarriorSparkLayer), aspect: fields.Read(tuning.WarriorSparkAspect), rotation: angle, alpha: fields.Read(tuning.WarriorSparkAlpha), core: fields.Read(tuning.WarriorSparkCore));
     }
 
     private static void ProjectCrescent(SpellParticlePool pool, Look look, Vector2 feet, Vector2 facing,
