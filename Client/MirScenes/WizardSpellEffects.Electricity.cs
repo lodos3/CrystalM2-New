@@ -16,6 +16,7 @@ internal static partial class WizardSpellEffects
     internal static void DrawArc(SpellParticlePool pool, Spell spell, Vector2 from, Vector2 to,
         long now, long start, int duration, float size, uint seed)
     {
+        using var emitterTime = SpellVfxAssets.AtProgress((now - start) / (float)Math.Max(1, duration));
         using var vfxScope = SpellVfxAssets.For(spell);
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.DrawArc);
         if (duration <= 0 || now < start || now - start >= duration) return;
@@ -28,21 +29,21 @@ internal static partial class WizardSpellEffects
         {
             Vector2 head = Vector2.Lerp(source, destination, Ease(progress)) - Vector2.UnitY * (tuning.Head * MathF.Sin(progress * MathF.PI));
             float depth = Vector2.Lerp(from, to, Ease(progress)).Y;
-            frame.Sprite(head, tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, tuning.OrbColour, tuning.OrbAlpha, light: tuning.OrbLight, sortY: depth);
-            frame.Sprite(head, tuning.FireCurlWidth, tuning.FireCurlHeight, tuning.FireCurlShape, tuning.FireCurlColour, tuning.FireCurlAlpha, rotation: time * tuning.FireCurlRotation, sortY: depth);
-            frame.Sprite(head, tuning.OrbWidth2, tuning.OrbHeight2, tuning.OrbShape2, tuning.OrbColour2, tuning.OrbAlpha2, tuning.OrbLayer, sortY: depth);
+            frame.Sprite(head, tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, tuning.OrbColour, tuning.OrbAlpha, light: tuning.OrbLight, sortY: depth, emitter: "WizardSpellEffects.Electricity.DrawArc.1");
+            frame.Sprite(head, tuning.FireCurlWidth, tuning.FireCurlHeight, tuning.FireCurlShape, tuning.FireCurlColour, tuning.FireCurlAlpha, rotation: time * tuning.FireCurlRotation, sortY: depth, emitter: "WizardSpellEffects.Electricity.DrawArc.2");
+            frame.Sprite(head, tuning.OrbWidth2, tuning.OrbHeight2, tuning.OrbShape2, tuning.OrbColour2, tuning.OrbAlpha2, tuning.OrbLayer, sortY: depth, emitter: "WizardSpellEffects.Electricity.DrawArc.3");
             for (int i = 1; i <= tuning.WispCount; i++)
             {
                 float age = Math.Max(0, progress - i * tuning.Age);
                 Vector2 tail = Vector2.Lerp(source, destination, Ease(age)) - Vector2.UnitY * (tuning.Tail * MathF.Sin(age * MathF.PI));
                 frame.Sprite(tail, tuning.WispWidth - i * tuning.WispWidth2, tuning.WispHeight - i * tuning.WispHeight2, tuning.WispShape, i % 2 == 0 ? tuning.WispColour : tuning.WispColour2,
-                    tuning.WispAlpha - i * tuning.WispAlpha2, sortY: Vector2.Lerp(from, to, Ease(age)).Y);
+                    tuning.WispAlpha - i * tuning.WispAlpha2, sortY: Vector2.Lerp(from, to, Ease(age)).Y, emitter: "WizardSpellEffects.Electricity.DrawArc.4");
             }
         }
         else if (spell == Spell.ThunderBolt)
         {
             Channel(frame, source, destination, tuning.Spread, tuning.Width, tuning.Alpha, time, tuning.Forks, tuning.Offset, depths: new(from.Y, to.Y));
-            frame.Sprite(destination, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, White, tuning.FlashAlpha, tuning.FlashLayer, light: tuning.FlashLight, sortY: to.Y);
+            frame.Sprite(destination, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, White, tuning.FlashAlpha, tuning.FlashLayer, light: tuning.FlashLight, sortY: to.Y, emitter: "WizardSpellEffects.Electricity.DrawArc.5");
         }
         else
             Lightning(frame, source, destination, time, new(from.Y, to.Y));
@@ -60,8 +61,8 @@ internal static partial class WizardSpellEffects
             Channel(frame, source - normal * tuning.Source2, Vector2.Lerp(source, destination, tuning.Amount) + normal * tuning.End2,
                 tuning.Spread3, tuning.Width3, tuning.Alpha3, time + tuning.Time2, tuning.Forks3, tuning.Offset2, depths: depths);
         }
-        frame.Sprite(source, tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, Blue, tuning.OrbAlpha, light: tuning.OrbLight);
-        frame.Sprite(source, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, White, tuning.FlashAlpha, tuning.FlashLayer);
+        frame.Sprite(source, tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, Blue, tuning.OrbAlpha, light: tuning.OrbLight, emitter: "WizardSpellEffects.Electricity.Lightning.1");
+        frame.Sprite(source, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, White, tuning.FlashAlpha, tuning.FlashLayer, emitter: "WizardSpellEffects.Electricity.Lightning.2");
     }
 
     // The 2D path, tapered branches and filtered halo adapt ARCFLUX Lite by gennai (MIT).
@@ -94,29 +95,29 @@ internal static partial class WizardSpellEffects
             if (corona > 0)
             {
                 frame.Sprite(centre, segment.Length() + tuning.WispWidth, tuning.WispHeight + tuning.WispHeight2 * corona, tuning.WispShape,
-                    tuning.WispColour, corona * tuning.WispAlpha, tuning.WispLayer, angle, sortY: sortY);
+                    tuning.WispColour, corona * tuning.WispAlpha, tuning.WispLayer, angle, sortY: sortY, emitter: "WizardSpellEffects.Electricity.Channel.1");
                 frame.Sprite(centre, segment.Length() + tuning.WispWidth2, tuning.WispHeight3 + tuning.WispHeight4 * corona, tuning.WispShape2,
-                    palette.Filament, corona * tuning.WispAlpha2, tuning.WispLayer2, angle, sortY: sortY);
+                    palette.Filament, corona * tuning.WispAlpha2, tuning.WispLayer2, angle, sortY: sortY, emitter: "WizardSpellEffects.Electricity.Channel.2");
             }
             frame.Sprite(centre, segment.Length() + glowSize * tuning.WispWidth3, glowSize * tuning.WispHeight5,
-                tuning.WispShape3, palette.Shadow, alpha * tuning.WispAlpha3, layer == Layer.Ground ? layer : tuning.WispLayer3, angle, sortY: sortY);
+                tuning.WispShape3, palette.Shadow, alpha * tuning.WispAlpha3, layer == Layer.Ground ? layer : tuning.WispLayer3, angle, sortY: sortY, emitter: "WizardSpellEffects.Electricity.Channel.3");
             frame.Sprite(centre, segment.Length() + glowSize * tuning.WispWidth4, glowSize,
-                tuning.WispShape4, palette.Glow, alpha * (tuning.WispAlpha4 + tuning.WispAlpha5 * decay), layer, angle, light: i % 3 == 1, sortY: sortY);
+                tuning.WispShape4, palette.Glow, alpha * (tuning.WispAlpha4 + tuning.WispAlpha5 * decay), layer, angle, light: i % 3 == 1, sortY: sortY, emitter: "WizardSpellEffects.Electricity.Channel.4");
             float thickness = thread * (tuning.Thickness + decay * tuning.Thickness2);
             frame.Thread(points[i - 1], points[i], thickness, thickness * (tuning.ThreadEndWidth + tuning.ThreadEndWidth2 * decay),
-                i % 4 == 0 ? palette.Filament : palette.Core, alpha * (tuning.ThreadAlpha + tuning.ThreadAlpha2 * decay), core, sortY: sortY);
+                i % 4 == 0 ? palette.Filament : palette.Core, alpha * (tuning.ThreadAlpha + tuning.ThreadAlpha2 * decay), core, sortY: sortY, emitter: "WizardSpellEffects.Electricity.Channel.5");
             if (i % 3 == 0)
                 // Fine raster lightning detail rides each jagged section.
                 // The bright authored core stays readable at low F12 glow.
                 frame.Sprite(centre, segment.Length() + tuning.UserLightningWidth, tuning.UserLightningHeight + width * tuning.UserLightningHeight2,
                     tuning.UserLightningShape, i % 2 == 0 ? palette.Core : palette.Filament,
-                    alpha * tuning.UserLightningAlpha * decay, core, angle, sortY: sortY);
+                    alpha * tuning.UserLightningAlpha * decay, core, angle, sortY: sortY, emitter: "WizardSpellEffects.Electricity.Channel.6");
             if (i % 3 == 1)
             {
                 float shift = (frame.Unit(i + offset + flash * 51) - tuning.Shift) * tuning.Shift2;
                 Vector2 spark = points[i] + new Vector2(-heading.Y, heading.X) * shift;
                 frame.Sprite(spark, tuning.SparkWidth + tuning.SparkWidth2 * decay, tuning.SparkHeight + tuning.SparkHeight2 * decay, tuning.SparkShape, palette.Filament,
-                    alpha * (tuning.SparkAlpha + decay * tuning.SparkAlpha2), core, angle, sortY: sortY);
+                    alpha * (tuning.SparkAlpha + decay * tuning.SparkAlpha2), core, angle, sortY: sortY, emitter: "WizardSpellEffects.Electricity.Channel.7");
             }
         }
 
@@ -153,9 +154,9 @@ internal static partial class WizardSpellEffects
             float taper = 1 - progress * progress * tuning.Taper;
             float thickness = Math.Clamp(width * tuning.Thickness * taper, .55f, 2.25f);
             frame.Thread(points[j - 1], points[j], thickness * tuning.ThreadStartWidth, thickness * tuning.ThreadEndWidth,
-                palette.Glow, alpha * tuning.ThreadAlpha * taper, layer, sortY: sortY);
+                palette.Glow, alpha * tuning.ThreadAlpha * taper, layer, sortY: sortY, emitter: "WizardSpellEffects.Electricity.Fork.1");
             frame.Thread(points[j - 1], points[j], thickness, thickness * tuning.ThreadEndWidth2,
-                palette.Filament, alpha * taper, layer, sortY: sortY);
+                palette.Filament, alpha * taper, layer, sortY: sortY, emitter: "WizardSpellEffects.Electricity.Fork.2");
         }
 
         if (split && reach > 22)
@@ -210,14 +211,14 @@ internal static partial class WizardSpellEffects
                 float opacity = (tuning.Opacity - step * tuning.Opacity2) * (tuning.Opacity3 + frame.Unit(j + i * 47 + flash * 21) * tuning.Opacity4);
                 Vector2 middle = (from + to) * tuning.Middle;
                 frame.Sprite(middle, Vector2.Distance(from, to) + tuning.WispWidth, tuning.WispHeight + opacity * tuning.WispHeight2, tuning.WispShape, j % 4 == 0 ? tuning.WispColour : Blue,
-                    opacity * tuning.WispAlpha, layer, MathF.Atan2(to.Y - from.Y, to.X - from.X), light: j % 7 == 1);
+                    opacity * tuning.WispAlpha, layer, MathF.Atan2(to.Y - from.Y, to.X - from.X), light: j % 7 == 1, emitter: "WizardSpellEffects.Electricity.ElectricWrap.1");
                 frame.Thread(from, to, tuning.ThreadStartWidth - step * tuning.ThreadStartWidth2, tuning.ThreadEndWidth - step * tuning.ThreadEndWidth2, j % 3 == 0 ? PaleBlue : White,
-                    opacity, layer == Layer.Ground ? layer : tuning.ThreadLayer);
+                    opacity, layer == Layer.Ground ? layer : tuning.ThreadLayer, emitter: "WizardSpellEffects.Electricity.ElectricWrap.2");
                 if (j == 8 || j == 16)
                 {
                     Fork(frame, to, Vector2.UnitY, Vector2.UnitX, tuning.Length, tuning.Width, tuning.Alpha, i * 29 + j + flash * 197, layer);
                     frame.Sprite(to, tuning.FlashWidth + frame.Unit(flash * 23 + i) * tuning.FlashWidth2, tuning.FlashHeight, tuning.FlashShape, PaleBlue, tuning.FlashAlpha,
-                        layer == Layer.Ground ? layer : tuning.FlashLayer);
+                        layer == Layer.Ground ? layer : tuning.FlashLayer, emitter: "WizardSpellEffects.Electricity.ElectricWrap.3");
                 }
                 from = to;
             }
@@ -231,8 +232,8 @@ internal static partial class WizardSpellEffects
             }
         }
         frame.Sprite(feet - Vector2.UnitY * (startHeight * tuning.WispOffset), radius * tuning.WispWidth2, height * tuning.WispHeight3, tuning.WispShape2,
-            tuning.WispColour2, tuning.WispAlpha2, light: tuning.WispLight);
-        frame.Sparks(feet - Vector2.UnitY * (startHeight * tuning.SparksOffset), tuning.SparksCount, radius * tuning.SparksRx, height * tuning.SparksRy, progress, PaleBlue);
+            tuning.WispColour2, tuning.WispAlpha2, light: tuning.WispLight, emitter: "WizardSpellEffects.Electricity.ElectricWrap.4");
+        frame.Sparks(feet - Vector2.UnitY * (startHeight * tuning.SparksOffset), tuning.SparksCount, radius * tuning.SparksRx, height * tuning.SparksRy, progress, PaleBlue, emitter: "WizardSpellEffects.Electricity.ElectricWrap.5");
     }
 
     private static void ThunderStrike(Frame frame, Vector2 feet, float progress, float time, bool prepare)
@@ -243,9 +244,9 @@ internal static partial class WizardSpellEffects
             Vector2 bottom = feet - Vector2.UnitY * tuning.Bottom;
             Channel(frame, bottom + new Vector2(tuning.X, tuning.Y), bottom, tuning.Spread, tuning.Width, tuning.Alpha, time, tuning.Forks, tuning.Offset);
             frame.Sprite(bottom - Vector2.UnitY * tuning.UserLightningOffset, tuning.UserLightningWidth, tuning.UserLightningHeight,
-                tuning.UserLightningShape, Blue, tuning.UserLightningAlpha, tuning.UserLightningLayer, light: tuning.UserLightningLight);
+                tuning.UserLightningShape, Blue, tuning.UserLightningAlpha, tuning.UserLightningLayer, light: tuning.UserLightningLight, emitter: "WizardSpellEffects.Electricity.ThunderStrike.1");
             frame.Sprite(bottom - Vector2.UnitY * tuning.WispOffset, tuning.WispWidth, tuning.WispHeight, tuning.WispShape, tuning.WispColour,
-                tuning.WispAlpha, tuning.WispLayer, tuning.WispRotation);
+                tuning.WispAlpha, tuning.WispLayer, tuning.WispRotation, emitter: "WizardSpellEffects.Electricity.ThunderStrike.2");
             return;
         }
 
@@ -262,25 +263,25 @@ internal static partial class WizardSpellEffects
                 float height = tuning.Height + i * tuning.Height2;
                 Vector2 corona = feet + new Vector2((frame.Unit(i + 26) - tuning.X7) * tuning.X8, -height);
                 frame.Sprite(corona, tuning.IonCoronaWidth - i * tuning.IonCoronaWidth2, tuning.IonCoronaHeight + i * tuning.IonCoronaHeight2, tuning.IonCoronaShape, i % 2 == 0 ? tuning.IonCoronaColour : tuning.IonCoronaColour2,
-                    peak * (tuning.IonCoronaAlpha - i * tuning.IonCoronaAlpha2), tuning.IonCoronaLayer, tuning.IonCoronaRotation + i * tuning.IonCoronaRotation2, light: i < 2);
+                    peak * (tuning.IonCoronaAlpha - i * tuning.IonCoronaAlpha2), tuning.IonCoronaLayer, tuning.IonCoronaRotation + i * tuning.IonCoronaRotation2, light: i < 2, emitter: "WizardSpellEffects.Electricity.ThunderStrike.3");
                 frame.Sprite(corona + new Vector2(tuning.X9 - i * tuning.X10, 0), tuning.UserLightningWidth2 + i * tuning.UserLightningWidth3, tuning.UserLightningHeight2, tuning.UserLightningShape2, PaleBlue,
-                    peak * (tuning.UserLightningAlpha2 - i * tuning.UserLightningAlpha3), tuning.UserLightningLayer2, tuning.UserLightningRotation + i * tuning.UserLightningRotation2);
+                    peak * (tuning.UserLightningAlpha2 - i * tuning.UserLightningAlpha3), tuning.UserLightningLayer2, tuning.UserLightningRotation + i * tuning.UserLightningRotation2, emitter: "WizardSpellEffects.Electricity.ThunderStrike.4");
             }
             frame.Sprite(feet - Vector2.UnitY * tuning.UserLightningOffset2, tuning.UserLightningWidth4, tuning.UserLightningHeight3,
-                tuning.UserLightningShape3, Blue, power * tuning.UserLightningAlpha4, tuning.UserLightningLayer3, light: tuning.UserLightningLight2);
-            frame.Sprite(feet - Vector2.UnitY * tuning.FlashOffset, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, White, power * tuning.FlashAlpha, tuning.FlashLayer, light: tuning.FlashLight);
+                tuning.UserLightningShape3, Blue, power * tuning.UserLightningAlpha4, tuning.UserLightningLayer3, light: tuning.UserLightningLight2, emitter: "WizardSpellEffects.Electricity.ThunderStrike.5");
+            frame.Sprite(feet - Vector2.UnitY * tuning.FlashOffset, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, White, power * tuning.FlashAlpha, tuning.FlashLayer, light: tuning.FlashLight, emitter: "WizardSpellEffects.Electricity.ThunderStrike.6");
         }
         frame.Sprite(feet - Vector2.UnitY * tuning.UserLightningOffset3, tuning.UserLightningWidth5, tuning.UserLightningHeight4,
-            tuning.UserLightningShape4, Blue, tuning.UserLightningAlpha5, tuning.UserLightningLayer4, light: tuning.UserLightningLight3);
+            tuning.UserLightningShape4, Blue, tuning.UserLightningAlpha5, tuning.UserLightningLayer4, light: tuning.UserLightningLight3, emitter: "WizardSpellEffects.Electricity.ThunderStrike.7");
         for (int i = 0; i < tuning.WispCount; i++)
         {
             float angle = (i + frame.Unit(i)) * MathF.Tau / tuning.AngleDivisor;
             Vector2 target = feet + Ellipse(angle, tuning.EllipseX, tuning.EllipseY) * (tuning.Target + progress * tuning.Target2);
             Channel(frame, feet, target, tuning.Spread5, tuning.Width5, tuning.Alpha4, time, 1, tuning.Offset5 * i, tuning.Layer);
             frame.Sprite(Vector2.Lerp(feet, target, tuning.Amount), tuning.WispWidth2, tuning.WispHeight2, tuning.WispShape2, tuning.WispColour2,
-                tuning.WispAlpha2 + tuning.WispAlpha3 * Ease(progress * tuning.Value), tuning.WispLayer2, angle);
+                tuning.WispAlpha2 + tuning.WispAlpha3 * Ease(progress * tuning.Value), tuning.WispLayer2, angle, emitter: "WizardSpellEffects.Electricity.ThunderStrike.8");
         }
-        frame.Sparks(feet, tuning.SparksCount, tuning.SparksRx, tuning.SparksRy, progress, PaleBlue, rise: tuning.SparksRise);
+        frame.Sparks(feet, tuning.SparksCount, tuning.SparksRx, tuning.SparksRy, progress, PaleBlue, rise: tuning.SparksRise, emitter: "WizardSpellEffects.Electricity.ThunderStrike.9");
     }
 
     private static void ThunderStorm(Frame frame, Vector2 feet, float progress, float time)
@@ -301,10 +302,10 @@ internal static partial class WizardSpellEffects
         }
         Vector2 body = feet - Vector2.UnitY * tuning.Body;
         frame.Sprite(body, tuning.UserLightningWidth, tuning.UserLightningHeight, tuning.UserLightningShape, PaleBlue,
-            tuning.UserLightningAlpha, tuning.UserLightningLayer, rotation: progress * tuning.UserLightningRotation, light: tuning.UserLightningLight);
+            tuning.UserLightningAlpha, tuning.UserLightningLayer, rotation: progress * tuning.UserLightningRotation, light: tuning.UserLightningLight, emitter: "WizardSpellEffects.Electricity.ThunderStorm.1");
         frame.Sprite(body + new Vector2(tuning.X, tuning.Y), tuning.UserLightningWidth2, tuning.UserLightningHeight2,
-            tuning.UserLightningShape2, White, tuning.UserLightningAlpha2 * (1 - progress * tuning.UserLightningAlpha3), tuning.UserLightningLayer2);
-        frame.Sparks(feet - Vector2.UnitY * tuning.SparksOffset, tuning.SparksCount, radius, radius * FloorAspect, progress, PaleBlue, rise: tuning.SparksRise);
+            tuning.UserLightningShape2, White, tuning.UserLightningAlpha2 * (1 - progress * tuning.UserLightningAlpha3), tuning.UserLightningLayer2, emitter: "WizardSpellEffects.Electricity.ThunderStorm.2");
+        frame.Sparks(feet - Vector2.UnitY * tuning.SparksOffset, tuning.SparksCount, radius, radius * FloorAspect, progress, PaleBlue, rise: tuning.SparksRise, emitter: "WizardSpellEffects.Electricity.ThunderStorm.3");
     }
 
     private static void StormEscape(Frame frame, Vector2 feet, float progress, float time)
@@ -320,12 +321,12 @@ internal static partial class WizardSpellEffects
             Layer layer = Depth(angle + tuning.Layer);
             Channel(frame, from, to, tuning.Spread, tuning.Width, tuning.Alpha, time, 1, i * tuning.Offset, layer);
             frame.Sprite(from, tuning.UserLightningWidth, tuning.UserLightningHeight, tuning.UserLightningShape, i % 2 == 0 ? PaleBlue : Blue,
-                tuning.UserLightningAlpha, layer, angle, light: i % 2 == 0);
+                tuning.UserLightningAlpha, layer, angle, light: i % 2 == 0, emitter: "WizardSpellEffects.Electricity.StormEscape.1");
             Vector2 edge = Ellipse(angle + frame.Unit(i) * tuning.EllipseAngle2, tuning.EllipseX + tuning.EllipseX2 * frame.Unit(i + 19), tuning.EllipseY3);
             Channel(frame, from, from + edge, tuning.Spread2, tuning.Width2, tuning.Alpha2, time, 1, tuning.Offset2 + i * tuning.Offset3, layer);
         }
         // No orbit/ring billboard; moving arcs already define the storm. 
-        frame.Sparks(centre, tuning.SparksCount, radius * tuning.SparksRx, radius * tuning.SparksRy, progress, PaleBlue, rise: tuning.SparksRise);
+        frame.Sparks(centre, tuning.SparksCount, radius * tuning.SparksRx, radius * tuning.SparksRy, progress, PaleBlue, rise: tuning.SparksRise, emitter: "WizardSpellEffects.Electricity.StormEscape.2");
     }
 
     private static void StormArrival(Frame frame, Vector2 feet, float progress, float time)
@@ -334,10 +335,10 @@ internal static partial class WizardSpellEffects
         Vector2 centre = feet - Vector2.UnitY * tuning.Centre;
         float radius = tuning.Radius + tuning.Radius2 * Ease(progress * tuning.Radius3);
         frame.Sprite(centre, tuning.UserLightningWidth, tuning.UserLightningHeight, tuning.UserLightningShape, Blue, tuning.UserLightningAlpha,
-            tuning.UserLightningLayer, rotation: progress * tuning.UserLightningRotation, light: tuning.UserLightningLight);
+            tuning.UserLightningLayer, rotation: progress * tuning.UserLightningRotation, light: tuning.UserLightningLight, emitter: "WizardSpellEffects.Electricity.StormArrival.1");
         frame.Sprite(centre, tuning.UserLightningWidth2, tuning.UserLightningHeight2, tuning.UserLightningShape2, PaleBlue, tuning.UserLightningAlpha2,
-            tuning.UserLightningLayer2, rotation: tuning.UserLightningRotation2 + progress * tuning.UserLightningRotation3);
-        frame.Sprite(centre, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, White, tuning.FlashAlpha * (1 - progress), tuning.FlashLayer, light: tuning.FlashLight);
+            tuning.UserLightningLayer2, rotation: tuning.UserLightningRotation2 + progress * tuning.UserLightningRotation3, emitter: "WizardSpellEffects.Electricity.StormArrival.2");
+        frame.Sprite(centre, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, White, tuning.FlashAlpha * (1 - progress), tuning.FlashLayer, light: tuning.FlashLight, emitter: "WizardSpellEffects.Electricity.StormArrival.3");
         for (int i = 0; i < tuning.ParticleCount; i++)
         {
             float angle = (i + frame.Unit(i) * tuning.Angle) * MathF.Tau / tuning.AngleDivisor + progress * tuning.Angle2;

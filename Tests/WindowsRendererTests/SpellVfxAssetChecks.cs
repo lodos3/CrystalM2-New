@@ -52,6 +52,46 @@ internal static class SpellVfxAssetChecks
             Check(after.Active.Length < before.Active.Length, "The actual Warrior emitter must use the edited particle count.");
             using var afterImage = RenderCharge(device, backBuffer, after);
             Check(PixelsChanged(beforeImage, afterImage), "A saved override must change the D3D11 preview.");
+            var roar = SpellVfxAssets.CollectEmitters(() => SampleRoar(Spell.LionRoar));
+            var ring = roar.Single(item => item.Value.Particle.Shape == SpellParticleShape.WarriorRing);
+            Check(roar.Count == 8, "Lion Roar should expose each authored particle layer separately.");
+            var emitter = new JsonObject
+            {
+                ["StartSize"] = new JsonObject { ["Min"] = 160, ["Max"] = 160 },
+                ["RenderMode"] = "TriangleMesh",
+                ["SizeOverLifetime"] = JsonNode.Parse("""[{"Time":0,"Value":1},{"Time":1,"Value":0.5}]""")
+            };
+            var roarProfile = new JsonObject
+            {
+                [SpellVfxAssets.EmitterGroup] = new JsonObject { [ring.Key] = emitter }
+            };
+            var originalRoar = SampleRoar(Spell.LionRoar).Active.ToArray();
+            SpellVfxAssets.SaveSpell(directory, Spell.LionRoar, roarProfile);
+            SpellVfxAssets.Reload(directory);
+            var editedRoar = SampleRoar(Spell.LionRoar).Active.ToArray();
+            var mesh = editedRoar.Single(particle => particle.Emitter != null);
+            Check(mesh.Emitter!.Id == ring.Key && mesh.Emitter.Settings.RenderMode == SpellEmitterRenderMode.TriangleMesh &&
+                mesh.Size == 160 && mesh.RibbonScale(0) is < 1 and > .5f,
+                "The runtime must apply saved size, stage curve and mesh mode to the chosen layer.");
+            Check(editedRoar.Where(particle => particle.Emitter == null).SequenceEqual(
+                originalRoar.Where(particle => particle.Shape != SpellParticleShape.WarriorRing)),
+                "Editing the ring must preserve every other layer.");
+            Check(SampleRoar(Spell.BattleCry).Active.ToArray().All(particle => particle.Emitter == null),
+                "A spell sharing the same emitter site must retain its own settings.");
+            using var originalRoarImage = RenderCharge(device, backBuffer, SampleRoarPool(originalRoar));
+            using var editedRoarImage = RenderCharge(device, backBuffer, SampleRoarPool(editedRoar));
+            Check(PixelsChanged(originalRoarImage, editedRoarImage), "The emitter settings must change the Direct3D output.");
+
+            emitter["StartSize"] = new JsonObject { ["Min"] = 40, ["Max"] = 20 };
+            try
+            {
+                SpellVfxAssets.SaveSpell(directory, Spell.LionRoar, roarProfile);
+                throw new InvalidOperationException("The loader accepted an inverted particle range.");
+            }
+            catch (System.Text.Json.JsonException) { }
+            Check(SampleRoar(Spell.LionRoar).Active.ToArray().Any(particle => particle.Emitter != null && particle.Size == 160),
+                "An invalid range must leave the last good profile active.");
+
             var shared = new JsonObject
             {
                 ["WindRibbon"] = new JsonObject { ["WindRibbonCastsLight"] = true }
@@ -85,6 +125,7 @@ internal static class SpellVfxAssetChecks
             if (Directory.Exists(spells))
             {
                 File.Delete(Path.Combine(spells, "TwinDrakeBlade.json"));
+                File.Delete(Path.Combine(spells, "LionRoar.json"));
                 Directory.Delete(spells);
             }
             Directory.Delete(directory);
@@ -98,6 +139,21 @@ internal static class SpellVfxAssetChecks
         var pool = new SpellParticlePool(2048);
         WarriorSpellEffects.DrawFrame(pool, new SpellVisual(Spell.TwinDrakeBlade, SpellVisualPhase.Prepare),
             new Vector2(150, 150), Vector2.UnitX, 1200, 1000, 500, seed: 79);
+        return pool;
+    }
+
+    private static SpellParticlePool SampleRoar(Spell spell)
+    {
+        var pool = new SpellParticlePool(2048);
+        WarriorSpellEffects.DrawFrame(pool, new SpellVisual(spell), new Vector2(150, 150), Vector2.UnitX,
+            1200, 1000, 500, seed: 79);
+        return pool;
+    }
+
+    private static SpellParticlePool SampleRoarPool(SpellParticle[] particles)
+    {
+        var pool = new SpellParticlePool(2048);
+        foreach (var particle in particles) pool.TryAdd(particle);
         return pool;
     }
 

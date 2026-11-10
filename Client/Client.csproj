@@ -37,6 +37,7 @@
     <None Update="Data\Shaders\World.hlsl" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Update="Data\ParticleCredits.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Update="Data\SpellVfx\**\*.json" CopyToOutputDirectory="Always" CopyToPublishDirectory="Always" />
+    <None Update="Data\SpellVfx\EmitterSchema.version" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <EmbeddedResource Include="Data\SpellVfx\*.json" LogicalName="SpellVfx.%(Filename)%(Extension)" />
   </ItemGroup>
 

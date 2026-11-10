@@ -135,7 +135,7 @@ internal sealed class SpellParticleRenderer
                 float age = particle.Age(now);
                 Vector2 point = particle.Position(now) + camera;
                 Vector2 size = particle.Dimensions(age, sizeScale);
-                float ribbonScale = emission ? lightRadius : 1f;
+                float ribbonScale = (emission ? lightRadius : 1f) * (particle.Ribbon.HasValue ? particle.RibbonScale(age) : 1f);
                 float angle = particle.Angle(now);
                 Rectangle bounds = particle.Bounds(point, size, ribbonScale, angle);
                 if (!bounds.IntersectsWith(clip)) continue;
@@ -183,7 +183,7 @@ internal sealed class SpellParticleRenderer
                         [new Vector4(look.EdgeSoftness, look.Detail, desiredRibbonMode, phase)]);
                     ribbonMode = desiredRibbonMode;
                 }
-                var source = SpellParticleAtlas.Part(particle.Shape, particle.Direction, particle.Frame);
+                var source = SpellParticleAtlas.Part(particle.Shape, particle.Direction, particle.AnimationFrame(age));
                 float depth = occlusion != null && !ground && !emission && !particle.AlwaysOnTop &&
                     (particle.DepthY.HasValue || particle.Motion.HasValue)
                     ? Math.Max(1, MathF.Floor(particle.DepthAt(now) / cellHeight) - depthOrigin)
@@ -192,6 +192,15 @@ internal sealed class SpellParticleRenderer
                 if (particle.AlwaysOnTop && particle.OpacityNoiseSeed != 0) depth = -particle.OpacityNoiseSeed;
                 if (particle.Ribbon is { } ribbon)
                     _device.Sprite.DrawQuad(_atlas, source, ribbon.Scaled(ribbonScale), point, tint, depth);
+                else if (particle.Emitter?.Settings.RenderMode is SpellEmitterRenderMode.QuadMesh or SpellEmitterRenderMode.TriangleMesh)
+                {
+                    Vector2 right = new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * (size.X * .5f);
+                    Vector2 down = new Vector2(-MathF.Sin(angle), MathF.Cos(angle)) * (size.Y * .5f);
+                    bool triangle = particle.Emitter.Settings.RenderMode == SpellEmitterRenderMode.TriangleMesh;
+                    var mesh = new SpriteQuad(triangle ? -down : -right - down, triangle ? -down : right - down,
+                        -right + down, right + down);
+                    _device.Sprite.DrawQuad(_atlas, source, mesh, point, tint, depth);
+                }
                 else
                     _device.Sprite.DrawRotated(_atlas, source, point, size, angle, tint, depth);
             }

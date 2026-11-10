@@ -18,6 +18,7 @@ internal static partial class WarriorSpellEffects
         Vector2 facing, Vector2 feet, long now, int remaining, int interval, float progress, float previousProgress,
         bool followThrough)
     {
+        using var emitterTime = SpellVfxAssets.AtProgress(progress);
         using var vfxScope = SpellVfxAssets.For(spell);
         var tuning = SpellVfxAssets.Current.Warrior.WeaponSweep;
         var fields = SpellVfxAssets.Fields("Warrior", "WeaponSweep");
@@ -45,10 +46,10 @@ internal static partial class WarriorSpellEffects
                 Layer layer = rear ? fields.Read(tuning.Layer) : fields.Read(tuning.Layer2);
                 float groundY = feet.Y + (rear ? fields.Read(tuning.GroundY) : fields.Read(tuning.GroundY2));
                 returnCut.Thread(root, end, fields.Read(tuning.ThreadStartWidth), fields.Read(tuning.ThreadEndWidth), i % 3 == 0 ? White : Ice,
-                    fields.Read(tuning.ThreadAlpha), layer, sortY: groundY);
+                    fields.Read(tuning.ThreadAlpha), layer, sortY: groundY, emitter: "WarriorSpellEffects.Weapons.WeaponSweep.1");
                 returnCut.Sprite(root, fields.Read(tuning.SparkWidth) + returnCut.Unit(i + 61) * fields.Read(tuning.SparkWidth2),
                     fields.Read(tuning.SparkHeight) + returnCut.Unit(i + 63) * fields.Read(tuning.SparkHeight2), fields.Read(tuning.SparkShape),
-                    i % 3 == 0 ? White : Ice, fields.Read(tuning.SparkAlpha), layer, sortY: groundY);
+                    i % 3 == 0 ? White : Ice, fields.Read(tuning.SparkAlpha), layer, sortY: groundY, emitter: "WarriorSpellEffects.Weapons.WeaponSweep.2");
             }
         }
         bool heavy = spell is Spell.FlamingSword or Spell.CrossHalfMoon or Spell.BladeAvalanche or Spell.SlashingBurst;
@@ -82,10 +83,10 @@ internal static partial class WarriorSpellEffects
         switch (spell)
         {
             case Spell.Slaying:
-                effect.Add(forwardTip, facing * fields.Read(tuning.SlayingOrbVelocity), fields.Read(tuning.SlayingOrbShape), fields.Read(tuning.SlayingOrbSize), life, fields.Read(tuning.SlayingOrbLayer), aspect: fields.Read(tuning.SlayingOrbAspect), alpha: fields.Read(tuning.SlayingOrbAlpha));
+                effect.Add(forwardTip, facing * fields.Read(tuning.SlayingOrbVelocity), fields.Read(tuning.SlayingOrbShape), fields.Read(tuning.SlayingOrbSize), life, fields.Read(tuning.SlayingOrbLayer), aspect: fields.Read(tuning.SlayingOrbAspect), alpha: fields.Read(tuning.SlayingOrbAlpha), emitter: "WarriorSpellEffects.Weapons.WeaponSweep.3");
                 effect.Add(forwardTip + facing * fields.Read(tuning.SlayingWarriorTripleCutOffset), facing * fields.Read(tuning.SlayingWarriorTripleCutVelocity), fields.Read(tuning.SlayingWarriorTripleCutShape), fields.Read(tuning.SlayingWarriorTripleCutSize), life,
-                    fields.Read(tuning.SlayingWarriorTripleCutLayer), aspect: fields.Read(tuning.SlayingWarriorTripleCutAspect), rotation: angle + fields.Read(tuning.SlayingWarriorTripleCutRotation), core: fields.Read(tuning.SlayingWarriorTripleCutCore), alpha: fields.Read(tuning.SlayingWarriorTripleCutAlpha));
-                effect.Scatter(forwardTip, fields.Read(tuning.SlayingSparkCount), fields.Read(tuning.SlayingSparkShape), fields.Read(tuning.SlayingSparkSpread), life);
+                    fields.Read(tuning.SlayingWarriorTripleCutLayer), aspect: fields.Read(tuning.SlayingWarriorTripleCutAspect), rotation: angle + fields.Read(tuning.SlayingWarriorTripleCutRotation), core: fields.Read(tuning.SlayingWarriorTripleCutCore), alpha: fields.Read(tuning.SlayingWarriorTripleCutAlpha), emitter: "WarriorSpellEffects.Weapons.WeaponSweep.4");
+                effect.Scatter(forwardTip, fields.Read(tuning.SlayingSparkCount), fields.Read(tuning.SlayingSparkShape), fields.Read(tuning.SlayingSparkSpread), life, emitter: "WarriorSpellEffects.Weapons.WeaponSweep.5");
                 break;
             case Spell.HalfMoon when cut:
                 ProjectCrescent(pool, look, feet, facing, 0, fields.Read(tuning.HalfMoonLift), fields.Read(tuning.HalfMoonRadius), fields.Read(tuning.HalfMoonWidth), now, life);
@@ -94,7 +95,7 @@ internal static partial class WarriorSpellEffects
                 ProjectCrescent(pool, look, feet, facing, fields.Read(tuning.CrossHalfMoonYaw), fields.Read(tuning.CrossHalfMoonLift), fields.Read(tuning.CrossHalfMoonRadius), fields.Read(tuning.CrossHalfMoonWidth), now, life, sweep: fields.Read(tuning.CrossHalfMoonSweep), stacked: true);
                 ProjectCrescent(pool, look, feet, facing, MathF.PI - fields.Read(tuning.CrossHalfMoonYaw2), fields.Read(tuning.CrossHalfMoonLift2), fields.Read(tuning.CrossHalfMoonRadius2), fields.Read(tuning.CrossHalfMoonWidth2), now, life, sweep: fields.Read(tuning.CrossHalfMoonSweep2), stacked: true);
                 effect.Add(feet + facing * fields.Read(tuning.CrossHalfMoonWarriorSparkOffset) - Vector2.UnitY * fields.Read(tuning.CrossHalfMoonWarriorSparkOffset2), facing * fields.Read(tuning.CrossHalfMoonWarriorSparkVelocity), fields.Read(tuning.CrossHalfMoonWarriorSparkShape), fields.Read(tuning.CrossHalfMoonWarriorSparkSize), life,
-                    fields.Read(tuning.CrossHalfMoonWarriorSparkLayer), aspect: fields.Read(tuning.CrossHalfMoonWarriorSparkAspect), rotation: angle, core: fields.Read(tuning.CrossHalfMoonWarriorSparkCore), alpha: fields.Read(tuning.CrossHalfMoonWarriorSparkAlpha));
+                    fields.Read(tuning.CrossHalfMoonWarriorSparkLayer), aspect: fields.Read(tuning.CrossHalfMoonWarriorSparkAspect), rotation: angle, core: fields.Read(tuning.CrossHalfMoonWarriorSparkCore), alpha: fields.Read(tuning.CrossHalfMoonWarriorSparkAlpha), emitter: "WarriorSpellEffects.Weapons.WeaponSweep.6");
                 break;
             case Spell.TwinDrakeBlade when cut:
                 // The attack peak is a fragmented electrical cut throughout
@@ -114,13 +115,13 @@ internal static partial class WarriorSpellEffects
                     float groundY = feet.Y + (rear ? fields.Read(tuning.TwinDrakeBladeGroundY) : fields.Read(tuning.TwinDrakeBladeGroundY2));
                     strike.Thread(root, tendril, fields.Read(tuning.TwinDrakeBladeThreadStartWidth), fields.Read(tuning.TwinDrakeBladeThreadEndWidth),
                         i % 4 == 0 ? White : Ice, fields.Read(tuning.TwinDrakeBladeThreadAlpha), layer,
-                        light: i == 7, sortY: groundY);
+                        light: i == 7, sortY: groundY, emitter: "WarriorSpellEffects.Weapons.WeaponSweep.7");
                     if (i % 2 == 0)
                     {
                         float rotation = MathF.Atan2(tendril.Y - root.Y, tendril.X - root.X);
                         strike.Sprite(Vector2.Lerp(root, tendril, fields.Read(tuning.TwinDrakeBladeAmount)), fields.Read(tuning.TwinDrakeBladeUserLightningWidth), fields.Read(tuning.TwinDrakeBladeUserLightningHeight),
                             fields.Read(tuning.TwinDrakeBladeUserLightningShape), White, fields.Read(tuning.TwinDrakeBladeUserLightningAlpha), layer,
-                            rotation, sortY: groundY);
+                            rotation, sortY: groundY, emitter: "WarriorSpellEffects.Weapons.WeaponSweep.8");
                     }
                 }
                 break;
@@ -131,13 +132,13 @@ internal static partial class WarriorSpellEffects
                 break;
             case Spell.CounterAttack:
                 effect.Add(pose.Tip, facing * fields.Read(tuning.CounterAttackWarriorCrescentVelocity), fields.Read(tuning.CounterAttackWarriorCrescentShape), fields.Read(tuning.CounterAttackWarriorCrescentSize), life,
-                    fields.Read(tuning.CounterAttackWarriorCrescentLayer), aspect: fields.Read(tuning.CounterAttackWarriorCrescentAspect), rotation: angle - fields.Read(tuning.CounterAttackWarriorCrescentRotation), core: fields.Read(tuning.CounterAttackWarriorCrescentCore), alpha: fields.Read(tuning.CounterAttackWarriorCrescentAlpha));
+                    fields.Read(tuning.CounterAttackWarriorCrescentLayer), aspect: fields.Read(tuning.CounterAttackWarriorCrescentAspect), rotation: angle - fields.Read(tuning.CounterAttackWarriorCrescentRotation), core: fields.Read(tuning.CounterAttackWarriorCrescentCore), alpha: fields.Read(tuning.CounterAttackWarriorCrescentAlpha), emitter: "WarriorSpellEffects.Weapons.WeaponSweep.9");
                 break;
         }
 
         if (spell != Spell.Thrusting)
             effect.Add(pose.Tip, facing * fields.Read(tuning.WarriorSparkVelocity), fields.Read(tuning.WarriorSparkShape), heavy ? fields.Read(tuning.WarriorSparkSize) : fields.Read(tuning.WarriorSparkSize2), Math.Min(life, fields.Read(tuning.Val22)),
-                fields.Read(tuning.WarriorSparkLayer), aspect: fields.Read(tuning.WarriorSparkAspect), rotation: angle, alpha: fields.Read(tuning.WarriorSparkAlpha), core: fields.Read(tuning.WarriorSparkCore));
+                fields.Read(tuning.WarriorSparkLayer), aspect: fields.Read(tuning.WarriorSparkAspect), rotation: angle, alpha: fields.Read(tuning.WarriorSparkAlpha), core: fields.Read(tuning.WarriorSparkCore), emitter: "WarriorSpellEffects.Weapons.WeaponSweep.10");
     }
 
     private static void ProjectCrescent(SpellParticlePool pool, Look look, Vector2 feet, Vector2 facing,
@@ -198,12 +199,12 @@ internal static partial class WarriorSpellEffects
             float depth = (aDepth + bDepth) * tuning.Depth;
             float length = tuning.Length + tuning.Length2 * MathF.Sin(i * MathF.PI / segments);
             Layer layer = depth < feet.Y ? tuning.Layer5 : tuning.Layer6;
-            pool.TryAdd(new SpellParticle(accent, Vector2.Zero, now, Math.Min(life, tuning.Val2),
+            SpellVfxAssets.Emit(pool, new SpellParticle(accent, Vector2.Zero, now, Math.Min(life, tuning.Val2),
                 Math.Max(1, (int)length), Color.FromArgb(depth < feet.Y ? tuning.Alpha6 : tuning.Alpha7,
                     i % 4 == 1 ? look.Core : look.Colour),
                 tuning.UserSlashShape, 0, Aspect: tuning.UserSlashAspect,
                 Rotation: MathF.Atan2(tangent.Y, tangent.X), Layer: layer,
-                CastsLight: tuning.UserSlashCastsLight, DepthY: depth));
+                CastsLight: tuning.UserSlashCastsLight, DepthY: depth), "WarriorSpellEffects.Weapons.ProjectCrescent.1");
         }
 
         // The detached glints remain small and follow each fragment's
@@ -216,11 +217,11 @@ internal static partial class WarriorSpellEffects
             Vector2 drift = (outerB - outerA) * tuning.Drift - Vector2.UnitY * tuning.Drift2;
             float depth = (depthA + depthB) * tuning.Depth2;
             Layer layer = depth < feet.Y ? tuning.Layer7 : tuning.Layer8;
-            pool.TryAdd(new SpellParticle(edge, drift, now, Math.Min(life, tuning.Val22),
+            SpellVfxAssets.Emit(pool, new SpellParticle(edge, drift, now, Math.Min(life, tuning.Val22),
                 tuning.WarriorSparkSize + i % 4, Color.FromArgb(depth < feet.Y ? tuning.Alpha8 : tuning.Alpha9, look.Core),
                 tuning.WarriorSparkShape, 0, Aspect: tuning.WarriorSparkAspect,
                 Rotation: MathF.Atan2(drift.Y, drift.X), Layer: layer,
-                CastsLight: tuning.WarriorSparkCastsLight, DepthY: depth));
+                CastsLight: tuning.WarriorSparkCastsLight, DepthY: depth), "WarriorSpellEffects.Weapons.ProjectCrescent.2");
         }
 
         // A few thin trailing flecks extend in the tangent direction and
@@ -233,12 +234,12 @@ internal static partial class WarriorSpellEffects
             Vector2 point = Vector2.Lerp(innerEdge, outerEdge, tuning.Point);
             Vector2 tangent = (nextInner + nextOuter - innerEdge - outerEdge) * tuning.Tangent3;
             Layer layer = depth < feet.Y ? tuning.Layer9 : tuning.Layer10;
-            pool.TryAdd(new SpellParticle(point, tangent * tuning.WispVelocity - Vector2.UnitY * tuning.WispVelocity2,
+            SpellVfxAssets.Emit(pool, new SpellParticle(point, tangent * tuning.WispVelocity - Vector2.UnitY * tuning.WispVelocity2,
                 now, Math.Min(life, tuning.Val23), tuning.WispSize + i % 3,
                 Color.FromArgb(depth < feet.Y ? tuning.Alpha10 : tuning.Alpha11, look.Core),
                 tuning.WispShape, 0, Aspect: tuning.WispAspect,
                 Rotation: MathF.Atan2(tangent.Y, tangent.X), Layer: layer,
-                CastsLight: tuning.WispCastsLight, DepthY: depth));
+                CastsLight: tuning.WispCastsLight, DepthY: depth), "WarriorSpellEffects.Weapons.ProjectCrescent.3");
         }
 
         if (stacked)
@@ -268,14 +269,14 @@ internal static partial class WarriorSpellEffects
                     bool rear = strokeDepth < feet.Y;
                     float length = tuning.Length3 + tier * tuning.Length4 + tuning.Length5 * MathF.Sin(t * MathF.PI);
                     int alpha = tier == 1 ? tuning.Alpha12 : rear ? tuning.Alpha13 : tuning.Alpha14;
-                    pool.TryAdd(new SpellParticle(point,
+                    SpellVfxAssets.Emit(pool, new SpellParticle(point,
                         tangent * (tuning.UserSlashVelocity + tier * tuning.UserSlashVelocity2), now, Math.Min(life, tuning.Val24),
                         (int)MathF.Round(length), Color.FromArgb(alpha,
                             tier == 1 ? look.Core : look.Colour),
                         tuning.UserSlashShape2, 0, Aspect: tier == 1 ? tuning.UserSlashAspect2 : tuning.UserSlashAspect3,
                         Rotation: orientation + (tier - 1) * tuning.UserSlashRotation,
                         Layer: rear ? tuning.UserSlashLayer : tuning.UserSlashLayer2,
-                        CastsLight: tuning.UserSlashCastsLight2, DepthY: strokeDepth));
+                        CastsLight: tuning.UserSlashCastsLight2, DepthY: strokeDepth), "WarriorSpellEffects.Weapons.ProjectCrescent.4");
                 }
             }
         }
@@ -305,9 +306,9 @@ internal static partial class WarriorSpellEffects
             Layer layer, Color tint, int alpha, float groundDepth)
         {
             var shape = new SpriteQuad(fromInner - centre, toInner - centre, fromOuter - centre, toOuter - centre);
-            pool.TryAdd(new SpellParticle(centre, Vector2.Zero, now, life, 1, Color.FromArgb(alpha, tint),
+            SpellVfxAssets.Emit(pool, new SpellParticle(centre, Vector2.Zero, now, life, 1, Color.FromArgb(alpha, tint),
                 tuning.RibbonShape, 0, Layer: layer, CastsLight: tuning.RibbonCastsLight,
-                Ribbon: shape, DepthY: groundDepth));
+                Ribbon: shape, DepthY: groundDepth), "WarriorSpellEffects.Weapons.ProjectCrescent.5");
         }
     }
 
@@ -342,24 +343,24 @@ internal static partial class WarriorSpellEffects
                 int tint = i % 4 == 0 ? White : Ice;
                 if (i > 0)
                     frame.Thread(previousPoint, point, tuning.ThreadStartWidth, tuning.ThreadEndWidth, tint,
-                        behind ? tuning.ThreadAlpha : tuning.ThreadAlpha2, layer, sortY: groundY);
+                        behind ? tuning.ThreadAlpha : tuning.ThreadAlpha2, layer, sortY: groundY, emitter: "WarriorSpellEffects.Weapons.DrakeEdgeSweep.1");
                 frame.Thread(oldPoint, point, tuning.ThreadStartWidth2, tuning.ThreadEndWidth2,
                     i % 3 == 0 ? White : Steel,
                     behind ? tuning.ThreadAlpha3 : tuning.ThreadAlpha4, layer,
-                    light: !behind && i == 7, sortY: groundY);
+                    light: !behind && i == 7, sortY: groundY, emitter: "WarriorSpellEffects.Weapons.DrakeEdgeSweep.2");
                 if (i % 3 == 1)
                 {
                     Vector2 delta = point - oldPoint;
                     frame.Sprite((oldPoint + point) * tuning.UserLightningOffset,
                         tuning.UserLightningWidth + delta.Length(), tuning.UserLightningHeight, tuning.UserLightningShape,
                         tint, behind ? tuning.UserLightningAlpha : tuning.UserLightningAlpha2, layer,
-                        MathF.Atan2(delta.Y, delta.X), sortY: groundY);
+                        MathF.Atan2(delta.Y, delta.X), sortY: groundY, emitter: "WarriorSpellEffects.Weapons.DrakeEdgeSweep.3");
                 }
                 if (i % 4 == 0)
                     frame.Sprite(point, tuning.SparkWidth + frame.Unit(i + 53) * tuning.SparkWidth2,
                         tuning.SparkHeight + frame.Unit(i + 57) * tuning.SparkHeight2,
                         tuning.SparkShape, White, behind ? tuning.SparkAlpha : tuning.SparkAlpha2,
-                        layer, sortY: groundY);
+                        layer, sortY: groundY, emitter: "WarriorSpellEffects.Weapons.DrakeEdgeSweep.4");
                 previousPoint = point;
             }
         }
@@ -386,9 +387,9 @@ internal static partial class WarriorSpellEffects
             Vector2 centre = (hilt + nextHilt + (blade + nextBlade) * tuning.Centre) * tuning.Centre2;
             var quad = new SpriteQuad(hilt + blade * inner - centre, nextHilt + nextBlade * inner - centre,
                 hilt + blade * outer - centre, nextHilt + nextBlade * outer - centre);
-            pool.TryAdd(new SpellParticle(centre, Vector2.Zero, now, duration, 1,
+            SpellVfxAssets.Emit(pool, new SpellParticle(centre, Vector2.Zero, now, duration, 1,
                 Color.FromArgb(alpha, colour), tuning.BladeRibbonShape, 0,
-                Layer: layer, CastsLight: tuning.BladeRibbonCastsLight, Ribbon: quad, DepthY: depthY));
+                Layer: layer, CastsLight: tuning.BladeRibbonCastsLight, Ribbon: quad, DepthY: depthY), "WarriorSpellEffects.Weapons.SweepRibbon.1");
             hilt = nextHilt;
             blade = nextBlade;
         }
@@ -423,11 +424,11 @@ internal static partial class WarriorSpellEffects
                     i % 5 == 0 ? Heat : i % 2 == 0 ? Flame : Ember,
                     alpha, i % 7 == 0 ? tuning.UserEmberLayer : tuning.UserEmberLayer2,
                     (frame.Unit(sample + 57) - tuning.UserEmberRotation) * tuning.UserEmberRotation2,
-                    light: i % 19 == 0);
+                    light: i % 19 == 0, emitter: "WarriorSpellEffects.Weapons.DrawWeaponEnchant.1");
                 if (i % 8 == 0)
                     frame.Clip(point - Vector2.UnitY * tuning.SmokeSequenceOffset, tuning.SmokeSequenceWidth, tuning.SmokeSequenceHeight,
                         tuning.SmokeSequenceShape, age + time * tuning.SmokeSequencePhase, Smoke,
-                        tuning.SmokeSequenceAlpha * (1 - age), tuning.SmokeSequenceLayer);
+                        tuning.SmokeSequenceAlpha * (1 - age), tuning.SmokeSequenceLayer, emitter: "WarriorSpellEffects.Weapons.DrawWeaponEnchant.2");
             }
             return;
         }
@@ -456,14 +457,14 @@ internal static partial class WarriorSpellEffects
                 int colour = step % 4 == 0 ? White : Ice;
                 frame.Thread(previous, point, tuning.ThreadStartWidth, tuning.ThreadEndWidth, colour,
                     behind ? tuning.ThreadAlpha : tuning.ThreadAlpha2, layer,
-                    light: !behind && step == segments / 2, sortY: depth);
+                    light: !behind && step == segments / 2, sortY: depth, emitter: "WarriorSpellEffects.Weapons.DrawWeaponEnchant.3");
                 if (step % 3 == 1)
                 {
                     Vector2 delta = point - previous;
                     frame.Sprite((point + previous) * tuning.UserLightningOffset, tuning.UserLightningWidth + delta.Length(),
                         tuning.UserLightningHeight, tuning.UserLightningShape,
                         colour, behind ? tuning.UserLightningAlpha : tuning.UserLightningAlpha2, layer,
-                        MathF.Atan2(delta.Y, delta.X), sortY: depth);
+                        MathF.Atan2(delta.Y, delta.X), sortY: depth, emitter: "WarriorSpellEffects.Weapons.DrawWeaponEnchant.4");
                 }
                 previous = point;
             }
@@ -486,10 +487,10 @@ internal static partial class WarriorSpellEffects
             frame.Sprite(point, tuning.SparkWidth + frame.Unit(sample + 19) * tuning.SparkWidth2,
                 tuning.SparkHeight + frame.Unit(sample + 23) * tuning.SparkHeight2, tuning.SparkShape,
                 i % 3 == 0 ? White : Ice, fade, layer,
-                sortY: depth);
+                sortY: depth, emitter: "WarriorSpellEffects.Weapons.DrawWeaponEnchant.5");
             if (i % 9 == 0)
                 frame.Sprite(root, tuning.WispWidth, tuning.WispHeight, tuning.WispShape, tuning.WispColour,
-                    tuning.WispAlpha * fade, tuning.WispLayer, sortY: depth);
+                    tuning.WispAlpha * fade, tuning.WispLayer, sortY: depth, emitter: "WarriorSpellEffects.Weapons.DrawWeaponEnchant.6");
         }
 
         if (!striking) return;
@@ -508,7 +509,7 @@ internal static partial class WarriorSpellEffects
             float depth = groundBase + (behind ? tuning.Depth5 : tuning.Depth6);
             frame.Thread(root, flick, tuning.ThreadStartWidth2, tuning.ThreadEndWidth2,
                 i % 3 == 0 ? White : Ice, tuning.ThreadAlpha3,
-                layer, sortY: depth);
+                layer, sortY: depth, emitter: "WarriorSpellEffects.Weapons.DrawWeaponEnchant.7");
         }
     }
 
@@ -536,12 +537,12 @@ internal static partial class WarriorSpellEffects
                 tuning.UserEmberHeight + stroke.Unit(seed + 23) * tuning.UserEmberHeight2,
                 i % 4 == 0 ? tuning.UserEmberShape : tuning.UserEmberShape2,
                 tint, alpha, i % 6 == 0 ? tuning.UserEmberLayer : tuning.UserEmberLayer2,
-                angle * tuning.UserEmberRotation, light: i % 16 == 0);
+                angle * tuning.UserEmberRotation, light: i % 16 == 0, emitter: "WarriorSpellEffects.Weapons.AddBladeFire.1");
             if (i % 6 == 0)
                 stroke.Clip(point - Vector2.UnitY * tuning.SmokeSequenceOffset,
                     tuning.SmokeSequenceWidth + stroke.Unit(seed + 27) * tuning.SmokeSequenceWidth2, tuning.SmokeSequenceHeight + stroke.Unit(seed + 29) * tuning.SmokeSequenceHeight2,
                     tuning.SmokeSequenceShape, progress + stroke.Unit(seed + 33),
-                    Smoke, tuning.SmokeSequenceAlpha * (1 - age), tuning.SmokeSequenceLayer);
+                    Smoke, tuning.SmokeSequenceAlpha * (1 - age), tuning.SmokeSequenceLayer, emitter: "WarriorSpellEffects.Weapons.AddBladeFire.2");
         }
     }
 }

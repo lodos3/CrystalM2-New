@@ -123,38 +123,38 @@ internal static class SignatureSpellEffects
         switch (look.Form)
         {
             case Form.Bolt when target != origin:
-                vfx.Projectile(hand, end, windup, look.Size, ability.Spell == Spell.AncestorsRend);
+                vfx.Projectile(hand, end, windup, look.Size, ability.Spell == Spell.AncestorsRend, emitter: "SignatureSpellEffects.Cast.1");
                 break;
             case Form.Arc when target != origin:
-                vfx.Lightning(hand, end, windup, look.Size);
+                vfx.Lightning(hand, end, windup, look.Size, emitter: "SignatureSpellEffects.Cast.2");
                 break;
             case Form.Cut:
             case Form.Cleave:
                 vfx.Add(hand + facing * tuning.CleaveSlashOffset, facing * tuning.CleaveSlashVelocity, tuning.CleaveSlashShape, look.Size, tuning.CleaveSlashDuration, tuning.CleaveSlashLayer,
-                    (byte)direction, tuning.CleaveSlashAspect, delay: Math.Max(0, windup - tuning.CleaveVal2));
+                    (byte)direction, tuning.CleaveSlashAspect, delay: Math.Max(0, windup - tuning.CleaveVal2), emitter: "SignatureSpellEffects.Cast.3");
                 if (look.Form == Form.Cleave)
                     vfx.Add(hand + facing * tuning.CleaveAddOffset, facing * tuning.CleaveAddVelocity, look.Shape, look.Size * tuning.CleaveAddSize / 4, tuning.CleaveAddDuration, tuning.CleaveAddLayer,
-                        (byte)direction, tuning.CleaveAddAspect, delay: Math.Max(0, windup - tuning.CleaveVal22), core: tuning.CleaveAddCore);
+                        (byte)direction, tuning.CleaveAddAspect, delay: Math.Max(0, windup - tuning.CleaveVal22), core: tuning.CleaveAddCore, emitter: "SignatureSpellEffects.Cast.4");
                 break;
             case Form.Hammer:
                 vfx.Add(end - Vector2.UnitY * tuning.HammerAddOffset, new Vector2(0, tuning.HammerY), look.Shape, look.Size, Math.Min(windup, tuning.HammerVal2),
-                    tuning.HammerAddLayer, aspect: tuning.HammerAddAspect, rotation: tuning.HammerAddRotation + facing.X * tuning.HammerAddRotation2, delay: Math.Max(0, windup - tuning.HammerVal22), linear: true);
+                    tuning.HammerAddLayer, aspect: tuning.HammerAddAspect, rotation: tuning.HammerAddRotation + facing.X * tuning.HammerAddRotation2, delay: Math.Max(0, windup - tuning.HammerVal22), linear: true, emitter: "SignatureSpellEffects.Cast.5");
                 break;
             case Form.Rush:
-                if (target != origin) vfx.Projectile(hand, end, windup, look.Size * tuning.RushSize / 4, false);
+                if (target != origin) vfx.Projectile(hand, end, windup, look.Size * tuning.RushSize / 4, false, emitter: "SignatureSpellEffects.Cast.6");
                 break;
             case Form.Heal:
             case Form.Ward:
-                vfx.Add(hand, -Vector2.UnitY * tuning.WardAddVelocity, look.Shape, tuning.WardAddSize, windup + tuning.WardAddDuration, tuning.WardAddLayer);
-                if (target != origin && ability.Target == AbilityTarget.Ally) vfx.Projectile(hand, end, windup, tuning.WardSize, false);
+                vfx.Add(hand, -Vector2.UnitY * tuning.WardAddVelocity, look.Shape, tuning.WardAddSize, windup + tuning.WardAddDuration, tuning.WardAddLayer, emitter: "SignatureSpellEffects.Cast.7");
+                if (target != origin && ability.Target == AbilityTarget.Ally) vfx.Projectile(hand, end, windup, tuning.WardSize, false, emitter: "SignatureSpellEffects.Cast.8");
                 break;
             case Form.Break:
                 return; // The instantaneous counter has an impact packet at the actor who breaks free.
             default:
-                vfx.Add(hand, -Vector2.UnitY * tuning.GlyphVelocity, tuning.GlyphShape, tuning.GlyphSize, windup + tuning.GlyphDuration, tuning.GlyphLayer, growth: tuning.GlyphGrowth);
+                vfx.Add(hand, -Vector2.UnitY * tuning.GlyphVelocity, tuning.GlyphShape, tuning.GlyphSize, windup + tuning.GlyphDuration, tuning.GlyphLayer, growth: tuning.GlyphGrowth, emitter: "SignatureSpellEffects.Cast.9");
                 break;
         }
-        vfx.Add(hand, facing * tuning.FlashVelocity, tuning.FlashShape, tuning.FlashSize, Math.Min(windup + tuning.Val1, tuning.Val2), tuning.FlashLayer, core: tuning.FlashCore);
+        vfx.Add(hand, facing * tuning.FlashVelocity, tuning.FlashShape, tuning.FlashSize, Math.Min(windup + tuning.Val1, tuning.Val2), tuning.FlashLayer, core: tuning.FlashCore, emitter: "SignatureSpellEffects.Cast.10");
     }
 
     internal static void Cell(SpellParticlePool pool, SpecialisationAbility ability, Vector2 cell, SpellEffect phase, long now)
@@ -166,14 +166,14 @@ internal static class SignatureSpellEffects
         if (phase == SpellEffect.SignatureWindup)
         {
             if (ability.Windup == 0) return;
-            vfx.Add(cell, Vector2.Zero, tuning.CellMarkShape, tuning.CellMarkSize, ability.Windup + tuning.CellMarkDuration, tuning.CellMarkLayer, aspect: tuning.CellMarkAspect, alpha: tuning.CellMarkAlpha);
+            vfx.Add(cell, Vector2.Zero, tuning.CellMarkShape, tuning.CellMarkSize, ability.Windup + tuning.CellMarkDuration, tuning.CellMarkLayer, aspect: tuning.CellMarkAspect, alpha: tuning.CellMarkAlpha, emitter: "SignatureSpellEffects.Cell.1");
             return;
         }
         if (phase == SpellEffect.SignatureArmed)
         {
-            vfx.Ring(cell, look.Size, tuning.RingDuration);
+            vfx.Ring(cell, look.Size, tuning.RingDuration, emitter: "SignatureSpellEffects.Cell.2");
             vfx.Add(cell - Vector2.UnitY * tuning.AddOffset, -Vector2.UnitY * tuning.AddVelocity, look.Shape, look.Size * tuning.AddSize / tuning.AddSizeDivisor,
-                ability.Spell is Spell.FluxPylon or Spell.MiasmaVessel ? tuning.AddDuration : tuning.AddDuration2, tuning.AddLayer);
+                ability.Spell is Spell.FluxPylon or Spell.MiasmaVessel ? tuning.AddDuration : tuning.AddDuration2, tuning.AddLayer, emitter: "SignatureSpellEffects.Cell.3");
             return;
         }
 
@@ -183,58 +183,58 @@ internal static class SignatureSpellEffects
             case Form.Cut:
             case Form.Cleave:
             case Form.Rush:
-                vfx.Add(body, new Vector2(tuning.RushX, tuning.RushY), look.Shape, look.Size, tuning.RushAddDuration, tuning.RushAddLayer, tuning.RushAddDirection, tuning.RushAddAspect, rotation: tuning.RushAddRotation);
-                vfx.Add(body, -Vector2.UnitY * tuning.RushFlashVelocity, tuning.RushFlashShape, look.Size / 2, tuning.RushFlashDuration, tuning.RushFlashLayer, core: tuning.RushFlashCore);
-                vfx.Scatter(body, tuning.RushSparkCount, tuning.RushSparkShape, look.Size * tuning.RushSparkSpread, tuning.RushSparkDuration);
+                vfx.Add(body, new Vector2(tuning.RushX, tuning.RushY), look.Shape, look.Size, tuning.RushAddDuration, tuning.RushAddLayer, tuning.RushAddDirection, tuning.RushAddAspect, rotation: tuning.RushAddRotation, emitter: "SignatureSpellEffects.Cell.4");
+                vfx.Add(body, -Vector2.UnitY * tuning.RushFlashVelocity, tuning.RushFlashShape, look.Size / 2, tuning.RushFlashDuration, tuning.RushFlashLayer, core: tuning.RushFlashCore, emitter: "SignatureSpellEffects.Cell.5");
+                vfx.Scatter(body, tuning.RushSparkCount, tuning.RushSparkShape, look.Size * tuning.RushSparkSpread, tuning.RushSparkDuration, emitter: "SignatureSpellEffects.Cell.6");
                 break;
             case Form.Hammer:
-                vfx.Ring(cell, look.Size + tuning.HammerRingSize, tuning.HammerRingDuration);
-                vfx.Add(body - Vector2.UnitY * tuning.HammerAddOffset, Vector2.UnitY * tuning.HammerAddVelocity, look.Shape, look.Size * tuning.HammerAddSize / 3, tuning.HammerAddDuration, tuning.HammerAddLayer, rotation: tuning.HammerAddRotation);
-                vfx.Add(body, -Vector2.UnitY * tuning.HammerFlashVelocity, tuning.HammerFlashShape, look.Size * tuning.HammerFlashSize / tuning.HammerFlashSizeDivisor, tuning.HammerFlashDuration, tuning.HammerFlashLayer, core: tuning.HammerFlashCore);
-                vfx.Scatter(body, tuning.HammerShardCount, tuning.HammerShardShape, look.Size * tuning.HammerShardSpread, tuning.HammerShardDuration);
+                vfx.Ring(cell, look.Size + tuning.HammerRingSize, tuning.HammerRingDuration, emitter: "SignatureSpellEffects.Cell.7");
+                vfx.Add(body - Vector2.UnitY * tuning.HammerAddOffset, Vector2.UnitY * tuning.HammerAddVelocity, look.Shape, look.Size * tuning.HammerAddSize / 3, tuning.HammerAddDuration, tuning.HammerAddLayer, rotation: tuning.HammerAddRotation, emitter: "SignatureSpellEffects.Cell.8");
+                vfx.Add(body, -Vector2.UnitY * tuning.HammerFlashVelocity, tuning.HammerFlashShape, look.Size * tuning.HammerFlashSize / tuning.HammerFlashSizeDivisor, tuning.HammerFlashDuration, tuning.HammerFlashLayer, core: tuning.HammerFlashCore, emitter: "SignatureSpellEffects.Cell.9");
+                vfx.Scatter(body, tuning.HammerShardCount, tuning.HammerShardShape, look.Size * tuning.HammerShardSpread, tuning.HammerShardDuration, emitter: "SignatureSpellEffects.Cell.10");
                 break;
             case Form.Eruption:
             case Form.Arc:
-                vfx.Ring(cell, look.Size, tuning.ArcRingDuration);
+                vfx.Ring(cell, look.Size, tuning.ArcRingDuration, emitter: "SignatureSpellEffects.Cell.11");
                 vfx.Add(body - Vector2.UnitY * tuning.ArcPillarOffset, new Vector2(0, tuning.ArcY), tuning.ArcPillarShape, look.Size * tuning.ArcPillarSize / 3, tuning.ArcPillarDuration, tuning.ArcPillarLayer,
-                    aspect: tuning.ArcPillarAspect, growth: tuning.ArcPillarGrowth);
-                vfx.Add(body, -Vector2.UnitY * tuning.ArcAddVelocity, look.Shape, look.Size * tuning.ArcAddSize / 3, tuning.ArcAddDuration, tuning.ArcAddLayer, core: tuning.ArcAddCore);
-                vfx.Scatter(body, tuning.ArcShardCount, look.Form == Form.Arc ? tuning.ArcShardShape : tuning.ArcShardShape2, look.Size * tuning.ArcShardSpread, tuning.ArcShardDuration);
+                    aspect: tuning.ArcPillarAspect, growth: tuning.ArcPillarGrowth, emitter: "SignatureSpellEffects.Cell.12");
+                vfx.Add(body, -Vector2.UnitY * tuning.ArcAddVelocity, look.Shape, look.Size * tuning.ArcAddSize / 3, tuning.ArcAddDuration, tuning.ArcAddLayer, core: tuning.ArcAddCore, emitter: "SignatureSpellEffects.Cell.13");
+                vfx.Scatter(body, tuning.ArcShardCount, look.Form == Form.Arc ? tuning.ArcShardShape : tuning.ArcShardShape2, look.Size * tuning.ArcShardSpread, tuning.ArcShardDuration, emitter: "SignatureSpellEffects.Cell.14");
                 break;
             case Form.Ice:
-                vfx.Ring(cell, look.Size, tuning.IceRingDuration);
+                vfx.Ring(cell, look.Size, tuning.IceRingDuration, emitter: "SignatureSpellEffects.Cell.15");
                 for (int i = -1; i <= tuning.IceParticleCount; i++)
                     vfx.Add(body + new Vector2(i * tuning.IceX, Math.Abs(i) * tuning.IceY), new Vector2(i * tuning.IceX2, tuning.IceY2), look.Shape,
-                        look.Size / (i == 0 ? tuning.IceAddSize : tuning.IceAddSize2), tuning.IceAddDuration, tuning.IceAddLayer, aspect: tuning.IceAddAspect, rotation: i * tuning.IceAddRotation, core: i == 0);
-                vfx.Scatter(body, tuning.IceShardCount, tuning.IceShardShape, tuning.IceShardSpread, tuning.IceShardDuration);
+                        look.Size / (i == 0 ? tuning.IceAddSize : tuning.IceAddSize2), tuning.IceAddDuration, tuning.IceAddLayer, aspect: tuning.IceAddAspect, rotation: i * tuning.IceAddRotation, core: i == 0, emitter: "SignatureSpellEffects.Cell.16");
+                vfx.Scatter(body, tuning.IceShardCount, tuning.IceShardShape, tuning.IceShardSpread, tuning.IceShardDuration, emitter: "SignatureSpellEffects.Cell.17");
                 break;
             case Form.Heal:
             case Form.Ward:
             case Form.Totem:
-                vfx.Ring(cell, look.Size + tuning.TotemRingSize, tuning.TotemRingDuration);
+                vfx.Ring(cell, look.Size + tuning.TotemRingSize, tuning.TotemRingDuration, emitter: "SignatureSpellEffects.Cell.18");
                 vfx.Add(body - Vector2.UnitY * tuning.TotemAddOffset, new Vector2(0, tuning.TotemY), look.Shape, look.Size * tuning.TotemAddSize / 4, tuning.TotemAddDuration, tuning.TotemAddLayer,
-                    aspect: tuning.TotemAddAspect, growth: tuning.TotemAddGrowth);
-                vfx.Add(body - Vector2.UnitY * tuning.TotemFlashOffset, -Vector2.UnitY * tuning.TotemFlashVelocity, tuning.TotemFlashShape, look.Size / 2, tuning.TotemFlashDuration, tuning.TotemFlashLayer, core: tuning.TotemFlashCore);
-                vfx.Scatter(body, tuning.TotemFeatherCount, tuning.TotemFeatherShape, look.Size * tuning.TotemFeatherSpread, tuning.TotemFeatherDuration, rise: true);
+                    aspect: tuning.TotemAddAspect, growth: tuning.TotemAddGrowth, emitter: "SignatureSpellEffects.Cell.19");
+                vfx.Add(body - Vector2.UnitY * tuning.TotemFlashOffset, -Vector2.UnitY * tuning.TotemFlashVelocity, tuning.TotemFlashShape, look.Size / 2, tuning.TotemFlashDuration, tuning.TotemFlashLayer, core: tuning.TotemFlashCore, emitter: "SignatureSpellEffects.Cell.20");
+                vfx.Scatter(body, tuning.TotemFeatherCount, tuning.TotemFeatherShape, look.Size * tuning.TotemFeatherSpread, tuning.TotemFeatherDuration, rise: true, emitter: "SignatureSpellEffects.Cell.21");
                 break;
             case Form.Bind:
             case Form.Break:
-                vfx.Ring(cell, look.Size, tuning.BreakRingDuration);
+                vfx.Ring(cell, look.Size, tuning.BreakRingDuration, emitter: "SignatureSpellEffects.Cell.22");
                 vfx.Add(body, new Vector2(0, tuning.BreakY), look.Shape, look.Size, tuning.BreakAddDuration, tuning.BreakAddLayer,
-                    growth: look.Form == Form.Break ? tuning.BreakAddGrowth : 0, core: tuning.BreakAddCore);
-                vfx.Scatter(body, tuning.BreakShardCount, tuning.BreakShardShape, look.Size * tuning.BreakShardSpread, tuning.BreakShardDuration);
+                    growth: look.Form == Form.Break ? tuning.BreakAddGrowth : 0, core: tuning.BreakAddCore, emitter: "SignatureSpellEffects.Cell.23");
+                vfx.Scatter(body, tuning.BreakShardCount, tuning.BreakShardShape, look.Size * tuning.BreakShardSpread, tuning.BreakShardDuration, emitter: "SignatureSpellEffects.Cell.24");
                 break;
             case Form.Veil:
-                vfx.Ring(cell, look.Size, tuning.VeilRingDuration);
+                vfx.Ring(cell, look.Size, tuning.VeilRingDuration, emitter: "SignatureSpellEffects.Cell.25");
                 for (int i = -1; i <= tuning.VeilWispCount; i++)
                     vfx.Add(body + new Vector2(i * tuning.VeilX, tuning.VeilY), new Vector2(i * tuning.VeilX2, tuning.VeilY2), tuning.VeilWispShape, look.Size, tuning.VeilWispDuration,
-                        tuning.VeilWispLayer, growth: tuning.VeilWispGrowth);
-                vfx.Add(body, new Vector2(0, tuning.VeilY3), tuning.VeilGlyphShape, look.Size * tuning.VeilGlyphSize / tuning.VeilGlyphSizeDivisor, tuning.VeilGlyphDuration, tuning.VeilGlyphLayer);
+                        tuning.VeilWispLayer, growth: tuning.VeilWispGrowth, emitter: "SignatureSpellEffects.Cell.26");
+                vfx.Add(body, new Vector2(0, tuning.VeilY3), tuning.VeilGlyphShape, look.Size * tuning.VeilGlyphSize / tuning.VeilGlyphSizeDivisor, tuning.VeilGlyphDuration, tuning.VeilGlyphLayer, emitter: "SignatureSpellEffects.Cell.27");
                 break;
             default:
-                vfx.Add(body, -Vector2.UnitY * tuning.AddVelocity2, look.Shape, look.Size * tuning.AddSize2 / 3, tuning.AddDuration3, tuning.AddLayer2, rotation: tuning.AddRotation);
-                vfx.Add(body, Vector2.Zero, tuning.FlashShape, look.Size * tuning.FlashSize / 3, tuning.FlashDuration, tuning.FlashLayer, core: tuning.FlashCore);
-                vfx.Scatter(body, tuning.ShardCount, tuning.ShardShape, look.Size * tuning.ShardSpread, tuning.ShardDuration);
+                vfx.Add(body, -Vector2.UnitY * tuning.AddVelocity2, look.Shape, look.Size * tuning.AddSize2 / 3, tuning.AddDuration3, tuning.AddLayer2, rotation: tuning.AddRotation, emitter: "SignatureSpellEffects.Cell.28");
+                vfx.Add(body, Vector2.Zero, tuning.FlashShape, look.Size * tuning.FlashSize / 3, tuning.FlashDuration, tuning.FlashLayer, core: tuning.FlashCore, emitter: "SignatureSpellEffects.Cell.29");
+                vfx.Scatter(body, tuning.ShardCount, tuning.ShardShape, look.Size * tuning.ShardSpread, tuning.ShardDuration, emitter: "SignatureSpellEffects.Cell.30");
                 break;
         }
     }
@@ -245,7 +245,7 @@ internal static class SignatureSpellEffects
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Signature.RelayArc);
         var effect = new Effect(pool, Profile(ability), now);
         var chest = Vector2.UnitY * tuning.Chest;
-        effect.Lightning(origin - chest, destination - chest, 0, tuning.Size);
+        effect.Lightning(origin - chest, destination - chest, 0, tuning.Size, emitter: "SignatureSpellEffects.RelayArc.1");
     }
 
     internal readonly struct Effect(SpellParticlePool pool, Look look, long now, bool castsLight = true,
@@ -254,8 +254,9 @@ internal static class SignatureSpellEffects
     {
         public void Add(Vector2 point, Vector2 movement, Shape shape, int size, int duration, Layer layer,
             byte direction = 0, float aspect = 1, float rotation = 0, float growth = 0, int delay = 0,
-            int? alpha = null, bool core = false, bool linear = false)
+            int? alpha = null, bool core = false, bool linear = false, string emitter = null)
         {
+            using var emitterScope = SpellVfxAssets.UseEmitter(emitter);
             var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Signature.EffectAdd);
             if (window > 0)
             {
@@ -269,40 +270,41 @@ internal static class SignatureSpellEffects
             var particle = new SpellParticle(point, movement, now + delay, duration, size, colour,
                 shape, direction, aspect, rotation, growth, core && layer == Layer.Emissive ? tuning.SpellParticleLayer : layer,
                 linear, castsLight && layer != Layer.Smoke, frameOnly, fieldObjectID, DepthY: depthY);
-            long sample = sampleTime ?? now;
-            if (particle.Start > sample) pool.Schedule(particle);
-            else if (sample - particle.Start < particle.Duration) pool.TryAdd(particle);
+            SpellVfxAssets.Emit(pool, particle, sampleTime: sampleTime ?? now);
         }
 
-        public void Ring(Vector2 point, int size, int duration)
+        public void Ring(Vector2 point, int size, int duration, string emitter = null)
         {
+            using var emitterScope = SpellVfxAssets.UseEmitter(emitter);
             var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Signature.EffectRing);
-            Add(point, Vector2.Zero, tuning.HaloShape, size, duration, tuning.HaloLayer, aspect: tuning.HaloAspect, growth: tuning.HaloGrowth, alpha: tuning.HaloAlpha);
+            Add(point, Vector2.Zero, tuning.HaloShape, size, duration, tuning.HaloLayer, aspect: tuning.HaloAspect, growth: tuning.HaloGrowth, alpha: tuning.HaloAlpha, emitter: SpellVfxAssets.EmitterPart("Ring"));
             Add(point - Vector2.UnitY * tuning.GlyphOffset, -Vector2.UnitY * tuning.GlyphVelocity, tuning.GlyphShape, size * tuning.GlyphSize / 3, duration * tuning.GlyphDuration / 4,
-                tuning.GlyphLayer, aspect: tuning.GlyphAspect, growth: tuning.GlyphGrowth, alpha: tuning.GlyphAlpha);
+                tuning.GlyphLayer, aspect: tuning.GlyphAspect, growth: tuning.GlyphGrowth, alpha: tuning.GlyphAlpha, emitter: SpellVfxAssets.EmitterPart("Glyph"));
         }
 
-        public void Projectile(Vector2 start, Vector2 end, int windup, int size, bool fork)
+        public void Projectile(Vector2 start, Vector2 end, int windup, int size, bool fork, string emitter = null)
         {
+            using var emitterScope = SpellVfxAssets.UseEmitter(emitter);
             var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Signature.EffectProjectile);
             Vector2 travel = end - start;
             float angle = MathF.Atan2(travel.Y, travel.X);
             int duration = Math.Max(tuning.Duration, windup - tuning.Duration2);
             var head = look.Shape == Shape.Shard ? tuning.Head : look.Form == Form.Rush ? tuning.Head2 : look.Shape;
-            Add(start, travel, tuning.BoltShape, size * tuning.BoltSize / 4, duration, tuning.BoltLayer, aspect: tuning.BoltAspect, rotation: angle, linear: true);
-            Add(start, travel, head, size / 2, duration, tuning.AddLayer, aspect: tuning.AddAspect, rotation: angle, core: tuning.AddCore, linear: true);
+            Add(start, travel, tuning.BoltShape, size * tuning.BoltSize / 4, duration, tuning.BoltLayer, aspect: tuning.BoltAspect, rotation: angle, linear: true, emitter: SpellVfxAssets.EmitterPart("Trail"));
+            Add(start, travel, head, size / 2, duration, tuning.AddLayer, aspect: tuning.AddAspect, rotation: angle, core: tuning.AddCore, linear: true, emitter: SpellVfxAssets.EmitterPart("Head"));
             for (int i = 1; i <= tuning.FeatherCount; i++)
             {
                 Vector2 trail = start + travel * (i / tuning.TrailDivisor);
                 Add(trail, -Vector2.UnitY * tuning.FeatherVelocity - travel * tuning.FeatherVelocity2, i % 2 == 0 ? tuning.FeatherShape : tuning.FeatherShape2,
-                    size / 2 - i * tuning.FeatherSize, tuning.FeatherDuration + i * tuning.FeatherDuration2, tuning.FeatherLayer, aspect: tuning.FeatherAspect, rotation: angle, delay: duration * i / tuning.FeatherDelayDivisor);
+                    size / 2 - i * tuning.FeatherSize, tuning.FeatherDuration + i * tuning.FeatherDuration2, tuning.FeatherLayer, aspect: tuning.FeatherAspect, rotation: angle, delay: duration * i / tuning.FeatherDelayDivisor, emitter: SpellVfxAssets.EmitterPart("Feather"));
                 if (fork) Add(trail + Vector2.UnitY * tuning.ClawOffset, new Vector2(0, tuning.Y), tuning.ClawShape, size / 3, tuning.ClawDuration, tuning.ClawLayer,
-                    aspect: tuning.ClawAspect, rotation: angle, delay: duration * i / tuning.ClawDelayDivisor + tuning.ClawDelay, alpha: tuning.ClawAlpha);
+                    aspect: tuning.ClawAspect, rotation: angle, delay: duration * i / tuning.ClawDelayDivisor + tuning.ClawDelay, alpha: tuning.ClawAlpha, emitter: SpellVfxAssets.EmitterPart("Fork"));
             }
         }
 
-        public void Lightning(Vector2 start, Vector2 end, int windup, int size)
+        public void Lightning(Vector2 start, Vector2 end, int windup, int size, string emitter = null)
         {
+            using var emitterScope = SpellVfxAssets.UseEmitter(emitter);
             var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Signature.EffectLightning);
             Vector2 travel = end - start;
             float length = travel.Length();
@@ -323,8 +325,9 @@ internal static class SignatureSpellEffects
             }
         }
 
-        public void Scatter(Vector2 point, int count, Shape shape, float spread, int duration, bool rise = false)
+        public void Scatter(Vector2 point, int count, Shape shape, float spread, int duration, bool rise = false, string emitter = null)
         {
+            using var emitterScope = SpellVfxAssets.UseEmitter(emitter);
             var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Signature.EffectScatter);
             if (pool.Active.Length > 660) return;
             for (int i = 0; i < count; i++)

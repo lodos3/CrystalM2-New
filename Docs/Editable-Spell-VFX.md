@@ -64,16 +64,34 @@ map lights, and depth masking.
    executable can stay as-is.
 
 A regular client build or publish also includes the saved authoring files. The
-local apply step is for testing an edit with an existing compatible client.
+local apply step is for testing an edit with an existing compatible client. A
+client built before the shared particle modules needs one update before it can
+load emitter profiles.
 
-## Inspector modules
+## Particle System inspector
 
-Select a spell stage to see the effect nodes sampled by that preview. The
-inspector groups settings by timing, emission, shape, velocity, size and
-rotation, colour and opacity, collision, and renderer. Settings unique to a
-procedural effect appear under Procedural. Enable **Advanced** to see the
-original JSON keys and inactive settings. The JSON format and existing spell
-overrides use the same keys in both views.
+Choose a spell and stage, then select a layer from the dropdown. Layers are
+discovered from the particles emitted during preview sampling. **Solo selected
+layer** isolates that layer in the preview. Every layer uses the same module
+names and setting names.
+
+Range controls accept an authored value, a constant, or random values between
+two constants. Curve and gradient controls show a graph and editable keyframes.
+Use the reset button beside a field to inherit its authored value again.
+
+The renderer supports authored geometry, billboards, quad meshes and triangle
+meshes. Persistent particles support timing, speed and force controls. Layers
+generated anew each frame keep their procedural motion and use stage progress
+for lifetime curves when the effect supplies it. Collision and sub-emitter
+settings edit the existing ground landing behaviour. The texture-sheet settings
+operate on the animated sprites in the game atlas.
+
+Saved overrides live under `groups.Emitters` in the spell JSON and use stable
+layer IDs. Previous spell assets load alongside those overrides. Existing spell
+routines still define where and when emitters run, preserving the authored
+effects until a module value is overridden. This release does not implement the
+full Unity feature set, including arbitrary mesh import, scene colliders,
+trigger volumes, and creating new emitter graphs.
 
 ## Studio integration
 
@@ -90,4 +108,4 @@ entries. The editor can read and write profiles with `SpellVfxAssets`.
 
 The existing C# routines define which effects run for a spell event. They also
 implement weapon tracking, sprite and rune geometry, and renderer behaviour.
-These files expose their tuning and do not define a custom emitter graph.
+The emitter overrides are evaluated by the same particle runtime in the Studio and client.

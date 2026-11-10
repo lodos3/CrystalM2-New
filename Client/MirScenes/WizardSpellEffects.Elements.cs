@@ -28,11 +28,11 @@ internal static partial class WizardSpellEffects
                 i % 4 == 0 ? tuning.UserEmberShape : tuning.UserEmberShape2,
                 i % 5 == 0 ? Hot : i % 3 == 0 ? Gold : Fire,
                 tuning.UserEmberAlpha * fade, i % 6 == 0 ? tuning.UserEmberLayer : tuning.UserEmberLayer2,
-                (frame.Unit(seed + 21) - tuning.UserEmberRotation) * tuning.UserEmberRotation2, light: i % 19 == 0);
+                (frame.Unit(seed + 21) - tuning.UserEmberRotation) * tuning.UserEmberRotation2, light: i % 19 == 0, emitter: "WizardSpellEffects.Elements.FireCharge.1");
             if (i % 7 == 0)
                 frame.Clip(point - Vector2.UnitY * tuning.SmokeSequenceOffset, tuning.SmokeSequenceWidth, tuning.SmokeSequenceHeight,
                     tuning.SmokeSequenceShape, progress + frame.Unit(seed + 23),
-                    tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha * fade, tuning.SmokeSequenceLayer);
+                    tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha * fade, tuning.SmokeSequenceLayer, emitter: "WizardSpellEffects.Elements.FireCharge.2");
         }
     }
 
@@ -56,12 +56,12 @@ internal static partial class WizardSpellEffects
                 i % 5 == 0 ? tuning.UserEmberShape : tuning.UserEmberShape2,
                 i % 4 == 0 ? Hot : i % 2 == 0 ? accent : Fire,
                 tuning.UserEmberAlpha * fade, i % 7 == 0 ? tuning.UserEmberLayer : tuning.UserEmberLayer2,
-                angle * tuning.UserEmberRotation, light: i % 17 == 0);
+                angle * tuning.UserEmberRotation, light: i % 17 == 0, emitter: "WizardSpellEffects.Elements.GreatFireCharge.1");
             if (i % 8 == 0)
                 frame.Clip(point - Vector2.UnitY * tuning.SmokeSequenceOffset,
                     tuning.SmokeSequenceWidth + frame.Unit(seed + 29) * tuning.SmokeSequenceWidth2, tuning.SmokeSequenceHeight + frame.Unit(seed + 31) * tuning.SmokeSequenceHeight2,
                     tuning.SmokeSequenceShape, progress + frame.Unit(seed + 37),
-                    tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha * fade, tuning.SmokeSequenceLayer);
+                    tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha * fade, tuning.SmokeSequenceLayer, emitter: "WizardSpellEffects.Elements.GreatFireCharge.2");
         }
     }
 
@@ -69,17 +69,17 @@ internal static partial class WizardSpellEffects
     {
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.HellfireCharge);
         Vector2 centre = feet - Vector2.UnitY * tuning.Centre;
-        frame.Orbit(centre, tuning.OrbitX, tuning.OrbitY, progress * tuning.OrbitAngle, tuning.OrbitSweep, Fire, tuning.OrbitWidth, tuning.OrbitAlpha);
-        frame.Orbit(centre, tuning.OrbitX2, tuning.OrbitY2, progress * tuning.OrbitAngle2 + tuning.OrbitAngle3, tuning.OrbitSweep2, Gold, tuning.OrbitWidth2, tuning.OrbitAlpha2);
+        frame.Orbit(centre, tuning.OrbitX, tuning.OrbitY, progress * tuning.OrbitAngle, tuning.OrbitSweep, Fire, tuning.OrbitWidth, tuning.OrbitAlpha, emitter: "WizardSpellEffects.Elements.HellfireCharge.1");
+        frame.Orbit(centre, tuning.OrbitX2, tuning.OrbitY2, progress * tuning.OrbitAngle2 + tuning.OrbitAngle3, tuning.OrbitSweep2, Gold, tuning.OrbitWidth2, tuning.OrbitAlpha2, emitter: "WizardSpellEffects.Elements.HellfireCharge.2");
         for (int i = 0; i < tuning.FlameCount; i++)
         {
             float angle = progress * tuning.Angle + i * MathF.PI;
             Vector2 point = centre + Ellipse(angle, tuning.EllipseX, tuning.EllipseY);
-            frame.Sprite(point, tuning.FlameWidth, tuning.FlameHeight, tuning.FlameShape, Ember, tuning.FlameAlpha, Depth(angle), angle, light: tuning.FlameLight);
-            frame.Sprite(point + new Vector2(tuning.X, tuning.Y), tuning.FlameWidth2, tuning.FlameHeight2, tuning.FlameShape2, Gold, tuning.FlameAlpha2, Depth(angle), angle - tuning.FlameRotation);
+            frame.Sprite(point, tuning.FlameWidth, tuning.FlameHeight, tuning.FlameShape, Ember, tuning.FlameAlpha, Depth(angle), angle, light: tuning.FlameLight, emitter: "WizardSpellEffects.Elements.HellfireCharge.3");
+            frame.Sprite(point + new Vector2(tuning.X, tuning.Y), tuning.FlameWidth2, tuning.FlameHeight2, tuning.FlameShape2, Gold, tuning.FlameAlpha2, Depth(angle), angle - tuning.FlameRotation, emitter: "WizardSpellEffects.Elements.HellfireCharge.4");
         }
-        frame.Sparks(centre, tuning.SparksCount, tuning.SparksRx, tuning.SparksRy, progress, Gold, rise: tuning.SparksRise);
-        frame.Sprite(centre, tuning.WispWidth, tuning.WispHeight, tuning.WispShape, tuning.WispColour, tuning.WispAlpha, tuning.WispLayer);
+        frame.Sparks(centre, tuning.SparksCount, tuning.SparksRx, tuning.SparksRy, progress, Gold, rise: tuning.SparksRise, emitter: "WizardSpellEffects.Elements.HellfireCharge.5");
+        frame.Sprite(centre, tuning.WispWidth, tuning.WispHeight, tuning.WispShape, tuning.WispColour, tuning.WispAlpha, tuning.WispLayer, emitter: "WizardSpellEffects.Elements.HellfireCharge.6");
     }
 
     private static void FireBurst(Frame frame, Vector2 centre, float progress, float diameter, bool fierce = false)
@@ -103,17 +103,17 @@ internal static partial class WizardSpellEffects
             frame.Sprite(point, tuning.UserFlameWidth + frame.Unit(seed + 39) * tuning.UserFlameWidth2,
                 tuning.UserFlameHeight + frame.Unit(seed + 41) * tuning.UserFlameHeight2, tuning.UserFlameShape,
                 tint, alpha * tuning.UserFlameAlpha, i % 8 == 0 ? tuning.UserFlameLayer : tuning.UserFlameLayer2,
-                (frame.Unit(seed + 43) - tuning.UserFlameRotation) * tuning.UserFlameRotation2, light: i % 19 == 0);
+                (frame.Unit(seed + 43) - tuning.UserFlameRotation) * tuning.UserFlameRotation2, light: i % 19 == 0, emitter: "WizardSpellEffects.Elements.FireBurst.1");
             if (i % 4 == 0)
                 frame.Sprite(point - Vector2.UnitY * (tuning.UserEmberOffset + age * tuning.UserEmberOffset2),
                     tuning.UserEmberWidth + frame.Unit(seed + 47) * tuning.UserEmberWidth2, tuning.UserEmberHeight + frame.Unit(seed + 49) * tuning.UserEmberHeight2,
-                    tuning.UserEmberShape, Hot, alpha * tuning.UserEmberAlpha, tuning.UserEmberLayer);
+                    tuning.UserEmberShape, Hot, alpha * tuning.UserEmberAlpha, tuning.UserEmberLayer, emitter: "WizardSpellEffects.Elements.FireBurst.2");
             if (i % 6 == 0)
                 frame.Clip(point - Vector2.UnitY * (tuning.SmokeSequenceOffset + age * tuning.SmokeSequenceOffset2),
                     tuning.SmokeSequenceWidth + age * tuning.SmokeSequenceWidth2, tuning.SmokeSequenceHeight + age * tuning.SmokeSequenceHeight2, tuning.SmokeSequenceShape,
                     time * tuning.SmokeSequencePhase + frame.Unit(seed + 53),
                     fierce ? tuning.SmokeSequenceColour : tuning.SmokeSequenceColour2, tuning.SmokeSequenceAlpha * (1 - age) * fade,
-                    tuning.SmokeSequenceLayer);
+                    tuning.SmokeSequenceLayer, emitter: "WizardSpellEffects.Elements.FireBurst.3");
         }
     }
 
@@ -135,17 +135,17 @@ internal static partial class WizardSpellEffects
                 tuning.UserFlameHeight + frame.Unit(seed + 21) * tuning.UserFlameHeight2,
                 tuning.UserFlameShape, i % 5 == 0 ? Hot : i % 2 == 0 ? accent : Gold,
                 tuning.UserFlameAlpha * alive, i % 7 == 0 ? tuning.UserFlameLayer : tuning.UserFlameLayer2,
-                (frame.Unit(seed + 25) - tuning.UserFlameRotation) * tuning.UserFlameRotation2, light: i % 23 == 0);
+                (frame.Unit(seed + 25) - tuning.UserFlameRotation) * tuning.UserFlameRotation2, light: i % 23 == 0, emitter: "WizardSpellEffects.Elements.SearingImpact.1");
             if (i % 4 == 0)
                 frame.Sprite(point - Vector2.UnitY * tuning.UserEmberOffset, tuning.UserEmberWidth + frame.Unit(seed + 27) * tuning.UserEmberWidth2,
                     tuning.UserEmberHeight + frame.Unit(seed + 29) * tuning.UserEmberHeight2,
                     tuning.UserEmberShape, i % 3 == 0 ? Hot : accent,
-                    tuning.UserEmberAlpha * alive, tuning.UserEmberLayer);
+                    tuning.UserEmberAlpha * alive, tuning.UserEmberLayer, emitter: "WizardSpellEffects.Elements.SearingImpact.2");
             if (i % 5 == 0)
                 frame.Clip(point - Vector2.UnitY * (tuning.SmokeSequenceOffset + age * tuning.SmokeSequenceOffset2),
                     tuning.SmokeSequenceWidth + age * tuning.SmokeSequenceWidth2, tuning.SmokeSequenceHeight + age * tuning.SmokeSequenceHeight2,
                     tuning.SmokeSequenceShape, progress * tuning.SmokeSequencePhase + frame.Unit(seed + 31),
-                    tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha * (1 - age) * heat, tuning.SmokeSequenceLayer);
+                    tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha * (1 - age) * heat, tuning.SmokeSequenceLayer, emitter: "WizardSpellEffects.Elements.SearingImpact.3");
         }
     }
 
@@ -154,18 +154,18 @@ internal static partial class WizardSpellEffects
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Repel);
         Vector2 centre = feet - Vector2.UnitY * tuning.Centre;
         float radius = tuning.Radius + tuning.Radius2 * Ease(progress * tuning.Radius3);
-        frame.Sprite(centre, radius * tuning.OrbWidth, radius * tuning.OrbHeight, tuning.OrbShape, Ember, tuning.OrbAlpha, light: tuning.OrbLight);
-        frame.Orbit(centre, radius, radius * tuning.OrbitY, 0, MathF.Tau, Ember, tuning.OrbitWidth, tuning.OrbitAlpha);
-        frame.Orbit(centre, radius - tuning.OrbitX, radius * tuning.OrbitY2, progress * tuning.OrbitAngle, MathF.Tau, Fire, tuning.OrbitWidth2, tuning.OrbitAlpha2);
-        frame.Sprite(feet, radius * tuning.WispWidth, radius * tuning.WispHeight, tuning.WispShape, tuning.WispColour, tuning.WispAlpha, tuning.WispLayer);
+        frame.Sprite(centre, radius * tuning.OrbWidth, radius * tuning.OrbHeight, tuning.OrbShape, Ember, tuning.OrbAlpha, light: tuning.OrbLight, emitter: "WizardSpellEffects.Elements.Repel.1");
+        frame.Orbit(centre, radius, radius * tuning.OrbitY, 0, MathF.Tau, Ember, tuning.OrbitWidth, tuning.OrbitAlpha, emitter: "WizardSpellEffects.Elements.Repel.2");
+        frame.Orbit(centre, radius - tuning.OrbitX, radius * tuning.OrbitY2, progress * tuning.OrbitAngle, MathF.Tau, Fire, tuning.OrbitWidth2, tuning.OrbitAlpha2, emitter: "WizardSpellEffects.Elements.Repel.3");
+        frame.Sprite(feet, radius * tuning.WispWidth, radius * tuning.WispHeight, tuning.WispShape, tuning.WispColour, tuning.WispAlpha, tuning.WispLayer, emitter: "WizardSpellEffects.Elements.Repel.4");
         for (int i = 0; i < tuning.FlameCount; i++)
         {
             float angle = i * MathF.Tau / tuning.AngleDivisor + progress * tuning.Angle;
             Vector2 arc = centre + Ellipse(angle, radius + (frame.Unit(i) - tuning.EllipseX) * tuning.EllipseX2, radius * tuning.EllipseY);
             frame.Sprite(arc, tuning.FlameWidth + frame.Unit(i + 10) * tuning.FlameWidth2, tuning.FlameHeight, tuning.FlameShape, i % 3 == 0 ? Gold : i % 3 == 1 ? Fire : Ember,
-                tuning.FlameAlpha, Depth(angle), angle, light: i % 3 == 0);
+                tuning.FlameAlpha, Depth(angle), angle, light: i % 3 == 0, emitter: "WizardSpellEffects.Elements.Repel.5");
         }
-        frame.Sparks(centre, tuning.SparksCount, radius, radius * tuning.SparksRy, progress, Fire);
+        frame.Sparks(centre, tuning.SparksCount, radius, radius * tuning.SparksRy, progress, Fire, emitter: "WizardSpellEffects.Elements.Repel.6");
     }
 
     // Every tongue has a floor root. Different widths, inclinations and rise phases keep a
@@ -176,23 +176,23 @@ internal static partial class WizardSpellEffects
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Flames);
         float phase = time * (tuning.Phase + frame.Unit(index + 21) * tuning.Phase2) + frame.Unit(index + 52);
         float sway = MathF.Sin(time * tuning.Sway + frame.Unit(index + 7) * MathF.Tau) * tuning.Sway2;
-        frame.Sprite(root, width * tuning.OrbWidth, width * tuning.OrbHeight, tuning.OrbShape, Fire, alpha * tuning.OrbAlpha, tuning.OrbLayer, light: tuning.OrbLight, sortY: sortY);
+        frame.Sprite(root, width * tuning.OrbWidth, width * tuning.OrbHeight, tuning.OrbShape, Fire, alpha * tuning.OrbAlpha, tuning.OrbLayer, light: tuning.OrbLight, sortY: sortY, emitter: "WizardSpellEffects.Elements.Flames.1");
         // Pivot the flame at the lower edge of the clip to keep it on the floor.
         float column = height * tuning.Column;
         Vector2 centre = root + new Vector2(MathF.Sin(sway), -MathF.Cos(sway)) * (column * tuning.Centre);
         frame.Clip(centre, width * tuning.FlameSequenceWidth, column, tuning.FlameSequenceShape, phase, Fire, alpha * tuning.FlameSequenceAlpha,
-            layer, sway, light: tuning.FlameSequenceLight, sortY: sortY);
+            layer, sway, light: tuning.FlameSequenceLight, sortY: sortY, emitter: "WizardSpellEffects.Elements.Flames.2");
         frame.Sprite(centre - Vector2.UnitY * (height * tuning.UserFlameOffset),
             width * tuning.UserFlameWidth, column * tuning.UserFlameHeight, tuning.UserFlameShape, Fire,
             alpha * (tuning.UserFlameAlpha + tuning.UserFlameAlpha2 * MathF.Sin(time * tuning.X + index)),
-            layer, sway, light: tuning.UserFlameLight, sortY: sortY);
+            layer, sway, light: tuning.UserFlameLight, sortY: sortY, emitter: "WizardSpellEffects.Elements.Flames.3");
         frame.Clip(root + new Vector2(-width * tuning.X2, -height * tuning.Y), width * tuning.FlameSequenceWidth2, height * tuning.FlameSequenceHeight,
-            tuning.FlameSequenceShape2, phase + tuning.FlameSequencePhase, Ember, alpha * tuning.FlameSequenceAlpha2, layer, sway * tuning.FlameSequenceRotation, sortY: sortY);
+            tuning.FlameSequenceShape2, phase + tuning.FlameSequencePhase, Ember, alpha * tuning.FlameSequenceAlpha2, layer, sway * tuning.FlameSequenceRotation, sortY: sortY, emitter: "WizardSpellEffects.Elements.Flames.4");
         Layer core = layer == Layer.Ground ? tuning.Core : tuning.Core2;
         frame.Clip(root + new Vector2(width * tuning.X3, -height * tuning.Y2), width * tuning.FlameSequenceWidth3, height * tuning.FlameSequenceHeight2,
-            tuning.FlameSequenceShape3, phase + tuning.FlameSequencePhase2, Gold, alpha * tuning.FlameSequenceAlpha3, core, sway * tuning.FlameSequenceRotation2, sortY: sortY);
+            tuning.FlameSequenceShape3, phase + tuning.FlameSequencePhase2, Gold, alpha * tuning.FlameSequenceAlpha3, core, sway * tuning.FlameSequenceRotation2, sortY: sortY, emitter: "WizardSpellEffects.Elements.Flames.5");
         frame.Sprite(root - Vector2.UnitY * (height * tuning.OrbOffset), width * tuning.OrbWidth2, height * tuning.OrbHeight2, tuning.OrbShape2,
-            Hot, alpha * tuning.OrbAlpha2, core, sortY: sortY);
+            Hot, alpha * tuning.OrbAlpha2, core, sortY: sortY, emitter: "WizardSpellEffects.Elements.Flames.6");
     }
 
     private static void FireWallCharge(Frame frame, Vector2 feet, float progress)
@@ -222,7 +222,7 @@ internal static partial class WizardSpellEffects
                 tuning.UserFlameHeight + frame.Unit(seed + 35) * tuning.UserFlameHeight2, tuning.UserFlameShape,
                 i % 5 == 0 ? Hot : i % 3 == 0 ? Gold : Fire,
                 tuning.UserFlameAlpha * alpha, i % 7 == 0 ? tuning.UserFlameLayer : tuning.UserFlameLayer2,
-                (frame.Unit(seed + 41) - tuning.UserFlameRotation) * tuning.UserFlameRotation2, light: i % 19 == 0);
+                (frame.Unit(seed + 41) - tuning.UserFlameRotation) * tuning.UserFlameRotation2, light: i % 19 == 0, emitter: "WizardSpellEffects.Elements.FireWallCharge.1");
         }
 
         // Compact layered flames read as a single fireball, not a 100px orb.
@@ -239,7 +239,7 @@ internal static partial class WizardSpellEffects
                     tuning.UserFlameHeight3 + frame.Unit(seed + 17) * tuning.UserFlameHeight4, tuning.UserFlameShape2,
                     i % 4 == 0 ? Hot : i % 3 == 0 ? Gold : Fire,
                     gather * tuning.UserFlameAlpha2, i % 5 == 0 ? tuning.UserFlameLayer3 : tuning.UserFlameLayer4,
-                    angle * tuning.UserFlameRotation3, light: i == 3);
+                    angle * tuning.UserFlameRotation3, light: i == 3, emitter: "WizardSpellEffects.Elements.FireWallCharge.2");
             }
         }
 
@@ -258,13 +258,13 @@ internal static partial class WizardSpellEffects
                     i % 4 == 0 ? tuning.UserFlameShape3 : tuning.UserFlameShape4,
                     i % 5 == 0 ? Hot : Gold,
                     tuning.UserFlameAlpha3 * (1 - burst * tuning.UserFlameAlpha4), tuning.UserFlameLayer5,
-                    theta, light: i % 13 == 0);
+                    theta, light: i % 13 == 0, emitter: "WizardSpellEffects.Elements.FireWallCharge.3");
             }
             for (int i = 0; i < tuning.SmokeSequenceCount; i++)
                 frame.Clip(overhead + new Vector2((i - tuning.X3) * tuning.X4, tuning.Y4 - burst * tuning.Y5),
                     tuning.SmokeSequenceWidth + burst * tuning.SmokeSequenceWidth2, tuning.SmokeSequenceHeight + burst * tuning.SmokeSequenceHeight2, tuning.SmokeSequenceShape,
                     progress + i * tuning.SmokeSequencePhase, tuning.SmokeSequenceColour,
-                    tuning.SmokeSequenceAlpha * burst * (1 - Ease((progress - tuning.Value) / tuning.ValueDivisor)), tuning.SmokeSequenceLayer);
+                    tuning.SmokeSequenceAlpha * burst * (1 - Ease((progress - tuning.Value) / tuning.ValueDivisor)), tuning.SmokeSequenceLayer, emitter: "WizardSpellEffects.Elements.FireWallCharge.4");
         }
     }
 
@@ -275,8 +275,8 @@ internal static partial class WizardSpellEffects
         Flames(frame, feet + new Vector2(tuning.X, tuning.Y), tuning.Width2, tuning.Height2, time, tuning.Alpha2, 3, tuning.Layer);
         float smoke = Fract(time * tuning.Smoke + frame.Unit(34));
         frame.Clip(feet + new Vector2((frame.Unit(12) - tuning.X2) * tuning.X3, tuning.Y2 - smoke * tuning.Y3), tuning.SmokeSequenceWidth + smoke * tuning.SmokeSequenceWidth2, tuning.SmokeSequenceHeight,
-            tuning.SmokeSequenceShape, smoke, tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha * MathF.Sin(smoke * MathF.PI), tuning.SmokeSequenceLayer, tuning.SmokeSequenceRotation);
-        frame.Sparks(feet - Vector2.UnitY * tuning.SparksOffset, tuning.SparksCount, tuning.SparksRx, tuning.SparksRy, time * tuning.SparksProgress, Gold, rise: tuning.SparksRise);
+            tuning.SmokeSequenceShape, smoke, tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha * MathF.Sin(smoke * MathF.PI), tuning.SmokeSequenceLayer, tuning.SmokeSequenceRotation, emitter: "WizardSpellEffects.Elements.FireWall.1");
+        frame.Sparks(feet - Vector2.UnitY * tuning.SparksOffset, tuning.SparksCount, tuning.SparksRx, tuning.SparksRy, time * tuning.SparksProgress, Gold, rise: tuning.SparksRise, emitter: "WizardSpellEffects.Elements.FireWall.2");
     }
 
     private static void FireBang(Frame frame, Vector2 feet, float progress, float time, bool prepare)
@@ -285,21 +285,21 @@ internal static partial class WizardSpellEffects
         if (prepare)
         {
             Vector2 centre = feet - Vector2.UnitY * tuning.Centre;
-            frame.Sprite(centre, tuning.FlameWidth, tuning.FlameHeight, tuning.FlameShape, Gold, tuning.FlameAlpha, tuning.FlameLayer, light: tuning.FlameLight);
+            frame.Sprite(centre, tuning.FlameWidth, tuning.FlameHeight, tuning.FlameShape, Gold, tuning.FlameAlpha, tuning.FlameLayer, light: tuning.FlameLight, emitter: "WizardSpellEffects.Elements.FireBang.1");
             for (int i = 0; i < tuning.FlameCount; i++)
             {
                 float angle = (i + frame.Unit(i + 9) * tuning.Angle) * MathF.Tau / tuning.AngleDivisor + progress * tuning.Angle2;
                 Vector2 ray = Ellipse(angle, tuning.EllipseX, tuning.EllipseY) * (tuning.Ray + tuning.Ray2 * Ease(progress * tuning.Ray3));
-                frame.Line(centre + ray * tuning.LineStart, centre + ray, tuning.LineWidth, Fire, tuning.LineAlpha, Depth(angle), light: i % 3 == 0);
-                frame.Line(centre + ray * tuning.LineStart2, centre + ray * tuning.LineEnd, tuning.LineWidth2, Gold, tuning.LineAlpha2, Depth(angle));
-                frame.Sprite(centre + ray * tuning.FlameOffset, tuning.FlameWidth2, tuning.FlameHeight2, tuning.FlameShape2, Gold, tuning.FlameAlpha2, Depth(angle), angle);
+                frame.Line(centre + ray * tuning.LineStart, centre + ray, tuning.LineWidth, Fire, tuning.LineAlpha, Depth(angle), light: i % 3 == 0, emitter: "WizardSpellEffects.Elements.FireBang.2");
+                frame.Line(centre + ray * tuning.LineStart2, centre + ray * tuning.LineEnd, tuning.LineWidth2, Gold, tuning.LineAlpha2, Depth(angle), emitter: "WizardSpellEffects.Elements.FireBang.3");
+                frame.Sprite(centre + ray * tuning.FlameOffset, tuning.FlameWidth2, tuning.FlameHeight2, tuning.FlameShape2, Gold, tuning.FlameAlpha2, Depth(angle), angle, emitter: "WizardSpellEffects.Elements.FireBang.4");
             }
-            frame.Sparks(centre, tuning.SparksCount, tuning.SparksRx, tuning.SparksRy, progress, Hot);
+            frame.Sparks(centre, tuning.SparksCount, tuning.SparksRx, tuning.SparksRy, progress, Hot, emitter: "WizardSpellEffects.Elements.FireBang.5");
             return;
         }
 
         float spread = tuning.Spread + tuning.Spread2 * Ease(progress * tuning.Spread3);
-        frame.Sprite(feet - Vector2.UnitY * 1, tuning.OrbWidth * spread, tuning.OrbHeight * spread, tuning.OrbShape, Ember, tuning.OrbAlpha, tuning.OrbLayer, light: tuning.OrbLight);
+        frame.Sprite(feet - Vector2.UnitY * 1, tuning.OrbWidth * spread, tuning.OrbHeight * spread, tuning.OrbShape, Ember, tuning.OrbAlpha, tuning.OrbLayer, light: tuning.OrbLight, emitter: "WizardSpellEffects.Elements.FireBang.6");
         for (int i = 0; i < tuning.FlameCount2; i++)
         {
             float angle = i * MathF.Tau / tuning.AngleDivisor2 + frame.Unit(i + 6) * tuning.Angle3;
@@ -308,9 +308,9 @@ internal static partial class WizardSpellEffects
             float height = (tuning.Height + tuning.Height2 * frame.Unit(i + 44)) * (1 - progress * tuning.Height3);
             Flames(frame, root, tuning.Width + tuning.Width2 * frame.Unit(i + 12), height, time, tuning.Alpha, i, Depth(angle), root.Y);
             frame.Sprite(root - Vector2.UnitY * (height * tuning.FlameOffset2), tuning.FlameWidth3, tuning.FlameHeight3, tuning.FlameShape3, i % 3 == 0 ? Hot : Gold,
-                tuning.FlameAlpha3, Depth(angle) == Layer.Ground ? tuning.FlameLayer2 : tuning.FlameLayer3, i * tuning.FlameRotation, light: i % 3 == 0, sortY: root.Y);
+                tuning.FlameAlpha3, Depth(angle) == Layer.Ground ? tuning.FlameLayer2 : tuning.FlameLayer3, i * tuning.FlameRotation, light: i % 3 == 0, sortY: root.Y, emitter: "WizardSpellEffects.Elements.FireBang.7");
         }
-        frame.Sparks(feet - Vector2.UnitY * tuning.SparksOffset, tuning.SparksCount2, tuning.SparksRx2, tuning.SparksRy2, progress, Gold, rise: tuning.SparksRise);
+        frame.Sparks(feet - Vector2.UnitY * tuning.SparksOffset, tuning.SparksCount2, tuning.SparksRx2, tuning.SparksRy2, progress, Gold, rise: tuning.SparksRise, emitter: "WizardSpellEffects.Elements.FireBang.8");
     }
 
     private static void Disruptor(Frame frame, Vector2 feet, float progress, float time, bool prepare)
@@ -318,23 +318,23 @@ internal static partial class WizardSpellEffects
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Disruptor);
         float height = (prepare ? tuning.PrepareHeight : tuning.ReleaseHeight) * (tuning.Height + tuning.Height2 * MathF.Sin(progress * MathF.PI));
         float width = prepare ? tuning.PrepareWidth : tuning.ReleaseWidth;
-        frame.Sprite(feet - Vector2.UnitY * tuning.OrbOffset, width * tuning.OrbWidth, width * tuning.OrbHeight, tuning.OrbShape, Ember, tuning.OrbAlpha, tuning.OrbLayer, light: tuning.OrbLight);
+        frame.Sprite(feet - Vector2.UnitY * tuning.OrbOffset, width * tuning.OrbWidth, width * tuning.OrbHeight, tuning.OrbShape, Ember, tuning.OrbAlpha, tuning.OrbLayer, light: tuning.OrbLight, emitter: "WizardSpellEffects.Elements.Disruptor.1");
         Flames(frame, feet, width, height, time, tuning.Alpha);
         frame.Clip(feet - Vector2.UnitY * (height * tuning.SmokeSequenceOffset), width * tuning.SmokeSequenceWidth, height * tuning.SmokeSequenceHeight,
-            tuning.SmokeSequenceShape, time * tuning.SmokeSequencePhase + tuning.SmokeSequencePhase2, tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha, tuning.SmokeSequenceLayer, tuning.SmokeSequenceRotation);
+            tuning.SmokeSequenceShape, time * tuning.SmokeSequencePhase + tuning.SmokeSequencePhase2, tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha, tuning.SmokeSequenceLayer, tuning.SmokeSequenceRotation, emitter: "WizardSpellEffects.Elements.Disruptor.2");
         for (int i = 0; i < tuning.ParticleCount; i++)
         {
             float angle = time * tuning.Angle + i * tuning.Angle2;
             Vector2 centre = feet - Vector2.UnitY * (tuning.Centre + height * (i + 1) / tuning.CentreDivisor);
-            frame.Orbit(centre, width * (tuning.OrbitX - i * tuning.OrbitX2), tuning.OrbitY - i * tuning.OrbitY2, angle, tuning.OrbitSweep, i == 1 ? Gold : Fire, tuning.OrbitWidth, tuning.OrbitAlpha);
+            frame.Orbit(centre, width * (tuning.OrbitX - i * tuning.OrbitX2), tuning.OrbitY - i * tuning.OrbitY2, angle, tuning.OrbitSweep, i == 1 ? Gold : Fire, tuning.OrbitWidth, tuning.OrbitAlpha, emitter: "WizardSpellEffects.Elements.Disruptor.3");
         }
         for (int i = 0; i < tuning.FlameCount; i++)
         {
             float angle = frame.Unit(i) * MathF.Tau;
             Vector2 root = feet + Ellipse(angle, width * tuning.EllipseX, width * tuning.EllipseY);
-            frame.Sprite(root, tuning.FlameWidth, tuning.FlameHeight, tuning.FlameShape, Fire, tuning.FlameAlpha, rotation: angle + time * tuning.FlameRotation);
+            frame.Sprite(root, tuning.FlameWidth, tuning.FlameHeight, tuning.FlameShape, Fire, tuning.FlameAlpha, rotation: angle + time * tuning.FlameRotation, emitter: "WizardSpellEffects.Elements.Disruptor.4");
         }
-        frame.Sparks(feet - Vector2.UnitY * tuning.SparksOffset, tuning.SparksCount, width * tuning.SparksRx, width * tuning.SparksRy, progress, Gold, rise: height * tuning.SparksRise);
+        frame.Sparks(feet - Vector2.UnitY * tuning.SparksOffset, tuning.SparksCount, width * tuning.SparksRx, width * tuning.SparksRy, progress, Gold, rise: height * tuning.SparksRise, emitter: "WizardSpellEffects.Elements.Disruptor.5");
     }
 
     private static void FlameField(Frame frame, Vector2 feet, float progress, float time)
@@ -343,25 +343,25 @@ internal static partial class WizardSpellEffects
         float open = tuning.Open + tuning.Open2 * Ease(progress * tuning.Open3);
         float radius = tuning.Radius * open;
         float rotation = progress * tuning.Rotation;
-        frame.Sprite(feet, radius * tuning.OrbWidth, radius * tuning.OrbHeight, tuning.OrbShape, Ember, tuning.OrbAlpha, tuning.OrbLayer, light: tuning.OrbLight);
+        frame.Sprite(feet, radius * tuning.OrbWidth, radius * tuning.OrbHeight, tuning.OrbShape, Ember, tuning.OrbAlpha, tuning.OrbLayer, light: tuning.OrbLight, emitter: "WizardSpellEffects.Elements.FlameField.1");
         Seal(frame, feet, radius, radius * FloorAspect, Gold, rotation, tuning.Alpha, tuning.Spokes);
         Seal(frame, feet, radius * tuning.X, radius * FloorAspect * tuning.Y, Fire, -rotation, tuning.Alpha2, tuning.Spokes2);
-        frame.Sprite(feet, radius * tuning.OrbWidth2, radius * tuning.OrbHeight2, tuning.OrbShape2, Gold, tuning.OrbAlpha2, tuning.OrbLayer2, light: tuning.OrbLight2);
-        frame.Sprite(feet, radius * tuning.SigilDiscWidth, radius * tuning.SigilDiscHeight, tuning.SigilDiscShape, Hot, tuning.SigilDiscAlpha, tuning.SigilDiscLayer);
+        frame.Sprite(feet, radius * tuning.OrbWidth2, radius * tuning.OrbHeight2, tuning.OrbShape2, Gold, tuning.OrbAlpha2, tuning.OrbLayer2, light: tuning.OrbLight2, emitter: "WizardSpellEffects.Elements.FlameField.2");
+        frame.Sprite(feet, radius * tuning.SigilDiscWidth, radius * tuning.SigilDiscHeight, tuning.SigilDiscShape, Hot, tuning.SigilDiscAlpha, tuning.SigilDiscLayer, emitter: "WizardSpellEffects.Elements.FlameField.3");
 
         float upper = 1 - Ease((progress - tuning.Upper) * tuning.Upper2);
         if (upper > 0)
         {
             Vector2 crown = feet - Vector2.UnitY * (tuning.Crown + tuning.Crown2 * progress);
             Seal(frame, crown, radius * tuning.X2, radius * tuning.Y2, Gold, -rotation, tuning.Alpha3 * upper, tuning.Spokes3, tuning.Layer);
-            frame.Sprite(crown, radius * tuning.OrbWidth3, radius * tuning.OrbHeight3, tuning.OrbShape3, Fire, tuning.OrbAlpha3 * upper, light: tuning.OrbLight3);
-            frame.Sprite(crown, radius * tuning.OrbWidth4, radius * tuning.OrbHeight4, tuning.OrbShape4, Hot, tuning.OrbAlpha4 * upper, tuning.OrbLayer3, light: tuning.OrbLight4);
+            frame.Sprite(crown, radius * tuning.OrbWidth3, radius * tuning.OrbHeight3, tuning.OrbShape3, Fire, tuning.OrbAlpha3 * upper, light: tuning.OrbLight3, emitter: "WizardSpellEffects.Elements.FlameField.4");
+            frame.Sprite(crown, radius * tuning.OrbWidth4, radius * tuning.OrbHeight4, tuning.OrbShape4, Hot, tuning.OrbAlpha4 * upper, tuning.OrbLayer3, light: tuning.OrbLight4, emitter: "WizardSpellEffects.Elements.FlameField.5");
             for (int i = 0; i < tuning.ParticleCount; i++)
             {
                 float angle = (i + frame.Unit(i + 13)) * MathF.Tau / tuning.AngleDivisor;
                 Vector2 ray = Ellipse(angle, radius * tuning.EllipseX, radius * tuning.EllipseY) - Vector2.UnitY * tuning.Ray;
                 frame.Line(crown + ray * tuning.LineStart, crown + ray * (1 + frame.Unit(i + 39) * tuning.LineEnd),
-                    tuning.LineWidth + frame.Unit(i + 5) * tuning.LineWidth2, Gold, (tuning.LineAlpha + tuning.LineAlpha2 * frame.Unit(i + 1)) * upper);
+                    tuning.LineWidth + frame.Unit(i + 5) * tuning.LineWidth2, Gold, (tuning.LineAlpha + tuning.LineAlpha2 * frame.Unit(i + 1)) * upper, emitter: "WizardSpellEffects.Elements.FlameField.6");
             }
         }
 
@@ -374,20 +374,20 @@ internal static partial class WizardSpellEffects
             if (i % 3 == 0)
             {
                 Vector2 falling = root - Vector2.UnitY * (height * (1 - beat));
-                frame.Line(falling - Vector2.UnitY * (tuning.LineStart2 + tuning.LineStart3 * upper), falling, tuning.LineWidth3, Gold, tuning.LineAlpha3 * upper, Depth(angle), light: tuning.LineLight);
+                frame.Line(falling - Vector2.UnitY * (tuning.LineStart2 + tuning.LineStart3 * upper), falling, tuning.LineWidth3, Gold, tuning.LineAlpha3 * upper, Depth(angle), light: tuning.LineLight, emitter: "WizardSpellEffects.Elements.FlameField.7");
             }
             Flames(frame, root, tuning.Width + tuning.Width2 * frame.Unit(i + 15), height * (tuning.Height3 + tuning.Height4 * MathF.Sin(beat * MathF.PI)),
                 time, tuning.Alpha4, i, Depth(angle), root.Y);
         }
-        frame.Sparks(feet - Vector2.UnitY * tuning.SparksOffset, tuning.SparksCount, radius, radius * tuning.SparksRy, progress, Gold, rise: tuning.SparksRise);
+        frame.Sparks(feet - Vector2.UnitY * tuning.SparksOffset, tuning.SparksCount, radius, radius * tuning.SparksRy, progress, Gold, rise: tuning.SparksRise, emitter: "WizardSpellEffects.Elements.FlameField.8");
     }
 
     private static void Seal(Frame frame, Vector2 centre, float x, float y, int colour, float rotation,
         float alpha, int spokes, Layer layer = Layer.Ground)
     {
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Seal);
-        frame.Sprite(centre, x * tuning.SigilDiscWidth, y * tuning.SigilDiscHeight, tuning.SigilDiscShape, colour, alpha, layer, light: tuning.SigilDiscLight);
-        frame.Sprite(centre, x * tuning.HaloWidth, y * tuning.HaloHeight, tuning.HaloShape, colour, alpha * tuning.HaloAlpha, layer);
+        frame.Sprite(centre, x * tuning.SigilDiscWidth, y * tuning.SigilDiscHeight, tuning.SigilDiscShape, colour, alpha, layer, light: tuning.SigilDiscLight, emitter: "WizardSpellEffects.Elements.Seal.1");
+        frame.Sprite(centre, x * tuning.HaloWidth, y * tuning.HaloHeight, tuning.HaloShape, colour, alpha * tuning.HaloAlpha, layer, emitter: "WizardSpellEffects.Elements.Seal.2");
         for (int i = 0; i < spokes; i++)
         {
             float angle = i * MathF.Tau / spokes + rotation;
@@ -395,8 +395,8 @@ internal static partial class WizardSpellEffects
             float inward = i % 2 == 0 ? tuning.Inward : tuning.Inward2;
             Vector2 end = centre + spoke * inward;
             Vector2 fork = centre + Ellipse(angle + tuning.EllipseAngle, x, y) * tuning.Fork;
-            frame.Line(centre + spoke, end, i % 2 == 0 ? tuning.LineWidth : tuning.LineWidth2, colour, alpha * tuning.LineAlpha, layer);
-            if (i % 2 == 0) frame.Line(end, fork, tuning.LineWidth3, colour, alpha * tuning.LineAlpha2, layer);
+            frame.Line(centre + spoke, end, i % 2 == 0 ? tuning.LineWidth : tuning.LineWidth2, colour, alpha * tuning.LineAlpha, layer, emitter: "WizardSpellEffects.Elements.Seal.3");
+            if (i % 2 == 0) frame.Line(end, fork, tuning.LineWidth3, colour, alpha * tuning.LineAlpha2, layer, emitter: "WizardSpellEffects.Elements.Seal.4");
         }
     }
 
@@ -422,23 +422,23 @@ internal static partial class WizardSpellEffects
                 tuning.UserFlameHeight + frame.Unit(seed + 23) * tuning.UserFlameHeight2,
                 tuning.UserFlameShape, tint, tuning.UserFlameAlpha * alive,
                 i % 4 == 0 ? tuning.UserFlameLayer : tuning.UserFlameLayer2,
-                (frame.Unit(seed + 27) - tuning.UserFlameRotation) * tuning.UserFlameRotation2, light: i % 13 == 0);
+                (frame.Unit(seed + 27) - tuning.UserFlameRotation) * tuning.UserFlameRotation2, light: i % 13 == 0, emitter: "WizardSpellEffects.Elements.FrostCharge.1");
             if (i % 3 == 0)
                 frame.Sprite(point - Vector2.UnitY * tuning.UserEmberOffset, tuning.UserEmberWidth + frame.Unit(seed + 37) * tuning.UserEmberWidth2,
                     tuning.UserEmberHeight + frame.Unit(seed + 41) * tuning.UserEmberHeight2,
-                    tuning.UserEmberShape, IceWhite, tuning.UserEmberAlpha * alive, tuning.UserEmberLayer);
+                    tuning.UserEmberShape, IceWhite, tuning.UserEmberAlpha * alive, tuning.UserEmberLayer, emitter: "WizardSpellEffects.Elements.FrostCharge.2");
             if (i % 6 == 0)
                 frame.Clip(point - Vector2.UnitY * tuning.SmokeSequenceOffset, tuning.SmokeSequenceWidth, tuning.SmokeSequenceHeight,
                     tuning.SmokeSequenceShape, progress + frame.Unit(seed + 47),
-                    tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha * alive, tuning.SmokeSequenceLayer);
+                    tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha * alive, tuning.SmokeSequenceLayer, emitter: "WizardSpellEffects.Elements.FrostCharge.3");
         }
         // Bright overlapping cold-blue shell / white frostfire core. The
         // highlights occupy a sphere; none is a flat opaque orb backdrop.
-        frame.Sprite(centre, tuning.FrostCoreWidth, tuning.FrostCoreHeight, tuning.FrostCoreShape, Ice, tuning.FrostCoreAlpha, tuning.FrostCoreLayer);
+        frame.Sprite(centre, tuning.FrostCoreWidth, tuning.FrostCoreHeight, tuning.FrostCoreShape, Ice, tuning.FrostCoreAlpha, tuning.FrostCoreLayer, emitter: "WizardSpellEffects.Elements.FrostCharge.4");
         frame.Sprite(centre, tuning.FrostCoreWidth2, tuning.FrostCoreHeight2, tuning.FrostCoreShape2, PaleBlue, tuning.FrostCoreAlpha2,
-            tuning.FrostCoreLayer2, light: tuning.FrostCoreLight);
+            tuning.FrostCoreLayer2, light: tuning.FrostCoreLight, emitter: "WizardSpellEffects.Elements.FrostCharge.5");
         frame.Sprite(centre - Vector2.UnitY * tuning.FlashOffset, tuning.FlashWidth, tuning.FlashHeight,
-            tuning.FlashShape, IceWhite, tuning.FlashAlpha, tuning.FlashLayer, light: tuning.FlashLight);
+            tuning.FlashShape, IceWhite, tuning.FlashAlpha, tuning.FlashLayer, light: tuning.FlashLight, emitter: "WizardSpellEffects.Elements.FrostCharge.6");
         for (int i = 0; i < tuning.FrostCoreCount; i++)
         {
             int seed = 1109 + i * 17;
@@ -448,7 +448,7 @@ internal static partial class WizardSpellEffects
             frame.Sprite(point, tuning.FrostCoreWidth3 + frame.Unit(seed + 7) * tuning.FrostCoreWidth4,
                 tuning.FrostCoreHeight3 + frame.Unit(seed + 9) * tuning.FrostCoreHeight4, tuning.FrostCoreShape3,
                 IceWhite, tuning.FrostCoreAlpha3 + tuning.FrostCoreAlpha4 * frame.Unit(seed + 11),
-                tuning.FrostCoreLayer3, light: i % 7 == 0);
+                tuning.FrostCoreLayer3, light: i % 7 == 0, emitter: "WizardSpellEffects.Elements.FrostCharge.7");
         }
     }
 
@@ -473,25 +473,25 @@ internal static partial class WizardSpellEffects
                 tuning.UserFlameHeight + frame.Unit(seed + 21) * tuning.UserFlameHeight2,
                 tuning.UserFlameShape, i % 6 == 0 ? IceWhite : i % 2 == 0 ? Ice : PaleBlue,
                 tuning.UserFlameAlpha * strength, i % 4 == 0 ? tuning.UserFlameLayer : tuning.UserFlameLayer2,
-                (frame.Unit(seed + 25) - tuning.UserFlameRotation) * tuning.UserFlameRotation2, light: i % 17 == 0);
+                (frame.Unit(seed + 25) - tuning.UserFlameRotation) * tuning.UserFlameRotation2, light: i % 17 == 0, emitter: "WizardSpellEffects.Elements.FrostFireImpact.1");
             if (i % 4 == 0)
                 frame.Sprite(point - Vector2.UnitY * tuning.ShardOffset, tuning.ShardWidth + frame.Unit(seed + 31) * tuning.ShardWidth2,
                     tuning.ShardHeight + frame.Unit(seed + 37) * tuning.ShardHeight2, tuning.ShardShape,
-                    IceWhite, tuning.ShardAlpha * strength, tuning.ShardLayer);
+                    IceWhite, tuning.ShardAlpha * strength, tuning.ShardLayer, emitter: "WizardSpellEffects.Elements.FrostFireImpact.2");
             if (i % 6 == 0)
                 frame.Clip(point, tuning.SmokeSequenceWidth + age * tuning.SmokeSequenceWidth2, tuning.SmokeSequenceHeight + age * tuning.SmokeSequenceHeight2,
                     tuning.SmokeSequenceShape, progress * tuning.SmokeSequencePhase + frame.Unit(seed + 41),
-                    tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha * strength, tuning.SmokeSequenceLayer);
+                    tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha * strength, tuning.SmokeSequenceLayer, emitter: "WizardSpellEffects.Elements.FrostFireImpact.3");
         }
         // Frostfire impact retains a bright blue-white centre while the
         // textured outer shell disperses into shards and vapour.
         frame.Sprite(centre, tuning.FrostCoreWidth, tuning.FrostCoreHeight, tuning.FrostCoreShape, Ice,
-            tuning.FrostCoreAlpha * fade, tuning.FrostCoreLayer);
+            tuning.FrostCoreAlpha * fade, tuning.FrostCoreLayer, emitter: "WizardSpellEffects.Elements.FrostFireImpact.4");
         frame.Sprite(centre, tuning.FrostCoreWidth2, tuning.FrostCoreHeight2, tuning.FrostCoreShape2, PaleBlue,
-            tuning.FrostCoreAlpha2 * fade, tuning.FrostCoreLayer2, light: tuning.FrostCoreLight);
+            tuning.FrostCoreAlpha2 * fade, tuning.FrostCoreLayer2, light: tuning.FrostCoreLight, emitter: "WizardSpellEffects.Elements.FrostFireImpact.5");
         frame.Sprite(centre - Vector2.UnitY * tuning.FlashOffset, tuning.FlashWidth, tuning.FlashHeight,
             tuning.FlashShape, IceWhite, tuning.FlashAlpha * fade,
-            tuning.FlashLayer, light: tuning.FlashLight);
+            tuning.FlashLayer, light: tuning.FlashLight, emitter: "WizardSpellEffects.Elements.FrostFireImpact.6");
         for (int i = 0; i < tuning.FrostCoreCount; i++)
         {
             int seed = 1601 + i * 19;
@@ -502,7 +502,7 @@ internal static partial class WizardSpellEffects
             frame.Sprite(point, tuning.FrostCoreWidth3 + frame.Unit(seed + 7) * tuning.FrostCoreWidth4,
                 tuning.FrostCoreHeight3 + frame.Unit(seed + 9) * tuning.FrostCoreHeight4, tuning.FrostCoreShape3,
                 IceWhite, fade * (tuning.FrostCoreAlpha3 + tuning.FrostCoreAlpha4 * frame.Unit(seed + 11)),
-                tuning.FrostCoreLayer3, light: i % 7 == 0);
+                tuning.FrostCoreLayer3, light: i % 7 == 0, emitter: "WizardSpellEffects.Elements.FrostFireImpact.7");
         }
     }
 
@@ -510,22 +510,22 @@ internal static partial class WizardSpellEffects
     {
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.IceBreak);
         float spread = tuning.Spread + tuning.Spread2 * Ease(progress * tuning.Spread3);
-        frame.Sprite(centre, radius * tuning.OrbWidth, radius * tuning.OrbHeight, tuning.OrbShape, Ice, tuning.OrbAlpha, light: tuning.OrbLight);
+        frame.Sprite(centre, radius * tuning.OrbWidth, radius * tuning.OrbHeight, tuning.OrbShape, Ice, tuning.OrbAlpha, light: tuning.OrbLight, emitter: "WizardSpellEffects.Elements.IceBreak.1");
         frame.Clip(centre, radius * tuning.SmokeSequenceWidth, radius * tuning.SmokeSequenceHeight, tuning.SmokeSequenceShape, progress * tuning.SmokeSequencePhase + tuning.SmokeSequencePhase2, tuning.SmokeSequenceColour,
-            tuning.SmokeSequenceAlpha, tuning.SmokeSequenceLayer, progress * tuning.SmokeSequenceRotation);
+            tuning.SmokeSequenceAlpha, tuning.SmokeSequenceLayer, progress * tuning.SmokeSequenceRotation, emitter: "WizardSpellEffects.Elements.IceBreak.2");
         for (int i = 0; i < count; i++)
         {
             float angle = (i + frame.Unit(i + 25)) * MathF.Tau / count;
             Vector2 point = centre + Ellipse(angle, radius, radius * tuning.EllipseY) * spread;
             float length = (tuning.Length + frame.Unit(i) * tuning.Length2) * (1 - tuning.Length3 * progress);
             frame.Sprite(point, length * tuning.IceSpireWidth, length, tuning.IceSpireShape, i % 3 == 0 ? IceWhite : Ice, tuning.IceSpireAlpha,
-                tuning.IceSpireLayer, angle + MathF.PI / 2, light: i % 3 == 0);
+                tuning.IceSpireLayer, angle + MathF.PI / 2, light: i % 3 == 0, emitter: "WizardSpellEffects.Elements.IceBreak.3");
             if (i % 2 == 0)
-                frame.Sprite(point, length * tuning.FrostCoreWidth, length * tuning.FrostCoreHeight, tuning.FrostCoreShape, IceWhite, tuning.FrostCoreAlpha, tuning.FrostCoreLayer, angle);
+                frame.Sprite(point, length * tuning.FrostCoreWidth, length * tuning.FrostCoreHeight, tuning.FrostCoreShape, IceWhite, tuning.FrostCoreAlpha, tuning.FrostCoreLayer, angle, emitter: "WizardSpellEffects.Elements.IceBreak.4");
         }
         frame.Sprite(centre, radius * tuning.FrostCoreWidth2, radius * tuning.FrostCoreHeight2, tuning.FrostCoreShape2, IceWhite, tuning.FrostCoreAlpha2 * (1 - progress),
-            tuning.FrostCoreLayer2, progress * tuning.FrostCoreRotation, light: tuning.FrostCoreLight);
-        frame.Sparks(centre, count, radius * tuning.ShardRx, radius * tuning.ShardRy, progress, IceWhite, rise: tuning.ShardRise, shape: tuning.ShardShape);
+            tuning.FrostCoreLayer2, progress * tuning.FrostCoreRotation, light: tuning.FrostCoreLight, emitter: "WizardSpellEffects.Elements.IceBreak.5");
+        frame.Sparks(centre, count, radius * tuning.ShardRx, radius * tuning.ShardRy, progress, IceWhite, rise: tuning.ShardRise, shape: tuning.ShardShape, emitter: "WizardSpellEffects.Elements.IceBreak.6");
     }
 
     private static void IceStorm(Frame frame, Vector2 feet, float progress, bool prepare)
@@ -540,7 +540,7 @@ internal static partial class WizardSpellEffects
         // Rotating this flattened ellipse skews its silhouette.
         frame.Sprite(feet, tuning.SigilDiscWidth, tuning.SigilDiscHeight,
             tuning.SigilDiscShape, IceWhite, runeFade * (tuning.SigilDiscAlpha + tuning.SigilDiscAlpha2 * MathF.Sin(progress * tuning.X)),
-            tuning.SigilDiscLayer, rotation: tuning.SigilDiscRotation, light: tuning.SigilDiscLight, sortY: feet.Y);
+            tuning.SigilDiscLayer, rotation: tuning.SigilDiscRotation, light: tuning.SigilDiscLight, sortY: feet.Y, emitter: "WizardSpellEffects.Elements.IceStorm.1");
 
         int ribbons = prepare ? tuning.PrepareRibbons : tuning.ReleaseRibbons;
         for (int i = 0; i < ribbons; i++)
@@ -567,7 +567,7 @@ internal static partial class WizardSpellEffects
             float alpha = tuning.Alpha * lifeCurve;
             frame.Sprite(centre, width, thickness,
                 tuning.UserSlashShape, i % 5 == 0 ? IceWhite : i % 2 == 0 ? PaleBlue : Ice,
-                alpha, Depth(angle), orientation, light: i % 9 == 0, sortY: root.Y);
+                alpha, Depth(angle), orientation, light: i % 9 == 0, sortY: root.Y, emitter: "WizardSpellEffects.Elements.IceStorm.2");
             // Backtrace three earlier points on the same projected orbit.
             // Narrow connected filaments and translucent wisps form a tail,
             // rather than detached spokes or oversized billboard cards.
@@ -580,17 +580,17 @@ internal static partial class WizardSpellEffects
                 float tailFade = alpha * (1 - tail * tuning.TailFade);
                 frame.Thread(back, previous, tuning.ThreadStartWidth + tuning.ThreadStartWidth2 * lifeCurve * (1 - tail * tuning.ThreadStartWidth3),
                     tuning.ThreadEndWidth + tuning.ThreadEndWidth2 * lifeCurve, i % 5 == 0 ? IceWhite : PaleBlue,
-                    tailFade * tuning.ThreadAlpha, Depth(angle), sortY: backRoot.Y);
+                    tailFade * tuning.ThreadAlpha, Depth(angle), sortY: backRoot.Y, emitter: "WizardSpellEffects.Elements.IceStorm.3");
                 frame.Sprite((back + previous) * tuning.WispOffset, (back - previous).Length() + tuning.WispWidth,
                     tuning.WispHeight + tuning.WispHeight2 * lifeCurve, tuning.WispShape, PaleBlue, tailFade * tuning.WispAlpha,
                     Depth(angle), MathF.Atan2(previous.Y - back.Y, previous.X - back.X),
-                    sortY: backRoot.Y);
+                    sortY: backRoot.Y, emitter: "WizardSpellEffects.Elements.IceStorm.4");
                 previous = back;
             }
             frame.Clip(centre - tangent * tuning.SmokeSequenceOffset, width * tuning.SmokeSequenceWidth, thickness * tuning.SmokeSequenceHeight,
                 tuning.SmokeSequenceShape, progress * tuning.SmokeSequencePhase + frame.Unit(seed + 27),
                 tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha * lifeCurve,
-                Depth(angle), orientation + tuning.SmokeSequenceRotation, sortY: root.Y);
+                Depth(angle), orientation + tuning.SmokeSequenceRotation, sortY: root.Y, emitter: "WizardSpellEffects.Elements.IceStorm.5");
 
             // Snow is born on each swirling ribbon, travels briefly and fades.
             for (int snow = 0; snow < tuning.SnowCount; snow++)
@@ -605,7 +605,7 @@ internal static partial class WizardSpellEffects
                     tuning.SparkHeight + frame.Unit(flake + 49) * tuning.SparkHeight2,
                     tuning.SparkShape, snow % 3 == 0 ? IceWhite : PaleBlue,
                     lifeCurve * (1 - driftAge) * tuning.SparkAlpha, Depth(angle),
-                    orientation, sortY: root.Y);
+                    orientation, sortY: root.Y, emitter: "WizardSpellEffects.Elements.IceStorm.6");
             }
         }
         int dust = prepare ? tuning.PrepareDust : tuning.ReleaseDust;
@@ -623,7 +623,7 @@ internal static partial class WizardSpellEffects
                 tuning.SparkHeight3 + frame.Unit(seed + 19) * tuning.SparkHeight4, tuning.SparkShape2,
                 i % 5 == 0 ? IceWhite : i % 2 == 0 ? PaleBlue : Ice,
                 tuning.SparkAlpha2 * MathF.Sin(age * MathF.PI), Depth(angle),
-                wind * tuning.SparkRotation, sortY: root.Y);
+                wind * tuning.SparkRotation, sortY: root.Y, emitter: "WizardSpellEffects.Elements.IceStorm.7");
         }
     }
 
@@ -635,7 +635,7 @@ internal static partial class WizardSpellEffects
         float reach = (tuning.Reach + extraReach * tuning.Reach2) / MathF.Max(MathF.Abs(forward.X), MathF.Abs(forward.Y));
         float surge = tuning.Surge + tuning.Surge2 * Ease(progress * tuning.Surge3);
         Vector2 chest = feet - Vector2.UnitY * tuning.Chest;
-        frame.Sprite(chest + facing * tuning.OrbOffset, tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, Ice, tuning.OrbAlpha * (1 - Ease(progress * tuning.Value)), light: tuning.OrbLight);
+        frame.Sprite(chest + facing * tuning.OrbOffset, tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, Ice, tuning.OrbAlpha * (1 - Ease(progress * tuning.Value)), light: tuning.OrbLight, emitter: "WizardSpellEffects.Elements.IceThrust.1");
 
         for (int stream = tuning.Stream; stream <= tuning.StreamCount; stream++)
         {
@@ -654,21 +654,21 @@ internal static partial class WizardSpellEffects
                 float depth = feet.Y + ProjectGround(lane).Y;
                 frame.Clip((point + previous) * tuning.SmokeSequenceOffset, travel.Length() + tuning.SmokeSequenceWidth, tuning.SmokeSequenceHeight + t * tuning.SmokeSequenceHeight2, tuning.SmokeSequenceShape,
                     progress * tuning.SmokeSequencePhase + sample * tuning.SmokeSequencePhase2 + stream * tuning.SmokeSequencePhase3, stream == 0 ? IceWhite : Ice,
-                    tuning.SmokeSequenceAlpha * taper, rotation: angle, light: stream == 0, sortY: depth);
-                frame.Thread(previous, point, tuning.ThreadStartWidth - t, tuning.ThreadEndWidth, IceWhite, tuning.ThreadAlpha * taper, tuning.ThreadLayer, sortY: depth);
+                    tuning.SmokeSequenceAlpha * taper, rotation: angle, light: stream == 0, sortY: depth, emitter: "WizardSpellEffects.Elements.IceThrust.2");
+                frame.Thread(previous, point, tuning.ThreadStartWidth - t, tuning.ThreadEndWidth, IceWhite, tuning.ThreadAlpha * taper, tuning.ThreadLayer, sortY: depth, emitter: "WizardSpellEffects.Elements.IceThrust.3");
                 frame.Sprite(point - Vector2.UnitY * (tuning.OrbOffset2 + t * tuning.OrbOffset3), tuning.OrbWidth2 + t * tuning.OrbWidth3, tuning.OrbHeight2 + t * tuning.OrbHeight3, tuning.OrbShape2,
-                    PaleBlue, tuning.OrbAlpha2 * taper, tuning.OrbLayer, sortY: depth);
+                    PaleBlue, tuning.OrbAlpha2 * taper, tuning.OrbLayer, sortY: depth, emitter: "WizardSpellEffects.Elements.IceThrust.4");
                 previous = point;
             }
             Vector2 front = feet + ProjectGround(forward * length + side * breadth);
-            frame.Sprite(front, tuning.SmokeWidth, tuning.SmokeHeight, tuning.SmokeShape, Ice, tuning.SmokeAlpha, tuning.SmokeLayer, light: stream == 0, sortY: front.Y);
+            frame.Sprite(front, tuning.SmokeWidth, tuning.SmokeHeight, tuning.SmokeShape, Ice, tuning.SmokeAlpha, tuning.SmokeLayer, light: stream == 0, sortY: front.Y, emitter: "WizardSpellEffects.Elements.IceThrust.5");
             if (stream % 2 == 0)
             {
                 Vector2 start = chest + ProjectGround(side * breadth * tuning.Start);
                 Channel(frame, start, front - Vector2.UnitY * tuning.End, tuning.Spread + Math.Abs(stream) * tuning.Spread2, stream == 0 ? tuning.Width : tuning.Width2,
                     stream == 0 ? tuning.Alpha : tuning.Alpha2, progress * tuning.Time, tuning.Forks, tuning.Offset + stream * tuning.Offset2, depths: new(feet.Y, front.Y));
             }
-            frame.Sparks(front - Vector2.UnitY * tuning.OrbOffset4, tuning.OrbCount, tuning.OrbRx, tuning.OrbRy, progress, IceWhite, rise: tuning.OrbRise, shape: tuning.OrbShape3, sortY: front.Y);
+            frame.Sparks(front - Vector2.UnitY * tuning.OrbOffset4, tuning.OrbCount, tuning.OrbRx, tuning.OrbRy, progress, IceWhite, rise: tuning.OrbRise, shape: tuning.OrbShape3, sortY: front.Y, emitter: "WizardSpellEffects.Elements.IceThrust.6");
         }
     }
 
@@ -678,8 +678,8 @@ internal static partial class WizardSpellEffects
         float lift = Ease(progress * tuning.Lift);
         Vector2 centre = feet + new Vector2(progress * tuning.X, -(tile ? tuning.Y : tuning.Y2) - lift * tuning.Y3);
         frame.Clip(centre, tile ? tuning.SmokeSequenceWidth : tuning.SmokeSequenceWidth2, tile ? tuning.SmokeSequenceHeight : tuning.SmokeSequenceHeight2, tuning.SmokeSequenceShape, progress * tuning.SmokeSequencePhase,
-            IceWhite, tile ? tuning.SmokeSequenceAlpha : tuning.SmokeSequenceAlpha2, tile ? tuning.SmokeSequenceLayer : tuning.SmokeSequenceLayer2, tuning.SmokeSequenceRotation, light: tuning.SmokeSequenceLight);
-        frame.Sparks(centre, tile ? tuning.OrbCount : tuning.OrbCount2, tuning.OrbRx, tuning.OrbRy, progress, IceWhite, rise: tuning.OrbRise, shape: tuning.OrbShape);
+            IceWhite, tile ? tuning.SmokeSequenceAlpha : tuning.SmokeSequenceAlpha2, tile ? tuning.SmokeSequenceLayer : tuning.SmokeSequenceLayer2, tuning.SmokeSequenceRotation, light: tuning.SmokeSequenceLight, emitter: "WizardSpellEffects.Elements.SnowContact.1");
+        frame.Sparks(centre, tile ? tuning.OrbCount : tuning.OrbCount2, tuning.OrbRx, tuning.OrbRy, progress, IceWhite, rise: tuning.OrbRise, shape: tuning.OrbShape, emitter: "WizardSpellEffects.Elements.SnowContact.2");
     }
 
     private static void SnowballWake(Frame frame, SpellParticlePool pool, Vector2 head, Vector2 heading,
@@ -693,7 +693,7 @@ internal static partial class WizardSpellEffects
             Vector2 point = head - heading * (tuning.Point + frame.Unit(i + 30) * tuning.Point2) +
                 new Vector2((frame.Unit(i + 55) - tuning.X) * tuning.X2, tuning.Y + tuning.Y2 * fall);
             float size = tuning.Size + frame.Unit(i + 62) * tuning.Size2;
-            frame.Sprite(point, size, size * tuning.OrbHeight, tuning.OrbShape, IceWhite, tuning.OrbAlpha * MathF.Sin(fall * MathF.PI), tuning.OrbLayer);
+            frame.Sprite(point, size, size * tuning.OrbHeight, tuning.OrbShape, IceWhite, tuning.OrbAlpha * MathF.Sin(fall * MathF.PI), tuning.OrbLayer, emitter: "WizardSpellEffects.Elements.SnowballWake.1");
         }
         if (!emit) return;
 
@@ -702,9 +702,9 @@ internal static partial class WizardSpellEffects
             int seed = frameIndex * 11 + i;
             Vector2 point = head - heading * (tuning.Point3 + frame.Unit(seed) * tuning.Point4) + Vector2.UnitY * (tuning.Point5 + tuning.Point6 * frame.Unit(seed + 73));
             Vector2 drift = new((frame.Unit(seed + 32) - tuning.Drift) * tuning.Drift2, tuning.Drift3 + frame.Unit(seed + 53) * tuning.Drift4);
-            pool.TryAdd(new SpellParticle(point, drift, now, Math.Min(remaining, tuning.Val2 + i * tuning.Val22), tuning.OrbSize + i * tuning.OrbSize2,
+            SpellVfxAssets.Emit(pool, new SpellParticle(point, drift, now, Math.Min(remaining, tuning.Val2 + i * tuning.Val22), tuning.OrbSize + i * tuning.OrbSize2,
                 Tint(IceWhite, tuning.Opacity), tuning.OrbShape2, 0, Aspect: tuning.OrbAspect, Growth: tuning.OrbGrowth,
-                Layer: tuning.OrbLayer2, Linear: true, CastsLight: tuning.OrbCastsLight, DepthY: head.Y + tuning.OrbDepthY));
+                Layer: tuning.OrbLayer2, Linear: true, CastsLight: tuning.OrbCastsLight, DepthY: head.Y + tuning.OrbDepthY), "WizardSpellEffects.Elements.SnowballWake.2");
         }
     }
 
@@ -718,28 +718,28 @@ internal static partial class WizardSpellEffects
         float lull = 1 - Ease((time % 3 - tuning.Lull) / tuning.LullDivisor);
         float warning = 1 - Ease(time / tuning.WarningDivisor);
         frame.Clip(root + new Vector2(tuning.X3, tuning.Y3), tuning.SmokeSequenceWidth, tuning.SmokeSequenceHeight, tuning.SmokeSequenceShape, time * tuning.SmokeSequencePhase + density,
-            tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha * warning, tuning.SmokeSequenceLayer, tuning.SmokeSequenceRotation, sortY: root.Y);
+            tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha * warning, tuning.SmokeSequenceLayer, tuning.SmokeSequenceRotation, sortY: root.Y, emitter: "WizardSpellEffects.Elements.Blizzard.1");
         frame.Sprite(root + new Vector2(tuning.X4, tuning.Y4), tuning.SparkWidth, tuning.SparkHeight, tuning.SparkShape, IceWhite, tuning.SparkAlpha * warning,
-            tuning.SparkLayer, rotation: tuning.SparkRotation, sortY: root.Y);
+            tuning.SparkLayer, rotation: tuning.SparkRotation, sortY: root.Y, emitter: "WizardSpellEffects.Elements.Blizzard.2");
         if (fall > .004f && density > .26f && lull > .015f)
         {
             Vector2 head = root - new Vector2(tuning.X5 + frame.Unit(7) * tuning.X6, tuning.Y5 + frame.Unit(9) * tuning.Y6) * fall;
             Vector2 tail = new Vector2(tuning.X7 + frame.Unit(10) * tuning.X8, tuning.Y7 + frame.Unit(17) * tuning.Y8);
             float opacity = (tuning.Opacity + density * tuning.Opacity2) * lull;
-            frame.Line(head - tail, head, tuning.LineWidth, Blue, opacity, light: tuning.LineLight);
-            frame.Line(head - tail * tuning.LineStart, head, tuning.LineWidth2, IceWhite, opacity, tuning.LineLayer);
+            frame.Line(head - tail, head, tuning.LineWidth, Blue, opacity, light: tuning.LineLight, emitter: "WizardSpellEffects.Elements.Blizzard.3");
+            frame.Line(head - tail * tuning.LineStart, head, tuning.LineWidth2, IceWhite, opacity, tuning.LineLayer, emitter: "WizardSpellEffects.Elements.Blizzard.4");
             frame.Clip(head - tail * tuning.SmokeSequenceOffset, tuning.SmokeSequenceWidth2, tail.Length() * tuning.SmokeSequenceHeight2, tuning.SmokeSequenceShape2, cycle * tuning.SmokeSequencePhase2,
-                tuning.SmokeSequenceColour2, tuning.SmokeSequenceAlpha2 * lull, tuning.SmokeSequenceLayer2, tuning.SmokeSequenceRotation2);
-            frame.Sprite(head, tuning.FlameWidth, tuning.FlameHeight, tuning.FlameShape, Blue, opacity, rotation: tuning.FlameRotation);
-            frame.Sprite(head, tuning.FrostCoreWidth, tuning.FrostCoreHeight, tuning.FrostCoreShape, IceWhite, opacity, tuning.FrostCoreLayer, tuning.FrostCoreRotation);
+                tuning.SmokeSequenceColour2, tuning.SmokeSequenceAlpha2 * lull, tuning.SmokeSequenceLayer2, tuning.SmokeSequenceRotation2, emitter: "WizardSpellEffects.Elements.Blizzard.5");
+            frame.Sprite(head, tuning.FlameWidth, tuning.FlameHeight, tuning.FlameShape, Blue, opacity, rotation: tuning.FlameRotation, emitter: "WizardSpellEffects.Elements.Blizzard.6");
+            frame.Sprite(head, tuning.FrostCoreWidth, tuning.FrostCoreHeight, tuning.FrostCoreShape, IceWhite, opacity, tuning.FrostCoreLayer, tuning.FrostCoreRotation, emitter: "WizardSpellEffects.Elements.Blizzard.7");
         }
         float land = Ease((time - tuning.Land) / tuning.LandDivisor);
-        frame.Sprite(root - Vector2.UnitY * tuning.SmokeOffset, tuning.SmokeWidth, tuning.SmokeHeight, tuning.SmokeShape, Ice, tuning.SmokeAlpha * land * (tuning.SmokeAlpha2 + tuning.SmokeAlpha3 * lull), tuning.SmokeLayer, light: tuning.SmokeLight);
+        frame.Sprite(root - Vector2.UnitY * tuning.SmokeOffset, tuning.SmokeWidth, tuning.SmokeHeight, tuning.SmokeShape, Ice, tuning.SmokeAlpha * land * (tuning.SmokeAlpha2 + tuning.SmokeAlpha3 * lull), tuning.SmokeLayer, light: tuning.SmokeLight, emitter: "WizardSpellEffects.Elements.Blizzard.8");
         if (land > .8f && cycle > .63f)
         {
             float spread = Ease((cycle - tuning.Spread) / tuning.SpreadDivisor);
-            frame.Sprite(root - Vector2.UnitY * tuning.FlashOffset, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, IceWhite, tuning.FlashAlpha * (1 - spread) * lull, tuning.FlashLayer);
-            if (lull > .3f) frame.Sparks(root, tuning.ShardCount, tuning.ShardRx, tuning.ShardRy, cycle, IceWhite, rise: tuning.ShardRise, shape: tuning.ShardShape);
+            frame.Sprite(root - Vector2.UnitY * tuning.FlashOffset, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, IceWhite, tuning.FlashAlpha * (1 - spread) * lull, tuning.FlashLayer, emitter: "WizardSpellEffects.Elements.Blizzard.9");
+            if (lull > .3f) frame.Sparks(root, tuning.ShardCount, tuning.ShardRx, tuning.ShardRy, cycle, IceWhite, rise: tuning.ShardRise, shape: tuning.ShardShape, emitter: "WizardSpellEffects.Elements.Blizzard.10");
         }
     }
 
@@ -749,7 +749,7 @@ internal static partial class WizardSpellEffects
         float phase = FieldDrop(time, tuning.Phase, frame.Unit(4));
         float density = frame.Unit(51);
         float warmup = tuning.Warmup + tuning.Warmup2 * Ease((time - tuning.Warmup3) / tuning.WarmupDivisor);
-        frame.Sprite(feet, tuning.SmokeWidth, tuning.SmokeHeight, tuning.SmokeShape, Ember, tuning.SmokeAlpha * warmup, tuning.SmokeLayer, light: tuning.SmokeLight);
+        frame.Sprite(feet, tuning.SmokeWidth, tuning.SmokeHeight, tuning.SmokeShape, Ember, tuning.SmokeAlpha * warmup, tuning.SmokeLayer, light: tuning.SmokeLight, emitter: "WizardSpellEffects.Elements.MeteorStrike.1");
         if (density < .32f) return;
 
         float fall = 1 - Ease(phase * tuning.Fall);
@@ -757,22 +757,22 @@ internal static partial class WizardSpellEffects
         {
             Vector2 head = feet - new Vector2(tuning.X + frame.Unit(5) * tuning.X2, tuning.Y + frame.Unit(8) * tuning.Y2) * fall;
             Vector2 tail = new(tuning.Tail + frame.Unit(12) * tuning.Tail2, tuning.Tail3 + density * tuning.Tail4);
-            frame.Line(head - tail, head, tuning.LineWidth, Ember, tuning.LineAlpha, light: tuning.LineLight);
-            frame.Line(head - tail * tuning.LineStart, head, tuning.LineWidth2, Gold, tuning.LineAlpha2, tuning.LineLayer);
+            frame.Line(head - tail, head, tuning.LineWidth, Ember, tuning.LineAlpha, light: tuning.LineLight, emitter: "WizardSpellEffects.Elements.MeteorStrike.2");
+            frame.Line(head - tail * tuning.LineStart, head, tuning.LineWidth2, Gold, tuning.LineAlpha2, tuning.LineLayer, emitter: "WizardSpellEffects.Elements.MeteorStrike.3");
             frame.Clip(head - tail * tuning.SmokeSequenceOffset, tuning.SmokeSequenceWidth, tail.Length(), tuning.SmokeSequenceShape, phase * tuning.SmokeSequencePhase,
-                tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha, tuning.SmokeSequenceLayer, tuning.SmokeSequenceRotation);
-            frame.Clip(head, tuning.FireSequenceWidth, tuning.FireSequenceHeight, tuning.FireSequenceShape, phase * tuning.FireSequencePhase, tuning.FireSequenceColour, tuning.FireSequenceAlpha);
+                tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha, tuning.SmokeSequenceLayer, tuning.SmokeSequenceRotation, emitter: "WizardSpellEffects.Elements.MeteorStrike.4");
+            frame.Clip(head, tuning.FireSequenceWidth, tuning.FireSequenceHeight, tuning.FireSequenceShape, phase * tuning.FireSequencePhase, tuning.FireSequenceColour, tuning.FireSequenceAlpha, emitter: "WizardSpellEffects.Elements.MeteorStrike.5");
             frame.Sprite(head, tuning.UserRockWidth, tuning.UserRockHeight, tuning.UserRockShape, tuning.UserRockColour, tuning.UserRockAlpha,
-                tuning.UserRockLayer, rotation: tuning.UserRockRotation + MathF.Sin(time * tuning.X3) * tuning.UserRockRotation2);
+                tuning.UserRockLayer, rotation: tuning.UserRockRotation + MathF.Sin(time * tuning.X3) * tuning.UserRockRotation2, emitter: "WizardSpellEffects.Elements.MeteorStrike.6");
             frame.Sprite(head + new Vector2(tuning.X4, tuning.Y3), tuning.UserFlameWidth, tuning.UserFlameHeight, tuning.UserFlameShape,
-                Gold, tuning.UserFlameAlpha, tuning.UserFlameLayer, light: tuning.UserFlameLight);
+                Gold, tuning.UserFlameAlpha, tuning.UserFlameLayer, light: tuning.UserFlameLight, emitter: "WizardSpellEffects.Elements.MeteorStrike.7");
         }
         else
         {
             float flash = 1 - Ease((phase - tuning.Flash) / tuning.FlashDivisor);
-            frame.Sprite(feet, tuning.FlameWidth, tuning.FlameHeight, tuning.FlameShape, Gold, tuning.FlameAlpha * flash, tuning.FlameLayer, light: tuning.FlameLight);
+            frame.Sprite(feet, tuning.FlameWidth, tuning.FlameHeight, tuning.FlameShape, Gold, tuning.FlameAlpha * flash, tuning.FlameLayer, light: tuning.FlameLight, emitter: "WizardSpellEffects.Elements.MeteorStrike.8");
             Flames(frame, feet, tuning.Width, tuning.Height * (tuning.Height2 - phase), time, tuning.Alpha * flash);
-            frame.Sparks(feet, tuning.SparksCount, tuning.SparksRx, tuning.SparksRy, phase, Gold, rise: tuning.SparksRise);
+            frame.Sparks(feet, tuning.SparksCount, tuning.SparksRx, tuning.SparksRy, phase, Gold, rise: tuning.SparksRise, emitter: "WizardSpellEffects.Elements.MeteorStrike.9");
             for (int fragment = 0; fragment < tuning.FragmentCount; fragment++)
             {
                 float age = Fract(phase * tuning.Age + frame.Unit(fragment + 190));
@@ -782,7 +782,7 @@ internal static partial class WizardSpellEffects
                 frame.Sprite(debris, tuning.UserRockWidth2 + frame.Unit(fragment + 210) * tuning.UserRockWidth3,
                     tuning.UserRockHeight2 + frame.Unit(fragment + 215) * tuning.UserRockHeight3,
                     tuning.UserRockShape2, tuning.UserRockColour2, tuning.UserRockAlpha2 * (1 - age * tuning.UserRockAlpha3),
-                    tuning.UserRockLayer2, age * (fragment % 2 == 0 ? tuning.UserRockRotation3 : tuning.UserRockRotation4));
+                    tuning.UserRockLayer2, age * (fragment % 2 == 0 ? tuning.UserRockRotation3 : tuning.UserRockRotation4), emitter: "WizardSpellEffects.Elements.MeteorStrike.10");
             }
         }
     }
@@ -795,9 +795,9 @@ internal static partial class WizardSpellEffects
         {
             float angle = i * MathF.Tau / 3 + progress * tuning.Angle;
             Vector2 seal = centre + Ellipse(angle, tuning.EllipseX, tuning.EllipseY);
-            frame.Sprite(seal, tuning.SigilDiscWidth, tuning.SigilDiscHeight, tuning.SigilDiscShape, Gold, tuning.SigilDiscAlpha, Depth(angle), angle, light: tuning.SigilDiscLight);
+            frame.Sprite(seal, tuning.SigilDiscWidth, tuning.SigilDiscHeight, tuning.SigilDiscShape, Gold, tuning.SigilDiscAlpha, Depth(angle), angle, light: tuning.SigilDiscLight, emitter: "WizardSpellEffects.Elements.MeteorCharge.1");
         }
-        frame.Sparks(centre, tuning.SparksCount, tuning.SparksRx, tuning.SparksRy, progress, Fire);
+        frame.Sparks(centre, tuning.SparksCount, tuning.SparksRx, tuning.SparksRy, progress, Fire, emitter: "WizardSpellEffects.Elements.MeteorCharge.2");
     }
 
     private static void MeteorSeal(Frame frame, Vector2 feet, float progress)
@@ -805,9 +805,9 @@ internal static partial class WizardSpellEffects
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.MeteorSeal);
         float open = tuning.Open + tuning.Open2 * Ease(progress * tuning.Open3);
         float pulse = tuning.Pulse + tuning.Pulse2 * MathF.Sin(progress * tuning.Pulse3);
-        frame.Sprite(feet, tuning.OrbWidth * open, tuning.OrbHeight * open, tuning.OrbShape, Ember, tuning.OrbAlpha * pulse, tuning.OrbLayer, light: tuning.OrbLight);
+        frame.Sprite(feet, tuning.OrbWidth * open, tuning.OrbHeight * open, tuning.OrbShape, Ember, tuning.OrbAlpha * pulse, tuning.OrbLayer, light: tuning.OrbLight, emitter: "WizardSpellEffects.Elements.MeteorSeal.1");
         Seal(frame, feet, tuning.X * open, tuning.Y * open, Fire, progress * tuning.Rotation, pulse, tuning.Spokes);
-        frame.Sprite(feet, tuning.GlyphWidth * open, tuning.GlyphHeight * open, tuning.GlyphShape, Gold, tuning.GlyphAlpha * pulse, tuning.GlyphLayer, rotation: progress * tuning.GlyphRotation);
+        frame.Sprite(feet, tuning.GlyphWidth * open, tuning.GlyphHeight * open, tuning.GlyphShape, Gold, tuning.GlyphAlpha * pulse, tuning.GlyphLayer, rotation: progress * tuning.GlyphRotation, emitter: "WizardSpellEffects.Elements.MeteorSeal.2");
     }
 
     private static float FieldDrop(float time, float contact, float variation)

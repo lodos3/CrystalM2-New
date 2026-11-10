@@ -156,6 +156,7 @@ internal static class LegacySpellEffects
         long now, int remaining, int interval, Vector2 facing = default, float progress = .58f,
         Vector2? feet = null, float previousProgress = 0, bool followThrough = false)
     {
+        using var emitterTime = SpellVfxAssets.AtProgress(progress);
         using var vfxScope = SpellVfxAssets.For(spell);
         var tuning = SpellVfxAssets.Current.Legacy.WeaponSweep;
         var fields = SpellVfxAssets.Fields("Legacy", "WeaponSweep");
@@ -185,16 +186,16 @@ internal static class LegacySpellEffects
                 int span = Math.Max(fields.Read(tuning.Span), (int)edge.Length() + fields.Read(tuning.Span2));
                 effect.Add(hilt + edge * fields.Read(tuning.BladeEdgeOffset), Vector2.Zero, fields.Read(tuning.BladeEdgeShape), span, life, fields.Read(tuning.BladeEdgeLayer),
                     aspect: fields.Read(tuning.BladeEdgeAspect) / span, rotation: MathF.Atan2(edge.Y, edge.X),
-                    alpha: (int)(fields.Read(tuning.BladeEdgeAlpha) + phase * fields.Read(tuning.BladeEdgeAlpha2)));
+                    alpha: (int)(fields.Read(tuning.BladeEdgeAlpha) + phase * fields.Read(tuning.BladeEdgeAlpha2)), emitter: "LegacySpellEffects.WeaponSweep.1");
             }
 
             int tipSpan = (int)drift.Length() + fields.Read(tuning.TipSpan);
             effect.Add((old.Tip + pose.Tip) * fields.Read(tuning.BladeEdgeOffset2), Vector2.Zero, fields.Read(tuning.BladeEdgeShape2), tipSpan, life,
                 fields.Read(tuning.BladeEdgeLayer2), aspect: fields.Read(tuning.BladeEdgeAspect2) / tipSpan,
-                rotation: MathF.Atan2(drift.Y, drift.X), core: fields.Read(tuning.BladeEdgeCore), alpha: fields.Read(tuning.BladeEdgeAlpha3));
+                rotation: MathF.Atan2(drift.Y, drift.X), core: fields.Read(tuning.BladeEdgeCore), alpha: fields.Read(tuning.BladeEdgeAlpha3), emitter: "LegacySpellEffects.WeaponSweep.2");
         }
 
-        effect.Add(pose.Tip, drift * fields.Read(tuning.FlashVelocity), fields.Read(tuning.FlashShape), fields.Read(tuning.FlashSize), life, fields.Read(tuning.FlashLayer), core: fields.Read(tuning.FlashCore));
+        effect.Add(pose.Tip, drift * fields.Read(tuning.FlashVelocity), fields.Read(tuning.FlashShape), fields.Read(tuning.FlashSize), life, fields.Read(tuning.FlashLayer), core: fields.Read(tuning.FlashCore), emitter: "LegacySpellEffects.WeaponSweep.3");
     }
 
     internal static Vector2 ProjectileAnchor(Spell spell, Vector2 cell)
@@ -239,12 +240,12 @@ internal static class LegacySpellEffects
             case Spell.ElementalShot:
             case Spell.CatTongue:
                 effect.Add(head, Vector2.Zero, tuning.CatTongueBladeEdgeShape, look.Size, remaining, tuning.CatTongueBladeEdgeLayer,
-                    aspect: tuning.CatTongueBladeEdgeAspect, rotation: angle, core: tuning.CatTongueBladeEdgeCore);
+                    aspect: tuning.CatTongueBladeEdgeAspect, rotation: angle, core: tuning.CatTongueBladeEdgeCore, emitter: "LegacySpellEffects.ProjectileFrame.1");
                 break;
             default:
-                effect.Add(head, Vector2.Zero, tuning.OrbShape, look.Size * tuning.OrbSize / tuning.OrbSizeDivisor, remaining, tuning.OrbLayer, alpha: tuning.OrbAlpha);
+                effect.Add(head, Vector2.Zero, tuning.OrbShape, look.Size * tuning.OrbSize / tuning.OrbSizeDivisor, remaining, tuning.OrbLayer, alpha: tuning.OrbAlpha, emitter: "LegacySpellEffects.ProjectileFrame.2");
                 effect.Add(head, Vector2.Zero, look.Shape, look.Size * tuning.AddSize / tuning.AddSizeDivisor, remaining,
-                    tuning.AddLayer, aspect: tuning.AddAspect, rotation: angle + turn, core: tuning.AddCore);
+                    tuning.AddLayer, aspect: tuning.AddAspect, rotation: angle + turn, core: tuning.AddCore, emitter: "LegacySpellEffects.ProjectileFrame.3");
                 break;
         }
 
@@ -254,9 +255,9 @@ internal static class LegacySpellEffects
         float drift = (frame % 3 - 1) * tuning.Drift;
         wake.Add(head - heading * tuning.OrbOffset + side * drift, -heading * tuning.OrbVelocity + side * drift * tuning.OrbVelocity2,
             tuning.OrbShape2, look.Size / 2, Math.Min(remaining, tuning.Val2), tuning.OrbLayer2,
-            aspect: tuning.OrbAspect, rotation: angle, growth: tuning.OrbGrowth, alpha: tuning.OrbAlpha2);
+            aspect: tuning.OrbAspect, rotation: angle, growth: tuning.OrbGrowth, alpha: tuning.OrbAlpha2, emitter: "LegacySpellEffects.ProjectileFrame.4");
         wake.Add(head - heading * tuning.SparkOffset, -heading * tuning.SparkVelocity + side * drift, tuning.SparkShape, tuning.SparkSize,
-            Math.Min(remaining, tuning.Val22), tuning.SparkLayer, rotation: angle + turn, core: tuning.SparkCore);
+            Math.Min(remaining, tuning.Val22), tuning.SparkLayer, rotation: angle + turn, core: tuning.SparkCore, emitter: "LegacySpellEffects.ProjectileFrame.5");
     }
 
     private static Look Profile(SpellVisual visual)
@@ -301,9 +302,9 @@ internal static class LegacySpellEffects
                 break;
             case SpellVisualPhase.Flight:
                 effect.Add(body, facing * fields.Read(tuning.FlightOrbVelocity), fields.Read(tuning.FlightOrbShape), look.Size * fields.Read(tuning.FlightOrbSize) / 4, fields.Read(tuning.FlightOrbDuration), fields.Read(tuning.FlightOrbLayer),
-                    aspect: fields.Read(tuning.FlightOrbAspect), alpha: fields.Read(tuning.FlightOrbAlpha));
+                    aspect: fields.Read(tuning.FlightOrbAspect), alpha: fields.Read(tuning.FlightOrbAlpha), emitter: "LegacySpellEffects.Emit.1");
                 effect.Add(body + facing * fields.Read(tuning.FlightAddOffset), facing * fields.Read(tuning.FlightAddVelocity), look.Shape, look.Size / 2, fields.Read(tuning.FlightAddDuration), fields.Read(tuning.FlightAddLayer),
-                    aspect: fields.Read(tuning.FlightAddAspect), rotation: angle, core: fields.Read(tuning.FlightAddCore));
+                    aspect: fields.Read(tuning.FlightAddAspect), rotation: angle, core: fields.Read(tuning.FlightAddCore), emitter: "LegacySpellEffects.Emit.2");
                 break;
             case SpellVisualPhase.Swing:
             case SpellVisualPhase.FollowThrough:
@@ -316,18 +317,18 @@ internal static class LegacySpellEffects
                 Field(effect, look, visual.Spell, feet, body, now);
                 break;
             case SpellVisualPhase.Expire:
-                effect.Scatter(body, fields.Read(tuning.ExpireShardCount), fields.Read(tuning.ExpireShardShape), fields.Read(tuning.ExpireShardSpread), fields.Read(tuning.ExpireShardDuration));
+                effect.Scatter(body, fields.Read(tuning.ExpireShardCount), fields.Read(tuning.ExpireShardShape), fields.Read(tuning.ExpireShardSpread), fields.Read(tuning.ExpireShardDuration), emitter: "LegacySpellEffects.Emit.3");
                 break;
             case SpellVisualPhase.Burn:
-                effect.Add(feet, Vector2.Zero, fields.Read(tuning.BurnHaloShape), fields.Read(tuning.BurnHaloSize), fields.Read(tuning.BurnHaloDuration), fields.Read(tuning.BurnHaloLayer), aspect: fields.Read(tuning.BurnHaloAspect), alpha: fields.Read(tuning.BurnHaloAlpha));
+                effect.Add(feet, Vector2.Zero, fields.Read(tuning.BurnHaloShape), fields.Read(tuning.BurnHaloSize), fields.Read(tuning.BurnHaloDuration), fields.Read(tuning.BurnHaloLayer), aspect: fields.Read(tuning.BurnHaloAspect), alpha: fields.Read(tuning.BurnHaloAlpha), emitter: "LegacySpellEffects.Emit.4");
                 effect.Add(body + new Vector2(fields.Read(tuning.BurnX), fields.Read(tuning.BurnY)), new Vector2(fields.Read(tuning.BurnX2), fields.Read(tuning.BurnY2)), fields.Read(tuning.BurnWispShape), fields.Read(tuning.BurnWispSize), fields.Read(tuning.BurnWispDuration),
-                    fields.Read(tuning.BurnWispLayer), aspect: fields.Read(tuning.BurnWispAspect), growth: fields.Read(tuning.BurnWispGrowth));
-                effect.Scatter(feet, fields.Read(tuning.BurnSparkCount), fields.Read(tuning.BurnSparkShape), fields.Read(tuning.BurnSparkSpread), fields.Read(tuning.BurnSparkDuration), rise: true);
+                    fields.Read(tuning.BurnWispLayer), aspect: fields.Read(tuning.BurnWispAspect), growth: fields.Read(tuning.BurnWispGrowth), emitter: "LegacySpellEffects.Emit.5");
+                effect.Scatter(feet, fields.Read(tuning.BurnSparkCount), fields.Read(tuning.BurnSparkShape), fields.Read(tuning.BurnSparkSpread), fields.Read(tuning.BurnSparkDuration), rise: true, emitter: "LegacySpellEffects.Emit.6");
                 break;
             case SpellVisualPhase.Ward:
-                effect.Ring(feet, look.Size, fields.Read(tuning.WardRingDuration));
+                effect.Ring(feet, look.Size, fields.Read(tuning.WardRingDuration), emitter: "LegacySpellEffects.Emit.7");
                 effect.Add(body, -Vector2.UnitY * fields.Read(tuning.WardShieldVelocity), fields.Read(tuning.WardShieldShape), fields.Read(tuning.WardShieldSize), fields.Read(tuning.WardShieldDuration), fields.Read(tuning.WardShieldLayer),
-                    aspect: fields.Read(tuning.WardShieldAspect), growth: fields.Read(tuning.WardShieldGrowth), alpha: fields.Read(tuning.WardShieldAlpha));
+                    aspect: fields.Read(tuning.WardShieldAspect), growth: fields.Read(tuning.WardShieldGrowth), alpha: fields.Read(tuning.WardShieldAlpha), emitter: "LegacySpellEffects.Emit.8");
                 break;
             default:
                 Impact(effect, look, visual.Spell, feet, body, facing, angle);
@@ -339,10 +340,10 @@ internal static class LegacySpellEffects
     {
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.Prepare);
         effect.Add(hand, -Vector2.UnitY * tuning.AddVelocity, look.Shape, Math.Max(tuning.Val1, look.Size * tuning.Val2 / 3),
-            tuning.AddDuration, tuning.AddLayer, aspect: tuning.AddAspect, rotation: angle * tuning.AddRotation, growth: tuning.AddGrowth, alpha: tuning.AddAlpha);
+            tuning.AddDuration, tuning.AddLayer, aspect: tuning.AddAspect, rotation: angle * tuning.AddRotation, growth: tuning.AddGrowth, alpha: tuning.AddAlpha, emitter: "LegacySpellEffects.Prepare.1");
         effect.Add(hand, Vector2.Zero, tuning.OrbShape, Math.Max(tuning.Val12, look.Size / 4), tuning.OrbDuration,
-            tuning.OrbLayer, delay: tuning.OrbDelay, core: tuning.OrbCore);
-        effect.Scatter(hand, tuning.SparkCount, tuning.SparkShape, tuning.SparkSpread, tuning.SparkDuration, rise: true);
+            tuning.OrbLayer, delay: tuning.OrbDelay, core: tuning.OrbCore, emitter: "LegacySpellEffects.Prepare.2");
+        effect.Scatter(hand, tuning.SparkCount, tuning.SparkShape, tuning.SparkSpread, tuning.SparkDuration, rise: true, emitter: "LegacySpellEffects.Prepare.3");
     }
 
     private static void Swing(Effect effect, Look look, SpellVisual visual, Vector2 feet, Vector2 body,
@@ -353,8 +354,8 @@ internal static class LegacySpellEffects
         if (visual.Spell == Spell.Thrusting)
         {
             effect.Add(body + facing * tuning.BoltOffset, facing * tuning.BoltVelocity, tuning.BoltShape, look.Size, tuning.BoltDuration, tuning.BoltLayer,
-                aspect: tuning.BoltAspect, rotation: angle, core: tuning.BoltCore);
-            effect.Scatter(body + facing * tuning.SparkOffset, tuning.SparkCount, tuning.SparkShape, tuning.SparkSpread, tuning.SparkDuration);
+                aspect: tuning.BoltAspect, rotation: angle, core: tuning.BoltCore, emitter: "LegacySpellEffects.Swing.1");
+            effect.Scatter(body + facing * tuning.SparkOffset, tuning.SparkCount, tuning.SparkShape, tuning.SparkSpread, tuning.SparkDuration, emitter: "LegacySpellEffects.Swing.2");
             return;
         }
 
@@ -362,7 +363,7 @@ internal static class LegacySpellEffects
         {
             for (int i = 0; i < tuning.ShardCount; i++)
                 effect.Add(body + facing * (tuning.ShardOffset + i * tuning.ShardOffset2), facing * tuning.ShardVelocity, tuning.ShardShape, tuning.ShardSize + i * tuning.ShardSize2, tuning.ShardDuration, tuning.ShardLayer,
-                    aspect: tuning.ShardAspect, rotation: angle + tuning.ShardRotation, delay: i * tuning.ShardDelay, core: i % 2 == 0);
+                    aspect: tuning.ShardAspect, rotation: angle + tuning.ShardRotation, delay: i * tuning.ShardDelay, core: i % 2 == 0, emitter: "LegacySpellEffects.Swing.3");
             return;
         }
 
@@ -372,13 +373,13 @@ internal static class LegacySpellEffects
             float direction = angle + i * (visual.Spell == Spell.CrossHalfMoon ? MathF.PI / 2 : tuning.Direction) + (follow ? tuning.Direction2 : tuning.Direction3);
             Vector2 travel = new(MathF.Cos(direction), MathF.Sin(direction));
             effect.Add(body + travel * tuning.AddOffset, travel * tuning.AddVelocity, look.Shape, look.Size, tuning.AddDuration, tuning.AddLayer,
-                aspect: tuning.AddAspect, rotation: direction, delay: i * tuning.AddDelay, core: follow || i == 1);
+                aspect: tuning.AddAspect, rotation: direction, delay: i * tuning.AddDelay, core: follow || i == 1, emitter: "LegacySpellEffects.Swing.4");
         }
         if (visual.Spell is Spell.HalfMoon or Spell.CrossHalfMoon or Spell.SlashingBurst)
-            effect.Ring(feet, look.Size, tuning.RingDuration);
+            effect.Ring(feet, look.Size, tuning.RingDuration, emitter: "LegacySpellEffects.Swing.5");
         if (visual.Spell == Spell.FlamingSword)
-            effect.Add(body + facing * tuning.WispOffset, facing * tuning.WispVelocity - Vector2.UnitY * tuning.WispVelocity2, tuning.WispShape, tuning.WispSize, tuning.WispDuration, tuning.WispLayer, growth: tuning.WispGrowth);
-        effect.Scatter(body + facing * tuning.SparkOffset2, tuning.SparkCount2, tuning.SparkShape2, look.Size * tuning.SparkSpread2, tuning.SparkDuration2);
+            effect.Add(body + facing * tuning.WispOffset, facing * tuning.WispVelocity - Vector2.UnitY * tuning.WispVelocity2, tuning.WispShape, tuning.WispSize, tuning.WispDuration, tuning.WispLayer, growth: tuning.WispGrowth, emitter: "LegacySpellEffects.Swing.6");
+        effect.Scatter(body + facing * tuning.SparkOffset2, tuning.SparkCount2, tuning.SparkShape2, look.Size * tuning.SparkSpread2, tuning.SparkDuration2, emitter: "LegacySpellEffects.Swing.7");
     }
 
     private static void Aura(Effect effect, Look look, Spell spell, Vector2 feet, Vector2 body)
@@ -386,16 +387,16 @@ internal static class LegacySpellEffects
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.Aura);
         if (spell is Spell.Poisoning or Spell.Plague or Spell.Curse or Spell.Hiding)
         {
-            effect.Add(body, -Vector2.UnitY * tuning.AddVelocity, look.Shape, look.Size * tuning.AddSize / 3, tuning.AddDuration, tuning.AddLayer, alpha: tuning.AddAlpha, growth: tuning.AddGrowth);
-            effect.Add(feet, -Vector2.UnitY * tuning.SparkVelocity, tuning.SparkShape, tuning.SparkSize, tuning.SparkDuration, tuning.SparkLayer, core: tuning.SparkCore);
+            effect.Add(body, -Vector2.UnitY * tuning.AddVelocity, look.Shape, look.Size * tuning.AddSize / 3, tuning.AddDuration, tuning.AddLayer, alpha: tuning.AddAlpha, growth: tuning.AddGrowth, emitter: "LegacySpellEffects.Aura.1");
+            effect.Add(feet, -Vector2.UnitY * tuning.SparkVelocity, tuning.SparkShape, tuning.SparkSize, tuning.SparkDuration, tuning.SparkLayer, core: tuning.SparkCore, emitter: "LegacySpellEffects.Aura.2");
             return;
         }
 
-        effect.Add(feet, Vector2.Zero, tuning.HaloShape, look.Size, tuning.HaloDuration, tuning.HaloLayer, aspect: tuning.HaloAspect, alpha: tuning.HaloAlpha);
+        effect.Add(feet, Vector2.Zero, tuning.HaloShape, look.Size, tuning.HaloDuration, tuning.HaloLayer, aspect: tuning.HaloAspect, alpha: tuning.HaloAlpha, emitter: "LegacySpellEffects.Aura.3");
         effect.Add(body, -Vector2.UnitY * tuning.AddVelocity2, look.Shape, look.Size * tuning.AddSize2 / 4, tuning.AddDuration2, tuning.AddLayer2,
-            aspect: tuning.AddAspect, alpha: tuning.AddAlpha2);
+            aspect: tuning.AddAspect, alpha: tuning.AddAlpha2, emitter: "LegacySpellEffects.Aura.4");
         effect.Add(body + new Vector2(tuning.X, tuning.Y), new Vector2(tuning.X2, tuning.Y2), tuning.SparkShape2, tuning.SparkSize2, tuning.SparkDuration2,
-            tuning.SparkLayer2, core: tuning.SparkCore2);
+            tuning.SparkLayer2, core: tuning.SparkCore2, emitter: "LegacySpellEffects.Aura.5");
     }
 
     private static void Field(Effect effect, Look look, Spell spell, Vector2 feet, Vector2 body, long now)
@@ -406,9 +407,9 @@ internal static class LegacySpellEffects
         {
             case Spell.PoisonCloud:
                 effect.Add(feet + new Vector2(drift, tuning.PoisonCloudY), new Vector2(tuning.PoisonCloudX, tuning.PoisonCloudY2), tuning.PoisonCloudWispShape, tuning.PoisonCloudWispSize, tuning.PoisonCloudWispDuration,
-                    tuning.PoisonCloudWispLayer, aspect: tuning.PoisonCloudWispAspect, alpha: tuning.PoisonCloudWispAlpha, growth: tuning.PoisonCloudWispGrowth);
+                    tuning.PoisonCloudWispLayer, aspect: tuning.PoisonCloudWispAspect, alpha: tuning.PoisonCloudWispAlpha, growth: tuning.PoisonCloudWispGrowth, emitter: "LegacySpellEffects.Field.1");
                 effect.Add(feet + new Vector2(-drift, tuning.PoisonCloudY3), new Vector2(tuning.PoisonCloudX2, tuning.PoisonCloudY4), tuning.PoisonCloudWispShape2, tuning.PoisonCloudWispSize2, tuning.PoisonCloudWispDuration2,
-                    tuning.PoisonCloudWispLayer2, aspect: tuning.PoisonCloudWispAspect2, alpha: tuning.PoisonCloudWispAlpha2, growth: tuning.PoisonCloudWispGrowth2);
+                    tuning.PoisonCloudWispLayer2, aspect: tuning.PoisonCloudWispAspect2, alpha: tuning.PoisonCloudWispAlpha2, growth: tuning.PoisonCloudWispGrowth2, emitter: "LegacySpellEffects.Field.2");
                 break;
             case Spell.TrapHexagon:
                 for (int i = 0; i < tuning.TrapHexagonBoltCount; i++)
@@ -419,7 +420,7 @@ internal static class LegacySpellEffects
                     Vector2 end = new(MathF.Cos(next) * tuning.TrapHexagonEnd, MathF.Sin(next) * tuning.TrapHexagonEnd2);
                     Vector2 edge = end - point;
                     effect.Add(feet + (point + end) * tuning.TrapHexagonBoltOffset, Vector2.Zero, tuning.TrapHexagonBoltShape, (int)edge.Length() + tuning.TrapHexagonBoltSize,
-                        tuning.TrapHexagonBoltDuration, tuning.TrapHexagonBoltLayer, aspect: tuning.TrapHexagonBoltAspect, rotation: MathF.Atan2(edge.Y, edge.X), alpha: tuning.TrapHexagonBoltAlpha);
+                        tuning.TrapHexagonBoltDuration, tuning.TrapHexagonBoltLayer, aspect: tuning.TrapHexagonBoltAspect, rotation: MathF.Atan2(edge.Y, edge.X), alpha: tuning.TrapHexagonBoltAlpha, emitter: "LegacySpellEffects.Field.3");
                 }
                 break;
             default:
@@ -437,57 +438,57 @@ internal static class LegacySpellEffects
             case Form.Cut:
             case Form.Cleave:
                 effect.Add(body, facing * tuning.CleaveAddVelocity, look.Shape, Math.Max(tuning.CleaveVal1, look.Size / 2), tuning.CleaveAddDuration, tuning.CleaveAddLayer,
-                    aspect: tuning.CleaveAddAspect, rotation: angle - tuning.CleaveAddRotation, core: tuning.CleaveAddCore);
+                    aspect: tuning.CleaveAddAspect, rotation: angle - tuning.CleaveAddRotation, core: tuning.CleaveAddCore, emitter: "LegacySpellEffects.Impact.1");
                 if (spell is not (Spell.Fencing or Spell.SpiritSword))
-                    effect.Scatter(body, tuning.CleaveSparkCount, tuning.CleaveSparkShape, tuning.CleaveSparkSpread, tuning.CleaveSparkDuration);
+                    effect.Scatter(body, tuning.CleaveSparkCount, tuning.CleaveSparkShape, tuning.CleaveSparkSpread, tuning.CleaveSparkDuration, emitter: "LegacySpellEffects.Impact.2");
                 break;
             case Form.Rush:
-                effect.Add(body, facing * tuning.RushBoltVelocity, tuning.RushBoltShape, look.Size, tuning.RushBoltDuration, tuning.RushBoltLayer, aspect: tuning.RushBoltAspect, rotation: angle);
-                effect.Add(feet, facing * tuning.RushWispVelocity, tuning.RushWispShape, tuning.RushWispSize, tuning.RushWispDuration, tuning.RushWispLayer, alpha: tuning.RushWispAlpha);
-                effect.Scatter(body, tuning.RushShardCount, tuning.RushShardShape, tuning.RushShardSpread, tuning.RushShardDuration);
+                effect.Add(body, facing * tuning.RushBoltVelocity, tuning.RushBoltShape, look.Size, tuning.RushBoltDuration, tuning.RushBoltLayer, aspect: tuning.RushBoltAspect, rotation: angle, emitter: "LegacySpellEffects.Impact.3");
+                effect.Add(feet, facing * tuning.RushWispVelocity, tuning.RushWispShape, tuning.RushWispSize, tuning.RushWispDuration, tuning.RushWispLayer, alpha: tuning.RushWispAlpha, emitter: "LegacySpellEffects.Impact.4");
+                effect.Scatter(body, tuning.RushShardCount, tuning.RushShardShape, tuning.RushShardSpread, tuning.RushShardDuration, emitter: "LegacySpellEffects.Impact.5");
                 break;
             case Form.Heal:
             case Form.Totem:
             case Form.Ward:
-                effect.Ring(feet, look.Size, tuning.WardRingDuration);
+                effect.Ring(feet, look.Size, tuning.WardRingDuration, emitter: "LegacySpellEffects.Impact.6");
                 effect.Add(body, -Vector2.UnitY * tuning.WardAddVelocity, look.Shape, look.Size * tuning.WardAddSize / 4, tuning.WardAddDuration,
-                    tuning.WardAddLayer, aspect: tuning.WardAddAspect, growth: tuning.WardAddGrowth);
-                effect.Add(body, -Vector2.UnitY * tuning.WardFlashVelocity, tuning.WardFlashShape, look.Size / 2, tuning.WardFlashDuration, tuning.WardFlashLayer, core: tuning.WardFlashCore);
-                effect.Scatter(body, tuning.WardFeatherCount, look.Form == Form.Totem ? look.Shape : tuning.WardFeatherShape, look.Size * tuning.WardFeatherSpread, tuning.WardFeatherDuration, rise: true);
+                    tuning.WardAddLayer, aspect: tuning.WardAddAspect, growth: tuning.WardAddGrowth, emitter: "LegacySpellEffects.Impact.7");
+                effect.Add(body, -Vector2.UnitY * tuning.WardFlashVelocity, tuning.WardFlashShape, look.Size / 2, tuning.WardFlashDuration, tuning.WardFlashLayer, core: tuning.WardFlashCore, emitter: "LegacySpellEffects.Impact.8");
+                effect.Scatter(body, tuning.WardFeatherCount, look.Form == Form.Totem ? look.Shape : tuning.WardFeatherShape, look.Size * tuning.WardFeatherSpread, tuning.WardFeatherDuration, rise: true, emitter: "LegacySpellEffects.Impact.9");
                 break;
             case Form.Bind:
-                effect.Ring(feet, look.Size, tuning.BindRingDuration);
+                effect.Ring(feet, look.Size, tuning.BindRingDuration, emitter: "LegacySpellEffects.Impact.10");
                 if (spell == Spell.Entrapment)
                 {
                     for (int i = 0; i < tuning.BindBoltCount; i++)
                         effect.Add(body + new Vector2(0, i * tuning.BindY - tuning.BindY2), Vector2.Zero, tuning.BindBoltShape, tuning.BindBoltSize, tuning.BindBoltDuration,
-                            tuning.BindBoltLayer, aspect: tuning.BindBoltAspect, rotation: i == 1 ? tuning.BindBoltRotation : tuning.BindBoltRotation2, delay: i * tuning.BindBoltDelay, core: i == 1);
+                            tuning.BindBoltLayer, aspect: tuning.BindBoltAspect, rotation: i == 1 ? tuning.BindBoltRotation : tuning.BindBoltRotation2, delay: i * tuning.BindBoltDelay, core: i == 1, emitter: "LegacySpellEffects.Impact.11");
                 }
                 else
                 {
                     effect.Add(body, -Vector2.UnitY * tuning.BindAddVelocity, look.Shape, look.Size * tuning.BindAddSize / 4, tuning.BindAddDuration,
-                        tuning.BindAddLayer, core: tuning.BindAddCore);
+                        tuning.BindAddLayer, core: tuning.BindAddCore, emitter: "LegacySpellEffects.Impact.12");
                 }
                 break;
             case Form.Veil:
-                effect.Ring(feet, look.Size, tuning.VeilRingDuration);
+                effect.Ring(feet, look.Size, tuning.VeilRingDuration, emitter: "LegacySpellEffects.Impact.13");
                 for (int i = -1; i <= tuning.VeilWispCount; i++)
                     effect.Add(body + new Vector2(i * tuning.VeilX, tuning.VeilY), new Vector2(i * tuning.VeilX2, tuning.VeilY2), tuning.VeilWispShape, look.Size * tuning.VeilWispSize / 4,
-                        tuning.VeilWispDuration, tuning.VeilWispLayer, growth: tuning.VeilWispGrowth, alpha: tuning.VeilWispAlpha);
-                effect.Add(body, -Vector2.UnitY * tuning.VeilAddVelocity, look.Shape, look.Size / 2, tuning.VeilAddDuration, tuning.VeilAddLayer, core: tuning.VeilAddCore);
+                        tuning.VeilWispDuration, tuning.VeilWispLayer, growth: tuning.VeilWispGrowth, alpha: tuning.VeilWispAlpha, emitter: "LegacySpellEffects.Impact.14");
+                effect.Add(body, -Vector2.UnitY * tuning.VeilAddVelocity, look.Shape, look.Size / 2, tuning.VeilAddDuration, tuning.VeilAddLayer, core: tuning.VeilAddCore, emitter: "LegacySpellEffects.Impact.15");
                 break;
             case Form.Break:
-                effect.Ring(feet, look.Size, tuning.BreakRingDuration);
+                effect.Ring(feet, look.Size, tuning.BreakRingDuration, emitter: "LegacySpellEffects.Impact.16");
                 effect.Add(body, Vector2.Zero, look.Shape, look.Size, tuning.BreakAddDuration, tuning.BreakAddLayer,
-                    aspect: tuning.BreakAddAspect, growth: tuning.BreakAddGrowth, alpha: tuning.BreakAddAlpha, core: tuning.BreakAddCore);
-                effect.Scatter(body, tuning.BreakFeatherCount, tuning.BreakFeatherShape, look.Size * tuning.BreakFeatherSpread, tuning.BreakFeatherDuration);
+                    aspect: tuning.BreakAddAspect, growth: tuning.BreakAddGrowth, alpha: tuning.BreakAddAlpha, core: tuning.BreakAddCore, emitter: "LegacySpellEffects.Impact.17");
+                effect.Scatter(body, tuning.BreakFeatherCount, tuning.BreakFeatherShape, look.Size * tuning.BreakFeatherSpread, tuning.BreakFeatherDuration, emitter: "LegacySpellEffects.Impact.18");
                 break;
             default:
-                if (look.Form is Form.Eruption or Form.Hammer) effect.Ring(feet, look.Size, tuning.RingDuration);
+                if (look.Form is Form.Eruption or Form.Hammer) effect.Ring(feet, look.Size, tuning.RingDuration, emitter: "LegacySpellEffects.Impact.19");
                 effect.Add(body, -Vector2.UnitY * tuning.PillarVelocity, look.Shape, look.Size * tuning.PillarSize / 4, tuning.PillarDuration, tuning.PillarLayer,
-                    aspect: look.Shape == Shape.Pillar ? tuning.PillarAspect : tuning.PillarAspect2, growth: tuning.PillarGrowth);
-                effect.Add(body, -Vector2.UnitY * tuning.FlashVelocity, tuning.FlashShape, look.Size * tuning.FlashSize / 3, tuning.FlashDuration, tuning.FlashLayer, core: tuning.FlashCore);
-                effect.Scatter(body, tuning.SparkCount, tuning.SparkShape, look.Size * tuning.SparkSpread, tuning.SparkDuration);
+                    aspect: look.Shape == Shape.Pillar ? tuning.PillarAspect : tuning.PillarAspect2, growth: tuning.PillarGrowth, emitter: "LegacySpellEffects.Impact.20");
+                effect.Add(body, -Vector2.UnitY * tuning.FlashVelocity, tuning.FlashShape, look.Size * tuning.FlashSize / 3, tuning.FlashDuration, tuning.FlashLayer, core: tuning.FlashCore, emitter: "LegacySpellEffects.Impact.21");
+                effect.Scatter(body, tuning.SparkCount, tuning.SparkShape, look.Size * tuning.SparkSpread, tuning.SparkDuration, emitter: "LegacySpellEffects.Impact.22");
                 break;
         }
     }

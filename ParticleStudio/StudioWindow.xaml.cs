@@ -1,4 +1,3 @@
-using System.Windows.Data;
 using System.Diagnostics;
 using System.IO;
 using System.Numerics;
@@ -21,7 +20,6 @@ public partial class StudioWindow : Window
     private readonly DispatcherTimer _timer = new(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(16) };
     private readonly Stopwatch _clock = new();
     private readonly Dictionary<Spell, Draft> _drafts = new();
-    private Dictionary<string, JsonObject> _defaults = new(StringComparer.Ordinal);
     private string _folder = FindAssetFolder();
     private SpellVfxEntry? _spell;
     private PreviewSequence? _sequence;
@@ -81,10 +79,7 @@ public partial class StudioWindow : Window
     {
         if (!SpellVfxAssets.Groups.All(group => File.Exists(Path.Combine(directory, group + ".json"))))
             throw new InvalidDataException("Choose a SpellVfx folder containing the seven group files.");
-        var defaults = SpellVfxAssets.Groups.ToDictionary(group => group,
-            group => SpellVfxAssets.ReadGroup(directory, group), StringComparer.Ordinal);
         SpellVfxAssets.Reload(directory);
-        _defaults = defaults;
         _folder = directory;
         _drafts.Clear();
         FolderText.Text = directory;
@@ -187,177 +182,99 @@ public partial class StudioWindow : Window
         UpdateClock();
     }
 
-    private Dictionary<(string Group, string Node), HashSet<string>> _activeFields = new();
+    private Dictionary<string, SpellVfxAssets.EmitterSample> _emitters = new();
+    private readonly HashSet<string> _expandedModules = ["Main", "Emission", "Renderer"];
 
     private void RefreshNodes()
     {
-        if (_spell == null || _defaults.Count == 0) return;
-        var prior = NodePicker.SelectedItem as NodeChoice;
-        var nodes = SpellVfxAssets.CollectNodes(() =>
+        if (_spell == null) return;
+        string? prior = (NodePicker.SelectedItem as LayerChoice)?.Id;
+        _emitters = SpellVfxAssets.CollectEmitters(() =>
         {
-            if (StagePicker.SelectedIndex == 0) _ = new PreviewSequence(_spell);
             var pool = new SpellParticlePool(4096);
             var direction = DirectionPicker.SelectedItem is MirDirection selected ? selected : MirDirection.Right;
             float angle = ((int)direction - 2) * MathF.PI / 4;
             var facing = Vector2.Normalize(new Vector2(MathF.Cos(angle), MathF.Sin(angle) * .68f));
             var rig = new PreviewRig(new Vector2(300, 280), facing, direction);
             foreach (var stage in SelectedStages())
+            foreach (float fraction in new[] { 0f, .08f, .2f, .33f, .5f, .67f, .8f, .92f, .99f })
             {
-                stage.InspectTiming?.Invoke();
-                foreach (float fraction in new[] { .08f, .33f, .67f, .92f })
-                {
-                    pool.Clear();
-                    stage.Sample(pool, rig, (int)(stage.Duration * fraction));
-                }
+                pool.Clear();
+                stage.Sample(pool, rig, (int)(stage.Duration * fraction));
             }
-        }, out _activeFields);
-        var items = (AllNodes.IsChecked == true
-            ? _defaults.SelectMany(group => group.Value.Select(node => (Group: group.Key, Node: node.Key)))
-            : nodes.Where(node => _defaults.TryGetValue(node.Group, out var group) && group.ContainsKey(node.Node)))
-            .OrderBy(node => node.Group).ThenBy(node => node.Node)
-            .SelectMany(node => ParticleLayers.Names(node.Group, node.Node, AllNodes.IsChecked == true)
-                .Select(layer => new NodeChoice(node.Group, node.Node, layer))).ToArray();
-        NodePicker.ItemsSource = items;
-        NodePicker.SelectedItem = items.Contains(prior) ? prior : items.FirstOrDefault(item => item.Layer != null) ?? items.FirstOrDefault();
-        ShowParameters();
-    }
+        });
 
-    private void NodesChanged(object sender, RoutedEventArgs e)
-    {
-        if (_ready) Try(RefreshNodes);
+        var names = new Dictionary<string, int>();
+        var items = _emitters.Select(item =>
+        {
+            var particle = item.Value.Particle;
+            string name = $"{particle.Shape} · {particle.Layer}";
+            int number = names.GetValueOrDefault(name) + 1;
+            names[name] = number;
+            return new LayerChoice(item.Key, number == 1 ? name : $"{name} {number}");
+        }).ToArray();
+        NodePicker.ItemsSource = items;
+        NodePicker.SelectedItem = items.FirstOrDefault(item => item.Id == prior) ?? items.FirstOrDefault();
+        ShowParameters();
     }
 
     private void NodeChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_ready) ShowParameters();
+        if (!_ready) return;
+        ShowParameters();
+        if (SoloLayer.IsChecked == true) Draw();
     }
 
     private void ShowParameters()
     {
-        if (_spell == null || NodePicker.SelectedItem is not NodeChoice choice)
+        if (_spell == null || NodePicker.SelectedItem is not LayerChoice choice)
         {
-            Parameters.ItemsSource = null;
+            EmitterModules.Children.Clear();
+            EmitterModules.Children.Add(new TextBlock
+            {
+                Text = "No particle layers were emitted in this stage.", TextWrapping = TextWrapping.Wrap
+            });
             return;
         }
-        var shared = _defaults[choice.Group][choice.Node]!.AsObject();
-        var overrides = _drafts[_spell.Spell].Working[choice.Group]?[choice.Node] as JsonObject;
-        JsonNode Value(string key) => overrides?[key] ?? shared[key]!;
-        var rows = shared.Where(item => ParticleLayers.Includes(choice.Layer, item.Key, _spell.Spell))
-            .Where(item => AllNodes.IsChecked == true ||
-                !_activeFields.TryGetValue((choice.Group, choice.Node), out var fields) || fields.Contains(item.Key))
-            .Where(item => !ParticleLayers.IsPairComponent(choice.Layer, item.Key))
-            .Select(item =>
+        Spell spell = _spell.Spell;
+        var current = _drafts[spell].Working[SpellVfxAssets.EmitterGroup]?[choice.Id] as JsonObject ?? new JsonObject();
+        EmitterInspector.Show(EmitterModules, _emitters[choice.Id], current, _expandedModules,
+            (key, value) => ChangeEmitter(spell, choice, key, value), this);
+    }
+
+    private bool ChangeEmitter(Spell spell, LayerChoice layer, string key, JsonNode? value)
+    {
+        if (_spell?.Spell != spell) return false;
+        var draft = _drafts[spell];
+        var updated = (JsonObject)draft.Working.DeepClone();
+        var group = updated[SpellVfxAssets.EmitterGroup] as JsonObject;
+        var settings = group?[layer.Id] as JsonObject;
+        if (value != null)
         {
-            JsonNode? edit = overrides?[item.Key];
-            JsonNode value = edit ?? item.Value!;
-            var control = ParticleSettings.Describe(choice.Group, choice.Node, item.Key, _spell.Spell);
-            string label = AllNodes.IsChecked == true ? item.Key : ParticleLayers.Label(choice.Layer, item.Key) ?? control.Label;
-            var pair = ParticleLayers.Pair(choice.Layer, item.Key);
-            if (pair is { } linked)
-            {
-                double start = value.GetValue<double>(), other = Value(linked.Key).GetValue<double>();
-                string summary = linked.Fade ? $"{start:g4} → {start * (1 - other):g4}" : $"{start:g4} – {start + other:g4}";
-                return new ParameterRow(item.Key, linked.Fade ? "Opacity over stage" : label + " range",
-                    control.Module, summary, edit == null && overrides?[linked.Key] == null ? "Default" : "Override", true);
-            }
-            return new ParameterRow(item.Key, label, control.Module, Format(value), edit == null ? "Default" : "Override",
-                value is JsonArray);
-        }).OrderBy(row => ParticleSettings.ModuleOrder(row.Module)).ToArray();
-        var view = new ListCollectionView(rows);
-        view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ParameterRow.Module)));
-        Parameters.ItemsSource = view;
-    }
+            if (group == null) updated[SpellVfxAssets.EmitterGroup] = group = new JsonObject();
+            if (settings == null) group[layer.Id] = settings = new JsonObject();
+            settings[key] = value.DeepClone();
+        }
+        else settings?.Remove(key);
+        if (settings?.Count == 0) group!.Remove(layer.Id);
+        if (group?.Count == 0) updated.Remove(SpellVfxAssets.EmitterGroup);
+        if (JsonNode.DeepEquals(updated, draft.Working)) return true;
 
-    private static string Format(JsonNode value) => value.GetValueKind() == JsonValueKind.String
-        ? value.GetValue<string>() : value.ToJsonString();
-
-    private void BeginParameterEdit(object sender, DataGridBeginningEditEventArgs e)
-    {
-        if (e.Row.Item is ParameterRow { Structured: true }) e.Cancel = true;
-    }
-
-    private void EditSelectedValue(object sender, RoutedEventArgs e)
-    {
-        if (_spell == null || NodePicker.SelectedItem is not NodeChoice choice ||
-            Parameters.SelectedItem is not ParameterRow row) return;
-        Try(() =>
-        {
-            var shared = _defaults[choice.Group][choice.Node]!.AsObject();
-            var overrides = _drafts[_spell.Spell].Working[choice.Group]?[choice.Node];
-            JsonNode Value(string key) => overrides?[key] ?? shared[key]!;
-            var pair = ParticleLayers.Pair(choice.Layer, row.Name);
-            var editor = new ParticleValueEditor(row.Label, row.Name, Value(row.Name),
-                pair is { } linked ? (linked.Key, linked.Fade, Value(linked.Key)) : null) { Owner = this };
-            if (editor.ShowDialog() != true) return;
-            ChangeValues(choice, editor.Values.Select(item =>
-                (item.Key, JsonNode.DeepEquals(shared[item.Key], item.Value) ? null : item.Value)));
-        });
-    }
-
-    private void ParameterEdited(object sender, DataGridCellEditEndingEventArgs e)
-    {
-        if (e.EditAction != DataGridEditAction.Commit || e.EditingElement is not TextBox input ||
-            e.Row.Item is not ParameterRow row || _spell == null ||
-            NodePicker.SelectedItem is not NodeChoice choice || row.Text == input.Text) return;
         try
         {
-            JsonNode shared = _defaults[choice.Group][choice.Node]![row.Name]!;
-            JsonNode value = shared.GetValueKind() == JsonValueKind.String
-                ? JsonValue.Create(input.Text.Trim())! : JsonNode.Parse(input.Text)!;
-            if (value == null) throw new InvalidDataException("Enter a number, true or false, or a colour curve as shown.");
-            ChangeValue(choice, row.Name, JsonNode.DeepEquals(shared, value) ? null : value);
+            SpellVfxAssets.PreviewSpell(_folder, spell, updated);
+            draft.Working = updated;
+            UpdateDirty();
+            Status.Text = $"{layer.Name} updated in preview";
+            Draw();
+            return true;
         }
         catch (Exception error) when (IsEditorError(error))
         {
-            e.Cancel = true;
             Status.Text = error.Message;
             Status.ToolTip = error.Message;
+            return false;
         }
-    }
-
-    private void ResetValue(object sender, RoutedEventArgs e)
-    {
-        if (NodePicker.SelectedItem is NodeChoice choice && Parameters.SelectedItem is ParameterRow row)
-            Try(() =>
-            {
-                var pair = ParticleLayers.Pair(choice.Layer, row.Name);
-                ChangeValues(choice, pair is { } linked ? [(row.Name, null), (linked.Key, null)] : [(row.Name, null)]);
-            });
-    }
-
-    private void ChangeValue(NodeChoice choice, string name, JsonNode? value) => ChangeValues(choice, [(name, value)]);
-
-    private void ChangeValues(NodeChoice choice, IEnumerable<(string Name, JsonNode? Value)> changes)
-    {
-        if (_spell == null) return;
-        Spell spell = _spell.Spell;
-        var draft = _drafts[spell];
-        var updated = (JsonObject)draft.Working.DeepClone();
-        var group = updated[choice.Group] as JsonObject;
-        var node = group?[choice.Node] as JsonObject;
-        foreach (var (name, value) in changes)
-        {
-            if (value != null)
-            {
-                if (group == null) updated[choice.Group] = group = new JsonObject();
-                if (node == null) group[choice.Node] = node = new JsonObject();
-                node[name] = value;
-            }
-            else node?.Remove(name);
-        }
-        if (node?.Count == 0) group!.Remove(choice.Node);
-        if (group?.Count == 0) updated.Remove(choice.Group);
-
-        SpellVfxAssets.PreviewSpell(_folder, spell, updated);
-        draft.Working = updated;
-        Pause();
-        Status.Text = $"{choice} updated in preview";
-        UpdateDirty();
-        // The grid must finish committing its cell before the inspector is rebound.
-        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
-        {
-            if (_spell?.Spell == spell) Try(() => RebuildStages(preserveSelection: true));
-        }));
     }
 
     private void OpenFolder(object sender, RoutedEventArgs e)
@@ -374,7 +291,7 @@ public partial class StudioWindow : Window
 
     private void Save(object sender, RoutedEventArgs e)
     {
-        if (_spell == null || !Parameters.CommitEdit(DataGridEditingUnit.Cell, true)) return;
+        if (_spell == null) return;
         Try(() =>
         {
             Spell spell = _spell.Spell;
@@ -445,7 +362,7 @@ public partial class StudioWindow : Window
 
     private void ApplyToClient(object sender, RoutedEventArgs e)
     {
-        if (_spell == null || _viewport.Reference is not { } scene || !Parameters.CommitEdit(DataGridEditingUnit.Cell, true))
+        if (_spell == null || _viewport.Reference is not { } scene)
             return;
         Try(() =>
         {
@@ -566,6 +483,8 @@ public partial class StudioWindow : Window
 
         try
         {
+            using var solo = SpellVfxAssets.SoloEmitter(SoloLayer.IsChecked == true &&
+                NodePicker.SelectedItem is LayerChoice layer ? layer.Id : null);
             _viewport.Render(stage, time, DirectionPicker.SelectedItem is MirDirection direction ? direction : MirDirection.Right,
                 Glow.IsChecked == true, Guide.IsChecked == true, ReferenceVisible.IsChecked == true,
                 AmbientPicker.SelectedItem is LightSetting ambient ? ambient : LightSetting.Day);
@@ -591,19 +510,9 @@ public partial class StudioWindow : Window
         }
     }
 
-    private sealed record NodeChoice(string Group, string Node, string? Layer)
+    private sealed record LayerChoice(string Id, string Name)
     {
-        public override string ToString() => Layer ?? ParticleSettings.NodeLabel(Group, Node);
-    }
-
-    private sealed class ParameterRow(string name, string label, string module, string text, string source, bool structured)
-    {
-        public string Name { get; } = name;
-        public string Label { get; } = label;
-        public string Module { get; } = module;
-        public string Text { get; set; } = text;
-        public string Source { get; } = source;
-        public bool Structured { get; } = structured;
+        public override string ToString() => Name;
     }
 
     private sealed class Draft(JsonObject saved)

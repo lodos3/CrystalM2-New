@@ -41,6 +41,7 @@ internal static partial class WarriorSpellEffects
     internal static void DrawFrame(SpellParticlePool pool, SpellVisual visual, Vector2 feet, Vector2 facing,
         long now, long start, int duration, float size = ReferenceSize, uint seed = 0, Vector2? weaponTip = null)
     {
+        using var emitterTime = SpellVfxAssets.AtProgress((now - start) / (float)Math.Max(1, duration));
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
         var tuning = SpellVfxAssets.Current.Warrior.DrawFrame;
         var fields = SpellVfxAssets.Fields("Warrior", "DrawFrame");
@@ -158,18 +159,18 @@ internal static partial class WarriorSpellEffects
                 float flicker = tuning.Flicker + tuning.Flicker2 * MathF.Sin(time * tuning.Flicker3 + j * tuning.Flicker4 + strand);
                 // Fine arcs stay below a few pixels wide: no solid streak slabs.
                 frame.Thread(previous, trail, tuning.ThreadStartWidth, tuning.ThreadEndWidth, j % 3 == 0 ? White : Ice,
-                    flicker * tuning.ThreadAlpha, layer, light: j == 4 && strand == 0, sortY: groundY);
+                    flicker * tuning.ThreadAlpha, layer, light: j == 4 && strand == 0, sortY: groundY, emitter: "WarriorSpellEffects.DrakeCharge.1");
                 if (j == 1 || j % 2 == 0)
                 {
                     Vector2 delta = trail - previous;
                     float direction = MathF.Atan2(delta.Y, delta.X);
                     frame.Sprite((previous + trail) * tuning.UserLightningOffset, tuning.UserLightningWidth + delta.Length() * tuning.UserLightningWidth2,
                         tuning.UserLightningHeight, tuning.UserLightningShape, j % 4 == 0 ? White : Ice,
-                        tuning.UserLightningAlpha * flicker, layer, direction, sortY: groundY);
+                        tuning.UserLightningAlpha * flicker, layer, direction, sortY: groundY, emitter: "WarriorSpellEffects.DrakeCharge.2");
                 }
                 if (j == 5 && strand % 2 == 0)
                     frame.Sprite(trail, tuning.WispWidth, tuning.WispHeight, tuning.WispShape, tuning.WispColour,
-                        tuning.WispAlpha * flicker, tuning.WispLayer, sortY: groundY);
+                        tuning.WispAlpha * flicker, tuning.WispLayer, sortY: groundY, emitter: "WarriorSpellEffects.DrakeCharge.3");
                 previous = trail;
             }
         }
@@ -188,7 +189,7 @@ internal static partial class WarriorSpellEffects
             frame.Sprite(point, tuning.SparkWidth + frame.Unit(i + 13) * tuning.SparkWidth2,
                 tuning.SparkHeight + frame.Unit(i + 14) * tuning.SparkHeight2,
                 tuning.SparkShape, i % 3 == 0 ? White : Ice,
-                fade, layer, phase * tuning.SparkRotation, sortY: ground.Y);
+                fade, layer, phase * tuning.SparkRotation, sortY: ground.Y, emitter: "WarriorSpellEffects.DrakeCharge.4");
         }
     }
 
@@ -217,21 +218,21 @@ internal static partial class WarriorSpellEffects
             frame.Sprite(tongue - Vector2.UnitY * smallHeight * tuning.UserFlameOffset,
                 smallWidth, smallHeight, tuning.UserFlameShape, colour, fade,
                 i % 5 == 0 ? tuning.UserFlameLayer : tuning.UserFlameLayer2,
-                (frame.Unit(seed + 49) - tuning.UserFlameRotation) * tuning.UserFlameRotation2, light: i % 17 == 0);
+                (frame.Unit(seed + 49) - tuning.UserFlameRotation) * tuning.UserFlameRotation2, light: i % 17 == 0, emitter: "WarriorSpellEffects.Engulf.1");
             if (i % 7 == 0)
                 frame.Clip(tongue, smallWidth, smallHeight,
                     tuning.FlameSequenceShape, time * tuning.FlameSequencePhase + age * tuning.FlameSequencePhase2,
-                    colour, fade * tuning.FlameSequenceAlpha, tuning.FlameSequenceLayer);
+                    colour, fade * tuning.FlameSequenceAlpha, tuning.FlameSequenceLayer, emitter: "WarriorSpellEffects.Engulf.2");
             if (i % 8 == 0)
                 frame.Sprite(tongue, smallWidth * tuning.FlameTongueWidth, smallHeight * tuning.FlameTongueHeight,
                     tuning.FlameTongueShape, Heat, fade * tuning.FlameTongueAlpha,
-                    tuning.FlameTongueLayer);
+                    tuning.FlameTongueLayer, emitter: "WarriorSpellEffects.Engulf.3");
             if (i % 4 == 0)
                 frame.Sprite(root + new Vector2(lateral * tuning.X3, -rise * tuning.Y3),
                     tuning.WarriorSparkWidth + frame.Unit(seed + 90) * tuning.WarriorSparkWidth2,
                     tuning.WarriorSparkHeight + frame.Unit(seed + 91) * tuning.WarriorSparkHeight2,
                     i % 8 == 0 ? tuning.WarriorSparkShape : tuning.WarriorSparkShape2, Heat,
-                    fade * tuning.WarriorSparkAlpha, tuning.WarriorSparkLayer);
+                    fade * tuning.WarriorSparkAlpha, tuning.WarriorSparkLayer, emitter: "WarriorSpellEffects.Engulf.4");
             if (i % 5 == 0)
             {
                 float smokeAge = Fract(progress * tuning.SmokeAge + frame.Unit(seed + 61));
@@ -241,7 +242,7 @@ internal static partial class WarriorSpellEffects
                 frame.Clip(plume, tuning.SmokeSequenceWidth + smokeAge * tuning.SmokeSequenceWidth2, tuning.SmokeSequenceHeight + smokeAge * tuning.SmokeSequenceHeight2,
                     tuning.SmokeSequenceShape, time * tuning.SmokeSequencePhase + smokeAge,
                     i % 2 == 0 ? tuning.SmokeSequenceColour : Smoke,
-                    tuning.SmokeSequenceAlpha * (1 - smokeAge) * durationFade, tuning.SmokeSequenceLayer);
+                    tuning.SmokeSequenceAlpha * (1 - smokeAge) * durationFade, tuning.SmokeSequenceLayer, emitter: "WarriorSpellEffects.Engulf.5");
             }
         }
     }
@@ -279,7 +280,7 @@ internal static partial class WarriorSpellEffects
                     tuning.UserLightningHeight + frame.Unit(i * 19 + j + 9) * tuning.UserLightningHeight2,
                     tuning.UserLightningShape, j == 1 ? White : Ice,
                     impact * (tuning.UserLightningAlpha + tuning.UserLightningAlpha2 * flicker), layer, direction,
-                    light: i % 6 == 0 && j == 0, sortY: groundY);
+                    light: i % 6 == 0 && j == 0, sortY: groundY, emitter: "WarriorSpellEffects.DrakeContact.1");
             }
         }
 
@@ -302,17 +303,17 @@ internal static partial class WarriorSpellEffects
             Layer layer = rear ? tuning.Layer3 : tuning.Layer4;
             int tint = i % 3 == 0 ? White : Ice;
             frame.Thread(root, middle, tuning.ThreadStartWidth, tuning.ThreadEndWidth, tint,
-                impact * tuning.ThreadAlpha, layer, sortY: root.Y);
+                impact * tuning.ThreadAlpha, layer, sortY: root.Y, emitter: "WarriorSpellEffects.DrakeContact.2");
             frame.Thread(middle, tip, tuning.ThreadStartWidth2, tuning.ThreadEndWidth2, i % 4 == 0 ? White : Steel,
-                impact * tuning.ThreadAlpha2, layer, sortY: root.Y);
+                impact * tuning.ThreadAlpha2, layer, sortY: root.Y, emitter: "WarriorSpellEffects.DrakeContact.3");
             if (i % 2 == 0)
             {
                 Vector2 fork = Vector2.Lerp(middle, tip, tuning.Fork) +
                     new Vector2((frame.Unit(seed + 17) - tuning.X5) * tuning.X6, tuning.Y2);
                 frame.Thread(middle, fork, tuning.ThreadStartWidth3, tuning.ThreadEndWidth3, Ice,
-                    impact * tuning.ThreadAlpha3, layer, sortY: root.Y);
+                    impact * tuning.ThreadAlpha3, layer, sortY: root.Y, emitter: "WarriorSpellEffects.DrakeContact.4");
                 frame.Sprite(fork, tuning.UserLightningWidth3, tuning.UserLightningHeight3, tuning.UserLightningShape2,
-                    White, impact * tuning.UserLightningAlpha3, layer, sortY: root.Y);
+                    White, impact * tuning.UserLightningAlpha3, layer, sortY: root.Y, emitter: "WarriorSpellEffects.DrakeContact.5");
             }
         }
 
@@ -335,7 +336,7 @@ internal static partial class WarriorSpellEffects
                 i % 5 == 0 ? tuning.WarriorSparkShape : tuning.WarriorSparkShape2,
                 i % 4 == 0 ? White : Ice,
                 impact * (tuning.WarriorSparkAlpha + tuning.WarriorSparkAlpha2 * (1 - age)), layer,
-                angle, light: i % 17 == 0, sortY: root.Y);
+                angle, light: i % 17 == 0, sortY: root.Y, emitter: "WarriorSpellEffects.DrakeContact.6");
         }
 
         // Thin cold-blue smoke appears just after contact and expands across
@@ -355,7 +356,7 @@ internal static partial class WarriorSpellEffects
                 i % 3 == 0 ? tuning.SmokeSequenceColour : tuning.SmokeSequenceColour2,
                 impact * tuning.SmokeSequenceAlpha * (1 - age * tuning.SmokeSequenceAlpha2),
                 layer, rotation: (frame.Unit(seed + 17) - tuning.SmokeSequenceRotation) * tuning.SmokeSequenceRotation2,
-                sortY: root.Y);
+                sortY: root.Y, emitter: "WarriorSpellEffects.DrakeContact.7");
         }
     }
 
@@ -380,20 +381,20 @@ internal static partial class WarriorSpellEffects
 
         frame.Sprite(centre + facing * (radius * tuning.UserSlashOffset), radius * tuning.UserSlashWidth * spread,
             radius * tuning.UserSlashHeight, tuning.UserSlashShape, colour, tuning.UserSlashAlpha * fade,
-            tuning.UserSlashLayer, angle - tuning.UserSlashRotation, light: heavy);
+            tuning.UserSlashLayer, angle - tuning.UserSlashRotation, light: heavy, emitter: "WarriorSpellEffects.Strike.1");
         frame.Sprite(centre + facing * (radius * tuning.UserSlashOffset2) - side * tuning.UserSlashOffset3,
             radius * tuning.UserSlashWidth2 * spread, radius * tuning.UserSlashHeight2,
             tuning.UserSlashShape2, core, tuning.UserSlashAlpha2 * fade,
-            tuning.UserSlashLayer2, angle - tuning.UserSlashRotation2, light: tuning.UserSlashLight);
+            tuning.UserSlashLayer2, angle - tuning.UserSlashRotation2, light: tuning.UserSlashLight, emitter: "WarriorSpellEffects.Strike.2");
 
         if (hot)
             frame.Sprite(centre + facing * tuning.UserFlameOffset, radius * tuning.UserFlameWidth, radius * tuning.UserFlameHeight,
                 tuning.UserFlameShape, Ember, tuning.UserFlameAlpha * fade,
-                tuning.UserFlameLayer, angle * tuning.UserFlameRotation);
+                tuning.UserFlameLayer, angle * tuning.UserFlameRotation, emitter: "WarriorSpellEffects.Strike.3");
         if (dash)
             frame.Sprite(feet + facing * tuning.UserRockOffset, radius * tuning.UserRockWidth, radius * tuning.UserRockHeight,
                 tuning.UserRockShape, tuning.UserRockColour, tuning.UserRockAlpha * fade,
-                tuning.UserRockLayer, angle);
+                tuning.UserRockLayer, angle, emitter: "WarriorSpellEffects.Strike.4");
 
         int fragments = fencing ? tuning.Fragments : heavy ? tuning.Fragments2 : tuning.Fragments3;
         for (int i = 0; i < fragments; i++)
@@ -410,7 +411,7 @@ internal static partial class WarriorSpellEffects
                 i % 3 == 0 ? core : colour, tuning.UserEmberAlpha * fade * (1f - age * tuning.UserEmberAlpha2),
                 i % 3 == 0 ? tuning.UserEmberLayer : tuning.UserEmberLayer2,
                 angle + (frame.Unit(seed + 21) - tuning.UserEmberRotation) * tuning.UserEmberRotation2,
-                light: i % 5 == 0);
+                light: i % 5 == 0, emitter: "WarriorSpellEffects.Strike.5");
         }
     }
 
@@ -427,11 +428,11 @@ internal static partial class WarriorSpellEffects
         {
             float edge = (i % 2 == 0 ? -1 : 1) * (tuning.Edge + i * tuning.Edge2);
             Vector2 foot = from + delta * (i / 4f) + side * edge;
-            pool.TryAdd(new SpellParticle(foot, side * edge - forward * tuning.WarriorDustVelocity, now, tuning.WarriorDustDuration + i * tuning.WarriorDustDuration2, tuning.WarriorDustSize + i * tuning.WarriorDustSize2,
-                Tint(tuning.Colour, tuning.Opacity), tuning.WarriorDustShape, 0, tuning.WarriorDustAspect, angle, tuning.WarriorDustGrowth, tuning.WarriorDustLayer, CastsLight: tuning.WarriorDustCastsLight));
-            pool.TryAdd(new SpellParticle(foot - Vector2.UnitY * (tuning.BladeEdgeOrigin + i * tuning.BladeEdgeOrigin2), -forward * tuning.BladeEdgeVelocity, now, tuning.BladeEdgeDuration, tuning.BladeEdgeSize + i * tuning.BladeEdgeSize2,
+            SpellVfxAssets.Emit(pool, new SpellParticle(foot, side * edge - forward * tuning.WarriorDustVelocity, now, tuning.WarriorDustDuration + i * tuning.WarriorDustDuration2, tuning.WarriorDustSize + i * tuning.WarriorDustSize2,
+                Tint(tuning.Colour, tuning.Opacity), tuning.WarriorDustShape, 0, tuning.WarriorDustAspect, angle, tuning.WarriorDustGrowth, tuning.WarriorDustLayer, CastsLight: tuning.WarriorDustCastsLight), "WarriorSpellEffects.Dash.1");
+            SpellVfxAssets.Emit(pool, new SpellParticle(foot - Vector2.UnitY * (tuning.BladeEdgeOrigin + i * tuning.BladeEdgeOrigin2), -forward * tuning.BladeEdgeVelocity, now, tuning.BladeEdgeDuration, tuning.BladeEdgeSize + i * tuning.BladeEdgeSize2,
                 Tint(i % 2 == 0 ? tuning.Colour2 : tuning.Colour3, tuning.Opacity2), tuning.BladeEdgeShape, 0, tuning.BladeEdgeAspect, angle + (i - tuning.BladeEdgeRotation) * tuning.BladeEdgeRotation2,
-                Layer: tuning.BladeEdgeLayer, CastsLight: tuning.BladeEdgeCastsLight, DepthY: foot.Y));
+                Layer: tuning.BladeEdgeLayer, CastsLight: tuning.BladeEdgeCastsLight, DepthY: foot.Y), "WarriorSpellEffects.Dash.2");
         }
     }
 
@@ -505,7 +506,7 @@ internal static partial class WarriorSpellEffects
                 tuning.Thickness7 + unfold * tuning.Thickness8, i % 3 == 0 ? White : i % 3 == 1 ? tuning.Colour3 : tuning.Colour4, tuning.Alpha5, tuning.Segments4);
         }
         frame.Sprite(source + travel * tuning.WispOffset, tuning.WispWidth + spread * tuning.WispWidth2, tuning.WispHeight + spread * tuning.WispHeight2,
-            tuning.WispShape, Ice, tuning.WispAlpha, rotation: MathF.Atan2(axis.Y, axis.X), light: tuning.WispLight);
+            tuning.WispShape, Ice, tuning.WispAlpha, rotation: MathF.Atan2(axis.Y, axis.X), light: tuning.WispLight, emitter: "WarriorSpellEffects.ThrustWind.1");
 
         void Strand(Vector2 start, Vector2 pull, Vector2 bend, Vector2 end, float thickness, int colour, float alpha, int segments)
         {
@@ -513,7 +514,7 @@ internal static partial class WarriorSpellEffects
             for (int i = 1; i <= segments; i++)
             {
                 var (nextInner, nextOuter) = Edge(i / (float)segments);
-                frame.WindRibbon(new SpriteQuad(inner, nextInner, outer, nextOuter), colour, alpha);
+                frame.WindRibbon(new SpriteQuad(inner, nextInner, outer, nextOuter), colour, alpha, emitter: "WarriorSpellEffects.ThrustWind.2");
                 (inner, outer) = (nextInner, nextOuter);
             }
 
@@ -548,8 +549,8 @@ internal static partial class WarriorSpellEffects
         Vector2 hand = feet - Vector2.UnitY * tuning.Hand + ProjectGround(heading * tuning.Hand2 + side * (MathF.Sin(turn) * tuning.Hand3));
         float windup = (1 - Ease((progress - tuning.Windup) * tuning.Windup2));
         frame.Sprite(hand, tuning.WarriorTripleCutWidth, tuning.WarriorTripleCutHeight, tuning.WarriorTripleCutShape, Ice, tuning.WarriorTripleCutAlpha * windup,
-            rotation: angle + turn, light: tuning.WarriorTripleCutLight);
-        frame.Sprite(hand, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, White, tuning.FlashAlpha * windup, tuning.FlashLayer);
+            rotation: angle + turn, light: tuning.WarriorTripleCutLight, emitter: "WarriorSpellEffects.Avalanche.1");
+        frame.Sprite(hand, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, White, tuning.FlashAlpha * windup, tuning.FlashLayer, emitter: "WarriorSpellEffects.Avalanche.2");
 
         // Frame six of the original has a broad release at the player before
         // the thin ground lanes fan out and carry the spikes farther forward.
@@ -560,9 +561,9 @@ internal static partial class WarriorSpellEffects
             Vector2 ray = ProjectGround(heading * (tuning.Ray + frame.Unit(i + 43) * tuning.Ray2) + side * (direction * tuning.Ray3));
             Vector2 centre = feet + ray * tuning.Centre - Vector2.UnitY * (tuning.Centre2 + frame.Unit(i + 57) * tuning.Centre3);
             frame.Sprite(centre, ray.Length() * tuning.WispWidth, tuning.WispHeight + frame.Unit(i) * tuning.WispHeight2, tuning.WispShape,
-                i % 4 == 0 ? Ice : tuning.WispColour, tuning.WispAlpha * release, tuning.WispLayer, MathF.Atan2(ray.Y, ray.X) - direction * tuning.WispRotation);
+                i % 4 == 0 ? Ice : tuning.WispColour, tuning.WispAlpha * release, tuning.WispLayer, MathF.Atan2(ray.Y, ray.X) - direction * tuning.WispRotation, emitter: "WarriorSpellEffects.Avalanche.3");
             frame.Thread(centre - ray * tuning.ThreadStart, centre + ray * tuning.ThreadEnd, tuning.ThreadStartWidth, tuning.ThreadEndWidth,
-                i % 3 == 0 ? White : Ice, tuning.ThreadAlpha * release, tuning.ThreadLayer);
+                i % 3 == 0 ? White : Ice, tuning.ThreadAlpha * release, tuning.ThreadLayer, emitter: "WarriorSpellEffects.Avalanche.4");
         }
 
         for (int lane = -1; lane <= tuning.LaneCount; lane++)
@@ -579,11 +580,11 @@ internal static partial class WarriorSpellEffects
             Vector2 root = feet + ProjectGround(heading * stride + side * breadth);
             Vector2 next = root + ProjectGround(heading * tuning.Next + side * (lane * tuning.Next2));
             frame.Thread(root - ProjectGround(heading * tuning.Offset), next, tuning.ThreadStartWidth2 + step * tuning.ThreadStartWidth3, tuning.ThreadEndWidth2,
-                lane == 0 ? Ice : Steel, tuning.ThreadAlpha2 * opacity, tuning.ThreadLayer2, light: lane == 0, sortY: root.Y);
+                lane == 0 ? Ice : Steel, tuning.ThreadAlpha2 * opacity, tuning.ThreadLayer2, light: lane == 0, sortY: root.Y, emitter: "WarriorSpellEffects.Avalanche.5");
             frame.Sprite(root, tuning.WarriorDustWidth + step * tuning.WarriorDustWidth2, tuning.WarriorDustHeight + step * tuning.WarriorDustHeight2, tuning.WarriorDustShape, tuning.WarriorDustColour, tuning.WarriorDustAlpha * opacity,
-                tuning.WarriorDustLayer, angle, sortY: root.Y);
+                tuning.WarriorDustLayer, angle, sortY: root.Y, emitter: "WarriorSpellEffects.Avalanche.6");
             frame.Sprite(root, tuning.WispWidth2 + step * tuning.WispWidth3, tuning.WispHeight3 + step * tuning.WispHeight4, tuning.WispShape2, tuning.WispColour2, tuning.WispAlpha2 * opacity,
-                tuning.WispLayer2, angle, sortY: root.Y);
+                tuning.WispLayer2, angle, sortY: root.Y, emitter: "WarriorSpellEffects.Avalanche.7");
 
             for (int blade = -1; blade <= tuning.BladeCount; blade++)
             {
@@ -594,12 +595,12 @@ internal static partial class WarriorSpellEffects
                 float tilt = MathF.Atan2(edge.Y, edge.X) + MathF.PI / 2;
                 float span = edge.Length();
                 frame.Sprite((foot + tip) * tuning.IceSpireOffset, tuning.IceSpireWidth + step * tuning.IceSpireWidth2, span, tuning.IceSpireShape, blade == 0 ? Ice : Steel,
-                    tuning.IceSpireAlpha * opacity, rotation: tilt, light: blade == 0, sortY: foot.Y);
+                    tuning.IceSpireAlpha * opacity, rotation: tilt, light: blade == 0, sortY: foot.Y, emitter: "WarriorSpellEffects.Avalanche.8");
                 frame.Sprite(Vector2.Lerp(foot, tip, tuning.Amount), tuning.IceSpireWidth3 + step, span * tuning.IceSpireHeight, tuning.IceSpireShape2, White,
-                    tuning.IceSpireAlpha2 * opacity, tuning.IceSpireLayer, tilt, sortY: foot.Y);
+                    tuning.IceSpireAlpha2 * opacity, tuning.IceSpireLayer, tilt, sortY: foot.Y, emitter: "WarriorSpellEffects.Avalanche.9");
                 if (blade == 0)
                     frame.Sprite(tip + new Vector2(tuning.X, tuning.Y), tuning.WarriorSparkWidth + step, tuning.WarriorSparkHeight, tuning.WarriorSparkShape, tuning.WarriorSparkColour, tuning.WarriorSparkAlpha * opacity,
-                        tuning.WarriorSparkLayer, tilt + tuning.WarriorSparkRotation, sortY: foot.Y);
+                        tuning.WarriorSparkLayer, tilt + tuning.WarriorSparkRotation, sortY: foot.Y, emitter: "WarriorSpellEffects.Avalanche.10");
             }
         }
     }
@@ -614,20 +615,20 @@ internal static partial class WarriorSpellEffects
         Vector2 tip = launch + forward * (tuning.Tip + tuning.Tip2 * Ease(progress * tuning.Tip3));
         Vector2 centre = Vector2.Lerp(launch, tip, tuning.Centre);
         float span = Vector2.Distance(launch, tip);
-        frame.Sprite(centre, span + tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, Ember, tuning.OrbAlpha, rotation: angle, light: tuning.OrbLight);
+        frame.Sprite(centre, span + tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, Ember, tuning.OrbAlpha, rotation: angle, light: tuning.OrbLight, emitter: "WarriorSpellEffects.Burst.1");
         frame.Clip(centre - side * tuning.SmokeSequenceOffset, span + tuning.SmokeSequenceWidth, tuning.SmokeSequenceHeight, tuning.SmokeSequenceShape, tuning.SmokeSequencePhase + progress * tuning.SmokeSequencePhase2,
-            tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha, tuning.SmokeSequenceLayer, angle);
+            tuning.SmokeSequenceColour, tuning.SmokeSequenceAlpha, tuning.SmokeSequenceLayer, angle, emitter: "WarriorSpellEffects.Burst.2");
         frame.Clip(centre, tuning.FlameSequenceWidth, span + tuning.FlameSequenceHeight, tuning.FlameSequenceShape, progress * tuning.FlameSequencePhase, Flame,
-            tuning.FlameSequenceAlpha, rotation: angle + MathF.PI / 2, light: tuning.FlameSequenceLight);
-        frame.Sprite(centre - side * tuning.BladeEdgeOffset, span + tuning.BladeEdgeWidth, tuning.BladeEdgeHeight, tuning.BladeEdgeShape, Heat, tuning.BladeEdgeAlpha, tuning.BladeEdgeLayer, angle - tuning.BladeEdgeRotation);
-        frame.Sprite(tip - forward * tuning.WarriorImpactOffset, tuning.WarriorImpactWidth, tuning.WarriorImpactHeight, tuning.WarriorImpactShape, Flame, tuning.WarriorImpactAlpha, rotation: angle + tuning.WarriorImpactRotation, light: tuning.WarriorImpactLight);
+            tuning.FlameSequenceAlpha, rotation: angle + MathF.PI / 2, light: tuning.FlameSequenceLight, emitter: "WarriorSpellEffects.Burst.3");
+        frame.Sprite(centre - side * tuning.BladeEdgeOffset, span + tuning.BladeEdgeWidth, tuning.BladeEdgeHeight, tuning.BladeEdgeShape, Heat, tuning.BladeEdgeAlpha, tuning.BladeEdgeLayer, angle - tuning.BladeEdgeRotation, emitter: "WarriorSpellEffects.Burst.4");
+        frame.Sprite(tip - forward * tuning.WarriorImpactOffset, tuning.WarriorImpactWidth, tuning.WarriorImpactHeight, tuning.WarriorImpactShape, Flame, tuning.WarriorImpactAlpha, rotation: angle + tuning.WarriorImpactRotation, light: tuning.WarriorImpactLight, emitter: "WarriorSpellEffects.Burst.5");
         for (int i = 0; i < tuning.ParticleCount; i++)
         {
             float lift = (frame.Unit(i + 18) - tuning.Lift) * tuning.Lift2;
             Vector2 tail = Vector2.Lerp(launch, tip, frame.Unit(i) * tuning.Tail) + side * lift;
-            frame.Line(tail, tip + side * (lift * tuning.LineEnd), tuning.LineWidth + frame.Unit(i + 34) * tuning.LineWidth2, Heat, tuning.LineAlpha);
+            frame.Line(tail, tip + side * (lift * tuning.LineEnd), tuning.LineWidth + frame.Unit(i + 34) * tuning.LineWidth2, Heat, tuning.LineAlpha, emitter: "WarriorSpellEffects.Burst.6");
         }
-        frame.Sparks(tip - forward * tuning.WarriorSparkOffset, tuning.WarriorSparkCount, tuning.WarriorSparkRx, tuning.WarriorSparkRy, progress, Heat, rise: tuning.WarriorSparkRise, shape: tuning.WarriorSparkShape);
+        frame.Sparks(tip - forward * tuning.WarriorSparkOffset, tuning.WarriorSparkCount, tuning.WarriorSparkRx, tuning.WarriorSparkRy, progress, Heat, rise: tuning.WarriorSparkRise, shape: tuning.WarriorSparkShape, emitter: "WarriorSpellEffects.Burst.7");
     }
 
     private static void Counter(Frame frame, Vector2 feet, Vector2 facing, float progress)
@@ -636,19 +637,19 @@ internal static partial class WarriorSpellEffects
         // The original two-frame flash occupies the first fifth of the ten-frame riposte.
         float flash = 1 - Ease(progress * tuning.Flash);
         Vector2 body = feet - Vector2.UnitY * tuning.Body;
-        frame.Sprite(body, tuning.FlameTongueWidth, tuning.FlameTongueHeight, tuning.FlameTongueShape, Ember, tuning.FlameTongueAlpha * flash, light: tuning.FlameTongueLight);
-        frame.Sprite(body, tuning.WarriorImpactWidth, tuning.WarriorImpactHeight, tuning.WarriorImpactShape, Heat, tuning.WarriorImpactAlpha * flash, tuning.WarriorImpactLayer, tuning.WarriorImpactRotation);
-        frame.Clip(body + Vector2.UnitY * tuning.FlameSequenceOffset, tuning.FlameSequenceWidth, tuning.FlameSequenceHeight, tuning.FlameSequenceShape, progress * tuning.FlameSequencePhase, Flame, flash * tuning.FlameSequenceAlpha);
+        frame.Sprite(body, tuning.FlameTongueWidth, tuning.FlameTongueHeight, tuning.FlameTongueShape, Ember, tuning.FlameTongueAlpha * flash, light: tuning.FlameTongueLight, emitter: "WarriorSpellEffects.Counter.1");
+        frame.Sprite(body, tuning.WarriorImpactWidth, tuning.WarriorImpactHeight, tuning.WarriorImpactShape, Heat, tuning.WarriorImpactAlpha * flash, tuning.WarriorImpactLayer, tuning.WarriorImpactRotation, emitter: "WarriorSpellEffects.Counter.2");
+        frame.Clip(body + Vector2.UnitY * tuning.FlameSequenceOffset, tuning.FlameSequenceWidth, tuning.FlameSequenceHeight, tuning.FlameSequenceShape, progress * tuning.FlameSequencePhase, Flame, flash * tuning.FlameSequenceAlpha, emitter: "WarriorSpellEffects.Counter.3");
         // The sword trace takes over through the swing. Carry a little heat between the flash and cut.
         float trail = Ease((progress - tuning.Trail) / tuning.TrailDivisor);
         float afterglow = (tuning.Afterglow + tuning.Afterglow2 * flash) * (1 - Ease((progress - tuning.Afterglow3) / tuning.AfterglowDivisor));
         Vector2 edge = feet + facing * (tuning.Edge + progress * tuning.Edge2) - Vector2.UnitY * tuning.Edge3;
         float rotation = MathF.Atan2(facing.Y, facing.X);
-        frame.Sprite(body, tuning.WispWidth, tuning.WispHeight, tuning.WispShape, Ember, afterglow, tuning.WispLayer, light: tuning.WispLight);
-        frame.Clip(edge - facing * tuning.FireSequenceOffset, tuning.FireSequenceWidth, tuning.FireSequenceHeight, tuning.FireSequenceShape, progress * tuning.FireSequencePhase, Ember, tuning.FireSequenceAlpha * trail, rotation: rotation);
+        frame.Sprite(body, tuning.WispWidth, tuning.WispHeight, tuning.WispShape, Ember, afterglow, tuning.WispLayer, light: tuning.WispLight, emitter: "WarriorSpellEffects.Counter.4");
+        frame.Clip(edge - facing * tuning.FireSequenceOffset, tuning.FireSequenceWidth, tuning.FireSequenceHeight, tuning.FireSequenceShape, progress * tuning.FireSequencePhase, Ember, tuning.FireSequenceAlpha * trail, rotation: rotation, emitter: "WarriorSpellEffects.Counter.5");
         frame.Sprite(edge, tuning.WarriorCrescentWidth, tuning.WarriorCrescentHeight, tuning.WarriorCrescentShape, Flame, tuning.WarriorCrescentAlpha * trail,
-            rotation: rotation - tuning.WarriorCrescentRotation, light: tuning.WarriorCrescentLight);
-        frame.Sparks(edge, tuning.WarriorSparkCount, tuning.WarriorSparkRx * trail, tuning.WarriorSparkRy, progress, Heat, tuning.WarriorSparkRise, tuning.WarriorSparkShape);
+            rotation: rotation - tuning.WarriorCrescentRotation, light: tuning.WarriorCrescentLight, emitter: "WarriorSpellEffects.Counter.6");
+        frame.Sparks(edge, tuning.WarriorSparkCount, tuning.WarriorSparkRx * trail, tuning.WarriorSparkRy, progress, Heat, tuning.WarriorSparkRise, tuning.WarriorSparkShape, emitter: "WarriorSpellEffects.Counter.7");
     }
 
     private static void Snare(Frame frame, Vector2 feet, float progress, bool preparing)
@@ -657,7 +658,7 @@ internal static partial class WarriorSpellEffects
         float sweep = progress * MathF.Tau * (preparing ? tuning.Sweep : tuning.Sweep2);
         float extent = tuning.Extent + tuning.Extent2 * Ease(progress * tuning.Extent3);
         float release = preparing ? 1 : 1 - Ease((progress - tuning.Release) / tuning.ReleaseDivisor);
-        frame.Sprite(feet, tuning.WispWidth * extent, tuning.WispHeight * extent, tuning.WispShape, tuning.WispColour, tuning.WispAlpha, tuning.WispLayer, light: tuning.WispLight);
+        frame.Sprite(feet, tuning.WispWidth * extent, tuning.WispHeight * extent, tuning.WispShape, tuning.WispColour, tuning.WispAlpha, tuning.WispLayer, light: tuning.WispLight, emitter: "WarriorSpellEffects.Snare.1");
         for (int i = 0; i < tuning.SmokeSequenceCount; i++)
         {
             float angle = sweep + i * MathF.Tau / tuning.AngleDivisor;
@@ -665,16 +666,16 @@ internal static partial class WarriorSpellEffects
             Vector2 ground = feet + Ellipse(angle, tuning.EllipseX, tuning.EllipseY) * edge;
             float tangent = MathF.Atan2(MathF.Cos(angle) * tuning.Tangent, -MathF.Sin(angle) * tuning.Tangent2);
             frame.Clip(ground - Vector2.UnitY * tuning.SmokeSequenceOffset, tuning.SmokeSequenceWidth, tuning.SmokeSequenceHeight, tuning.SmokeSequenceShape, progress + i * tuning.SmokeSequencePhase,
-                i % 2 == 0 ? tuning.SmokeSequenceColour : tuning.SmokeSequenceColour2, tuning.SmokeSequenceAlpha * release, tuning.SmokeSequenceLayer, tangent);
+                i % 2 == 0 ? tuning.SmokeSequenceColour : tuning.SmokeSequenceColour2, tuning.SmokeSequenceAlpha * release, tuning.SmokeSequenceLayer, tangent, emitter: "WarriorSpellEffects.Snare.2");
             if (preparing) continue;
             float bind = 1 - Ease((progress - tuning.Bind) / tuning.BindDivisor);
             float climb = Fract(progress * tuning.Climb + i * tuning.Climb2);
             Vector2 point = feet + Ellipse(angle, tuning.EllipseX2 - climb * tuning.EllipseX3, tuning.EllipseY2) - Vector2.UnitY * (tuning.Point + climb * tuning.Point2);
             Layer layer = MathF.Sin(angle) < 0 ? tuning.Layer : tuning.Layer2;
             frame.Clip(point, tuning.SmokeSequenceWidth2 - climb * tuning.SmokeSequenceWidth3, tuning.SmokeSequenceHeight2 - climb * tuning.SmokeSequenceHeight3, tuning.SmokeSequenceShape2, progress + i * tuning.SmokeSequencePhase2,
-                i % 2 == 0 ? tuning.SmokeSequenceColour3 : tuning.SmokeSequenceColour4, tuning.SmokeSequenceAlpha2 * bind * (1 - climb * tuning.SmokeSequenceAlpha3), layer, tangent * tuning.SmokeSequenceRotation);
+                i % 2 == 0 ? tuning.SmokeSequenceColour3 : tuning.SmokeSequenceColour4, tuning.SmokeSequenceAlpha2 * bind * (1 - climb * tuning.SmokeSequenceAlpha3), layer, tangent * tuning.SmokeSequenceRotation, emitter: "WarriorSpellEffects.Snare.3");
             frame.Sprite(point + Vector2.UnitY * tuning.WispOffset, tuning.WispWidth2 - climb * tuning.WispWidth3, tuning.WispHeight2 - climb * tuning.WispHeight3, tuning.WispShape2,
-                tuning.WispColour2, tuning.WispAlpha2 * bind, layer, tangent * tuning.WispRotation);
+                tuning.WispColour2, tuning.WispAlpha2 * bind, layer, tangent * tuning.WispRotation, emitter: "WarriorSpellEffects.Snare.4");
         }
     }
 
@@ -684,10 +685,10 @@ internal static partial class WarriorSpellEffects
         int tint = rally ? tuning.TintColour : tuning.TintColour2;
         float spread = tuning.Spread + tuning.Spread2 * Ease(progress * tuning.Spread3);
         Vector2 head = feet - Vector2.UnitY * tuning.Head;
-        frame.Sprite(feet, tuning.WarriorRingWidth * spread, tuning.WarriorRingHeight * spread, tuning.WarriorRingShape, tint, tuning.WarriorRingAlpha, tuning.WarriorRingLayer, light: tuning.WarriorRingLight);
-        frame.Sprite(head, tuning.WarriorImpactWidth * spread, tuning.WarriorImpactHeight * spread, tuning.WarriorImpactShape, tint, tuning.WarriorImpactAlpha, light: tuning.WarriorImpactLight);
-        frame.Sprite(head, tuning.WispWidth * spread, tuning.WispHeight * spread, tuning.WispShape, rally ? tuning.WispColour : tuning.WispColour2, tuning.WispAlpha, tuning.WispLayer);
-        frame.Sprite(head, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, White, tuning.FlashAlpha * (1 - progress * tuning.FlashAlpha2), tuning.FlashLayer);
+        frame.Sprite(feet, tuning.WarriorRingWidth * spread, tuning.WarriorRingHeight * spread, tuning.WarriorRingShape, tint, tuning.WarriorRingAlpha, tuning.WarriorRingLayer, light: tuning.WarriorRingLight, emitter: "WarriorSpellEffects.Roar.1");
+        frame.Sprite(head, tuning.WarriorImpactWidth * spread, tuning.WarriorImpactHeight * spread, tuning.WarriorImpactShape, tint, tuning.WarriorImpactAlpha, light: tuning.WarriorImpactLight, emitter: "WarriorSpellEffects.Roar.2");
+        frame.Sprite(head, tuning.WispWidth * spread, tuning.WispHeight * spread, tuning.WispShape, rally ? tuning.WispColour : tuning.WispColour2, tuning.WispAlpha, tuning.WispLayer, emitter: "WarriorSpellEffects.Roar.3");
+        frame.Sprite(head, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, White, tuning.FlashAlpha * (1 - progress * tuning.FlashAlpha2), tuning.FlashLayer, emitter: "WarriorSpellEffects.Roar.4");
         for (int i = 0; i < tuning.WispCount; i++)
         {
             float angle = (i + frame.Unit(i) * tuning.Angle) * MathF.Tau / tuning.AngleDivisor;
@@ -696,11 +697,11 @@ internal static partial class WarriorSpellEffects
             Vector2 bend = head + ray * tuning.Bend + Ellipse(angle + tuning.EllipseAngle, tuning.EllipseX2, tuning.EllipseY2) * (frame.Unit(i + 67) - tuning.Bend2);
             Layer layer = Depth(angle);
             frame.Sprite(bend, ray.Length() * tuning.WispWidth2, tuning.WispHeight2 + frame.Unit(i + 44) * tuning.WispHeight3,
-                tuning.WispShape2, tint, tuning.WispAlpha2, layer, MathF.Atan2(ray.Y, ray.X));
-            frame.Thread(head + ray * tuning.ThreadStart, bend, tuning.ThreadStartWidth, tuning.ThreadEndWidth, i % 3 == 0 ? White : tint, tuning.ThreadAlpha, layer);
-            frame.Thread(bend, edge, tuning.ThreadStartWidth2, tuning.ThreadEndWidth2, White, tuning.ThreadAlpha2, layer == Layer.Ground ? layer : tuning.ThreadLayer);
+                tuning.WispShape2, tint, tuning.WispAlpha2, layer, MathF.Atan2(ray.Y, ray.X), emitter: "WarriorSpellEffects.Roar.5");
+            frame.Thread(head + ray * tuning.ThreadStart, bend, tuning.ThreadStartWidth, tuning.ThreadEndWidth, i % 3 == 0 ? White : tint, tuning.ThreadAlpha, layer, emitter: "WarriorSpellEffects.Roar.6");
+            frame.Thread(bend, edge, tuning.ThreadStartWidth2, tuning.ThreadEndWidth2, White, tuning.ThreadAlpha2, layer == Layer.Ground ? layer : tuning.ThreadLayer, emitter: "WarriorSpellEffects.Roar.7");
             if (i % 2 == 0)
-                frame.Sprite(edge, tuning.SparkWidth + frame.Unit(i) * tuning.SparkWidth2, tuning.SparkHeight, tuning.SparkShape, White, tuning.SparkAlpha, layer, angle);
+                frame.Sprite(edge, tuning.SparkWidth + frame.Unit(i) * tuning.SparkWidth2, tuning.SparkHeight, tuning.SparkShape, White, tuning.SparkAlpha, layer, angle, emitter: "WarriorSpellEffects.Roar.8");
         }
     }
 
@@ -712,25 +713,25 @@ internal static partial class WarriorSpellEffects
         int core = rage ? Heat : White;
         float spread = tuning.Spread + tuning.Spread2 * Ease(progress * tuning.Spread3);
         frame.Sprite(centre, (rage ? tuning.OrbWidth : tuning.OrbWidth2) * spread, (rage ? tuning.OrbHeight : tuning.OrbHeight2) * spread, tuning.OrbShape, tint,
-            tuning.OrbAlpha, light: tuning.OrbLight);
-        frame.Sprite(centre, tuning.FlashWidth * spread, tuning.FlashHeight * spread, tuning.FlashShape, core, tuning.FlashAlpha, tuning.FlashLayer, light: tuning.FlashLight);
+            tuning.OrbAlpha, light: tuning.OrbLight, emitter: "WarriorSpellEffects.Surge.1");
+        frame.Sprite(centre, tuning.FlashWidth * spread, tuning.FlashHeight * spread, tuning.FlashShape, core, tuning.FlashAlpha, tuning.FlashLayer, light: tuning.FlashLight, emitter: "WarriorSpellEffects.Surge.2");
         for (int i = 0; i < tuning.BladeEdgeCount; i++)
         {
             float angle = (i + frame.Unit(i) * tuning.Angle) * MathF.Tau / tuning.AngleDivisor;
             float length = spread * (tuning.Length + frame.Unit(i + 33) * tuning.Length2);
             Vector2 ray = Ellipse(angle, rage ? tuning.EllipseX : tuning.EllipseX2, rage ? tuning.EllipseY : tuning.EllipseY2) * length;
             frame.Sprite(centre + ray * tuning.BladeEdgeOffset, ray.Length() + tuning.BladeEdgeWidth, tuning.BladeEdgeHeight + frame.Unit(i + 11) * tuning.BladeEdgeHeight2,
-                tuning.BladeEdgeShape, i % 3 == 0 ? core : tint, tuning.BladeEdgeAlpha, Depth(angle), MathF.Atan2(ray.Y, ray.X));
+                tuning.BladeEdgeShape, i % 3 == 0 ? core : tint, tuning.BladeEdgeAlpha, Depth(angle), MathF.Atan2(ray.Y, ray.X), emitter: "WarriorSpellEffects.Surge.3");
         }
-        frame.Sparks(centre, tuning.WarriorSparkCount, rage ? tuning.WarriorSparkRx : tuning.WarriorSparkRx2, tuning.WarriorSparkRy, progress, core, rise: tuning.WarriorSparkRise, shape: tuning.WarriorSparkShape);
+        frame.Sparks(centre, tuning.WarriorSparkCount, rage ? tuning.WarriorSparkRx : tuning.WarriorSparkRx2, tuning.WarriorSparkRy, progress, core, rise: tuning.WarriorSparkRise, shape: tuning.WarriorSparkShape, emitter: "WarriorSpellEffects.Surge.4");
     }
 
     private static void BladeFlame(Frame frame, Vector2 point, float progress, float width)
     {
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.BladeFlame);
-        frame.Clip(point - Vector2.UnitY * tuning.FireSequenceOffset, width, width * tuning.FireSequenceHeight, tuning.FireSequenceShape, progress * tuning.FireSequencePhase, Flame, tuning.FireSequenceAlpha, light: tuning.FireSequenceLight);
-        frame.Clip(point, width * tuning.FireSequenceWidth, width * tuning.FireSequenceHeight2, tuning.FireSequenceShape2, progress * tuning.FireSequencePhase2 + tuning.FireSequencePhase3, Heat, tuning.FireSequenceAlpha2, tuning.FireSequenceLayer);
-        frame.Sparks(point, tuning.WarriorSparkCount, width * tuning.WarriorSparkRx, width * tuning.WarriorSparkRy, progress, Heat, rise: tuning.WarriorSparkRise, shape: tuning.WarriorSparkShape);
+        frame.Clip(point - Vector2.UnitY * tuning.FireSequenceOffset, width, width * tuning.FireSequenceHeight, tuning.FireSequenceShape, progress * tuning.FireSequencePhase, Flame, tuning.FireSequenceAlpha, light: tuning.FireSequenceLight, emitter: "WarriorSpellEffects.BladeFlame.1");
+        frame.Clip(point, width * tuning.FireSequenceWidth, width * tuning.FireSequenceHeight2, tuning.FireSequenceShape2, progress * tuning.FireSequencePhase2 + tuning.FireSequencePhase3, Heat, tuning.FireSequenceAlpha2, tuning.FireSequenceLayer, emitter: "WarriorSpellEffects.BladeFlame.2");
+        frame.Sparks(point, tuning.WarriorSparkCount, width * tuning.WarriorSparkRx, width * tuning.WarriorSparkRy, progress, Heat, rise: tuning.WarriorSparkRise, shape: tuning.WarriorSparkShape, emitter: "WarriorSpellEffects.BladeFlame.3");
     }
 
     private static void Fury(Frame frame, Vector2 feet, float progress, bool aura)
@@ -739,10 +740,10 @@ internal static partial class WarriorSpellEffects
         if (aura)
         {
             Vector2 eye = feet - Vector2.UnitY * tuning.Eye;
-            frame.Sprite(eye, tuning.WarriorRingWidth, tuning.WarriorRingHeight, tuning.WarriorRingShape, Flame, tuning.WarriorRingAlpha, light: tuning.WarriorRingLight);
-            frame.Sprite(eye, tuning.SigilEyeWidth, tuning.SigilEyeHeight, tuning.SigilEyeShape, Ember, tuning.SigilEyeAlpha + tuning.SigilEyeAlpha2 * MathF.Sin(progress * MathF.Tau), light: tuning.SigilEyeLight);
-            frame.Sprite(eye, tuning.WarriorSparkWidth, tuning.WarriorSparkHeight, tuning.WarriorSparkShape, Heat, tuning.WarriorSparkAlpha, tuning.WarriorSparkLayer);
-            frame.Clip(eye - Vector2.UnitY * tuning.FireSequenceOffset, tuning.FireSequenceWidth, tuning.FireSequenceHeight, tuning.FireSequenceShape, progress, Flame, tuning.FireSequenceAlpha);
+            frame.Sprite(eye, tuning.WarriorRingWidth, tuning.WarriorRingHeight, tuning.WarriorRingShape, Flame, tuning.WarriorRingAlpha, light: tuning.WarriorRingLight, emitter: "WarriorSpellEffects.Fury.1");
+            frame.Sprite(eye, tuning.SigilEyeWidth, tuning.SigilEyeHeight, tuning.SigilEyeShape, Ember, tuning.SigilEyeAlpha + tuning.SigilEyeAlpha2 * MathF.Sin(progress * MathF.Tau), light: tuning.SigilEyeLight, emitter: "WarriorSpellEffects.Fury.2");
+            frame.Sprite(eye, tuning.WarriorSparkWidth, tuning.WarriorSparkHeight, tuning.WarriorSparkShape, Heat, tuning.WarriorSparkAlpha, tuning.WarriorSparkLayer, emitter: "WarriorSpellEffects.Fury.3");
+            frame.Clip(eye - Vector2.UnitY * tuning.FireSequenceOffset, tuning.FireSequenceWidth, tuning.FireSequenceHeight, tuning.FireSequenceShape, progress, Flame, tuning.FireSequenceAlpha, emitter: "WarriorSpellEffects.Fury.4");
             return;
         }
 
@@ -750,11 +751,11 @@ internal static partial class WarriorSpellEffects
         {
             Vector2 plume = feet + new Vector2(side * tuning.X, tuning.Y);
             frame.Clip(plume, tuning.FlameSequenceWidth, tuning.FlameSequenceHeight, tuning.FlameSequenceShape, progress + (side + 1) * tuning.FlameSequencePhase, Ember,
-                tuning.FlameSequenceAlpha, side < 0 ? tuning.FlameSequenceLayer : tuning.FlameSequenceLayer2, side * tuning.FlameSequenceRotation, light: tuning.FlameSequenceLight);
+                tuning.FlameSequenceAlpha, side < 0 ? tuning.FlameSequenceLayer : tuning.FlameSequenceLayer2, side * tuning.FlameSequenceRotation, light: tuning.FlameSequenceLight, emitter: "WarriorSpellEffects.Fury.5");
             frame.Clip(plume + new Vector2(-side * tuning.X2, tuning.Y2), tuning.FireSequenceWidth2, tuning.FireSequenceHeight2, tuning.FireSequenceShape2, progress + tuning.FireSequencePhase, Heat,
-                tuning.FireSequenceAlpha2, tuning.FireSequenceLayer, side * tuning.FireSequenceRotation);
+                tuning.FireSequenceAlpha2, tuning.FireSequenceLayer, side * tuning.FireSequenceRotation, emitter: "WarriorSpellEffects.Fury.6");
         }
-        frame.Sparks(feet - Vector2.UnitY * tuning.WarriorSparkOffset, tuning.WarriorSparkCount, tuning.WarriorSparkRx, tuning.WarriorSparkRy, progress, Heat, rise: tuning.WarriorSparkRise, shape: tuning.WarriorSparkShape2);
+        frame.Sparks(feet - Vector2.UnitY * tuning.WarriorSparkOffset, tuning.WarriorSparkCount, tuning.WarriorSparkRx, tuning.WarriorSparkRy, progress, Heat, rise: tuning.WarriorSparkRise, shape: tuning.WarriorSparkShape2, emitter: "WarriorSpellEffects.Fury.7");
     }
 
     private static void Skin(Frame frame, Vector2 feet, float progress, bool aura)
@@ -763,8 +764,8 @@ internal static partial class WarriorSpellEffects
         Vector2 body = feet - Vector2.UnitY * tuning.Body;
         if (aura)
         {
-            frame.Sprite(feet, tuning.WarriorRingWidth, tuning.WarriorRingHeight, tuning.WarriorRingShape, tuning.WarriorRingColour, tuning.WarriorRingAlpha, tuning.WarriorRingLayer);
-            frame.Sprite(body, tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, tuning.OrbColour, tuning.OrbAlpha, tuning.OrbLayer, light: tuning.OrbLight);
+            frame.Sprite(feet, tuning.WarriorRingWidth, tuning.WarriorRingHeight, tuning.WarriorRingShape, tuning.WarriorRingColour, tuning.WarriorRingAlpha, tuning.WarriorRingLayer, emitter: "WarriorSpellEffects.Skin.1");
+            frame.Sprite(body, tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, tuning.OrbColour, tuning.OrbAlpha, tuning.OrbLayer, light: tuning.OrbLight, emitter: "WarriorSpellEffects.Skin.2");
             for (int i = tuning.I; i <= tuning.FlameTongueCount; i++)
             {
                 float wave = MathF.Sin((progress + i * tuning.Wave) * MathF.Tau);
@@ -772,23 +773,23 @@ internal static partial class WarriorSpellEffects
                 float tilt = i * tuning.Tilt + wave * tuning.Tilt2;
                 float height = tuning.Height - Math.Abs(i) * tuning.Height2;
                 frame.Sprite(rise, tuning.FlameTongueWidth, height, tuning.FlameTongueShape, i % 2 == 0 ? Gold : tuning.FlameTongueColour,
-                    tuning.FlameTongueAlpha + wave * tuning.FlameTongueAlpha2, i % 2 == 0 ? tuning.FlameTongueLayer : tuning.FlameTongueLayer2, tilt, light: tuning.FlameTongueLight);
+                    tuning.FlameTongueAlpha + wave * tuning.FlameTongueAlpha2, i % 2 == 0 ? tuning.FlameTongueLayer : tuning.FlameTongueLayer2, tilt, light: tuning.FlameTongueLight, emitter: "WarriorSpellEffects.Skin.3");
                 frame.Sprite(rise + Vector2.UnitY * tuning.FlameTongueOffset, tuning.FlameTongueWidth2, height * tuning.FlameTongueHeight, tuning.FlameTongueShape2, PaleGold,
-                    tuning.FlameTongueAlpha3 + wave * tuning.FlameTongueAlpha4, tuning.FlameTongueLayer3, tilt);
+                    tuning.FlameTongueAlpha3 + wave * tuning.FlameTongueAlpha4, tuning.FlameTongueLayer3, tilt, emitter: "WarriorSpellEffects.Skin.4");
             }
             return;
         }
 
         Vector2 overhead = feet - Vector2.UnitY * (tuning.Overhead - tuning.Overhead2 * Ease(progress * tuning.Overhead3));
-        frame.Sprite(overhead, tuning.WarriorImpactWidth, tuning.WarriorImpactHeight, tuning.WarriorImpactShape, Gold, tuning.WarriorImpactAlpha, rotation: tuning.WarriorImpactRotation, light: tuning.WarriorImpactLight);
-        frame.Sprite(overhead, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, PaleGold, tuning.FlashAlpha, tuning.FlashLayer, light: tuning.FlashLight);
+        frame.Sprite(overhead, tuning.WarriorImpactWidth, tuning.WarriorImpactHeight, tuning.WarriorImpactShape, Gold, tuning.WarriorImpactAlpha, rotation: tuning.WarriorImpactRotation, light: tuning.WarriorImpactLight, emitter: "WarriorSpellEffects.Skin.5");
+        frame.Sprite(overhead, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, PaleGold, tuning.FlashAlpha, tuning.FlashLayer, light: tuning.FlashLight, emitter: "WarriorSpellEffects.Skin.6");
         for (int i = 0; i < tuning.ParticleCount; i++)
         {
             float spread = (i - tuning.Spread) * tuning.Spread2;
             Vector2 end = feet + new Vector2(spread, tuning.Y3 - frame.Unit(i) * tuning.Y4);
             frame.Line(overhead + new Vector2(spread * tuning.X2, tuning.Y5), end, tuning.LineWidth + frame.Unit(i + 15) * tuning.LineWidth2,
-                i % 3 == 0 ? PaleGold : Gold, tuning.LineAlpha, i % 2 == 0 ? tuning.LineLayer : tuning.LineLayer2);
+                i % 3 == 0 ? PaleGold : Gold, tuning.LineAlpha, i % 2 == 0 ? tuning.LineLayer : tuning.LineLayer2, emitter: "WarriorSpellEffects.Skin.7");
         }
-        frame.Sprite(feet, tuning.WarriorRingWidth2, tuning.WarriorRingHeight2, tuning.WarriorRingShape2, Gold, tuning.WarriorRingAlpha2, tuning.WarriorRingLayer2);
+        frame.Sprite(feet, tuning.WarriorRingWidth2, tuning.WarriorRingHeight2, tuning.WarriorRingShape2, Gold, tuning.WarriorRingAlpha2, tuning.WarriorRingLayer2, emitter: "WarriorSpellEffects.Skin.8");
     }
 }

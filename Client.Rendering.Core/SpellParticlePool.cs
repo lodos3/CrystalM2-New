@@ -46,6 +46,25 @@ public readonly record struct SpellParticle(Vector2 Origin, Vector2 Velocity, lo
     bool AlwaysOnTop = false, SpellParticleMotion? Motion = null, SpellParticleImpact? Impact = null, float LightEnergy = 1,
     SpellParticleColourCurve? ColourCurve = null, float ColourCurveFullSpeed = 0, ushort OpacityNoiseSeed = 0)
 {
+    [System.Text.Json.Serialization.JsonIgnore]
+    public SpellEmitterPlayback? Emitter { get; init; }
+
+    private float ModuleTime(float age) => Emitter?.StageProgress ?? age;
+
+    public float RibbonScale(float age)
+    {
+        float size = SpellEmitterSettings.Evaluate(Emitter?.Settings.SizeOverLifetime, ModuleTime(age), 1);
+        return Emitter?.Settings.SizeBySpeed is { } curve ? size * SpellEmitterSettings.Evaluate(curve, SpeedTime(age), 1) : size;
+    }
+
+    public byte AnimationFrame(float age)
+    {
+        if (Emitter?.Settings.TextureCycles is not { } cycles) return Frame;
+        float progress = ModuleTime(age) * cycles;
+        return (byte)((Emitter.Settings.TextureFrame.GetValueOrDefault() +
+            (int)((progress - MathF.Floor(progress)) * SpellParticleAtlas.ClipFrames)) % SpellParticleAtlas.ClipFrames);
+    }
+
     public bool Ground => Layer is SpellParticleLayer.Ground or SpellParticleLayer.Floor ||
         (Layer == SpellParticleLayer.Legacy && Shape == SpellParticleShape.Halo);
     public bool Emissive => Layer is SpellParticleLayer.Emissive or SpellParticleLayer.EmissiveCore or SpellParticleLayer.Glow;
@@ -56,41 +75,67 @@ public readonly record struct SpellParticle(Vector2 Origin, Vector2 Velocity, lo
     // A positive full-speed value maps pixels per second to the last key. Otherwise the curve follows normalized age.
     public Color ColourAt(float age)
     {
-        if (ColourCurve is null) return Colour;
-        if (ColourCurveFullSpeed <= 0) return ColourCurve.Apply(Colour, age);
+        Color result = Colour;
+        if (Emitter?.Colour is { } gradient) result = gradient.Apply(result, ModuleTime(age));
+        else if (ColourCurve is { } authored)
+            result = authored.Apply(result, ColourCurveFullSpeed <= 0 ? age : Speed(age) / ColourCurveFullSpeed);
+        return Emitter?.SpeedColour is { } bySpeed ? bySpeed.Apply(result, SpeedTime(age)) : result;
+    }
 
-        float speed;
+    private float Speed(float age)
+    {
+        float multiplier = SpellEmitterSettings.Evaluate(Emitter?.Settings.VelocityOverLifetime, age, 1);
+        if (Motion is not { } motion)
+            return Velocity.Length() * (Linear ? 1 : 2 * (1 - age)) * 1000 / Duration * multiplier;
+
+        float seconds = age * Duration * .001f;
+        float travel = SpellEmitterSettings.Integrate(Emitter?.Settings.VelocityOverLifetime, age) * Duration * .001f;
+        Vector2 planar = (motion.Drift + motion.Wind * travel) * multiplier;
+        float vertical = motion.Elevation(seconds) > 0 ? motion.Lift - motion.Gravity * seconds : 0;
+        return MathF.Sqrt(planar.LengthSquared() + vertical * vertical);
+    }
+
+    private float SpeedTime(float age)
+    {
+        var range = Emitter?.Settings.SpeedRange;
+        float min = range?.Min ?? 0, max = range?.Max ?? 200;
+        return Math.Clamp((Speed(age) - min) / Math.Max(.001f, max - min), 0, 1);
+    }
+
+    public Vector2 Position(long now)
+    {
+        float age = Age(now);
+        float travel = SpellEmitterSettings.Integrate(Emitter?.Settings.VelocityOverLifetime, age);
         if (Motion is { } motion)
         {
             float seconds = age * Duration * .001f;
-            Vector2 planar = motion.Drift + motion.Wind * seconds;
-            float vertical = motion.Elevation(seconds) > 0 ? motion.Lift - motion.Gravity * seconds : 0;
-            speed = MathF.Sqrt(planar.LengthSquared() + vertical * vertical);
+            return Origin + motion.Travel(travel * Duration * .001f) - Vector2.UnitY * motion.Elevation(seconds);
         }
-        else
-            speed = Velocity.Length() * (Linear ? 1 : 2 * (1 - age)) * 1000 / Duration;
-        return ColourCurve.Apply(Colour, speed / ColourCurveFullSpeed);
-    }
-    public Vector2 Position(long now)
-    {
-        if (Motion is { } motion)
-        {
-            float seconds = Age(now) * Duration * .001f;
-            return Origin + motion.Travel(seconds) - Vector2.UnitY * motion.Elevation(seconds);
-        }
-        float age = Age(now);
-        return Origin + Velocity * (Linear ? age : age * (2 - age));
+        float path = travel <= 1 ? travel * (2 - travel) : 1;
+        return Origin + Velocity * (Linear ? travel : path);
     }
 
-    public float Angle(long now) => Rotation + (Motion?.Spin ?? 0) * Age(now) * Duration * .001f;
-    public float DepthAt(long now) => GroundDepth + (Motion?.Travel(Age(now) * Duration * .001f).Y ?? 0);
-    public float Fade(float age) => Layer == SpellParticleLayer.Legacy ? (1 - age) * (1 - age) :
-        Math.Clamp((1 - age) / .76f, 0, 1);
+    public float Angle(long now)
+    {
+        float age = Age(now);
+        float authored = Rotation + (Motion?.Spin ?? 0) * age * Duration * .001f;
+        if (Emitter == null) return authored;
+        float angle = SpellEmitterSettings.Evaluate(Emitter.Settings.RotationOverLifetime, ModuleTime(age), 0);
+        if (Emitter.Settings.RotationBySpeed is { } curve) angle += SpellEmitterSettings.Evaluate(curve, SpeedTime(age), 0);
+        return authored + angle * (MathF.PI / 180);
+    }
+
+    public float DepthAt(long now) => GroundDepth +
+        (Motion?.Travel(SpellEmitterSettings.Integrate(Emitter?.Settings.VelocityOverLifetime, Age(now)) * Duration * .001f).Y ?? 0);
+    public float Fade(float age) => (Layer == SpellParticleLayer.Legacy ? (1 - age) * (1 - age) :
+        Math.Clamp((1 - age) / .76f, 0, 1)) *
+        SpellEmitterSettings.Evaluate(Emitter?.Settings.OpacityOverLifetime, ModuleTime(age), 1);
 
     public Vector2 Dimensions(float age, float scale)
     {
         float size = Size * scale;
         size *= Layer == SpellParticleLayer.Legacy ? Ground ? .7f + age * .3f : 1 - age * .22f : 1 + age * Growth;
+        size *= RibbonScale(age);
         return new Vector2(size, size * (Aspect > 0 ? Aspect : Ground ? .5f : 1));
     }
 
@@ -126,6 +171,16 @@ public sealed class SpellParticlePool
     }
 
     public ReadOnlySpan<SpellParticle> Active => _items.AsSpan(0, _count);
+
+    public int CountEmitter(string id, int spell)
+    {
+        int count = 0;
+        foreach (ref readonly var particle in Active)
+            if (particle.Emitter is { } emitter && emitter.Id == id && emitter.Spell == spell) count++;
+        for (int i = 0; i < _pendingCount; i++)
+            if (_pending[i].Emitter is { } emitter && emitter.Id == id && emitter.Spell == spell) count++;
+        return count;
+    }
 
     public bool TryAdd(SpellParticle particle)
     {

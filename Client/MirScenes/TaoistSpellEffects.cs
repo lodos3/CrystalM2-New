@@ -47,6 +47,7 @@ internal static partial class TaoistSpellEffects
         long now, long start, int duration, float size = Frame.ReferenceSize, uint seed = 0, uint field = 0,
         float? fieldSize = null)
     {
+        using var emitterTime = SpellVfxAssets.AtProgress((now - start) / (float)Math.Max(1, duration));
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
         var tuning = SpellVfxAssets.Current.Taoist.DrawFrame;
         var fields = SpellVfxAssets.Fields("Taoist", "DrawFrame");
@@ -75,7 +76,7 @@ internal static partial class TaoistSpellEffects
             alwaysOnTop: isRune, opacityNoiseSeed: opacityNoiseSeed);
         if (visual.Phase == SpellVisualPhase.Expire)
         {
-            frame.Sparks(feet, fields.Read(tuning.SparksCount), fields.Read(tuning.SparksRx), fields.Read(tuning.SparksRy), progress, Ice, fields.Read(tuning.SparksRise));
+            frame.Sparks(feet, fields.Read(tuning.SparksCount), fields.Read(tuning.SparksRx), fields.Read(tuning.SparksRy), progress, Ice, fields.Read(tuning.SparksRise), emitter: "TaoistSpellEffects.DrawFrame.1");
             return;
         }
 
@@ -131,24 +132,24 @@ internal static partial class TaoistSpellEffects
             Spell.Hallucination or Spell.MassHiding => Violet,
             _ => Amber
         };
-        frame.Sprite(head - heading * fields.Read(tuning.MistFilamentOffset), fields.Read(tuning.MistFilamentWidth), fields.Read(tuning.MistFilamentHeight), fields.Read(tuning.MistFilamentShape), accent, fields.Read(tuning.MistFilamentAlpha), fields.Read(tuning.MistFilamentLayer), angle, light: fields.Read(tuning.MistFilamentLight));
-        frame.Sprite(head, fields.Read(tuning.TalismanWidth), fields.Read(tuning.TalismanHeight), fields.Read(tuning.TalismanShape), Amber, fields.Read(tuning.TalismanAlpha), rotation: angle);
-        frame.Sprite(head + heading * fields.Read(tuning.FlashOffset), fields.Read(tuning.FlashWidth), fields.Read(tuning.FlashHeight), fields.Read(tuning.FlashShape), Ivory, fields.Read(tuning.FlashAlpha), fields.Read(tuning.FlashLayer), angle);
+        frame.Sprite(head - heading * fields.Read(tuning.MistFilamentOffset), fields.Read(tuning.MistFilamentWidth), fields.Read(tuning.MistFilamentHeight), fields.Read(tuning.MistFilamentShape), accent, fields.Read(tuning.MistFilamentAlpha), fields.Read(tuning.MistFilamentLayer), angle, light: fields.Read(tuning.MistFilamentLight), emitter: "TaoistSpellEffects.DrawProjectile.1");
+        frame.Sprite(head, fields.Read(tuning.TalismanWidth), fields.Read(tuning.TalismanHeight), fields.Read(tuning.TalismanShape), Amber, fields.Read(tuning.TalismanAlpha), rotation: angle, emitter: "TaoistSpellEffects.DrawProjectile.2");
+        frame.Sprite(head + heading * fields.Read(tuning.FlashOffset), fields.Read(tuning.FlashWidth), fields.Read(tuning.FlashHeight), fields.Read(tuning.FlashShape), Ivory, fields.Read(tuning.FlashAlpha), fields.Read(tuning.FlashLayer), angle, emitter: "TaoistSpellEffects.DrawProjectile.3");
         for (int i = 0; i < fields.Read(tuning.MistFilamentCount); i++)
         {
             float drift = MathF.Sin(frameIndex * fields.Read(tuning.Drift) - i * fields.Read(tuning.Drift2));
             Vector2 point = head - heading * (fields.Read(tuning.Point) + i * fields.Read(tuning.Point2)) + side * drift * (fields.Read(tuning.Point3) + i);
             frame.Sprite(point, fields.Read(tuning.MistFilamentWidth2) - i * fields.Read(tuning.MistFilamentWidth3), fields.Read(tuning.MistFilamentHeight2) - i * fields.Read(tuning.MistFilamentHeight3), fields.Read(tuning.MistFilamentShape2), i % 2 == 0 ? accent : Amber,
-                fields.Read(tuning.MistFilamentAlpha2) - i * fields.Read(tuning.MistFilamentAlpha3), rotation: angle + drift * fields.Read(tuning.MistFilamentRotation));
+                fields.Read(tuning.MistFilamentAlpha2) - i * fields.Read(tuning.MistFilamentAlpha3), rotation: angle + drift * fields.Read(tuning.MistFilamentRotation), emitter: "TaoistSpellEffects.DrawProjectile.4");
             frame.Sprite(point + side * (i % 2 == 0 ? fields.Read(tuning.SparkOffset) : fields.Read(tuning.SparkOffset2)), fields.Read(tuning.SparkWidth) + i % 3, fields.Read(tuning.SparkHeight), fields.Read(tuning.SparkShape),
-                i % 2 == 0 ? Gold : Ice, fields.Read(tuning.SparkAlpha) - i * fields.Read(tuning.SparkAlpha2), fields.Read(tuning.SparkLayer), angle);
+                i % 2 == 0 ? Gold : Ice, fields.Read(tuning.SparkAlpha) - i * fields.Read(tuning.SparkAlpha2), fields.Read(tuning.SparkLayer), angle, emitter: "TaoistSpellEffects.DrawProjectile.5");
         }
         if (leaveWake)
         {
             int life = Math.Min(remaining, fields.Read(tuning.Life));
             Vector2 point = head - heading * fields.Read(tuning.Point4);
-            pool.TryAdd(new SpellParticle(point, -heading * fields.Read(tuning.WispVelocity) + side * MathF.Sin(frameIndex) * fields.Read(tuning.WispVelocity2), now, life, fields.Read(tuning.WispSize),
-                Tint(accent, fields.Read(tuning.Opacity)), fields.Read(tuning.WispShape), 0, fields.Read(tuning.WispAspect), angle, fields.Read(tuning.WispGrowth), fields.Read(tuning.WispLayer), CastsLight: fields.Read(tuning.WispCastsLight), DepthY: head.Y + fields.Read(tuning.WispDepthY)));
+            SpellVfxAssets.Emit(pool, new SpellParticle(point, -heading * fields.Read(tuning.WispVelocity) + side * MathF.Sin(frameIndex) * fields.Read(tuning.WispVelocity2), now, life, fields.Read(tuning.WispSize),
+                Tint(accent, fields.Read(tuning.Opacity)), fields.Read(tuning.WispShape), 0, fields.Read(tuning.WispAspect), angle, fields.Read(tuning.WispGrowth), fields.Read(tuning.WispLayer), CastsLight: fields.Read(tuning.WispCastsLight), DepthY: head.Y + fields.Read(tuning.WispDepthY)), "TaoistSpellEffects.DrawProjectile.6");
         }
         return true;
     }
@@ -161,13 +162,13 @@ internal static partial class TaoistSpellEffects
         float phase = progress * (prepare ? tuning.PreparePhase : MathF.Tau * tuning.Phase);
         Vector2 head = prepare ? feet - Vector2.UnitY * (tuning.Head + travel * tuning.Head2) :
             body + Ellipse(phase - tuning.EllipseAngle, tuning.EllipseX, tuning.EllipseY);
-        frame.Sprite(feet, tuning.WispWidth, tuning.WispHeight, tuning.WispShape, Teal, tuning.WispAlpha, tuning.WispLayer);
-        frame.Sprite(body, tuning.WispWidth2, tuning.WispHeight2, tuning.WispShape2, Jade, tuning.WispAlpha2, tuning.WispLayer2, light: tuning.WispLight);
+        frame.Sprite(feet, tuning.WispWidth, tuning.WispHeight, tuning.WispShape, Teal, tuning.WispAlpha, tuning.WispLayer, emitter: "TaoistSpellEffects.Heal.1");
+        frame.Sprite(body, tuning.WispWidth2, tuning.WispHeight2, tuning.WispShape2, Jade, tuning.WispAlpha2, tuning.WispLayer2, light: tuning.WispLight, emitter: "TaoistSpellEffects.Heal.2");
         HealMotes(frame, body, tuning.Radius, progress, tuning.Count);
         float trailAngle = prepare ? MathF.PI * tuning.TrailAngle : phase + MathF.PI * tuning.TrailAngle2;
-        frame.Sprite(head, tuning.WispWidth3, tuning.WispHeight3, tuning.WispShape3, prepare ? Blue : Jade, tuning.WispAlpha3, tuning.WispLayer3, trailAngle, light: tuning.WispLight2);
-        frame.Sprite(head, tuning.WispWidth4, tuning.WispHeight4, tuning.WispShape4, prepare ? Ice : Mint, tuning.WispAlpha4, tuning.WispLayer4, trailAngle, light: tuning.WispLight3);
-        frame.Sprite(head, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, White, tuning.FlashAlpha, tuning.FlashLayer, phase * tuning.FlashRotation);
+        frame.Sprite(head, tuning.WispWidth3, tuning.WispHeight3, tuning.WispShape3, prepare ? Blue : Jade, tuning.WispAlpha3, tuning.WispLayer3, trailAngle, light: tuning.WispLight2, emitter: "TaoistSpellEffects.Heal.3");
+        frame.Sprite(head, tuning.WispWidth4, tuning.WispHeight4, tuning.WispShape4, prepare ? Ice : Mint, tuning.WispAlpha4, tuning.WispLayer4, trailAngle, light: tuning.WispLight3, emitter: "TaoistSpellEffects.Heal.4");
+        frame.Sprite(head, tuning.FlashWidth, tuning.FlashHeight, tuning.FlashShape, White, tuning.FlashAlpha, tuning.FlashLayer, phase * tuning.FlashRotation, emitter: "TaoistSpellEffects.Heal.5");
         for (int i = 0; i < tuning.SparkCount; i++)
         {
             float age = i / tuning.AgeDivisor;
@@ -176,7 +177,7 @@ internal static partial class TaoistSpellEffects
                 body + Ellipse(turn - tuning.EllipseAngle2, tuning.EllipseX2 - age * tuning.EllipseX3, tuning.EllipseY2 + age * tuning.EllipseY3) + new Vector2((frame.Unit(i) - tuning.X3) * tuning.X4, age * tuning.Y3);
             Layer depth = prepare ? tuning.PrepareDepth : Depth(turn - tuning.Depth);
             frame.Sprite(point, tuning.SparkWidth + tuning.SparkWidth2 * frame.Unit(i + 7), tuning.SparkHeight + tuning.SparkHeight2 * frame.Unit(i + 1), tuning.SparkShape,
-                i % 5 == 0 ? Ice : i % 2 == 0 ? Mint : Jade, tuning.SparkAlpha - age * tuning.SparkAlpha2, depth, turn);
+                i % 5 == 0 ? Ice : i % 2 == 0 ? Mint : Jade, tuning.SparkAlpha - age * tuning.SparkAlpha2, depth, turn, emitter: "TaoistSpellEffects.Heal.6");
         }
         // Fine sparks rise through the larger healing ribbons. Each has its own
         // deterministic phase so they glitter instead of moving as one ring.
@@ -190,10 +191,10 @@ internal static partial class TaoistSpellEffects
             int colour = i % 5 == 0 ? Ivory : i % 2 == 0 ? Mint : Ice;
             frame.Sprite(point, tuning.FlashWidth2 + frame.Unit(i + 35) * tuning.FlashWidth3, tuning.FlashHeight2 + frame.Unit(i + 83) * tuning.FlashHeight3,
                 i % 6 == 0 ? tuning.FlashShape2 : tuning.FlashShape3, colour, tuning.FlashAlpha2 * twinkle,
-                tuning.FlashLayer2, turn, light: i % 9 == 0);
+                tuning.FlashLayer2, turn, light: i % 9 == 0, emitter: "TaoistSpellEffects.Heal.7");
             if (i % 8 == 0)
                 frame.Sprite(point, tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, Jade, tuning.OrbAlpha * twinkle,
-                    tuning.OrbLayer, light: tuning.OrbLight);
+                    tuning.OrbLayer, light: tuning.OrbLight, emitter: "TaoistSpellEffects.Heal.8");
         }
     }
 
@@ -201,12 +202,12 @@ internal static partial class TaoistSpellEffects
     {
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.SpiritEdge);
         Vector2 centre = feet + facing * tuning.Centre - Vector2.UnitY * tuning.Centre2;
-        frame.Sprite(centre, tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, Teal, tuning.OrbAlpha, light: tuning.OrbLight);
+        frame.Sprite(centre, tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, Teal, tuning.OrbAlpha, light: tuning.OrbLight, emitter: "TaoistSpellEffects.SpiritEdge.1");
         for (int i = 0; i < tuning.ParticleCount; i++)
         {
             Vector2 point = centre + facing * (i * tuning.Point) + new Vector2(0, (frame.Unit(i) - tuning.Y) * tuning.Y2);
-            frame.Thread(point, point + facing * (tuning.ThreadEnd + tuning.ThreadEnd2 * progress), tuning.ThreadStartWidth, tuning.ThreadEndWidth, i % 2 == 0 ? Ice : Jade, tuning.ThreadAlpha);
+            frame.Thread(point, point + facing * (tuning.ThreadEnd + tuning.ThreadEnd2 * progress), tuning.ThreadStartWidth, tuning.ThreadEndWidth, i % 2 == 0 ? Ice : Jade, tuning.ThreadAlpha, emitter: "TaoistSpellEffects.SpiritEdge.2");
         }
-        frame.Sparks(centre, tuning.SparksCount, tuning.SparksRx, tuning.SparksRy, progress, Mint, tuning.SparksRise);
+        frame.Sparks(centre, tuning.SparksCount, tuning.SparksRx, tuning.SparksRy, progress, Mint, tuning.SparksRise, emitter: "TaoistSpellEffects.SpiritEdge.3");
     }
 }

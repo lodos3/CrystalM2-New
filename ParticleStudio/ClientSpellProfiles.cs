@@ -13,6 +13,10 @@ internal static class ClientSpellProfiles
             throw new InvalidDataException("Choose a client build that already supports editable spell profiles.");
 
         var saved = SpellVfxAssets.ReadSpell(sourceDirectory, spell);
+        string emitterSchema = Path.Combine(destination, "EmitterSchema.version");
+        if (saved.ContainsKey(SpellVfxAssets.EmitterGroup) &&
+            (!File.Exists(emitterSchema) || File.ReadAllText(emitterSchema).Trim() != "1"))
+            throw new InvalidDataException("This client build needs an update before it can read the shared particle modules.");
         SpellVfxAssets.SaveSpell(destination, spell, saved);
         return destination;
     }

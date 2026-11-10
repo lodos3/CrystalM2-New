@@ -10,7 +10,7 @@ using CrystalM2.Rendering.Core;
 namespace Client.MirScenes;
 
 /// <summary>The file format shared by the client and particle authoring tools.</summary>
-public static class SpellVfxAssets
+public static partial class SpellVfxAssets
 {
     private const int SchemaVersion = 1;
     private static readonly JsonSerializerOptions Options = new()
@@ -258,6 +258,11 @@ public static class SpellVfxAssets
     {
         foreach (var (group, value) in overrides)
         {
+            if (group == EmitterGroup && value is JsonObject emitters)
+            {
+                settings = settings with { Emitters = DecodeEmitters(emitters) };
+                continue;
+            }
             if (!defaults.TryGetValue(group, out var original) || value is not JsonObject nodes)
                 throw new InvalidDataException($"Invalid VFX group '{group}'.");
             settings = DecodeGroup(settings, group, Merge(original, nodes, group));
@@ -355,17 +360,26 @@ public static class SpellVfxAssets
         private readonly Snapshot _previousFrame;
         private readonly SpellVfxData _previous;
         private readonly Spell _previousSpell;
+        private readonly uint _previousIndex;
+        private readonly bool _resetIndex;
 
         internal Scope(Spell spell)
         {
             (_previousFrame, _previous, _previousSpell) = (_frame, _scoped, _spell);
-            if (_frame != null && spell == _spell) return;
+            _previousIndex = _particleIndex;
+            _resetIndex = _frame == null || spell != _spell;
+            if (!_resetIndex) return;
+            _particleIndex = 0;
             _frame ??= Volatile.Read(ref _active);
             _scoped = _frame.Spells.TryGetValue(spell, out var data) ? data : _frame.Defaults;
             _spell = spell;
         }
 
-        public void Dispose() => (_frame, _scoped, _spell) = (_previousFrame, _previous, _previousSpell);
+        public void Dispose()
+        {
+            (_frame, _scoped, _spell) = (_previousFrame, _previous, _previousSpell);
+            if (_resetIndex) _particleIndex = _previousIndex;
+        }
     }
 }
 

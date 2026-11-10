@@ -181,40 +181,16 @@
             <Border Grid.Column="4" Background="{StaticResource Panel}" BorderBrush="{StaticResource Edge}" BorderThickness="1" Padding="11">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top">
-                        <DockPanel LastChildFill="True">
-                            <CheckBox x:Name="AllNodes" DockPanel.Dock="Right" Content="Advanced" Checked="NodesChanged" Unchecked="NodesChanged"
-                                      ToolTip="Show all source nodes and settings, including inactive branches" />
-                            <TextBlock Text="Layer settings" FontSize="16" FontWeight="SemiBold" />
-                        </DockPanel>
+                        <TextBlock Text="Particle System" FontSize="16" FontWeight="SemiBold" />
                         <ComboBox x:Name="NodePicker" Margin="0,11,0,7" SelectionChanged="NodeChanged"
                                   AutomationProperties.Name="Spell layer" />
-                        <TextBlock Text="Choose a layer, then edit a value or open its range or curve." Foreground="{StaticResource Muted}"
+                        <CheckBox x:Name="SoloLayer" Content="Solo selected layer" Margin="0,0,0,7" Checked="ViewChanged" Unchecked="ViewChanged" />
+                        <TextBlock Text="Choose a layer to edit its particle modules." Foreground="{StaticResource Muted}"
                                    TextWrapping="Wrap" Margin="0,0,0,8" />
                     </StackPanel>
-                    <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0" Orientation="Horizontal">
-                        <Button Content="Edit value..." Click="EditSelectedValue" />
-                        <Button Content="Reset selected value" HorizontalAlignment="Left" Click="ResetValue" />
-                    </StackPanel>
-                    <DataGrid x:Name="Parameters" Background="#11171E" RowBackground="#151E28" AlternatingRowBackground="#192430"
-                              Foreground="#E3E9F0" BorderBrush="{StaticResource Edge}" AutoGenerateColumns="False"
-                              CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="None"
-                              SelectionMode="Single" SelectionUnit="FullRow" BeginningEdit="BeginParameterEdit" CellEditEnding="ParameterEdited"
-                              EnableRowVirtualization="True" AutomationProperties.Name="Effect parameters">
-                        <DataGrid.GroupStyle>
-                            <GroupStyle>
-                                <GroupStyle.HeaderTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding Name}" Foreground="#E5BA78" FontWeight="SemiBold" Margin="7,9,3,3" />
-                                    </DataTemplate>
-                                </GroupStyle.HeaderTemplate>
-                            </GroupStyle>
-                        </DataGrid.GroupStyle>
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Setting" Binding="{Binding Label}" IsReadOnly="True" Width="1.25*" />
-                            <DataGridTextColumn Header="Value" Binding="{Binding Text, UpdateSourceTrigger=Explicit}" Width="*" />
-                            <DataGridTextColumn Header="Source" Binding="{Binding Source}" IsReadOnly="True" Width="69" />
-                        </DataGrid.Columns>
-                    </DataGrid>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel x:Name="EmitterModules" />
+                    </ScrollViewer>
                 </DockPanel>
             </Border>
         </Grid>

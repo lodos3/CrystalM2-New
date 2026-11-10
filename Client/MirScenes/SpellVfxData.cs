@@ -6,6 +6,7 @@ namespace Client.MirScenes;
 // Typed bindings for the editable assets in Data/SpellVfx.
 internal sealed record SpellVfxData
 {
+    internal Dictionary<string, SpellVfxAssets.ConfiguredEmitter> Emitters { get; init; }
     internal DebrisNodes Debris { get; init; }
     internal FrameNodes Frame { get; init; }
     internal LegacyNodes Legacy { get; init; }

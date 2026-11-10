@@ -51,7 +51,7 @@ internal static class SpellImpactDebris
                 Motion: motion, Impact: new SpellParticleImpact(profile.Child, fields.Read(tuning.SpellParticleImpactCount), fields.Read(tuning.SpellParticleImpactSize), fields.Read(tuning.SpellParticleImpactDuration) + i * fields.Read(tuning.SpellParticleImpactDuration2), fields.Read(tuning.SpellParticleImpactScatter) * driftScale, Lights: i % 3 == 0),
                 LightEnergy: profile.Energy, ColourCurve: visual.Spell == Spell.SoulFireBall ? SoulEmber : null,
                 ColourCurveFullSpeed: fields.Read(tuning.SpellParticleColourCurveFullSpeed));
-            pool.Schedule(particle);
+            SpellVfxAssets.Emit(pool, particle, "SpellImpactDebris.Emit.1", schedule: true);
         }
     }
 }
