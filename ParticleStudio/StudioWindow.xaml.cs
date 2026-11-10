@@ -215,9 +215,10 @@ public partial class StudioWindow : Window
             ? _defaults.SelectMany(group => group.Value.Select(node => (Group: group.Key, Node: node.Key)))
             : nodes.Where(node => _defaults.TryGetValue(node.Group, out var group) && group.ContainsKey(node.Node)))
             .OrderBy(node => node.Group).ThenBy(node => node.Node)
-            .Select(node => new NodeChoice(node.Group, node.Node)).ToArray();
+            .SelectMany(node => ParticleLayers.Names(node.Group, node.Node, AllNodes.IsChecked == true)
+                .Select(layer => new NodeChoice(node.Group, node.Node, layer))).ToArray();
         NodePicker.ItemsSource = items;
-        NodePicker.SelectedItem = items.Contains(prior) ? prior : items.FirstOrDefault();
+        NodePicker.SelectedItem = items.Contains(prior) ? prior : items.FirstOrDefault(item => item.Layer != null) ?? items.FirstOrDefault();
         ShowParameters();
     }
 
@@ -240,15 +241,27 @@ public partial class StudioWindow : Window
         }
         var shared = _defaults[choice.Group][choice.Node]!.AsObject();
         var overrides = _drafts[_spell.Spell].Working[choice.Group]?[choice.Node] as JsonObject;
-        var rows = shared.Where(item => AllNodes.IsChecked == true ||
-            !_activeFields.TryGetValue((choice.Group, choice.Node), out var fields) || fields.Contains(item.Key))
+        JsonNode Value(string key) => overrides?[key] ?? shared[key]!;
+        var rows = shared.Where(item => ParticleLayers.Includes(choice.Layer, item.Key, _spell.Spell))
+            .Where(item => AllNodes.IsChecked == true ||
+                !_activeFields.TryGetValue((choice.Group, choice.Node), out var fields) || fields.Contains(item.Key))
+            .Where(item => !ParticleLayers.IsPairComponent(choice.Layer, item.Key))
             .Select(item =>
         {
             JsonNode? edit = overrides?[item.Key];
             JsonNode value = edit ?? item.Value!;
             var control = ParticleSettings.Describe(choice.Group, choice.Node, item.Key, _spell.Spell);
-            string label = AllNodes.IsChecked == true ? item.Key : control.Label;
-            return new ParameterRow(item.Key, label, control.Module, Format(value), edit == null ? "Default" : "Override");
+            string label = AllNodes.IsChecked == true ? item.Key : ParticleLayers.Label(choice.Layer, item.Key) ?? control.Label;
+            var pair = ParticleLayers.Pair(choice.Layer, item.Key);
+            if (pair is { } linked)
+            {
+                double start = value.GetValue<double>(), other = Value(linked.Key).GetValue<double>();
+                string summary = linked.Fade ? $"{start:g4} → {start * (1 - other):g4}" : $"{start:g4} – {start + other:g4}";
+                return new ParameterRow(item.Key, linked.Fade ? "Opacity over stage" : label + " range",
+                    control.Module, summary, edit == null && overrides?[linked.Key] == null ? "Default" : "Override", true);
+            }
+            return new ParameterRow(item.Key, label, control.Module, Format(value), edit == null ? "Default" : "Override",
+                value is JsonArray);
         }).OrderBy(row => ParticleSettings.ModuleOrder(row.Module)).ToArray();
         var view = new ListCollectionView(rows);
         view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ParameterRow.Module)));
@@ -257,6 +270,29 @@ public partial class StudioWindow : Window
 
     private static string Format(JsonNode value) => value.GetValueKind() == JsonValueKind.String
         ? value.GetValue<string>() : value.ToJsonString();
+
+    private void BeginParameterEdit(object sender, DataGridBeginningEditEventArgs e)
+    {
+        if (e.Row.Item is ParameterRow { Structured: true }) e.Cancel = true;
+    }
+
+    private void EditSelectedValue(object sender, RoutedEventArgs e)
+    {
+        if (_spell == null || NodePicker.SelectedItem is not NodeChoice choice ||
+            Parameters.SelectedItem is not ParameterRow row) return;
+        Try(() =>
+        {
+            var shared = _defaults[choice.Group][choice.Node]!.AsObject();
+            var overrides = _drafts[_spell.Spell].Working[choice.Group]?[choice.Node];
+            JsonNode Value(string key) => overrides?[key] ?? shared[key]!;
+            var pair = ParticleLayers.Pair(choice.Layer, row.Name);
+            var editor = new ParticleValueEditor(row.Label, row.Name, Value(row.Name),
+                pair is { } linked ? (linked.Key, linked.Fade, Value(linked.Key)) : null) { Owner = this };
+            if (editor.ShowDialog() != true) return;
+            ChangeValues(choice, editor.Values.Select(item =>
+                (item.Key, JsonNode.DeepEquals(shared[item.Key], item.Value) ? null : item.Value)));
+        });
+    }
 
     private void ParameterEdited(object sender, DataGridCellEditEndingEventArgs e)
     {
@@ -282,10 +318,16 @@ public partial class StudioWindow : Window
     private void ResetValue(object sender, RoutedEventArgs e)
     {
         if (NodePicker.SelectedItem is NodeChoice choice && Parameters.SelectedItem is ParameterRow row)
-            Try(() => ChangeValue(choice, row.Name, null));
+            Try(() =>
+            {
+                var pair = ParticleLayers.Pair(choice.Layer, row.Name);
+                ChangeValues(choice, pair is { } linked ? [(row.Name, null), (linked.Key, null)] : [(row.Name, null)]);
+            });
     }
 
-    private void ChangeValue(NodeChoice choice, string name, JsonNode? value)
+    private void ChangeValue(NodeChoice choice, string name, JsonNode? value) => ChangeValues(choice, [(name, value)]);
+
+    private void ChangeValues(NodeChoice choice, IEnumerable<(string Name, JsonNode? Value)> changes)
     {
         if (_spell == null) return;
         Spell spell = _spell.Spell;
@@ -293,23 +335,23 @@ public partial class StudioWindow : Window
         var updated = (JsonObject)draft.Working.DeepClone();
         var group = updated[choice.Group] as JsonObject;
         var node = group?[choice.Node] as JsonObject;
-        if (value != null)
+        foreach (var (name, value) in changes)
         {
-            if (group == null) updated[choice.Group] = group = new JsonObject();
-            if (node == null) group[choice.Node] = node = new JsonObject();
-            node[name] = value;
+            if (value != null)
+            {
+                if (group == null) updated[choice.Group] = group = new JsonObject();
+                if (node == null) group[choice.Node] = node = new JsonObject();
+                node[name] = value;
+            }
+            else node?.Remove(name);
         }
-        else if (node != null)
-        {
-            node.Remove(name);
-            if (node.Count == 0) group!.Remove(choice.Node);
-            if (group!.Count == 0) updated.Remove(choice.Group);
-        }
+        if (node?.Count == 0) group!.Remove(choice.Node);
+        if (group?.Count == 0) updated.Remove(choice.Group);
 
         SpellVfxAssets.PreviewSpell(_folder, spell, updated);
         draft.Working = updated;
         Pause();
-        Status.Text = $"{choice.Node} · {name} applied to preview";
+        Status.Text = $"{choice} updated in preview";
         UpdateDirty();
         // The grid must finish committing its cell before the inspector is rebound.
         Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
@@ -549,18 +591,19 @@ public partial class StudioWindow : Window
         }
     }
 
-    private sealed record NodeChoice(string Group, string Node)
+    private sealed record NodeChoice(string Group, string Node, string? Layer)
     {
-        public override string ToString() => ParticleSettings.NodeLabel(Group, Node);
+        public override string ToString() => Layer ?? ParticleSettings.NodeLabel(Group, Node);
     }
 
-    private sealed class ParameterRow(string name, string label, string module, string text, string source)
+    private sealed class ParameterRow(string name, string label, string module, string text, string source, bool structured)
     {
         public string Name { get; } = name;
         public string Label { get; } = label;
         public string Module { get; } = module;
         public string Text { get; set; } = text;
         public string Source { get; } = source;
+        public bool Structured { get; } = structured;
     }
 
     private sealed class Draft(JsonObject saved)

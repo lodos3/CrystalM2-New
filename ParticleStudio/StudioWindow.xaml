@@ -184,20 +184,21 @@
                         <DockPanel LastChildFill="True">
                             <CheckBox x:Name="AllNodes" DockPanel.Dock="Right" Content="Advanced" Checked="NodesChanged" Unchecked="NodesChanged"
                                       ToolTip="Show all source nodes and settings, including inactive branches" />
-                            <TextBlock Text="Effect settings" FontSize="16" FontWeight="SemiBold" />
+                            <TextBlock Text="Layer settings" FontSize="16" FontWeight="SemiBold" />
                         </DockPanel>
                         <ComboBox x:Name="NodePicker" Margin="0,11,0,7" SelectionChanged="NodeChanged"
-                                  AutomationProperties.Name="Effect node" />
-                        <TextBlock Text="Edit a value, then press Enter to preview it." Foreground="{StaticResource Muted}"
+                                  AutomationProperties.Name="Spell layer" />
+                        <TextBlock Text="Choose a layer, then edit a value or open its range or curve." Foreground="{StaticResource Muted}"
                                    TextWrapping="Wrap" Margin="0,0,0,8" />
                     </StackPanel>
-                    <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                    <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0" Orientation="Horizontal">
+                        <Button Content="Edit value..." Click="EditSelectedValue" />
                         <Button Content="Reset selected value" HorizontalAlignment="Left" Click="ResetValue" />
                     </StackPanel>
                     <DataGrid x:Name="Parameters" Background="#11171E" RowBackground="#151E28" AlternatingRowBackground="#192430"
                               Foreground="#E3E9F0" BorderBrush="{StaticResource Edge}" AutoGenerateColumns="False"
                               CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="None"
-                              SelectionMode="Single" SelectionUnit="FullRow" CellEditEnding="ParameterEdited"
+                              SelectionMode="Single" SelectionUnit="FullRow" BeginningEdit="BeginParameterEdit" CellEditEnding="ParameterEdited"
                               EnableRowVirtualization="True" AutomationProperties.Name="Effect parameters">
                         <DataGrid.GroupStyle>
                             <GroupStyle>
