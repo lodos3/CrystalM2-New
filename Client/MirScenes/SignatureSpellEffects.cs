@@ -13,7 +13,7 @@ internal static class SignatureSpellEffects
 
     private static Look Profile(SpecialisationAbility ability)
     {
-        var tuning = SpellVfxAssets.Current.Signature.Profile;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Signature.Profile);
         (Form form, Shape shape, int size) = ability.Spell switch
         {
             Spell.SteelCut or Spell.QuickCut => (tuning.SteelCutForm, tuning.SteelCutShape, tuning.SteelCutSize),
@@ -111,7 +111,7 @@ internal static class SignatureSpellEffects
         MirDirection direction, long now)
     {
         using var vfxScope = SpellVfxAssets.For(ability.Spell);
-        var tuning = SpellVfxAssets.Current.Signature.Cast;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Signature.Cast);
         var look = Profile(ability);
         var vfx = new Effect(pool, look, now);
         int windup = Math.Max(tuning.Windup, (int)ability.Windup);
@@ -159,7 +159,7 @@ internal static class SignatureSpellEffects
     internal static void Cell(SpellParticlePool pool, SpecialisationAbility ability, Vector2 cell, SpellEffect phase, long now)
     {
         using var vfxScope = SpellVfxAssets.For(ability.Spell);
-        var tuning = SpellVfxAssets.Current.Signature.Cell;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Signature.Cell);
         var look = Profile(ability);
         var vfx = new Effect(pool, look, now);
         if (phase == SpellEffect.SignatureWindup)
@@ -241,7 +241,7 @@ internal static class SignatureSpellEffects
     internal static void RelayArc(SpellParticlePool pool, SpecialisationAbility ability, Vector2 origin, Vector2 destination, long now)
     {
         using var vfxScope = SpellVfxAssets.For(ability.Spell);
-        var tuning = SpellVfxAssets.Current.Signature.RelayArc;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Signature.RelayArc);
         var effect = new Effect(pool, Profile(ability), now);
         var chest = Vector2.UnitY * tuning.Chest;
         effect.Lightning(origin - chest, destination - chest, 0, tuning.Size);
@@ -255,7 +255,7 @@ internal static class SignatureSpellEffects
             byte direction = 0, float aspect = 1, float rotation = 0, float growth = 0, int delay = 0,
             int? alpha = null, bool core = false, bool linear = false)
         {
-            var tuning = SpellVfxAssets.Current.Signature.EffectAdd;
+            var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Signature.EffectAdd);
             if (window > 0)
             {
                 delay = delay * window / referenceDuration;
@@ -275,7 +275,7 @@ internal static class SignatureSpellEffects
 
         public void Ring(Vector2 point, int size, int duration)
         {
-            var tuning = SpellVfxAssets.Current.Signature.EffectRing;
+            var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Signature.EffectRing);
             Add(point, Vector2.Zero, tuning.HaloShape, size, duration, tuning.HaloLayer, aspect: tuning.HaloAspect, growth: tuning.HaloGrowth, alpha: tuning.HaloAlpha);
             Add(point - Vector2.UnitY * tuning.GlyphOffset, -Vector2.UnitY * tuning.GlyphVelocity, tuning.GlyphShape, size * tuning.GlyphSize / 3, duration * tuning.GlyphDuration / 4,
                 tuning.GlyphLayer, aspect: tuning.GlyphAspect, growth: tuning.GlyphGrowth, alpha: tuning.GlyphAlpha);
@@ -283,7 +283,7 @@ internal static class SignatureSpellEffects
 
         public void Projectile(Vector2 start, Vector2 end, int windup, int size, bool fork)
         {
-            var tuning = SpellVfxAssets.Current.Signature.EffectProjectile;
+            var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Signature.EffectProjectile);
             Vector2 travel = end - start;
             float angle = MathF.Atan2(travel.Y, travel.X);
             int duration = Math.Max(tuning.Duration, windup - tuning.Duration2);
@@ -302,7 +302,7 @@ internal static class SignatureSpellEffects
 
         public void Lightning(Vector2 start, Vector2 end, int windup, int size)
         {
-            var tuning = SpellVfxAssets.Current.Signature.EffectLightning;
+            var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Signature.EffectLightning);
             Vector2 travel = end - start;
             float length = travel.Length();
             if (length < 1) return;
@@ -324,7 +324,7 @@ internal static class SignatureSpellEffects
 
         public void Scatter(Vector2 point, int count, Shape shape, float spread, int duration, bool rise = false)
         {
-            var tuning = SpellVfxAssets.Current.Signature.EffectScatter;
+            var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Signature.EffectScatter);
             if (pool.Active.Length > 660) return;
             for (int i = 0; i < count; i++)
             {

@@ -225,10 +225,7 @@ public sealed partial class MapControl
 
         // These spells already show the complete field at the cast location. The hit packets
         // confirm contacts elsewhere in that field and only need a small accent on each target.
-        var phase = WarriorSpellEffects.HasArt(spell) ||
-            spell is Spell.FireBang or Spell.IceStorm or Spell.IceThrust or Spell.FlameField or Spell.ThunderStorm or Spell.StormEscape
-            ? SpellVisualPhase.Contact : SpellVisualPhase.Impact;
-        var visual = new SpellVisual(spell, phase);
+        var visual = new SpellVisual(spell, LegacySpellEffects.ImpactPhase(spell));
         if (spell == Spell.FlamingSword && CanEmitSpellParticles(location) &&
             M2CellInfo[location.X, location.Y].CellObjects is { } occupants)
         {

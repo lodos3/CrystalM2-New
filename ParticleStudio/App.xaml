@@ -1,0 +1,4 @@
+<Application x:Class="CrystalM2.ParticleStudio.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="StudioWindow.xaml" />

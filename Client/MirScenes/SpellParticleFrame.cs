@@ -24,7 +24,7 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
 
     internal static float Envelope(float progress, float? fadeStart = null, float? tail = null)
     {
-        var tuning = SpellVfxAssets.Current.Frame.Envelope;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Frame.Envelope);
         float fade = fadeStart ?? tuning.FadeStart;
         return (tuning.RiseBase + tuning.RiseGain * Ease(progress * tuning.RiseSpeed)) *
             (1 - (1 - (tail ?? tuning.TailOpacity)) * Ease((progress - fade) / (1 - fade)));
@@ -64,7 +64,7 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
 
     internal void FloorSeal(Vector2 centre, float width, float angle, Shape shape, int colour, float alpha, bool light = false)
     {
-        var tuning = SpellVfxAssets.Current.Frame.FloorSeal;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Frame.FloorSeal);
         alpha *= strength;
         if (alpha < .014f) return;
         Vector2 right = Ellipse(angle, 1, 1) * (width * Scale * tuning.Right);
@@ -79,7 +79,7 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
     internal void Line(Vector2 start, Vector2 end, float width, int colour, float alpha,
         Layer layer = Layer.Emissive, bool light = false)
     {
-        var tuning = SpellVfxAssets.Current.Frame.Line;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Frame.Line);
         Vector2 delta = end - start;
         if (delta.LengthSquared() < .09f) return;
         bool haze = width > 4;
@@ -93,7 +93,7 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
     internal void Thread(Vector2 start, Vector2 end, float startWidth, float endWidth, int colour, float alpha,
         Layer layer = Layer.Emissive, bool light = false, float? sortY = null)
     {
-        var tuning = SpellVfxAssets.Current.Frame.Thread;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Frame.Thread);
         alpha *= strength;
         if (alpha < .014f) return;
         (start, end) = (Place(start), Place(end));
@@ -113,7 +113,7 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
 
     internal void WindRibbon(SpriteQuad edges, int colour, float alpha)
     {
-        var tuning = SpellVfxAssets.Current.Frame.WindRibbon;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Frame.WindRibbon);
         alpha *= strength;
         if (alpha < .014f) return;
         var (a, b, c, d) = edges;
@@ -127,7 +127,7 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
 
     internal void Orbit(Vector2 centre, float x, float y, float angle, float sweep, int colour, float width, float alpha)
     {
-        var tuning = SpellVfxAssets.Current.Frame.Orbit;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Frame.Orbit);
         int segments = Math.Max(tuning.Segments, (int)MathF.Ceiling(sweep * tuning.Segments2));
         Vector2 from = centre + Ellipse(angle, x, y);
         for (int i = 1; i <= segments; i++)
@@ -144,7 +144,7 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
     internal void Sparks(Vector2 centre, int count, float rx, float ry, float progress, int tint,
         float rise = 0, Shape shape = Shape.Spark, float? sortY = null)
     {
-        var tuning = SpellVfxAssets.Current.Frame.Sparks;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Frame.Sparks);
         for (int i = 0; i < count; i++)
         {
             float age = Fract(progress + Unit(i + 41) * tuning.Age);
@@ -168,7 +168,7 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
     private void Add(Vector2 centre, float width, float height, Shape shape, int colour, float alpha,
         Layer layer, float rotation, bool light, byte animationFrame = 0, float? sortY = null)
     {
-        var tuning = SpellVfxAssets.Current.Frame.Add;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Frame.Add);
         alpha *= strength;
         if (alpha < .014f || width <= 0 || height <= 0) return;
         if (light && layer == Layer.Emissive && shape is Shape.Orb or Shape.Wisp) layer = tuning.Layer;

@@ -10,7 +10,7 @@ internal static partial class TaoistSpellEffects
 {
     private static void Trap(Frame frame, Vector2 feet, float progress, bool prepare)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.Trap;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Trap);
         if (prepare)
         {
             float open = Ease(progress * tuning.Open);
@@ -43,7 +43,7 @@ internal static partial class TaoistSpellEffects
 
     private static void Phantom(Frame frame, Vector2 feet, float progress, float time)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.Phantom;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Phantom);
         float rise = Ease(progress) * tuning.Rise;
         Vector2 centre = feet - Vector2.UnitY * (tuning.Centre + rise);
         frame.Sprite(feet, tuning.WispWidth, tuning.WispHeight, tuning.WispShape, tuning.WispColour, tuning.WispAlpha, tuning.WispLayer);
@@ -56,7 +56,7 @@ internal static partial class TaoistSpellEffects
 
     private static void Enhance(Frame frame, Vector2 feet, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.Enhance;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Enhance);
         Vector2 centre = feet - Vector2.UnitY * (tuning.Centre + Ease(progress) * tuning.Centre2);
         float open = tuning.Open + tuning.Open2 * Ease(progress * tuning.Open3);
         frame.Sprite(feet, tuning.OrbWidth * open, tuning.OrbHeight * open, tuning.OrbShape, Ochre, tuning.OrbAlpha, tuning.OrbLayer, light: tuning.OrbLight);
@@ -84,7 +84,7 @@ internal static partial class TaoistSpellEffects
 
     private static void Shinsu(Frame frame, Vector2 feet, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.Shinsu;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Shinsu);
         Vector2 centre = feet - Vector2.UnitY * (tuning.Centre + progress * tuning.Centre2);
         float open = tuning.Open + tuning.Open2 * Ease(progress * tuning.Open3);
         float fade = 1 - Ease((progress - tuning.Fade) / tuning.FadeDivisor);
@@ -126,7 +126,7 @@ internal static partial class TaoistSpellEffects
 
     private static void Revive(Frame frame, Vector2 feet, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.Revive;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Revive);
         float lift = tuning.Lift + tuning.Lift2 * MathF.Sin(progress * MathF.PI);
         frame.Sprite(feet, tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, InkBlue, tuning.OrbAlpha, tuning.OrbLayer, light: tuning.OrbLight);
         frame.Sprite(feet, tuning.HaloWidth, tuning.HaloHeight, tuning.HaloShape, Ice, tuning.HaloAlpha, tuning.HaloLayer);
@@ -143,7 +143,7 @@ internal static partial class TaoistSpellEffects
 
     private static void Plague(Frame frame, Vector2 feet, float progress, float time)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.Plague;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Plague);
         float open = tuning.Open + tuning.Open2 * Ease(progress * tuning.Open3);
         Vector2 centre = feet - Vector2.UnitY * tuning.Centre;
         frame.Sprite(feet, tuning.OrbWidth * open, tuning.OrbHeight * open, tuning.OrbShape, tuning.OrbColour, tuning.OrbAlpha, tuning.OrbLayer, light: tuning.OrbLight);
@@ -171,7 +171,7 @@ internal static partial class TaoistSpellEffects
         float size, uint seed, uint field, Vector2 inward, int neighbours)
     {
         using var vfxScope = SpellVfxAssets.For(Spell.PoisonCloud);
-        var tuning = SpellVfxAssets.Current.Taoist.DrawPoisonField;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.DrawPoisonField);
         float time = (now - start) * tuning.Time;
         if (time < 0) return;
         var frame = new Frame(pool, feet, now, 1, size, seed ^ (uint)Spell.PoisonCloud * 0x2d5bu, field);
@@ -180,7 +180,7 @@ internal static partial class TaoistSpellEffects
 
     private static void Cloud(Frame frame, Vector2 feet, float time, Vector2 inward = default, int neighbours = 2)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.Cloud;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Cloud);
         float bloom = tuning.Bloom + tuning.Bloom2 * Ease(time * tuning.Bloom3);
         Vector2 drift = new(MathF.Sin(time * tuning.Drift + feet.Y * tuning.Drift2) * tuning.Drift3,
             MathF.Cos(time * tuning.Drift4 + feet.X * tuning.Drift5) * tuning.Drift6);
@@ -207,7 +207,7 @@ internal static partial class TaoistSpellEffects
 
     private static void Shield(Frame frame, Vector2 feet, float progress, bool aura)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.Shield;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Shield);
         // Anchor the shell to the actor and send pulses along each curved rim.
         Vector2 centre = feet - Vector2.UnitY * tuning.Centre;
         float spread = aura ? 0 : tuning.Spread * (1 - Ease(progress * tuning.Spread2));
@@ -290,7 +290,7 @@ internal static partial class TaoistSpellEffects
 
     private static void Pet(Frame frame, Vector2 feet, float progress, float time, bool aura)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.Pet;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Pet);
         Vector2 centre = feet - Vector2.UnitY * (aura ? tuning.AuraCentre : tuning.ImpactCentre);
         if (!aura)
         {
@@ -312,7 +312,7 @@ internal static partial class TaoistSpellEffects
 
     private static void HealingCircle(Frame frame, Vector2 feet, float progress, float time, bool field, float fieldSize)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.HealingCircle;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.HealingCircle);
         float opening = Ease((field ? time : progress) * tuning.Opening);
         float width = field ? fieldSize : tuning.Width * (tuning.Width2 + opening * tuning.Width3);
         float height = width * GroundAspect;

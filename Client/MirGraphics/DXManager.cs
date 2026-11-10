@@ -1,4 +1,4 @@
-﻿using System.Drawing.Drawing2D;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using Client.MirControls;
 using Client.MirScenes;
@@ -110,70 +110,47 @@ namespace Client.MirGraphics
             CreateLights();
         }
 
-        private unsafe static void CreateLights()
+        private static void CreateLights()
         {
-
-            for (int i = Lights.Count - 1; i >= 0; i--)
-                Lights[i].Dispose();
-
+            foreach (Texture light in Lights) light.Dispose();
             Lights.Clear();
 
             for (int i = 1; i < LightSizes.Length; i++)
+                Lights.Add(CreateRadialLight(Device, LightSizes[i].X, LightSizes[i].Y));
+        }
+
+        internal static unsafe Texture CreateRadialLight(RendererDevice device, int width, int height)
+        {
+            var light = new Texture(device, width, height);
+            try
             {
-                // int width = 125 + (57 *i);
-                //int height = 110 + (57 * i);
-                int width = LightSizes[i].X;
-                int height = LightSizes[i].Y;
-
-                Texture light = new Texture(Device, width, height);
-
-                DataRectangle stream = light.BeginUpload();
-                using (Bitmap image = new Bitmap(width, height, width * 4, PixelFormat.Format32bppArgb, stream.Data.DataPointer))
+                DataRectangle upload = light.BeginUpload();
+                using (var image = new Bitmap(width, height, width * 4, PixelFormat.Format32bppArgb, upload.Data.DataPointer))
+                using (var graphics = Graphics.FromImage(image))
+                using (var path = new GraphicsPath())
                 {
-                    using (Graphics graphics = Graphics.FromImage(image))
+                    path.AddEllipse(new Rectangle(0, 0, width, height));
+                    Color[] colours = [Color.White, Color.FromArgb(255, 210, 210, 210),
+                        Color.FromArgb(255, 160, 160, 160), Color.FromArgb(255, 70, 70, 70),
+                        Color.FromArgb(255, 40, 40, 40), Color.FromArgb(0, 0, 0, 0)];
+                    using var brush = new PathGradientBrush(path);
+                    graphics.Clear(Color.FromArgb(0, 0, 0, 0));
+                    brush.InterpolationColors = new ColorBlend
                     {
-                        using (GraphicsPath path = new GraphicsPath())
-                        {
-                            //path.AddEllipse(new Rectangle(0, 0, width, height));
-                            //using (PathGradientBrush brush = new PathGradientBrush(path))
-                            //{
-                            //    graphics.Clear(Color.FromArgb(0, 0, 0, 0));
-                            //    brush.SurroundColors = new[] { Color.FromArgb(0, 255, 255, 255) };
-                            //    brush.CenterColor = Color.FromArgb(255, 255, 255, 255);
-                            //    graphics.FillPath(brush, path);
-                            //    graphics.Save();
-                            //}
-
-                            path.AddEllipse(new Rectangle(0, 0, width, height));
-                            using (PathGradientBrush brush = new PathGradientBrush(path))
-                            {
-                                Color[] blendColours = { Color.White,
-                                                     Color.FromArgb(255,210,210,210),
-                                                     Color.FromArgb(255,160,160,160),
-                                                     Color.FromArgb(255,70,70,70),
-                                                     Color.FromArgb(255,40,40,40),
-                                                     Color.FromArgb(0,0,0,0)};
-
-                                float[] radiusPositions = { 0f, .20f, .40f, .60f, .80f, 1.0f };
-
-                                ColorBlend colourBlend = new ColorBlend();
-                                colourBlend.Colors = blendColours;
-                                colourBlend.Positions = radiusPositions;
-
-                                graphics.Clear(Color.FromArgb(0, 0, 0, 0));
-                                brush.InterpolationColors = colourBlend;
-                                brush.SurroundColors = blendColours;
-                                brush.CenterColor = Color.White;
-                                graphics.FillPath(brush, path);
-                                graphics.Save();
-                            }
-                        }
-                    }
+                        Colors = colours,
+                        Positions = [0f, .20f, .40f, .60f, .80f, 1f]
+                    };
+                    brush.SurroundColors = colours;
+                    brush.CenterColor = Color.White;
+                    graphics.FillPath(brush, path);
                 }
-
                 light.EndUpload();
-                //light.Disposing += (o, e) => Lights.Remove(light);
-                Lights.Add(light);
+                return light;
+            }
+            catch
+            {
+                light.Dispose();
+                throw;
             }
         }
 

@@ -10,14 +10,14 @@ namespace Client.MirScenes;
 internal static partial class WizardSpellEffects
 {
     internal readonly record struct ArcColours(int Shadow, int Glow, int Filament, int Core);
-    private static ArcColours StormColours => new(SpellVfxAssets.Current.Wizard.Palette.StormColoursShadow, SpellVfxAssets.Current.Wizard.Palette.StormColoursGlow, SpellVfxAssets.Current.Wizard.Palette.StormColoursFilament, White);
-    internal static ArcColours DrakeColours => new(SpellVfxAssets.Current.Wizard.Palette.DrakeColoursShadow, SpellVfxAssets.Current.Wizard.Palette.DrakeColoursGlow, SpellVfxAssets.Current.Wizard.Palette.DrakeColoursFilament, SpellVfxAssets.Current.Wizard.Palette.DrakeColoursCore);
+    private static ArcColours StormColours => new(SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Palette).StormColoursShadow, SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Palette).StormColoursGlow, SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Palette).StormColoursFilament, White);
+    internal static ArcColours DrakeColours => new(SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Palette).DrakeColoursShadow, SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Palette).DrakeColoursGlow, SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Palette).DrakeColoursFilament, SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Palette).DrakeColoursCore);
 
     internal static void DrawArc(SpellParticlePool pool, Spell spell, Vector2 from, Vector2 to,
         long now, long start, int duration, float size, uint seed)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Current.Wizard.DrawArc;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.DrawArc);
         if (duration <= 0 || now < start || now - start >= duration) return;
         float progress = (now - start) / (float)duration;
         float time = (now - start) / 1000f;
@@ -50,7 +50,7 @@ internal static partial class WizardSpellEffects
 
     private static void Lightning(Frame frame, Vector2 source, Vector2 destination, float time, Vector2? depths = null)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.Lightning;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Lightning);
         Channel(frame, source, destination, tuning.Spread, tuning.Width, tuning.Alpha, time, tuning.Forks, 0, depths: depths);
         Vector2 direction = destination - source;
         if (direction.LengthSquared() >= 36)
@@ -70,7 +70,7 @@ internal static partial class WizardSpellEffects
         float time, int forks, int offset, Layer layer = Layer.Emissive, ArcColours? colours = null, Vector2? depths = null,
         float corona = 0)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.Channel;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Channel);
         Vector2 delta = end - source;
         float length = delta.Length();
         if (length < 2) return;
@@ -140,7 +140,7 @@ internal static partial class WizardSpellEffects
     private static void Fork(Frame frame, Vector2 source, Vector2 heading, Vector2 side, float length, float width,
         float alpha, int seed, Layer layer, bool split = false, ArcColours? colours = null, float? sortY = null)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.Fork;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Fork);
         float angle = (tuning.Angle + tuning.Angle2 * frame.Unit(seed + 1)) * (frame.Unit(seed) < .5f ? -1 : 1);
         Vector2 forward = heading * MathF.Cos(angle) + side * MathF.Sin(angle);
         float reach = length * (tuning.Reach + tuning.Reach2 * frame.Unit(seed + 2));
@@ -165,7 +165,7 @@ internal static partial class WizardSpellEffects
 
     private static void Displace(Frame frame, Span<Vector2> points, Vector2 source, Vector2 end, float spread, int seed, int flash)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.Displace;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Displace);
         int segments = points.Length - 1;
         points[0] = source;
         points[segments] = end;
@@ -190,7 +190,7 @@ internal static partial class WizardSpellEffects
 
     private static void ElectricWrap(Frame frame, Vector2 feet, float progress, float time, bool prepare)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.ElectricWrap;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.ElectricWrap);
         float radius = prepare ? tuning.PrepareRadius : tuning.ReleaseRadius;
         float height = prepare ? tuning.PrepareHeight : tuning.ReleaseHeight;
         float drop = (prepare ? tuning.PrepareDrop : tuning.ReleaseDrop) * Ease(progress * tuning.Drop);
@@ -237,7 +237,7 @@ internal static partial class WizardSpellEffects
 
     private static void ThunderStrike(Frame frame, Vector2 feet, float progress, float time, bool prepare)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.ThunderStrike;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.ThunderStrike);
         if (prepare)
         {
             Vector2 bottom = feet - Vector2.UnitY * tuning.Bottom;
@@ -285,7 +285,7 @@ internal static partial class WizardSpellEffects
 
     private static void ThunderStorm(Frame frame, Vector2 feet, float progress, float time)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.ThunderStorm;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.ThunderStorm);
         float radius = tuning.Radius * (tuning.Radius2 + tuning.Radius3 * Ease(progress * tuning.Radius4));
         // Grounded strikes are made of independent bolts; never fill the
         // entire radius with an opaque blue disc.
@@ -309,7 +309,7 @@ internal static partial class WizardSpellEffects
 
     private static void StormEscape(Frame frame, Vector2 feet, float progress, float time)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.StormEscape;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.StormEscape);
         float radius = tuning.Radius + tuning.Radius2 * Ease(progress * tuning.Radius3);
         Vector2 centre = feet - Vector2.UnitY * tuning.Centre;
         for (int i = 0; i < tuning.UserLightningCount; i++)
@@ -330,7 +330,7 @@ internal static partial class WizardSpellEffects
 
     private static void StormArrival(Frame frame, Vector2 feet, float progress, float time)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.StormArrival;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.StormArrival);
         Vector2 centre = feet - Vector2.UnitY * tuning.Centre;
         float radius = tuning.Radius + tuning.Radius2 * Ease(progress * tuning.Radius3);
         frame.Sprite(centre, tuning.UserLightningWidth, tuning.UserLightningHeight, tuning.UserLightningShape, Blue, tuning.UserLightningAlpha,

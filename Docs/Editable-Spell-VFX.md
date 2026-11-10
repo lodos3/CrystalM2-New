@@ -39,6 +39,33 @@ use `#RRGGBB` and shapes and draw layers use their names. Colour curves contain
 ordered stops with a `position` between 0 and 1 and a `colour`. Timing keys ending
 in `Ms` are in milliseconds.
 
+## Run Particle Studio
+
+Build the standalone Windows app with:
+
+~~~powershell
+dotnet build ParticleStudio/ParticleStudio.csproj -c Release
+~~~
+
+Open **Build/ParticleStudio/Release/ParticleStudio.exe**. The Studio uses the
+client's artwork by path, so it can stay in its own directory. It detects the
+sibling **Build/Client/Release** installation when available. Use **Client
+folder…** to choose another installation, **Map…** to choose a reference map,
+and the lighting menu to compare Day, Evening, and Night. The preview uses a
+reference character and the selected map, with the game's particle renderer,
+map lights, and depth masking.
+
+1. Choose a spell and press **F1** to play. Use the stage picker and timeline to
+   inspect an individual part of the effect.
+2. Edit a value and press **Enter** to preview it. **Save spell** writes the
+   override into the authoring folder.
+3. Select **Apply to client** to install that saved override in the selected
+   client's **Data/SpellVfx** folder. Restart an open client to load it. The
+   executable can stay as-is.
+
+A regular client build or publish also includes the saved authoring files. The
+local apply step is for testing an edit with an existing compatible client.
+
 ## Studio integration
 
 Use `SpellVfxCatalogue.All` for the catalogue generated from the curriculum,

@@ -11,7 +11,7 @@ internal static partial class TaoistSpellEffects
 {
     private static void Poison(Frame frame, Vector2 feet, float progress, float time, bool prepare)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.Poison;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Poison);
         Vector2 body = feet - Vector2.UnitY * (prepare ? tuning.Body + Ease(progress) * tuning.Body2 : tuning.ReleaseBody);
         float bloom = tuning.Bloom + tuning.Bloom2 * Ease(progress * tuning.Bloom3);
         int bodyTint = prepare ? tuning.PrepareBodyTintColour : tuning.ReleaseBodyTintColour;
@@ -31,16 +31,16 @@ internal static partial class TaoistSpellEffects
             frame.Orbit(body, tuning.OrbitX * bloom, tuning.OrbitY * bloom, progress * tuning.OrbitAngle, tuning.OrbitSweep, tuning.OrbitColour, tuning.OrbitWidth, tuning.OrbitAlpha);
     }
 
-    private static SpellParticleColourCurve PaperFlame => SpellVfxAssets.Current.Taoist.Palette.PaperFlame;
-    private static SpellParticleColourCurve PaperCore => SpellVfxAssets.Current.Taoist.Palette.PaperCore;
-    private static SpellParticleColourCurve PaperHeat => SpellVfxAssets.Current.Taoist.Palette.PaperHeat;
-    private static SpellParticleColourCurve PaperEmber => SpellVfxAssets.Current.Taoist.Palette.PaperEmber;
-    private static SpellParticleColourCurve SoulFlame => SpellVfxAssets.Current.Taoist.Palette.SoulFlame;
-    private static SpellParticleColourCurve ArmourFlame => SpellVfxAssets.Current.Taoist.Palette.ArmourFlame;
+    private static SpellParticleColourCurve PaperFlame => SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Palette).PaperFlame;
+    private static SpellParticleColourCurve PaperCore => SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Palette).PaperCore;
+    private static SpellParticleColourCurve PaperHeat => SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Palette).PaperHeat;
+    private static SpellParticleColourCurve PaperEmber => SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Palette).PaperEmber;
+    private static SpellParticleColourCurve SoulFlame => SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Palette).SoulFlame;
+    private static SpellParticleColourCurve ArmourFlame => SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Palette).ArmourFlame;
 
     private static void PaperBurst(Frame frame, Vector2 feet, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.PaperBurst;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.PaperBurst);
         Vector2 centre = feet - Vector2.UnitY * tuning.Centre;
         float spread = tuning.Spread + tuning.Spread2 * Ease(progress * tuning.Spread3);
         float heat = 1 - Ease((progress - tuning.Heat) / tuning.HeatDivisor);
@@ -90,7 +90,7 @@ internal static partial class TaoistSpellEffects
 
     private static void SummonStars(Frame frame, Vector2 feet, float progress, bool deva)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.SummonStars;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.SummonStars);
         int dusk = deva ? tuning.DuskColour : InkBlue, glow = deva ? Mint : Blue;
         float lift = Ease(progress) * tuning.Lift;
         float opening = Ease(progress * tuning.Opening);
@@ -130,7 +130,7 @@ internal static partial class TaoistSpellEffects
 
     private static void Veil(Frame frame, Vector2 feet, float progress, float time, bool mass)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.Veil;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Veil);
         float width = mass ? tuning.Width : 1;
         int puffs = mass ? tuning.Puffs : tuning.Puffs2;
         for (int i = 0; i < puffs; i++)
@@ -176,7 +176,7 @@ internal static partial class TaoistSpellEffects
 
     private static void BurningWard(Frame frame, Vector2 feet, float progress, Shape glyph)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.BurningWard;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.BurningWard);
         bool armour = glyph == Shape.ArmourGlyph;
         float width = armour ? tuning.ArmourWidth : tuning.SoulShieldWidth, height = armour ? tuning.ArmourHeight : tuning.SoulShieldHeight;
         var flame = armour ? ArmourFlame : SoulFlame;
@@ -261,7 +261,7 @@ internal static partial class TaoistSpellEffects
 
     private static void CurseRune(Frame frame, Vector2 feet, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.CurseRune;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.CurseRune);
         float width = tuning.Width, height = tuning.Height;
         Vector2 centre = feet - Vector2.UnitY * tuning.Centre;
         Vector2 scale = new(width * tuning.Scale, height * tuning.Scale2);
@@ -327,7 +327,7 @@ internal static partial class TaoistSpellEffects
 
     private static void Reveal(Frame frame, Vector2 feet, float progress, float time, bool prepare)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.Reveal;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Reveal);
         Vector2 centre = feet - Vector2.UnitY * (tuning.Centre + MathF.Sin(time * tuning.Centre2) * tuning.Centre3);
         float growth = tuning.Growth + tuning.Growth2 * Ease(progress * tuning.Growth3);
         int tint = prepare ? Jade : tuning.ReleaseTintColour;
@@ -347,7 +347,7 @@ internal static partial class TaoistSpellEffects
 
     private static void Repulse(Frame frame, Vector2 feet, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.Repulse;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Repulse);
         float open = Ease(progress * tuning.Open);
         Vector2 body = feet - Vector2.UnitY * tuning.Body;
         frame.Sprite(feet, tuning.OrbWidth + open * tuning.OrbWidth2, tuning.OrbHeight, tuning.OrbShape, tuning.OrbColour, tuning.OrbAlpha, tuning.OrbLayer, light: tuning.OrbLight);
@@ -364,7 +364,7 @@ internal static partial class TaoistSpellEffects
 
     private static void Cleanse(Frame frame, Vector2 feet, float progress, bool prepare)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.Cleanse;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Cleanse);
         float travel = Ease(progress);
         Vector2 head = feet - Vector2.UnitY * (prepare ? tuning.Head + travel * tuning.Head2 : tuning.Head3 + (1 - travel) * tuning.Head4);
         frame.Sprite(feet, tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, InkBlue, tuning.OrbAlpha, tuning.OrbLayer);
@@ -394,7 +394,7 @@ internal static partial class TaoistSpellEffects
 
     private static void MassHeal(Frame frame, Vector2 feet, float progress, bool prepare)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.MassHeal;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.MassHeal);
         float bloom = tuning.Bloom + tuning.Bloom2 * Ease(progress * tuning.Bloom3);
         float radius = (prepare ? tuning.PrepareRadius : tuning.ReleaseRadius) * bloom;
         Vector2 centre = feet - Vector2.UnitY * (tuning.Centre + (prepare ? tuning.PrepareCentre : tuning.ReleaseCentre) * Ease(progress));
@@ -426,7 +426,7 @@ internal static partial class TaoistSpellEffects
 
     private static void HealMotes(Frame frame, Vector2 centre, float radius, float progress, int count)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.HealMotes;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.HealMotes);
         for (int i = 0; i < count; i++)
         {
             float age = Fract(progress * tuning.Age + frame.Unit(i + 271));

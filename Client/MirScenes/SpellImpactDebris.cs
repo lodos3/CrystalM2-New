@@ -9,13 +9,13 @@ namespace Client.MirScenes;
 internal static class SpellImpactDebris
 {
     private readonly record struct Profile(Shape Parent, Shape Child, int Hot, int Cool, float Speed, float Lift, float Energy);
-    private static SpellParticleColourCurve SoulEmber => SpellVfxAssets.Current.Debris.Palette.SoulEmber;
+    private static SpellParticleColourCurve SoulEmber => SpellVfxAssets.Observe(SpellVfxAssets.Current.Debris.Palette).SoulEmber;
 
     internal static void Emit(SpellParticlePool pool, SpellVisual visual, Vector2 feet, Vector2 heading,
         long start, int density, float gravity, float driftScale, uint seed)
     {
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
-        var tuning = SpellVfxAssets.Current.Debris.Emit;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Debris.Emit);
         if (density <= 0 || visual.Phase is not (SpellVisualPhase.Impact or SpellVisualPhase.Contact)) return;
         if (visual.Phase == SpellVisualPhase.Contact && visual.Spell is not (Spell.FlamingSword or Spell.TwinDrakeBlade)) return;
         Profile profile = visual.Spell switch

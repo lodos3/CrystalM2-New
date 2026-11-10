@@ -11,7 +11,7 @@ internal static partial class WizardSpellEffects
 {
     private static void FireCharge(Frame frame, Vector2 feet, float progress, Vector2 facing)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.FireCharge;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.FireCharge);
         Vector2 hand = feet + facing * (tuning.Hand + progress * tuning.Hand2) - Vector2.UnitY * tuning.Hand3;
         for (int i = 0; i < tuning.UserEmberCount; i++)
         {
@@ -38,7 +38,7 @@ internal static partial class WizardSpellEffects
 
     private static void GreatFireCharge(Frame frame, Vector2 feet, float progress, int accent)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.GreatFireCharge;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.GreatFireCharge);
         Vector2 focus = feet - Vector2.UnitY * (tuning.Focus + tuning.Focus2 * Ease(progress));
         for (int i = 0; i < tuning.UserEmberCount; i++)
         {
@@ -67,7 +67,7 @@ internal static partial class WizardSpellEffects
 
     private static void HellfireCharge(Frame frame, Vector2 feet, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.HellfireCharge;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.HellfireCharge);
         Vector2 centre = feet - Vector2.UnitY * tuning.Centre;
         frame.Orbit(centre, tuning.OrbitX, tuning.OrbitY, progress * tuning.OrbitAngle, tuning.OrbitSweep, Fire, tuning.OrbitWidth, tuning.OrbitAlpha);
         frame.Orbit(centre, tuning.OrbitX2, tuning.OrbitY2, progress * tuning.OrbitAngle2 + tuning.OrbitAngle3, tuning.OrbitSweep2, Gold, tuning.OrbitWidth2, tuning.OrbitAlpha2);
@@ -84,7 +84,7 @@ internal static partial class WizardSpellEffects
 
     private static void FireBurst(Frame frame, Vector2 centre, float progress, float diameter, bool fierce = false)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.FireBurst;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.FireBurst);
         // Individually animated pockets of combustion; no oversized fire card.
         float radius = diameter * (tuning.Radius + tuning.Radius2 * Ease(progress * tuning.Radius3));
         float fade = 1f - Ease((progress - tuning.Fade) / tuning.FadeDivisor);
@@ -119,7 +119,7 @@ internal static partial class WizardSpellEffects
 
     private static void SearingImpact(Frame frame, Vector2 centre, float progress, int accent)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.SearingImpact;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.SearingImpact);
         float open = tuning.Open + tuning.Open2 * Ease(progress * tuning.Open3);
         float heat = 1f - Ease((progress - tuning.Heat) / tuning.HeatDivisor);
         for (int i = 0; i < tuning.UserFlameCount; i++)
@@ -151,7 +151,7 @@ internal static partial class WizardSpellEffects
 
     private static void Repel(Frame frame, Vector2 feet, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.Repel;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Repel);
         Vector2 centre = feet - Vector2.UnitY * tuning.Centre;
         float radius = tuning.Radius + tuning.Radius2 * Ease(progress * tuning.Radius3);
         frame.Sprite(centre, radius * tuning.OrbWidth, radius * tuning.OrbHeight, tuning.OrbShape, Ember, tuning.OrbAlpha, light: tuning.OrbLight);
@@ -173,7 +173,7 @@ internal static partial class WizardSpellEffects
     internal static void Flames(Frame frame, Vector2 root, float width, float height, float time, float alpha, int index = 0,
         Layer layer = Layer.Emissive, float? sortY = null)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.Flames;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Flames);
         float phase = time * (tuning.Phase + frame.Unit(index + 21) * tuning.Phase2) + frame.Unit(index + 52);
         float sway = MathF.Sin(time * tuning.Sway + frame.Unit(index + 7) * MathF.Tau) * tuning.Sway2;
         frame.Sprite(root, width * tuning.OrbWidth, width * tuning.OrbHeight, tuning.OrbShape, Fire, alpha * tuning.OrbAlpha, tuning.OrbLayer, light: tuning.OrbLight, sortY: sortY);
@@ -197,7 +197,7 @@ internal static partial class WizardSpellEffects
 
     private static void FireWallCharge(Frame frame, Vector2 feet, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.FireWallCharge;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.FireWallCharge);
         // The cast starts at the caster's feet, climbs the torso, gathers as
         // one overhead fire mass and releases an outward ember burst.
         float climb = Ease(progress / tuning.ClimbDivisor);
@@ -270,7 +270,7 @@ internal static partial class WizardSpellEffects
 
     private static void FireWall(Frame frame, Vector2 feet, float time)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.FireWall;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.FireWall);
         Flames(frame, feet, tuning.Width, tuning.Height, time, tuning.Alpha);
         Flames(frame, feet + new Vector2(tuning.X, tuning.Y), tuning.Width2, tuning.Height2, time, tuning.Alpha2, 3, tuning.Layer);
         float smoke = Fract(time * tuning.Smoke + frame.Unit(34));
@@ -281,7 +281,7 @@ internal static partial class WizardSpellEffects
 
     private static void FireBang(Frame frame, Vector2 feet, float progress, float time, bool prepare)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.FireBang;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.FireBang);
         if (prepare)
         {
             Vector2 centre = feet - Vector2.UnitY * tuning.Centre;
@@ -315,7 +315,7 @@ internal static partial class WizardSpellEffects
 
     private static void Disruptor(Frame frame, Vector2 feet, float progress, float time, bool prepare)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.Disruptor;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Disruptor);
         float height = (prepare ? tuning.PrepareHeight : tuning.ReleaseHeight) * (tuning.Height + tuning.Height2 * MathF.Sin(progress * MathF.PI));
         float width = prepare ? tuning.PrepareWidth : tuning.ReleaseWidth;
         frame.Sprite(feet - Vector2.UnitY * tuning.OrbOffset, width * tuning.OrbWidth, width * tuning.OrbHeight, tuning.OrbShape, Ember, tuning.OrbAlpha, tuning.OrbLayer, light: tuning.OrbLight);
@@ -339,7 +339,7 @@ internal static partial class WizardSpellEffects
 
     private static void FlameField(Frame frame, Vector2 feet, float progress, float time)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.FlameField;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.FlameField);
         float open = tuning.Open + tuning.Open2 * Ease(progress * tuning.Open3);
         float radius = tuning.Radius * open;
         float rotation = progress * tuning.Rotation;
@@ -385,7 +385,7 @@ internal static partial class WizardSpellEffects
     private static void Seal(Frame frame, Vector2 centre, float x, float y, int colour, float rotation,
         float alpha, int spokes, Layer layer = Layer.Ground)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.Seal;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Seal);
         frame.Sprite(centre, x * tuning.SigilDiscWidth, y * tuning.SigilDiscHeight, tuning.SigilDiscShape, colour, alpha, layer, light: tuning.SigilDiscLight);
         frame.Sprite(centre, x * tuning.HaloWidth, y * tuning.HaloHeight, tuning.HaloShape, colour, alpha * tuning.HaloAlpha, layer);
         for (int i = 0; i < spokes; i++)
@@ -402,7 +402,7 @@ internal static partial class WizardSpellEffects
 
     private static void FrostCharge(Frame frame, Vector2 feet, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.FrostCharge;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.FrostCharge);
         // Cold flame climbs like a blue torch, with shard flecks and vapour.
         Vector2 centre = feet - Vector2.UnitY * (tuning.Centre + tuning.Centre2 * Ease(progress * tuning.Centre3));
         for (int i = 0; i < tuning.UserFlameCount; i++)
@@ -454,7 +454,7 @@ internal static partial class WizardSpellEffects
 
     private static void FrostFireImpact(Frame frame, Vector2 centre, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.FrostFireImpact;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.FrostFireImpact);
         // Impact returns to cold combustion rather than a large blue orb.
         float fade = 1f - Ease((progress - tuning.Fade) / tuning.FadeDivisor);
         for (int i = 0; i < tuning.UserFlameCount; i++)
@@ -508,7 +508,7 @@ internal static partial class WizardSpellEffects
 
     private static void IceBreak(Frame frame, Vector2 centre, float progress, float radius, int count)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.IceBreak;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.IceBreak);
         float spread = tuning.Spread + tuning.Spread2 * Ease(progress * tuning.Spread3);
         frame.Sprite(centre, radius * tuning.OrbWidth, radius * tuning.OrbHeight, tuning.OrbShape, Ice, tuning.OrbAlpha, light: tuning.OrbLight);
         frame.Clip(centre, radius * tuning.SmokeSequenceWidth, radius * tuning.SmokeSequenceHeight, tuning.SmokeSequenceShape, progress * tuning.SmokeSequencePhase + tuning.SmokeSequencePhase2, tuning.SmokeSequenceColour,
@@ -530,7 +530,7 @@ internal static partial class WizardSpellEffects
 
     private static void IceStorm(Frame frame, Vector2 feet, float progress, bool prepare)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.IceStorm;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.IceStorm);
         // Both cast and contact carry the same detailed runic seal, while
         // irregular spinning cold ribbons breathe small > large > small.
         float spread = prepare ? tuning.PrepareSpread : tuning.ReleaseSpread;
@@ -629,7 +629,7 @@ internal static partial class WizardSpellEffects
 
     private static void IceThrust(Frame frame, Vector2 feet, Vector2 facing, float progress, int extraReach)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.IceThrust;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.IceThrust);
         Vector2 forward = GroundHeading(facing);
         var side = new Vector2(-forward.Y, forward.X);
         float reach = (tuning.Reach + extraReach * tuning.Reach2) / MathF.Max(MathF.Abs(forward.X), MathF.Abs(forward.Y));
@@ -674,7 +674,7 @@ internal static partial class WizardSpellEffects
 
     private static void SnowContact(Frame frame, Vector2 feet, float progress, bool tile)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.SnowContact;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.SnowContact);
         float lift = Ease(progress * tuning.Lift);
         Vector2 centre = feet + new Vector2(progress * tuning.X, -(tile ? tuning.Y : tuning.Y2) - lift * tuning.Y3);
         frame.Clip(centre, tile ? tuning.SmokeSequenceWidth : tuning.SmokeSequenceWidth2, tile ? tuning.SmokeSequenceHeight : tuning.SmokeSequenceHeight2, tuning.SmokeSequenceShape, progress * tuning.SmokeSequencePhase,
@@ -685,7 +685,7 @@ internal static partial class WizardSpellEffects
     private static void SnowballWake(Frame frame, SpellParticlePool pool, Vector2 head, Vector2 heading,
         long now, int frameIndex, int remaining, bool emit)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.SnowballWake;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.SnowballWake);
         float phase = now % 700 / tuning.PhaseDivisor;
         for (int i = 0; i < tuning.OrbCount; i++)
         {
@@ -710,7 +710,7 @@ internal static partial class WizardSpellEffects
 
     private static void Blizzard(Frame frame, Vector2 feet, float time)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.Blizzard;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Blizzard);
         float cycle = FieldDrop(time, tuning.Cycle, frame.Unit(1));
         Vector2 root = feet + new Vector2((frame.Unit(20) - tuning.X) * tuning.X2, (frame.Unit(3) - tuning.Y) * tuning.Y2);
         float fall = 1 - Ease(cycle * tuning.Fall);
@@ -745,7 +745,7 @@ internal static partial class WizardSpellEffects
 
     private static void MeteorStrike(Frame frame, Vector2 feet, float time)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.MeteorStrike;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.MeteorStrike);
         float phase = FieldDrop(time, tuning.Phase, frame.Unit(4));
         float density = frame.Unit(51);
         float warmup = tuning.Warmup + tuning.Warmup2 * Ease((time - tuning.Warmup3) / tuning.WarmupDivisor);
@@ -789,7 +789,7 @@ internal static partial class WizardSpellEffects
 
     private static void MeteorCharge(Frame frame, Vector2 feet, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.MeteorCharge;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.MeteorCharge);
         Vector2 centre = feet - Vector2.UnitY * tuning.Centre;
         for (int i = 0; i < tuning.SigilDiscCount; i++)
         {
@@ -802,7 +802,7 @@ internal static partial class WizardSpellEffects
 
     private static void MeteorSeal(Frame frame, Vector2 feet, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.MeteorSeal;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.MeteorSeal);
         float open = tuning.Open + tuning.Open2 * Ease(progress * tuning.Open3);
         float pulse = tuning.Pulse + tuning.Pulse2 * MathF.Sin(progress * tuning.Pulse3);
         frame.Sprite(feet, tuning.OrbWidth * open, tuning.OrbHeight * open, tuning.OrbShape, Ember, tuning.OrbAlpha * pulse, tuning.OrbLayer, light: tuning.OrbLight);
@@ -812,7 +812,7 @@ internal static partial class WizardSpellEffects
 
     private static float FieldDrop(float time, float contact, float variation)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.FieldDrop;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.FieldDrop);
         // These fields get their tile packets before the server's 800 ms warmup ends.
         // Start with a descent, then stagger the repeated drops across neighboring tiles.
         float lead = tuning.Lead + variation * tuning.Lead2;

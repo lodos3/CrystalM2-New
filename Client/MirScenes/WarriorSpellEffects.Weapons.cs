@@ -19,7 +19,7 @@ internal static partial class WarriorSpellEffects
         bool followThrough)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Current.Warrior.WeaponSweep;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.WeaponSweep);
         int life = Math.Min(remaining, Math.Clamp(interval * tuning.Life, 55, 190));
         if (life <= 0) return;
         Vector2 blade = pose.Tip - pose.Hilt;
@@ -143,7 +143,7 @@ internal static partial class WarriorSpellEffects
         float yaw, float lift, float radius, float width, long now, int life, float sweep = 2.65f,
         bool stacked = false)
     {
-        var tuning = SpellVfxAssets.Current.Warrior.ProjectCrescent;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.ProjectCrescent);
         Vector2 forward = GroundHeading(facing);
         float heading = MathF.Atan2(forward.Y, forward.X);
         Vector2 centre = feet - Vector2.UnitY * lift;
@@ -316,7 +316,7 @@ internal static partial class WarriorSpellEffects
     private static void DrakeEdgeSweep(SpellParticlePool pool, WeaponMaskTrace from,
         WeaponMaskTrace to, float feetY, long now, int life)
     {
-        var tuning = SpellVfxAssets.Current.Warrior.DrakeEdgeSweep;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.DrakeEdgeSweep);
         Vector2 previousBlade = from.Tip - from.Hilt;
         Vector2 currentBlade = to.Tip - to.Hilt;
         if (previousBlade.LengthSquared() < 9 || currentBlade.LengthSquared() < 9) return;
@@ -367,7 +367,7 @@ internal static partial class WarriorSpellEffects
     private static void SweepRibbon(SpellParticlePool pool, WeaponMaskTrace from, WeaponMaskTrace to, float inner, float outer,
         Layer layer, float depthY, Color colour, long now, int duration, int alpha)
     {
-        var tuning = SpellVfxAssets.Current.Warrior.SweepRibbon;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.SweepRibbon);
         Vector2 oldBlade = from.Tip - from.Hilt, newBlade = to.Tip - to.Hilt;
         float oldLength = oldBlade.Length(), newLength = newBlade.Length();
         if (oldLength < 3 || newLength < 3) return;
@@ -397,7 +397,7 @@ internal static partial class WarriorSpellEffects
         Vector2 facing, long now, float size, uint seed, bool striking, float? feetY = null)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Current.Warrior.DrawWeaponEnchant;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.DrawWeaponEnchant);
         Vector2 blade = pose.Tip - pose.Hilt;
         if (blade.LengthSquared() < 9) return;
         float time = now % 10400 / 1000f;
@@ -514,7 +514,7 @@ internal static partial class WarriorSpellEffects
     private static void AddBladeFire(SpellParticlePool pool, WeaponMaskTrace pose, Look look,
         long now, int life, float progress, float feetY)
     {
-        var tuning = SpellVfxAssets.Current.Warrior.AddBladeFire;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.AddBladeFire);
         Vector2 blade = pose.Tip - pose.Hilt;
         float angle = MathF.Atan2(blade.Y, blade.X);
         var stroke = new Frame(pool, pose.Hilt, now, 1, Frame.ReferenceSize,

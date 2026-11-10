@@ -15,34 +15,34 @@ internal static partial class WizardSpellEffects
         get
         {
             using var vfxScope = SpellVfxAssets.For(Spell.Lightning);
-            return SpellVfxAssets.Current.Wizard.ArcTiming.LightningDuration;
+            return SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.ArcTiming).LightningDuration;
         }
     }
 
     internal static int RelayDuration(Spell spell)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var timing = SpellVfxAssets.Current.Wizard.ArcTiming;
+        var timing = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.ArcTiming);
         return spell == Spell.Vampirism ? timing.VampirismDurationMs : timing.RelayDurationMs;
     }
 
     private const float FloorAspect = 2f / 3f;
-    private static int Gold => SpellVfxAssets.Current.Wizard.Palette.Gold;
-    private static int Fire => SpellVfxAssets.Current.Wizard.Palette.Fire;
-    private static int Ember => SpellVfxAssets.Current.Wizard.Palette.Ember;
-    private static int Hot => SpellVfxAssets.Current.Wizard.Palette.Hot;
-    private static int Blue => SpellVfxAssets.Current.Wizard.Palette.Blue;
-    private static int PaleBlue => SpellVfxAssets.Current.Wizard.Palette.PaleBlue;
-    private static int White => SpellVfxAssets.Current.Wizard.Palette.White;
-    private static int Ice => SpellVfxAssets.Current.Wizard.Palette.Ice;
-    private static int IceWhite => SpellVfxAssets.Current.Wizard.Palette.IceWhite;
+    private static int Gold => SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Palette).Gold;
+    private static int Fire => SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Palette).Fire;
+    private static int Ember => SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Palette).Ember;
+    private static int Hot => SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Palette).Hot;
+    private static int Blue => SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Palette).Blue;
+    private static int PaleBlue => SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Palette).PaleBlue;
+    private static int White => SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Palette).White;
+    private static int Ice => SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Palette).Ice;
+    private static int IceWhite => SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Palette).IceWhite;
 
     internal static bool HasArt(Spell spell) => SpellCurriculum.Owns(MirClass.Wizard, spell);
 
     internal static int PacketDuration(SpellVisual visual)
     {
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
-        var tuning = SpellVfxAssets.Current.Wizard.PacketDuration;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.PacketDuration);
         return visual.Phase switch
         {
             SpellVisualPhase.Contact => tuning.ContactDurationMs,
@@ -58,7 +58,7 @@ internal static partial class WizardSpellEffects
         long now, long start, int duration, float size = DefaultSize, uint seed = 0, uint field = 0)
     {
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
-        var tuning = SpellVfxAssets.Current.Wizard.DrawFrame;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.DrawFrame);
         if (duration <= 0 || now < start || now - start >= duration) return;
         float progress = (now - start) / (float)duration;
         float time = (now - start) / 1000f;
@@ -200,7 +200,7 @@ internal static partial class WizardSpellEffects
         long now, int frameIndex, int remaining, bool wake, float size)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Current.Wizard.DrawProjectile;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.DrawProjectile);
         if (spell is not (Spell.FireBall or Spell.GreatFireBall or Spell.FireBounce or Spell.MeteorShower or Spell.FrostCrunch)) return false;
         if (remaining <= 0) return true;
 
@@ -292,7 +292,7 @@ internal static partial class WizardSpellEffects
 
     private static void Shield(Frame frame, Vector2 feet, SpellVisualPhase phase, float progress, long now)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.Shield;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Shield);
         float hit = phase is SpellVisualPhase.Hit or SpellVisualPhase.Ward ? MathF.Sin(progress * MathF.PI) : 0;
         bool prepare = phase == SpellVisualPhase.Prepare;
         float unfold = prepare ? Ease(progress * tuning.Unfold) : 1;
@@ -327,7 +327,7 @@ internal static partial class WizardSpellEffects
 
     private static void BlinkRing(Frame frame, Vector2 feet, float progress, bool descending)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.BlinkRing;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.BlinkRing);
         float lift = tuning.Lift + tuning.Lift2 * (descending ? 1 - Ease(progress * tuning.Lift3) : Ease(progress * tuning.Lift4));
         Vector2 centre = feet - Vector2.UnitY * lift;
         float width = tuning.Width + tuning.Width2 * MathF.Sin(progress * MathF.PI);
@@ -348,7 +348,7 @@ internal static partial class WizardSpellEffects
 
     private static void TeleportLight(Frame frame, Vector2 feet, float progress, bool departure)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.TeleportLight;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.TeleportLight);
         float spread = departure ? 1 - progress * tuning.Spread : tuning.Spread2 + tuning.Spread3 * Ease(progress * tuning.Spread4);
         Vector2 centre = feet - Vector2.UnitY * (tuning.Centre + tuning.Centre2 * MathF.Sin(progress * MathF.PI));
         float pulse = tuning.Pulse + tuning.Pulse2 * MathF.Sin(progress * MathF.PI);
@@ -369,7 +369,7 @@ internal static partial class WizardSpellEffects
 
     private static void TurnUndead(Frame frame, Vector2 feet, float progress, bool prepare)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.TurnUndead;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.TurnUndead);
         Vector2 centre = feet - Vector2.UnitY * (prepare ? tuning.PrepareCentre : tuning.ReleaseCentre);
         if (prepare)
         {
@@ -404,7 +404,7 @@ internal static partial class WizardSpellEffects
 
     private static void Vampirism(Frame frame, Vector2 feet, SpellVisualPhase phase, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.Vampirism;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Vampirism);
         Vector2 centre = feet - Vector2.UnitY * (phase == SpellVisualPhase.Prepare ? tuning.Centre : tuning.Centre2);
         if (phase == SpellVisualPhase.Return)
         {
@@ -436,7 +436,7 @@ internal static partial class WizardSpellEffects
 
     private static void Mirroring(Frame frame, Vector2 feet, SpellVisualPhase phase, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.Mirroring;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Mirroring);
         bool fade = phase == SpellVisualPhase.Expire;
         bool prepare = phase == SpellVisualPhase.Prepare;
         float lift = prepare ? progress * tuning.Lift : tuning.Lift2 + tuning.Lift3 * progress;
@@ -468,7 +468,7 @@ internal static partial class WizardSpellEffects
 
     private static void Booster(Frame frame, Vector2 feet, SpellVisualPhase phase, float progress, long now)
     {
-        var tuning = SpellVfxAssets.Current.Wizard.Booster;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.Booster);
         bool active = phase == SpellVisualPhase.Aura;
         Vector2 eye = feet - Vector2.UnitY * (tuning.Eye + (active ? 0 : tuning.Eye2 * MathF.Sin(progress * MathF.PI)));
         frame.Sprite(eye, tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, tuning.OrbColour, tuning.OrbAlpha, light: tuning.OrbLight);

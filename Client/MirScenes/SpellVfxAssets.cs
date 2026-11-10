@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -35,11 +36,41 @@ public static class SpellVfxAssets
     [ThreadStatic] private static Snapshot _frame;
     [ThreadStatic] private static SpellVfxData _scoped;
     [ThreadStatic] private static Spell _spell;
+    [ThreadStatic] private static HashSet<(string Group, string Node)> _observedNodes;
 
     internal static SpellVfxData Current => _scoped ?? Volatile.Read(ref _active).Defaults;
 
     /// <summary>Apply a complete, validated directory to subsequent effect calls.</summary>
     public static void Reload(string directory) => Volatile.Write(ref _active, Load(directory, tolerateBadFiles: false));
+
+    internal static void PreviewSpell(string directory, Spell spell, JsonObject overrides)
+    {
+        var defaults = ReadGroups(directory, tolerateBadFiles: false);
+        var settings = Decode(defaults);
+        var draft = WithOverrides(settings, defaults, (JsonObject)JsonNode.Parse(overrides.ToJsonString()));
+        Volatile.Write(ref _active, new Snapshot(settings, new Dictionary<Spell, SpellVfxData> { [spell] = draft }));
+    }
+
+    internal static HashSet<(string Group, string Node)> CollectNodes(Action sample)
+    {
+        var previous = _observedNodes;
+        var result = new HashSet<(string Group, string Node)>();
+        _observedNodes = result;
+        try { sample(); }
+        finally { _observedNodes = previous; }
+        return result;
+    }
+
+    internal static T Observe<T>(T node, [CallerArgumentExpression(nameof(node))] string path = null)
+    {
+        if (_observedNodes != null)
+        {
+            const string prefix = "SpellVfxAssets.Current.";
+            int split = path.IndexOf('.', prefix.Length);
+            _observedNodes.Add((path[prefix.Length..split], path[(split + 1)..]));
+        }
+        return node;
+    }
 
     /// <summary>Return the effective node settings for a group, including any local defaults.</summary>
     public static JsonObject ReadGroup(string directory, string group)

@@ -9,25 +9,25 @@ namespace Client.MirScenes;
 
 internal static partial class TaoistSpellEffects
 {
-    private static int White => SpellVfxAssets.Current.Taoist.Palette.White;
-    private static int Jade => SpellVfxAssets.Current.Taoist.Palette.Jade;
-    private static int Teal => SpellVfxAssets.Current.Taoist.Palette.Teal;
-    private static int Mint => SpellVfxAssets.Current.Taoist.Palette.Mint;
-    private static int InkBlue => SpellVfxAssets.Current.Taoist.Palette.InkBlue;
-    private static int Blue => SpellVfxAssets.Current.Taoist.Palette.Blue;
-    private static int Ice => SpellVfxAssets.Current.Taoist.Palette.Ice;
-    private static int Violet => SpellVfxAssets.Current.Taoist.Palette.Violet;
-    private static int Ochre => SpellVfxAssets.Current.Taoist.Palette.Ochre;
-    private static int Amber => SpellVfxAssets.Current.Taoist.Palette.Amber;
-    private static int Gold => SpellVfxAssets.Current.Taoist.Palette.Gold;
-    private static int Ivory => SpellVfxAssets.Current.Taoist.Palette.Ivory;
+    private static int White => SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Palette).White;
+    private static int Jade => SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Palette).Jade;
+    private static int Teal => SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Palette).Teal;
+    private static int Mint => SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Palette).Mint;
+    private static int InkBlue => SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Palette).InkBlue;
+    private static int Blue => SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Palette).Blue;
+    private static int Ice => SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Palette).Ice;
+    private static int Violet => SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Palette).Violet;
+    private static int Ochre => SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Palette).Ochre;
+    private static int Amber => SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Palette).Amber;
+    private static int Gold => SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Palette).Gold;
+    private static int Ivory => SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Palette).Ivory;
 
     internal static bool HasArt(Spell spell) => SpellCurriculum.Owns(MirClass.Taoist, spell);
 
     internal static int PacketDuration(SpellVisual visual)
     {
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
-        var tuning = SpellVfxAssets.Current.Taoist.PacketDuration;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.PacketDuration);
         return visual.Spell switch
         {
             Spell.SoulFireBall => tuning.SoulFireBallDurationMs,
@@ -47,7 +47,7 @@ internal static partial class TaoistSpellEffects
         float? fieldSize = null)
     {
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
-        var tuning = SpellVfxAssets.Current.Taoist.DrawFrame;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.DrawFrame);
         if (duration <= 0 || now < start || now - start >= duration) return;
         float elapsed = (now - start) / 1000f;
         float progress = (now - start) / (float)duration;
@@ -114,7 +114,7 @@ internal static partial class TaoistSpellEffects
         long now, int frameIndex, int remaining, bool leaveWake, float size)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Current.Taoist.DrawProjectile;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.DrawProjectile);
         if (spell is not (Spell.SoulFireBall or Spell.MassHiding or Spell.SoulShield or Spell.BlessedArmour or
             Spell.Curse or Spell.Hallucination or Spell.Plague or Spell.PoisonCloud)) return false;
         if (remaining <= 0) return true;
@@ -152,7 +152,7 @@ internal static partial class TaoistSpellEffects
 
     private static void Heal(Frame frame, Vector2 feet, float progress, bool prepare)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.Heal;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.Heal);
         Vector2 body = feet - Vector2.UnitY * tuning.Body;
         float travel = Ease(progress);
         float phase = progress * (prepare ? tuning.PreparePhase : MathF.Tau * tuning.Phase);
@@ -196,7 +196,7 @@ internal static partial class TaoistSpellEffects
 
     private static void SpiritEdge(Frame frame, Vector2 feet, Vector2 facing, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Taoist.SpiritEdge;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Taoist.SpiritEdge);
         Vector2 centre = feet + facing * tuning.Centre - Vector2.UnitY * tuning.Centre2;
         frame.Sprite(centre, tuning.OrbWidth, tuning.OrbHeight, tuning.OrbShape, Teal, tuning.OrbAlpha, light: tuning.OrbLight);
         for (int i = 0; i < tuning.ParticleCount; i++)

@@ -9,15 +9,15 @@ namespace Client.MirScenes;
 
 internal static partial class WarriorSpellEffects
 {
-    private static int Steel => SpellVfxAssets.Current.Warrior.Palette.Steel;
-    private static int Ice => SpellVfxAssets.Current.Warrior.Palette.Ice;
-    private static int White => SpellVfxAssets.Current.Warrior.Palette.White;
-    private static int Flame => SpellVfxAssets.Current.Warrior.Palette.Flame;
-    private static int Ember => SpellVfxAssets.Current.Warrior.Palette.Ember;
-    private static int Heat => SpellVfxAssets.Current.Warrior.Palette.Heat;
-    private static int Gold => SpellVfxAssets.Current.Warrior.Palette.Gold;
-    private static int PaleGold => SpellVfxAssets.Current.Warrior.Palette.PaleGold;
-    private static int Smoke => SpellVfxAssets.Current.Warrior.Palette.Smoke;
+    private static int Steel => SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Palette).Steel;
+    private static int Ice => SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Palette).Ice;
+    private static int White => SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Palette).White;
+    private static int Flame => SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Palette).Flame;
+    private static int Ember => SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Palette).Ember;
+    private static int Heat => SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Palette).Heat;
+    private static int Gold => SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Palette).Gold;
+    private static int PaleGold => SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Palette).PaleGold;
+    private static int Smoke => SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Palette).Smoke;
 
     internal static bool HasArt(Spell spell) => SpellCurriculum.Owns(MirClass.Warrior, spell);
     internal static bool UsesBodyMask(Spell spell) => spell is Spell.Rage or Spell.ImmortalSkin or Spell.ProtectionField or Spell.Fury;
@@ -25,7 +25,7 @@ internal static partial class WarriorSpellEffects
     internal static int PacketDuration(SpellVisual visual)
     {
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
-        var tuning = SpellVfxAssets.Current.Warrior.PacketDuration;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.PacketDuration);
         return visual.Phase switch
         {
             SpellVisualPhase.Prepare => tuning.PrepareDurationMs,
@@ -41,7 +41,7 @@ internal static partial class WarriorSpellEffects
         long now, long start, int duration, float size = ReferenceSize, uint seed = 0, Vector2? weaponTip = null)
     {
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
-        var tuning = SpellVfxAssets.Current.Warrior.DrawFrame;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.DrawFrame);
         if (duration <= 0 || now < start || now - start >= duration) return;
         float progress = (now - start) / (float)duration;
         if (visual is { Spell: Spell.Thrusting, Phase: SpellVisualPhase.Swing })
@@ -125,7 +125,7 @@ internal static partial class WarriorSpellEffects
 
     private static void DrakeCharge(Frame frame, Vector2 feet, Vector2 hand, float progress, float time)
     {
-        var tuning = SpellVfxAssets.Current.Warrior.DrakeCharge;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.DrakeCharge);
         // Actor-following four-strand spiral, rising from the weapon around
         // the torso before returning to the blade. Root Y is ground depth;
         // screen-space lift never changes which side of the actor owns a mote.
@@ -192,7 +192,7 @@ internal static partial class WarriorSpellEffects
 
     private static void Engulf(Frame frame, Vector2 feet, float progress, float time)
     {
-        var tuning = SpellVfxAssets.Current.Warrior.Engulf;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Engulf);
         // Small individual tongues form a hot wound-shaped contact zone.
         // No vertical pillars, static opaque fire blobs or floor discs.
         float durationFade = 1f - Ease((progress - tuning.DurationFade) / tuning.DurationFadeDivisor);
@@ -246,7 +246,7 @@ internal static partial class WarriorSpellEffects
 
     private static void DrakeContact(Frame frame, Vector2 feet, float progress, float time)
     {
-        var tuning = SpellVfxAssets.Current.Warrior.DrakeContact;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.DrakeContact);
         // The impact originates on the struck actor's actual map cell. The
         // electrical silhouette winds around the target, but the burst and
         // rising lightning spikes root in the ground BELOW that actor.
@@ -359,7 +359,7 @@ internal static partial class WarriorSpellEffects
 
     private static void Strike(Frame frame, Spell spell, Vector2 feet, Vector2 facing, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Warrior.Strike;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Strike);
         // The shared physical strike has a blade-shaped silhouette, not a round
         // explosion. Variant styling follows the hit mechanism: steel slash,
         // hot riposte, or a dusty shoulder collision.
@@ -415,7 +415,7 @@ internal static partial class WarriorSpellEffects
     internal static void Dash(SpellParticlePool pool, Vector2 from, Vector2 to, long now)
     {
         using var vfxScope = SpellVfxAssets.For(Spell.ShoulderDash);
-        var tuning = SpellVfxAssets.Current.Warrior.Dash;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Dash);
         Vector2 delta = to - from;
         if (delta.LengthSquared() < 1) return;
         Vector2 forward = Vector2.Normalize(delta);
@@ -435,11 +435,11 @@ internal static partial class WarriorSpellEffects
 
     // Attack areas use the same 48 Ã— 32 projection as the tiles they sweep through.
     private static Vector2 GroundDirection(Vector2 facing) =>
-        facing / MathF.Max(MathF.Abs(facing.X), MathF.Abs(facing.Y) * SpellVfxAssets.Current.Warrior.GroundDirection.Y);
+        facing / MathF.Max(MathF.Abs(facing.X), MathF.Abs(facing.Y) * SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.GroundDirection).Y);
 
     private static void ThrustWind(Frame frame, Vector2 feet, Vector2 facing, float progress, int extraReach)
     {
-        var tuning = SpellVfxAssets.Current.Warrior.ThrustWind;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.ThrustWind);
         Vector2 source = feet - Vector2.UnitY * tuning.Source;
         Vector2 heading = GroundHeading(facing);
         var direction = (MirDirection)(((int)MathF.Round(MathF.Atan2(heading.Y, heading.X) * tuning.Direction / MathF.PI) + tuning.Direction2) & 7);
@@ -537,7 +537,7 @@ internal static partial class WarriorSpellEffects
 
     private static void Avalanche(Frame frame, Vector2 feet, Vector2 facing, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Warrior.Avalanche;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Avalanche);
         Vector2 heading = GroundHeading(facing);
         heading /= MathF.Max(MathF.Abs(heading.X), MathF.Abs(heading.Y));
         var side = new Vector2(-heading.Y, heading.X);
@@ -604,7 +604,7 @@ internal static partial class WarriorSpellEffects
 
     private static void Burst(Frame frame, Vector2 feet, Vector2 facing, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Warrior.Burst;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Burst);
         Vector2 forward = GroundDirection(facing);
         var side = new Vector2(-facing.Y, facing.X);
         float angle = MathF.Atan2(facing.Y, facing.X);
@@ -630,7 +630,7 @@ internal static partial class WarriorSpellEffects
 
     private static void Counter(Frame frame, Vector2 feet, Vector2 facing, float progress)
     {
-        var tuning = SpellVfxAssets.Current.Warrior.Counter;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Counter);
         // The original two-frame flash occupies the first fifth of the ten-frame riposte.
         float flash = 1 - Ease(progress * tuning.Flash);
         Vector2 body = feet - Vector2.UnitY * tuning.Body;
@@ -651,7 +651,7 @@ internal static partial class WarriorSpellEffects
 
     private static void Snare(Frame frame, Vector2 feet, float progress, bool preparing)
     {
-        var tuning = SpellVfxAssets.Current.Warrior.Snare;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Snare);
         float sweep = progress * MathF.Tau * (preparing ? tuning.Sweep : tuning.Sweep2);
         float extent = tuning.Extent + tuning.Extent2 * Ease(progress * tuning.Extent3);
         float release = preparing ? 1 : 1 - Ease((progress - tuning.Release) / tuning.ReleaseDivisor);
@@ -678,7 +678,7 @@ internal static partial class WarriorSpellEffects
 
     private static void Roar(Frame frame, Vector2 feet, float progress, bool rally)
     {
-        var tuning = SpellVfxAssets.Current.Warrior.Roar;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Roar);
         int tint = rally ? tuning.TintColour : tuning.TintColour2;
         float spread = tuning.Spread + tuning.Spread2 * Ease(progress * tuning.Spread3);
         Vector2 head = feet - Vector2.UnitY * tuning.Head;
@@ -704,7 +704,7 @@ internal static partial class WarriorSpellEffects
 
     private static void Surge(Frame frame, Vector2 feet, float progress, bool rage)
     {
-        var tuning = SpellVfxAssets.Current.Warrior.Surge;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Surge);
         Vector2 centre = feet - Vector2.UnitY * (rage ? tuning.Centre : tuning.Centre2);
         int tint = rage ? Ember : Steel;
         int core = rage ? Heat : White;
@@ -725,7 +725,7 @@ internal static partial class WarriorSpellEffects
 
     private static void BladeFlame(Frame frame, Vector2 point, float progress, float width)
     {
-        var tuning = SpellVfxAssets.Current.Warrior.BladeFlame;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.BladeFlame);
         frame.Clip(point - Vector2.UnitY * tuning.FireSequenceOffset, width, width * tuning.FireSequenceHeight, tuning.FireSequenceShape, progress * tuning.FireSequencePhase, Flame, tuning.FireSequenceAlpha, light: tuning.FireSequenceLight);
         frame.Clip(point, width * tuning.FireSequenceWidth, width * tuning.FireSequenceHeight2, tuning.FireSequenceShape2, progress * tuning.FireSequencePhase2 + tuning.FireSequencePhase3, Heat, tuning.FireSequenceAlpha2, tuning.FireSequenceLayer);
         frame.Sparks(point, tuning.WarriorSparkCount, width * tuning.WarriorSparkRx, width * tuning.WarriorSparkRy, progress, Heat, rise: tuning.WarriorSparkRise, shape: tuning.WarriorSparkShape);
@@ -733,7 +733,7 @@ internal static partial class WarriorSpellEffects
 
     private static void Fury(Frame frame, Vector2 feet, float progress, bool aura)
     {
-        var tuning = SpellVfxAssets.Current.Warrior.Fury;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Fury);
         if (aura)
         {
             Vector2 eye = feet - Vector2.UnitY * tuning.Eye;
@@ -757,7 +757,7 @@ internal static partial class WarriorSpellEffects
 
     private static void Skin(Frame frame, Vector2 feet, float progress, bool aura)
     {
-        var tuning = SpellVfxAssets.Current.Warrior.Skin;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Skin);
         Vector2 body = feet - Vector2.UnitY * tuning.Body;
         if (aura)
         {

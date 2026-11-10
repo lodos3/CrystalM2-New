@@ -25,7 +25,7 @@ internal static class LegacySpellEffects
     internal static WindupCue Windup(Spell spell, int frames, int interval)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Current.Legacy.Windup;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.Windup);
         int cast = frames * interval;
         return spell switch
         {
@@ -59,7 +59,7 @@ internal static class LegacySpellEffects
     internal static int FieldInterval(Spell spell)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Current.Legacy.FieldInterval;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.FieldInterval);
         return spell switch
         {
             Spell.HealingCircle => tuning.HealingCircleIntervalMs,
@@ -75,7 +75,7 @@ internal static class LegacySpellEffects
     private static Look Profile(Spell spell)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Current.Legacy.Profile;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.Profile);
         return spell switch
         {
             // Warrior. Use the angle and length of the hit to identify each weapon technique.
@@ -123,6 +123,14 @@ internal static class LegacySpellEffects
     internal static bool HasLiveArt(Spell spell) =>
         WizardSpellEffects.HasArt(spell) || WarriorSpellEffects.HasArt(spell) || TaoistSpellEffects.HasArt(spell);
 
+    internal static SpellVisualPhase ImpactPhase(Spell spell) => spell switch
+    {
+        Spell.MassHealing or Spell.MassHiding => SpellVisualPhase.Hit,
+        _ when WarriorSpellEffects.HasArt(spell) || spell is Spell.FireBang or Spell.IceStorm or Spell.IceThrust or
+            Spell.FlameField or Spell.ThunderStorm or Spell.StormEscape => SpellVisualPhase.Contact,
+        _ => SpellVisualPhase.Impact
+    };
+
     internal static int PacketDuration(SpellVisual visual)
     {
         if (WarriorSpellEffects.HasArt(visual.Spell)) return WarriorSpellEffects.PacketDuration(visual);
@@ -146,7 +154,7 @@ internal static class LegacySpellEffects
         Vector2? feet = null, float previousProgress = 0, bool followThrough = false)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Current.Legacy.WeaponSweep;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.WeaponSweep);
         if (remaining <= 0) return;
         var look = Profile(spell);
         if (look.Size == 0) return;
@@ -188,7 +196,7 @@ internal static class LegacySpellEffects
     internal static Vector2 ProjectileAnchor(Spell spell, Vector2 cell)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Current.Legacy.ProjectileAnchor;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.ProjectileAnchor);
         return spell switch
         {
             Spell.FireBall or Spell.GreatFireBall or Spell.FireBounce or Spell.MeteorShower or Spell.FrostCrunch => cell - new Vector2(0, tuning.FireBallY),
@@ -201,7 +209,7 @@ internal static class LegacySpellEffects
     internal static (int TravelPerCellMs, int WakeIntervalMs) ProjectileTiming(Spell spell)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Current.Legacy.ProjectileTiming;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.ProjectileTiming);
         return (tuning.TravelPerCellMs, tuning.WakeIntervalMs);
     }
 
@@ -209,7 +217,7 @@ internal static class LegacySpellEffects
         long now, int frame, int remaining, bool leaveWake, float size = WizardSpellEffects.DefaultSize)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Current.Legacy.ProjectileFrame;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.ProjectileFrame);
         if (WizardSpellEffects.DrawProjectile(pool, spell, head, heading, now, frame, remaining, leaveWake, size)) return;
         if (TaoistSpellEffects.DrawProjectile(pool, spell, head, heading, now, frame, remaining, leaveWake, size)) return;
         var look = Profile(spell);
@@ -248,7 +256,7 @@ internal static class LegacySpellEffects
 
     private static Look Profile(SpellVisual visual)
     {
-        var tuning = SpellVfxAssets.Current.Legacy.MotifProfile;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.MotifProfile);
         return visual.Motif switch
         {
             ParticleMotif.Celebration => Art(tuning.CelebrationForm, tuning.CelebrationShape, tuning.CelebrationSize, tuning.CelebrationColour, tuning.CelebrationCore),
@@ -264,7 +272,7 @@ internal static class LegacySpellEffects
         int duration = 0, long? sampleTime = null, uint fieldObjectID = 0)
     {
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
-        var tuning = SpellVfxAssets.Current.Legacy.Emit;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.Emit);
         var look = Profile(visual);
         if (look.Size == 0) return;
 
@@ -323,7 +331,7 @@ internal static class LegacySpellEffects
 
     private static void Prepare(Effect effect, Look look, Vector2 hand, float angle)
     {
-        var tuning = SpellVfxAssets.Current.Legacy.Prepare;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.Prepare);
         effect.Add(hand, -Vector2.UnitY * tuning.AddVelocity, look.Shape, Math.Max(tuning.Val1, look.Size * tuning.Val2 / 3),
             tuning.AddDuration, tuning.AddLayer, aspect: tuning.AddAspect, rotation: angle * tuning.AddRotation, growth: tuning.AddGrowth, alpha: tuning.AddAlpha);
         effect.Add(hand, Vector2.Zero, tuning.OrbShape, Math.Max(tuning.Val12, look.Size / 4), tuning.OrbDuration,
@@ -334,7 +342,7 @@ internal static class LegacySpellEffects
     private static void Swing(Effect effect, Look look, SpellVisual visual, Vector2 feet, Vector2 body,
         Vector2 facing, float angle)
     {
-        var tuning = SpellVfxAssets.Current.Legacy.Swing;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.Swing);
         bool follow = visual.Phase == SpellVisualPhase.FollowThrough;
         if (visual.Spell == Spell.Thrusting)
         {
@@ -369,7 +377,7 @@ internal static class LegacySpellEffects
 
     private static void Aura(Effect effect, Look look, Spell spell, Vector2 feet, Vector2 body)
     {
-        var tuning = SpellVfxAssets.Current.Legacy.Aura;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.Aura);
         if (spell is Spell.Poisoning or Spell.Plague or Spell.Curse or Spell.Hiding)
         {
             effect.Add(body, -Vector2.UnitY * tuning.AddVelocity, look.Shape, look.Size * tuning.AddSize / 3, tuning.AddDuration, tuning.AddLayer, alpha: tuning.AddAlpha, growth: tuning.AddGrowth);
@@ -386,7 +394,7 @@ internal static class LegacySpellEffects
 
     private static void Field(Effect effect, Look look, Spell spell, Vector2 feet, Vector2 body, long now)
     {
-        var tuning = SpellVfxAssets.Current.Legacy.Field;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.Field);
         float drift = MathF.Sin(feet.X * tuning.Drift + feet.Y * tuning.Drift2 + now % 4096 * tuning.Drift3) * tuning.Drift4;
         switch (spell)
         {
@@ -417,7 +425,7 @@ internal static class LegacySpellEffects
     private static void Impact(Effect effect, Look look, Spell spell, Vector2 feet, Vector2 body,
         Vector2 facing, float angle)
     {
-        var tuning = SpellVfxAssets.Current.Legacy.Impact;
+        var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.Impact);
         switch (look.Form)
         {
             case Form.Cut:
