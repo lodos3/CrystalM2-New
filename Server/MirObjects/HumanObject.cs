@@ -162,6 +162,8 @@ namespace Server.MirObjects
 
         public short TransformType;
         public short Looks_Armour = 0, Looks_Weapon = -1, Looks_WeaponEffect = 0;
+        // Visual-only generated outfits may override the network appearance, not equipment.
+        protected virtual short AppearanceArmour => Looks_Armour;
         public byte Looks_Wings = 0;
         protected virtual byte VisibleWings => Looks_Wings;
 
@@ -7108,7 +7110,7 @@ namespace Server.MirObjects
                 ObjectID = ObjectID,
                 Weapon = Looks_Weapon,
                 WeaponEffect = Looks_WeaponEffect,
-                Armour = Looks_Armour,
+                Armour = AppearanceArmour,
                 Light = Light,
                 WingEffect = VisibleWings
             };

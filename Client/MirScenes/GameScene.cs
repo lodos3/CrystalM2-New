@@ -3209,6 +3209,8 @@ namespace Client.MirScenes
         {
             if (MapControl.Objects.TryGetValue(p.ObjectID, out var ob) && ob is PlayerObject player)
                 player.Update(p);
+            else if (User != null && User.ObjectID == p.ObjectID)
+                User.Update(p); // The GM override must also reach the local avatar.
         }
 
         private void PlayerInspect(S.PlayerInspect p)
