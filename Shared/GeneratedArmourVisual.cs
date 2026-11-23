@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 
 public static class GeneratedArmourVisual
@@ -24,7 +26,7 @@ public static class GeneratedArmourVisual
         }
 
         // Invalid negative values are not legitimate generated IDs.
-        baseArmour = (short)Math.Max(0, transmitted);
+        baseArmour = transmitted < 0 ? (short)0 : transmitted;
         generatedId = 0;
     }
 
