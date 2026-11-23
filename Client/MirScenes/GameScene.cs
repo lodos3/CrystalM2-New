@@ -1476,6 +1476,10 @@ namespace Client.MirScenes
                 case (short)ServerPacketIds.TransferHeroItem:
                     TransferHeroItem((S.TransferHeroItem)p);
                     break;
+                case (short)ServerPacketIds.GeneratedArmourAction:
+                    var armourAction = (S.GeneratedArmourAction)p;
+                    GeneratedArmourRuntime.HandleAction(armourAction.Id, armourAction.Build);
+                    break;
                 case (short)ServerPacketIds.PlayerUpdate:
                     PlayerUpdate((S.PlayerUpdate)p);
                     break;

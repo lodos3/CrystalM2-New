@@ -2186,9 +2186,9 @@ namespace Server.MirObjects
 
                     case "ARM":
                         if (!IsGM) return;
-                        if (parts.Length != 3)
+                        if (parts.Length is < 3 or > 4)
                         {
-                            ReceiveChat("Usage: @arm username g01-g99 | off", ChatType.System);
+                            ReceiveChat("Usage: @arm username g01-g99 [build|reload] | off", ChatType.System);
                             return;
                         }
 
@@ -2205,6 +2205,26 @@ namespace Server.MirObjects
                         else if (!GeneratedArmourVisual.TryParseId(parts[2], out generatedId))
                         {
                             ReceiveChat("Invalid generated armour. Use g01-g99 or off.", ChatType.System);
+                            return;
+                        }
+
+                        if (parts.Length == 4)
+                        {
+                            bool build = parts[3].Equals("build", StringComparison.OrdinalIgnoreCase);
+                            bool reload = parts[3].Equals("reload", StringComparison.OrdinalIgnoreCase);
+                            if ((!build && !reload) || generatedId != 1)
+                            {
+                                ReceiveChat("Runtime actions: @arm username g01 build|reload", ChatType.System);
+                                return;
+                            }
+                            if (build && player._generatedArmourVisual != generatedId)
+                            {
+                                ReceiveChat("Preview g01 on the target before exporting it.", ChatType.System);
+                                return;
+                            }
+                            // Export/reload on the issuing GM's machine, never remotely write a target client's files.
+                            Enqueue(new S.GeneratedArmourAction { Id = generatedId, Build = build });
+                            if (reload) player.SetGeneratedArmourVisual(generatedId);
                             return;
                         }
 

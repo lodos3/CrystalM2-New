@@ -1914,6 +1914,15 @@ namespace ServerPackets
             writer.Write(WingEffect);
         }
     }
+    public sealed class GeneratedArmourAction : Packet
+    {
+        public override short Index => (short)ServerPacketIds.GeneratedArmourAction;
+        public override bool Observable => false;
+        public byte Id;
+        public bool Build;
+        protected override void ReadPacket(BinaryReader reader) { Id = reader.ReadByte(); Build = reader.ReadBoolean(); }
+        protected override void WritePacket(BinaryWriter writer) { writer.Write(Id); writer.Write(Build); }
+    }
     public sealed class PlayerInspect : Packet
     {
         public override short Index

@@ -1892,6 +1892,7 @@ public enum ServerPacketIds : short
     TalentState,
     RotationState,
     SpellPerkState,
+    GeneratedArmourAction,
 }
 
 public enum ClientPacketIds : short

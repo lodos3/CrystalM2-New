@@ -538,6 +538,8 @@ public abstract class Packet
                 return new S.UseItem();
             case (short)ServerPacketIds.DropItem:
                 return new S.DropItem();
+            case (short)ServerPacketIds.GeneratedArmourAction:
+                return new S.GeneratedArmourAction();
             case (short)ServerPacketIds.PlayerUpdate:
                 return new S.PlayerUpdate();
             case (short)ServerPacketIds.PlayerInspect:

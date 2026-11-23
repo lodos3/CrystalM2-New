@@ -29,9 +29,10 @@ namespace Client.MirObjects
         public byte Hair;
         public ushort Level;
 
-        public MLibrary WeaponLibrary1, WeaponEffectLibrary1, WeaponLibrary2, HairLibrary, WingLibrary, MountLibrary, GeneratedArmourLibrary;
+        public MLibrary WeaponLibrary1, WeaponEffectLibrary1, WeaponLibrary2, HairLibrary, WingLibrary, MountLibrary;
         public int Armour, Weapon, WeaponEffect, ArmourOffSet, HairOffSet, WeaponOffSet, WingOffset, MountOffset;
         public byte GeneratedArmour;
+        private bool _drawGeneratedArmour;
 
         public int DieSound, FlinchSound, AttackSound;
 
@@ -608,14 +609,14 @@ namespace Client.MirObjects
 
             // Generated CArmour overlays are painted on the original naked CArmour/00.
             // Alternate assassin/archer poses use incompatible atlas indices.
-            GeneratedArmourLibrary = null;
+            bool useGeneratedArmour = false;
             if (GeneratedArmour > 0 && TransformType < 0 && !altAnim && Libraries.CArmours.Length > 0)
             {
                 BodyLibrary = Libraries.CArmours[0];
-                if (GeneratedArmour < Libraries.GArmours.Length)
-                    GeneratedArmourLibrary = Libraries.GArmours[GeneratedArmour];
+                useGeneratedArmour = true;
             }
 
+            _drawGeneratedArmour = useGeneratedArmour;
             #region Common
             _wingFamily = altAnim ? Class == MirClass.Assassin ? 1 : 2 : 0;
             //Harvest
@@ -5013,7 +5014,7 @@ namespace Client.MirObjects
             if (BodyLibrary != null)
             {
                 BodyLibrary.Draw(DrawFrame + ArmourOffSet, DrawLocation, drawColour, true);
-                GeneratedArmourLibrary?.Draw(DrawFrame + ArmourOffSet, DrawLocation, drawColour, true);
+                if (_drawGeneratedArmour) GeneratedArmourRuntime.Draw(GeneratedArmour, DrawFrame + ArmourOffSet, DrawLocation, drawColour);
                 if (spellMask) DrawBodySpellVisual(BodyLibrary, DrawFrame + ArmourOffSet);
             }
 

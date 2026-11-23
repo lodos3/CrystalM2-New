@@ -426,7 +426,8 @@ namespace Client.MirGraphics
         private bool _initialized;
 
         private BinaryReader _reader;
-        private FileStream _fStream;
+        private Stream _fStream;
+        private CrystalM2.ArmourCreate.ArmourAtlas _generatedAtlas;
 
         public FrameSet Frames
         {
@@ -449,6 +450,26 @@ namespace Client.MirGraphics
             {
                 _mapShadowBackup = new Lazy<LegacyMirLibReader>(() => OpenMapShadowBackup(relativePath));
             }
+        }
+
+        internal MLibrary(string filename, CrystalM2.ArmourCreate.ArmourAtlas atlas) : this(filename)
+        {
+            _generatedAtlas = atlas;
+            _count = atlas.Count;
+            _images = new MImage[_count];
+            _indexList = new int[_count];
+            _fStream = new MemoryStream();
+            _reader = new BinaryReader(_fStream);
+            _initialized = true;
+        }
+
+        internal void ReleaseGeneratedPreview()
+        {
+            if (_generatedAtlas == null) return;
+            foreach (var image in _images) image?.DisposeTexture();
+            _reader.Dispose();
+            _generatedAtlas.Dispose();
+            _generatedAtlas = null;
         }
 
         private static LegacyMirLibReader OpenMapShadowBackup(string relativePath)
@@ -540,6 +561,13 @@ namespace Client.MirGraphics
             MImage image = _images[index];
             if (image == null)
             {
+                if (_generatedAtlas != null)
+                {
+                    byte[] record = _generatedAtlas.GetRecord(index);
+                    _fStream.Position = _fStream.Length;
+                    _indexList[index] = checked((int)_fStream.Position);
+                    _fStream.Write(record, 0, record.Length);
+                }
                 _fStream.Position = _indexList[index];
                 image = new MImage(_reader);
                 _images[index] = image;

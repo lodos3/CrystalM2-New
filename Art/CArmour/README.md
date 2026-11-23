@@ -57,3 +57,8 @@ The appearance changes immediately for the target player and nearby players. A n
 - Character models that use classic CArmour frame indices are supported. The special alternate animation banks for Assassin and Archer have different frame numbering. Those frames fall back to their existing naked base until separate AArmour/ARArmour mask atlases are authored. Transformed characters do not use the overlay.
 - The 11 anatomical anchors and RGB coverage maps are estimates, not rigged 3D bone meshes. Fallen and severely foreshortened poses may require hand-edited anchor positions.
 - Source `CArmour/00.Lib` is required **locally** for generation and is not in the GitHub repository. The generated `.Lib` and preview are local build outputs. Preview, build and live appearance must be checked on both genders, all eight directions, movement, attacks and death poses before release.
+
+
+## Runtime authoring
+
+The client build now copies the existing pose atlas and RGB masks into `Data/ArmourAuthoring`. For g01, the client paints individual poses on demand into an in-memory library; no GArmour file is needed. Each pose is compressed once and cached, and ordinary GPU texture eviction remains active. `@arm PlayerName g01 build` exports all poses into `Data/GArmour/01.Lib` on the issuing GM's client, using the same cached frame records as the preview. It refuses to overwrite an existing library. `@arm PlayerName g01 reload` drops the issuing client's preview cache and reloads its local pose atlas/masks. Source-code changes to ArmourPainter still require recompilation. Other numbered looks require their own authored designs or prebuilt LIBs. Keep both client and server on the same version.
