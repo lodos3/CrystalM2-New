@@ -55,6 +55,7 @@ namespace Client.MirGraphics
             Deco = new MLibrary(Settings.DataPath + "Deco");
 
         public static MLibrary[] CArmours,
+                                          GArmours,
                                           CWeapons,
 										  CWeaponEffect,
 										  CHair,
@@ -86,6 +87,7 @@ namespace Client.MirGraphics
         {
             //Wiz/War/Tao
             InitLibrary(ref CArmours, Settings.CArmourPath, "00");
+            InitLibrary(ref GArmours, Settings.DataPath + "GArmour" + Path.DirectorySeparatorChar, "00");
             InitLibrary(ref CHair, Settings.CHairPath, "00");
             InitLibrary(ref CWeapons, Settings.CWeaponPath, "00");
             InitLibrary(ref CWeaponEffect, Settings.CWeaponEffectPath, "00");
@@ -134,7 +136,7 @@ namespace Client.MirGraphics
                 Directory.CreateDirectory(path);
             }
 
-            var allFiles = Directory.GetFiles(path, "*" + suffix + MLibrary.Extention, SearchOption.TopDirectoryOnly).OrderBy(x => int.Parse(Regex.Match(x, @"\d+").Value));
+            var allFiles = Directory.GetFiles(path, "*" + suffix + MLibrary.Extention, SearchOption.TopDirectoryOnly).OrderBy(x => int.Parse(Regex.Match(Path.GetFileName(x), @"\d+").Value));
 
             var lastFile = allFiles.Count() > 0 ? Path.GetFileName(allFiles.Last()) : "0";
 
@@ -171,7 +173,7 @@ namespace Client.MirGraphics
 
         private static void LoadGameLibraries()
         {
-            Count = MapLibs.Length + Monsters.Length + Gates.Length + Flags.Length + Siege.Length + NPCs.Length + CArmours.Length +
+            Count = MapLibs.Length + Monsters.Length + Gates.Length + Flags.Length + Siege.Length + NPCs.Length + CArmours.Length + GArmours.Length +
                 CHair.Length + CWeapons.Length + CWeaponEffect.Length + AArmours.Length + AHair.Length + AWeaponsL.Length + AWeaponsR.Length +
                 ARArmours.Length + ARHair.Length + ARWeapons.Length + ARWeaponsS.Length +
                 CHumEffect.Length + AHumEffect.Length + ARHumEffect.Length + Mounts.Length + Fishing.Length + Pets.Length +
@@ -267,6 +269,12 @@ namespace Client.MirGraphics
             for (int i = 0; i < CArmours.Length; i++)
             {
                 CArmours[i].Initialize();
+                Progress++;
+            }
+
+            for (int i = 0; i < GArmours.Length; i++)
+            {
+                GArmours[i].Initialize();
                 Progress++;
             }
 
