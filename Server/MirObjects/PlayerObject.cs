@@ -2184,6 +2184,36 @@ namespace Server.MirObjects
                         ReceiveChat(GameLanguage.ServerTextMap.GetLocalization(ServerTextKeys.EnterGmPassword), ChatType.Hint);
                         return;
 
+                    case "ARM":
+                        if (!IsGM) return;
+                        if (parts.Length != 3)
+                        {
+                            ReceiveChat("Usage: @arm username g01-g99 | off", ChatType.System);
+                            return;
+                        }
+
+                        player = Envir.GetPlayer(parts[1]);
+                        if (player == null)
+                        {
+                            ReceiveChat($"Player not online: {parts[1]}", ChatType.System);
+                            return;
+                        }
+
+                        byte generatedId;
+                        if (parts[2].Equals("off", StringComparison.OrdinalIgnoreCase))
+                            generatedId = 0;
+                        else if (!GeneratedArmourVisual.TryParseId(parts[2], out generatedId))
+                        {
+                            ReceiveChat("Invalid generated armour. Use g01-g99 or off.", ChatType.System);
+                            return;
+                        }
+
+                        player.SetGeneratedArmourVisual(generatedId);
+                        string visualName = generatedId == 0 ? "equipped armour" : $"g{generatedId:00}";
+                        ReceiveChat($"{player.Name} appearance set to {visualName} (visual only).", ChatType.System);
+                        player.ReceiveChat($"Your armour appearance was set to {visualName} by a GM.", ChatType.System);
+                        return;
+
                     case "KILL":
                         if (!IsGM) return;
 
@@ -4798,7 +4828,7 @@ namespace Server.MirObjects
                 Hair = Hair,
                 Weapon = Looks_Weapon,
                 WeaponEffect = Looks_WeaponEffect,
-                Armour = Looks_Armour,
+                Armour = AppearanceArmour,
                 Light = Light,
                 Poison = CurrentPoison,
                 Dead = Dead,
