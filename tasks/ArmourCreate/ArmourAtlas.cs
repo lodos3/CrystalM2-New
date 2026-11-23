@@ -20,13 +20,22 @@ public sealed class ArmourAtlas : IDisposable
     private readonly Dictionary<int, byte[]> _records = new();
     public int Count => _frames.Length;
 
-    public ArmourAtlas(string dataRoot, string artRoot)
+    public ArmourAtlas(string dataRoot, string artRoot) : this(artRoot, ReadSourceCount(dataRoot)) { }
+
+    private static int ReadSourceCount(string dataRoot)
+    {
+        using var source = new LegacyMirLibReader(File.OpenRead(Path.Combine(dataRoot, "CArmour", "00.Lib")));
+        return source.Count;
+    }
+
+    // The geometry and artwork depend only on the verified pose atlas; no skin pixels
+    // are sampled. The expected bank size can also come from a known atlas contract.
+    public ArmourAtlas(string artRoot, int expectedFrameCount)
     {
         _artRoot = artRoot;
-        using var source = new LegacyMirLibReader(File.OpenRead(Path.Combine(dataRoot, "CArmour", "00.Lib")));
         _poses = JsonDocument.Parse(File.ReadAllText(Path.Combine(artRoot, "poses.json")));
         _frames = _poses.RootElement.GetProperty("frames").EnumerateArray().ToArray();
-        if (source.Count != _frames.Length || _poses.RootElement.GetProperty("regions").GetArrayLength() != 11)
+        if (expectedFrameCount != _frames.Length || _poses.RootElement.GetProperty("regions").GetArrayLength() != 11)
         {
             _poses.Dispose();
             throw new InvalidDataException("Armour pose atlas does not match the naked body library.");

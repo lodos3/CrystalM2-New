@@ -63,3 +63,54 @@ foreach (int index in new[] {0, 16, 60, 824})
             $"pixels={painted}, blue={blue}, white={white}, gold={gold}.");
 }
 Console.WriteLine($"Verified {count} real CArmour masks and four original armour poses.");
+
+using (var atlas = new ArmourAtlas(art, 1616))
+{
+    // These are the exact compressed records the live MLibrary consumes.
+    int[] sample = [0, 16, 60, 824];
+    foreach (int index in sample)
+    {
+        byte[] record = atlas.GetRecord(index);
+        if (!ReferenceEquals(record, atlas.GetRecord(index)))
+            throw new Exception($"Runtime frame {index} was not cached.");
+        using var reader = new BinaryReader(new MemoryStream(record));
+        int w = reader.ReadInt16(), h = reader.ReadInt16();
+        int x = reader.ReadInt16(), y = reader.ReadInt16();
+        var pose = frames[index];
+        if (w != pose.GetProperty("rect")[2].GetInt32() || h != pose.GetProperty("rect")[3].GetInt32() ||
+            x != pose.GetProperty("origin")[0].GetInt32() || y != pose.GetProperty("origin")[1].GetInt32())
+            throw new Exception($"Generated frame {index} lost its pose alignment.");
+        if (reader.ReadInt16() != 0 || reader.ReadInt16() != 0 || reader.ReadByte() != 0)
+            throw new Exception("An overlay must not inherit body shadows.");
+        int length = reader.ReadInt32();
+        using var zip = new System.IO.Compression.GZipStream(new MemoryStream(reader.ReadBytes(length)),
+            System.IO.Compression.CompressionMode.Decompress);
+        using var pixels = new MemoryStream();
+        zip.CopyTo(pixels);
+        byte[] bgra = pixels.ToArray();
+        if (bgra.Length != w*h*4 || !bgra.Where((_, n) => n % 4 == 3).Any(a => a > 0) ||
+            !bgra.Where((_, n) => n % 4 == 3).Any(a => a == 0))
+            throw new Exception($"Generated frame {index} is not an independent transparent overlay.");
+    }
+    string folder = Path.Combine(Path.GetTempPath(), "CrystalM2Armour-" + Guid.NewGuid().ToString("N"));
+    try
+    {
+        string path = Path.Combine(folder, "01.Lib");
+        atlas.Export(path);
+        using var stream = File.OpenRead(path);
+        using var reader = new BinaryReader(stream);
+        if (reader.ReadInt32() != 3 || reader.ReadInt32() != atlas.Count)
+            throw new Exception("Exported library header is invalid.");
+        reader.ReadInt32();
+        int[] offsets = Enumerable.Range(0, atlas.Count).Select(_ => reader.ReadInt32()).ToArray();
+        foreach (int index in sample)
+        {
+            stream.Position = offsets[index];
+            byte[] expected = atlas.GetRecord(index);
+            if (!reader.ReadBytes(expected.Length).SequenceEqual(expected))
+                throw new Exception($"Export does not preserve the preview frame {index}.");
+        }
+    }
+    finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+}
+Console.WriteLine("Verified cached runtime armour records and exported LIB byte parity.");

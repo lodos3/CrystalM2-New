@@ -34,3 +34,14 @@ try { GeneratedArmourVisual.Encode(4, 100); }
 catch (ArgumentOutOfRangeException) { threw = true; }
 Check(threw, "Out-of-range IDs must not be encoded.");
 Console.WriteLine("Generated armour ID parsing and wire compatibility checks passed.");
+
+var command = new ServerPackets.GeneratedArmourAction { Id = 1, Build = true };
+bool wasServer = Packet.IsServer;
+try
+{
+    Packet.IsServer = false;
+    var decoded = Packet.ReceivePacket(command.GetPacketBytes().ToArray(), out byte[] extra);
+    Check(decoded is ServerPackets.GeneratedArmourAction action && action.Id == 1 && action.Build && extra.Length == 0,
+        "Generated armour export instruction must round-trip.");
+}
+finally { Packet.IsServer = wasServer; }
