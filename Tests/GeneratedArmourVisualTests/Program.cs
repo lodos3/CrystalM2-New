@@ -1,0 +1,36 @@
+using System;
+
+static void Check(bool ok, string description)
+{
+    if (!ok) throw new Exception(description);
+}
+
+Check(GeneratedArmourVisual.TryParseId("g01", out byte first) && first == 1, "g01 must be valid.");
+Check(GeneratedArmourVisual.TryParseId("G99", out byte last) && last == 99, "G99 must be valid.");
+foreach (string invalid in new[] {"g00", "g1", "g100", "g-1", "gXX", "01", "off", ""})
+    Check(!GeneratedArmourVisual.TryParseId(invalid, out _), $"Unexpected ID accepted: {invalid}");
+Check(!GeneratedArmourVisual.TryParseId(null, out _), "Null IDs must be rejected.");
+
+for (byte id = 1; id <= 99; id++)
+{
+    short transmitted = GeneratedArmourVisual.Encode(12, id);
+    Check(transmitted == -id, $"Incorrect encoded look: {id}");
+    GeneratedArmourVisual.Decode(transmitted, out short baseArmour, out byte decoded);
+    Check(baseArmour == 0 && decoded == id, $"Generated armour {id} must draw on 00.");
+}
+
+foreach (short original in new short[] {0, 1, 12, 32767})
+{
+    short transmitted = GeneratedArmourVisual.Encode(original, 0);
+    GeneratedArmourVisual.Decode(transmitted, out short baseArmour, out byte decoded);
+    Check(original == transmitted && baseArmour == original && decoded == 0,
+        "Legacy armour look must be preserved without an overlay.");
+}
+
+GeneratedArmourVisual.Decode(-100, out short fallback, out byte none);
+Check(fallback == 0 && none == 0, "Invalid negative armour must not index out of bounds.");
+bool threw = false;
+try { GeneratedArmourVisual.Encode(4, 100); }
+catch (ArgumentOutOfRangeException) { threw = true; }
+Check(threw, "Out-of-range IDs must not be encoded.");
+Console.WriteLine("Generated armour ID parsing and wire compatibility checks passed.");
