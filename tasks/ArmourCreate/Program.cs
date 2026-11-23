@@ -14,8 +14,6 @@ string dataRoot = Path.GetFullPath(args[0]);
 string artRoot = Path.GetFullPath(args[1]);
 string destination = Path.GetFullPath(args[2]);
 string? previewFile = args.Length == 4 ? Path.GetFullPath(args[3]) : null;
-if (!Directory.Exists(Path.GetDirectoryName(destination)))
-    throw new DirectoryNotFoundException("Create the destination CArmour directory first.");
 if (File.Exists(destination))
     throw new IOException($"Refusing to overwrite the existing armour: {destination}");
 if (previewFile is not null && File.Exists(previewFile))
@@ -25,6 +23,7 @@ if (Path.GetFileName(destination).Equals("00.Lib", StringComparison.OrdinalIgnor
 if (!Path.GetFileName(Path.GetDirectoryName(destination)!).Equals("GArmour", StringComparison.OrdinalIgnoreCase) ||
     !System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileName(destination), @"^(0[1-9]|[1-9][0-9])\.Lib$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
     throw new ArgumentException("Generated armour must be saved to GArmour/01.Lib through GArmour/99.Lib.");
+Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
 
 using var source = new LegacyMirLibReader(File.OpenRead(Path.Combine(dataRoot, "CArmour", "00.Lib")));
 using var poses = JsonDocument.Parse(File.ReadAllText(Path.Combine(artRoot, "poses.json")));
