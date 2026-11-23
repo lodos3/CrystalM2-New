@@ -8,14 +8,24 @@ namespace Client.MirScenes;
 
 internal static partial class SpellVfxBladeParticles
 {
+    internal static void DrawAttack(SpellParticlePool pool, Spell spell, SpellVisualPhase phase, Vector2 feet,
+        MirDirection direction, int pose, float progress, long now, float size, uint seed, WeaponMaskTrace? weapon)
+    {
+        var mask = new Frame(pool, feet, now, 1, size, seed, depthY: feet.Y);
+        SpellVfxPoseMasks.Draw(mask, spell, feet, (int)direction, pose, .67f, phase == SpellVisualPhase.FollowThrough);
+        Draw(pool, spell, phase, feet, direction, pose, progress, now, size, seed, weapon, .40f);
+    }
+
     internal static void Draw(SpellParticlePool pool, Spell spell, SpellVisualPhase phase, Vector2 feet,
-        MirDirection direction, int pose, float progress, long now, float size, uint seed, WeaponMaskTrace? weapon = null)
+        MirDirection direction, int pose, float progress, long now, float size, uint seed, WeaponMaskTrace? weapon = null,
+        float detailStrength = 1)
     {
         using var profile = SpellVfxAssets.For(spell);
         using var timeline = SpellVfxAssets.AtProgress(progress);
         var motion = SpellVfxAssets.Current.Warrior.BladeMotion;
-        var frame = new Frame(pool, feet, now, 1, size, seed ^ (uint)pose * 69069, depthY: feet.Y);
         int index = (int)direction * 6 + pose;
+        float strength = detailStrength * SpellVfxLegacyFrames.BladeStrength(spell, phase, index);
+        var frame = new Frame(pool, feet, now, strength, size, seed ^ (uint)pose * 69069, depthY: feet.Y);
 
         switch (phase)
         {
@@ -28,13 +38,18 @@ internal static partial class SpellVfxBladeParticles
             case SpellVisualPhase.Swing:
             case SpellVisualPhase.FollowThrough:
                 if (spell == Spell.FlamingSword)
+                {
+                    if (pose == 0)
+                        frame.Sprite(feet + SpellVfxLegacyFrames.FlameIgnition[(int)direction], 10, 19,
+                            Shape.Wisp, 0xCD632E, .48f, Layer.EmissiveCore, emitter: "Blade.Ignition");
                     FlameSweep(frame, feet, Guide.Read(motion.HotCore[index]), Guide.Read(motion.Wake[index]), pose, progress, weapon);
+                }
                 else
                 {
                     ArcSweep(frame, feet, Guide.Read(motion.Sweep[index]), motion.SweepOutline[index], pose);
                     if (phase == SpellVisualPhase.FollowThrough)
                     {
-                        var charge = new Frame(pool, feet, now, 1, size,
+                        var charge = new Frame(pool, feet, now, strength, size,
                             seed ^ ((uint)pose * 69069) ^ ((uint)(progress * 15) * 18311), depthY: feet.Y);
                         ChargedSweep(pool, charge, feet, Guide.Read(motion.ChargedSweep[index]), motion.BodyAxis[index],
                             direction, pose, progress);
@@ -49,6 +64,22 @@ internal static partial class SpellVfxBladeParticles
         float phase = progress * 2.3f;
         float fade = pose == 0 ? .09f : 1 - .53f * Frame.Ease((progress - .79f) / .21f);
         float spread = .16f + .84f * Frame.Ease((progress - .22f) / .48f);
+        if (pose >= 2)
+        {
+            // Diffuse fire and torn streamers spread well outside the incandescent blade.
+            for (int i = 0; i < 13; i++)
+            {
+                float along = (i - 6) / 6f;
+                float across = MathF.Sin(i * 2.4f + phase) * wake.Width * .85f;
+                Vector2 point = feet + wake.At(along * 1.2f, across);
+                float width = (38 + wake.Width * 1.3f) * (1 - .35f * MathF.Abs(along));
+                frame.Sprite(point, width * 1.65f, width * 1.2f, Shape.Wisp, 0xB94314, .40f * fade,
+                    Layer.EmissiveCore, wake.Angle, emitter: "Blade.Wake-glow");
+                frame.Clip(point, width, width * .60f, Shape.FireSequence, phase * .36f + i * .19f,
+                    i % 3 == 0 ? 0xC34814 : 0x7C260E, .42f * fade, Layer.EmissiveCore, wake.Angle + across * .018f,
+                    emitter: "Blade.Wake-glow");
+            }
+        }
         if (pose is 1 or 2 && weapon is { } blade && (blade.Tip - blade.Hilt).LengthSquared() > 9)
         {
             Vector2 edge = blade.Tip - blade.Hilt;
@@ -165,6 +196,14 @@ internal static partial class SpellVfxBladeParticles
         float bodyFade = 1 - dissipation;
         float topY = feet.Y - 20 + (crown.Y - feet.Y + 20) * rise;
         float bottomY = feet.Y + 2 - dissipation * 57;
+        if (pose < 5)
+        {
+            float afterglow = 1 - Frame.Ease((progress - .5f) * 3);
+            frame.Sprite(torso, 42, 110, Shape.Wisp, 0x72AEFF, afterglow, Layer.EmissiveCore, emitter: "Blade.Body-glow");
+            frame.Sprite(torso, 24, 85, Shape.Wisp, 0xBEDFFF, afterglow, Layer.EmissiveCore, emitter: "Blade.Body-glow");
+            if (pose == 0)
+                Bolt(frame, head, crown, new Vector2(-3, 0), .66f * (1 - poseTime), 891, "Blade.Body-glow");
+        }
         if (pose < dischargePoses)
             BodyDischarge(frame, feet, torso, head, crown, bodyAxis[2], bodyFade, topY, bottomY);
 

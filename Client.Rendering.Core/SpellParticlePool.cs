@@ -48,6 +48,7 @@ public readonly record struct SpellParticle(Vector2 Origin, Vector2 Velocity, lo
 {
     [System.Text.Json.Serialization.JsonIgnore]
     public SpellEmitterPlayback? Emitter { get; init; }
+    public int CoveragePlane { get; init; }
 
     private float ModuleTime(float age) => Emitter?.StageProgress ?? age;
 

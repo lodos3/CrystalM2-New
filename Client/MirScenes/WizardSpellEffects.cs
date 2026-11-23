@@ -208,7 +208,7 @@ internal static partial class WizardSpellEffects
         if (spell is not (Spell.FireBall or Spell.GreatFireBall or Spell.FireBounce or Spell.MeteorShower or Spell.FrostCrunch)) return false;
         if (remaining <= 0) return true;
 
-        var frame = new Frame(pool, head, now, 1, size, (uint)spell, depthY: head.Y + fields.Read(tuning.DepthY));
+        var frame = new Frame(pool, head, now, .34f, size, (uint)spell, depthY: head.Y + fields.Read(tuning.DepthY));
         float angle = MathF.Atan2(heading.Y, heading.X);
         Vector2 side = new(-heading.Y, heading.X);
         bool frost = spell == Spell.FrostCrunch;
@@ -216,6 +216,7 @@ internal static partial class WizardSpellEffects
         int mantle = frost ? fields.Read(tuning.MantleColour) : spell == Spell.MeteorShower ? fields.Read(tuning.MantleColour2) : Gold;
         int core = frost ? IceWhite : Hot;
         float phase = frameIndex * fields.Read(tuning.Phase);
+        if (frost) frame.Clip(head, 22, 17, Shape.FireSequence, phase * .24f, Ice, .8f, Layer.EmissiveCore, angle);
 
         // The projectile core is made of individual directional flame tongues,
         // never a single 100px orb. Frost Crunch uses the same cold-fire flow.

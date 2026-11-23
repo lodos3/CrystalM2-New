@@ -69,7 +69,7 @@ foreach (Spell ward in new[] { Spell.SoulShield, Spell.BlessedArmour })
     Check(!formed.Any(p => p.Shape is SpellParticleShape.Halo or SpellParticleShape.Orb ||
         p.Shape == SpellParticleShape.SmokeSequence && p.Dimensions(0f, 1.28f).X > 32),
         $"Ward has an unwanted oval/background effect: {ward}");
-    Check(!formed.Any(p => p.Shape == SpellParticleShape.Wisp &&
+    Check(!formed.Any(p => p.CoveragePlane == 0 && p.Shape == SpellParticleShape.Wisp &&
         p.Dimensions(0f, 1.28f).X > 70), $"Ward has an oversized backdrop wisp: {ward}");
     Check(formed.Any(p => p.Shape == SpellParticleShape.FlameTongue && p.Emissive) &&
           burning.Any(p => p.Shape == SpellParticleShape.FlameTongue && p.Emissive),

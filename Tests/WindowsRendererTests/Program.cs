@@ -9,6 +9,11 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        if (args is ["--compare-spell-poses", var directory])
+        {
+            SpellPoseComparisons.Run(directory);
+            return;
+        }
         SpellVfxAssetChecks.Run();
         if (args is ["--spell-vfx-assets"]) return;
 

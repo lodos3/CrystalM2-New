@@ -229,7 +229,7 @@ internal static partial class TaoistSpellEffects
                     flame.Sample(age * fields.Read(tuning.Offset3)), alpha, fields.Read(tuning.UserFlameLayer2), -tilt, light: i % 6 == 0, emitter: "TaoistSpellEffects.Rituals.BurningWard.8");
                 frame.Sprite(root - Vector2.UnitY * (lift * fields.Read(tuning.FlameTongueOffset) + rise), size * fields.Read(tuning.FlameTongueWidth), lift, fields.Read(tuning.FlameTongueShape),
                     flame.Sample(age * fields.Read(tuning.Offset4)), fields.Read(tuning.FlameTongueAlpha) * alpha, fields.Read(tuning.FlameTongueLayer), tilt, emitter: "TaoistSpellEffects.Rituals.BurningWard.9");
-                if (armour && i % 4 == 0)
+                if (armour)
                     frame.Clip(root + new Vector2(tilt * fields.Read(tuning.X2), -lift * fields.Read(tuning.Y3)), size * fields.Read(tuning.FlameSequenceWidth), lift * fields.Read(tuning.FlameSequenceHeight),
                         fields.Read(tuning.FlameSequenceShape2), age + fields.Read(tuning.FlameSequencePhase), flame.Sample(age * fields.Read(tuning.Offset5)), fields.Read(tuning.FlameSequenceAlpha2) * alpha, fields.Read(tuning.FlameSequenceLayer2), tilt, emitter: "TaoistSpellEffects.Rituals.BurningWard.10");
                 if (i % 4 == 0)
@@ -300,6 +300,16 @@ internal static partial class TaoistSpellEffects
                     Vector2 ray = Vector2.Normalize(new Vector2(knot.X * (tuning.X + frame.Unit(seed + 28) * tuning.X2), -1));
                     float length = (tuning.Length + tuning.Length2 * frame.Unit(seed + 29)) * (tuning.Length3 + tuning.Length4 * surge);
                     float angle = MathF.Atan2(ray.Y, ray.X);
+                    Vector2 fan = new(-ray.Y, ray.X);
+                    for (int strand = -1; strand <= 1; strand += 2)
+                    {
+                        Vector2 end = root + ray * (length * (.60f + .35f * frame.Unit(seed + strand + 57))) +
+                            fan * (strand * (2 + 5 * pressure));
+                        frame.Thread(root, end, 1.2f, .24f, tuning.MistFilamentColour,
+                            flare * surge * .85f, Layer.EmissiveCore);
+                        frame.Sprite(Vector2.Lerp(root, end, .68f), 3, 3, tuning.SparkShape,
+                            Mint, flare * surge * .76f, Layer.EmissiveCore);
+                    }
                     frame.Sprite(root + ray * length * tuning.PillarOffset, tuning.PillarWidth + tuning.PillarWidth2 * pressure, length, tuning.PillarShape,
                         tuning.PillarColour, tuning.PillarAlpha * flare * surge, tuning.PillarLayer, angle + MathF.PI * tuning.PillarRotation, emitter: "TaoistSpellEffects.Rituals.CurseRune.7");
                     frame.Sprite(root + ray * length * tuning.MistFilamentOffset, length, tuning.MistFilamentHeight + tuning.MistFilamentHeight2 * pressure, tuning.MistFilamentShape, tuning.MistFilamentColour,

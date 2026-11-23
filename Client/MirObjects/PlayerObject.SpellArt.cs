@@ -27,14 +27,19 @@ public partial class PlayerObject
 
     private void ProcessBladeSpell()
     {
-        if (!Settings.Effect || Hidden || Dead ||
-            SpellVfxBladeFrames.Attack(Spell, CurrentAction) is not { } cue ||
+        if (!Settings.Effect || Hidden || Dead) return;
+        var map = GameScene.Scene.MapControl;
+        if (SpellVfxPoseMasks.IsWeaponSwing(Spell) && CurrentAction == MirAction.Attack1)
+        {
+            map.EmitBladeAttack(this, Spell, SpellVisualPhase.Swing, FrameIndex, FrameIndex / 6f);
+            return;
+        }
+        if (SpellVfxBladeFrames.Attack(Spell, CurrentAction) is not { } cue ||
             (uint)FrameIndex >= (uint)cue.FrameCount) return;
 
         float withinFrame = FrameInterval > 0
             ? 1 - Math.Clamp((NextMotion - CMain.Time) / (float)FrameInterval, 0, 1)
             : 0;
-        var map = GameScene.Scene.MapControl;
         map.EmitBladeAttack(this, Spell,
             CurrentAction == MirAction.Attack4 ? SpellVisualPhase.FollowThrough : SpellVisualPhase.Swing,
             FrameIndex, (FrameIndex + withinFrame) / cue.FrameCount);

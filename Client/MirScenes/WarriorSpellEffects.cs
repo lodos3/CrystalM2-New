@@ -59,6 +59,8 @@ internal static partial class WarriorSpellEffects
         float cycle = aura ? now % duration / (float)duration : progress;
         float strength = aura ? 1 : visual.Spell is Spell.BladeAvalanche or Spell.Entrapment or Spell.TwinDrakeBlade
             ? Envelope(progress, fields.Read(tuning.EnvelopeFadeStart), fields.Read(tuning.EnvelopeTail)) : Envelope(progress);
+        if (SpellVfxPoseMasks.DrawWarriorCast(new Frame(pool, feet, now, 1, size, seed), visual, feet, facing, progress))
+            strength *= visual.Spell == Spell.SlashingBurst ? .30f * Ease(progress * 6) : .30f;
         var frame = new Frame(pool, feet, now, strength, size, seed ^ (uint)visual.Spell * 34763);
 
         switch (visual.Phase)
@@ -95,7 +97,9 @@ internal static partial class WarriorSpellEffects
                 DrakeContact(frame, feet, progress, (now - start) / 1000f);
                 break;
             case Spell.BladeAvalanche when visual.Phase == SpellVisualPhase.Swing:
-                Avalanche(frame, feet, facing, progress);
+                SpellVfxPoseMasks.Draw(new Frame(pool, feet, now, 1, size, seed), Spell.BladeAvalanche,
+                    feet, SpellVfxPoseMasks.Facing(facing, 8), Math.Clamp((int)(progress * 15), 0, 14), .96f);
+                Avalanche(new Frame(pool, feet, now, strength * .19f, size, seed), feet, facing, progress);
                 break;
             case Spell.SlashingBurst when visual.Phase == SpellVisualPhase.Swing:
                 Burst(frame, feet, facing, progress);
@@ -199,6 +203,12 @@ internal static partial class WarriorSpellEffects
         // Small individual tongues form a hot wound-shaped contact zone.
         // No vertical pillars, static opaque fire blobs or floor discs.
         float durationFade = 1f - Ease((progress - tuning.DurationFade) / tuning.DurationFadeDivisor);
+        frame.Sprite(feet - Vector2.UnitY * 21, 46, 61, Shape.Wisp, 0xFF7C23, .84f * durationFade,
+            Layer.EmissiveCore, light: true);
+        frame.Clip(feet + new Vector2(-6, -6), 23, 20, Shape.FlameSequence, time * 2, 0xF98827,
+            .77f * durationFade, Layer.Ground, light: true);
+        frame.Clip(feet + new Vector2(4, -43), 17, 28, Shape.FlameSequence, time * 2 + .37f,
+            0xFFC558, .74f * durationFade, Layer.EmissiveCore);
         for (int i = 0; i < tuning.UserFlameCount; i++)
         {
             int seed = i * 29 + 71;
@@ -590,7 +600,7 @@ internal static partial class WarriorSpellEffects
             {
                 Vector2 foot = root + ProjectGround(side * (blade * (tuning.Foot + step * tuning.Foot2)) - heading * Math.Abs(blade) * tuning.Foot3);
                 float height = (tuning.Height + step * tuning.Height2 + frame.Unit(index * 3 + blade + 17) * tuning.Height3 - Math.Abs(blade) * tuning.Height4) * rise;
-                Vector2 tip = foot + ProjectGround(heading * (height * tuning.Tip)) - Vector2.UnitY * height;
+                Vector2 tip = foot - ProjectGround(heading * (height * tuning.Tip)) - Vector2.UnitY * height;
                 Vector2 edge = tip - foot;
                 float tilt = MathF.Atan2(edge.Y, edge.X) + MathF.PI / 2;
                 float span = edge.Length();

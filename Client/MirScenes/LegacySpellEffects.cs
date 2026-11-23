@@ -199,11 +199,12 @@ internal static class LegacySpellEffects
         effect.Add(pose.Tip, drift * fields.Read(tuning.FlashVelocity), fields.Read(tuning.FlashShape), fields.Read(tuning.FlashSize), life, fields.Read(tuning.FlashLayer), core: fields.Read(tuning.FlashCore), emitter: "LegacySpellEffects.WeaponSweep.3");
     }
 
-    internal static Vector2 ProjectileAnchor(Spell spell, Vector2 cell)
+    internal static Vector2 ProjectileAnchor(Spell spell, Vector2 cell, int direction = -1, int pose = 0)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
         var tuning = SpellVfxAssets.Current.Legacy.ProjectileAnchor;
         var fields = SpellVfxAssets.Fields("Legacy", "ProjectileAnchor");
+        cell += SpellVfxLegacyFrames.ProjectileOffset(spell, direction, pose);
         return spell switch
         {
             Spell.FireBall or Spell.GreatFireBall or Spell.FireBounce or Spell.MeteorShower or Spell.FrostCrunch => cell - new Vector2(0, fields.Read(tuning.FireBallY)),
@@ -221,10 +222,28 @@ internal static class LegacySpellEffects
     }
 
     internal static void ProjectileFrame(SpellParticlePool pool, Spell spell, Vector2 head, Vector2 heading,
-        long now, int frame, int remaining, bool leaveWake, float size = WizardSpellEffects.DefaultSize)
+        long now, int frame, int remaining, bool leaveWake, float size = WizardSpellEffects.DefaultSize, int direction = -1)
     {
         using var vfxScope = SpellVfxAssets.For(spell);
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.ProjectileFrame);
+        int poses = spell switch
+        {
+            Spell.FireBall or Spell.GreatFireBall or Spell.FireBounce or Spell.MeteorShower or Spell.CatTongue => 6,
+            Spell.FrostCrunch => 4,
+            Spell.SoulFireBall or Spell.MassHiding or Spell.SoulShield or Spell.BlessedArmour or Spell.Curse or
+                Spell.Hallucination or Spell.Plague or Spell.PoisonCloud => 3,
+            _ => 0
+        };
+        if (poses != 0)
+        {
+            if (remaining <= 0) return;
+            int facing = direction >= 0 ? direction : SpellVfxPoseMasks.Facing(heading, 16);
+            int height = poses == 3 ? 36 : spell == Spell.CatTongue ? 24 : 47;
+            Vector2 feet = head + new Vector2(0, height) - SpellVfxLegacyFrames.ProjectileOffset(spell, facing, frame);
+            var particles = new SpellParticleFrame(pool, feet, now, 1, size, (uint)frame, depthY: feet.Y);
+            SpellVfxPoseMasks.Draw(particles, spell, feet, facing, frame % poses, 1);
+            if (spell == Spell.CatTongue) return;
+        }
         if (WizardSpellEffects.DrawProjectile(pool, spell, head, heading, now, frame, remaining, leaveWake, size)) return;
         if (TaoistSpellEffects.DrawProjectile(pool, spell, head, heading, now, frame, remaining, leaveWake, size)) return;
         var look = Profile(spell);
@@ -239,7 +258,6 @@ internal static class LegacySpellEffects
             case Spell.DoubleShot:
             case Spell.NapalmShot:
             case Spell.ElementalShot:
-            case Spell.CatTongue:
                 effect.Add(head, Vector2.Zero, tuning.CatTongueBladeEdgeShape, look.Size, remaining, tuning.CatTongueBladeEdgeLayer,
                     aspect: tuning.CatTongueBladeEdgeAspect, rotation: angle, core: tuning.CatTongueBladeEdgeCore, emitter: "LegacySpellEffects.ProjectileFrame.1");
                 break;

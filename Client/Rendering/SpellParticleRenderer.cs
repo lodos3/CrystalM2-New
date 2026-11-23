@@ -15,6 +15,22 @@ internal sealed class SpellParticleRenderer
 {
     private readonly RendererDevice _device;
     private readonly Texture _atlas;
+    private readonly Dictionary<int, Texture> _posePages = new();
+
+    private Texture PosePage(int index)
+    {
+        if (_posePages.TryGetValue(index, out var texture)) return texture;
+        texture = Texture.CreateCoverageAtlas(_device, SpellPoseAtlas.PageSize, SpellPoseAtlas.PageSize, 1);
+        try
+        {
+            var upload = texture.BeginUpload();
+            upload.Data.Write(SpellPoseAtlas.GetPage(index));
+            texture.EndUpload();
+            _posePages.Add(index, texture);
+            return texture;
+        }
+        catch { texture.Dispose(); throw; }
+    }
 
     public SpellParticleRenderer(RendererDevice device)
     {
@@ -184,6 +200,13 @@ internal sealed class SpellParticleRenderer
                     ribbonMode = desiredRibbonMode;
                 }
                 var source = SpellParticleAtlas.Part(particle.Shape, particle.Direction, particle.AnimationFrame(age));
+                Texture atlas = _atlas;
+                if (particle.CoveragePlane != 0)
+                {
+                    var plane = SpellPoseAtlas.GetPlane(particle.CoveragePlane);
+                    source = plane.Source;
+                    atlas = PosePage(plane.Page);
+                }
                 float depth = occlusion != null && !ground && !emission && !particle.AlwaysOnTop &&
                     (particle.DepthY.HasValue || particle.Motion.HasValue)
                     ? Math.Max(1, MathF.Floor(particle.DepthAt(now) / cellHeight) - depthOrigin)
@@ -199,7 +222,7 @@ internal sealed class SpellParticleRenderer
                         source.X += start;
                         source.Width = end - start;
                     }
-                    _device.Sprite.DrawQuad(_atlas, source, ribbon.Scaled(ribbonScale), point, tint, depth);
+                    _device.Sprite.DrawQuad(atlas, source, ribbon.Scaled(ribbonScale), point, tint, depth);
                 }
                 else if (particle.Emitter?.Settings.RenderMode is SpellEmitterRenderMode.QuadMesh or SpellEmitterRenderMode.TriangleMesh)
                 {
@@ -208,10 +231,10 @@ internal sealed class SpellParticleRenderer
                     bool triangle = particle.Emitter.Settings.RenderMode == SpellEmitterRenderMode.TriangleMesh;
                     var mesh = new SpriteQuad(triangle ? -down : -right - down, triangle ? -down : right - down,
                         -right + down, right + down);
-                    _device.Sprite.DrawQuad(_atlas, source, mesh, point, tint, depth);
+                    _device.Sprite.DrawQuad(atlas, source, mesh, point, tint, depth);
                 }
                 else
-                    _device.Sprite.DrawRotated(_atlas, source, point, size, angle, tint, depth);
+                    _device.Sprite.DrawRotated(atlas, source, point, size, angle, tint, depth);
             }
         }
     }

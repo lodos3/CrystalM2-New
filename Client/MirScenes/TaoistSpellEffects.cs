@@ -72,6 +72,18 @@ internal static partial class TaoistSpellEffects
         uint artSeed = seed ^ (uint)visual.Spell * 0x2d5bu;
         bool isRune = visual.Spell is Spell.SoulShield or Spell.BlessedArmour or Spell.Curse;
         ushort opacityNoiseSeed = isRune ? (ushort)(1 + ((artSeed ^ (uint)start * 0x9e3779b9u) & 1023)) : (ushort)0;
+        if (isRune && visual.Phase == SpellVisualPhase.Impact)
+        {
+            var brush = new Frame(pool, feet, now, 1, size, artSeed, field, alwaysOnTop: true,
+                opacityNoiseSeed: opacityNoiseSeed);
+            var (sequence, count) = visual.Spell switch
+            {
+                Spell.SoulShield => ("SoulShieldWard", 15),
+                Spell.BlessedArmour => ("BlessedArmourWard", 15),
+                _ => ("CurseRune", 24)
+            };
+            SpellVfxPoseMasks.Draw(brush, sequence, feet, 0, (int)(progress * count), .9f);
+        }
         var frame = new Frame(pool, feet, now, strength, size, artSeed, field,
             alwaysOnTop: isRune, opacityNoiseSeed: opacityNoiseSeed);
         if (visual.Phase == SpellVisualPhase.Expire)
@@ -122,7 +134,7 @@ internal static partial class TaoistSpellEffects
         if (spell is not (Spell.SoulFireBall or Spell.MassHiding or Spell.SoulShield or Spell.BlessedArmour or
             Spell.Curse or Spell.Hallucination or Spell.Plague or Spell.PoisonCloud)) return false;
         if (remaining <= 0) return true;
-        var frame = new Frame(pool, head, now, 1, size, (uint)(spell.GetHashCode() * 719 + frameIndex), depthY: head.Y + fields.Read(tuning.DepthY));
+        var frame = new Frame(pool, head, now, .25f, size, (uint)(spell.GetHashCode() * 719 + frameIndex), depthY: head.Y + fields.Read(tuning.DepthY));
         Vector2 side = new(-heading.Y, heading.X);
         float angle = MathF.Atan2(heading.Y, heading.X) + MathF.Sin(frameIndex * fields.Read(tuning.Angle)) * fields.Read(tuning.Angle2);
         int accent = spell switch

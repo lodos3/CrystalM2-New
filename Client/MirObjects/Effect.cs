@@ -276,7 +276,8 @@ namespace Client.MirObjects
             CurrentFrame = timing.Frame(CMain.Time);
             bool wake = CMain.Time >= _nextTrailTime;
             if (wake) _nextTrailTime = CMain.Time + wakeInterval;
-            map.EmitProjectileFrame(Art.Visual.Spell, Source, Destination, timing, wake);
+            map.EmitProjectileFrame(Art.Visual.Spell, Source, Destination, timing, Direction,
+                CurrentFrame % Math.Max(1, FrameCount), wake);
         }
 
         public override void Remove()

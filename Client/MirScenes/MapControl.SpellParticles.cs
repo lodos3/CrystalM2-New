@@ -138,13 +138,20 @@ public sealed partial class MapControl
     {
         if (!CanEmitSpellParticles(actor.CurrentLocation)) return;
         Vector2 feet = AuthoredEffectFeet(actor);
+        if (SpellVfxPoseMasks.IsWeaponSwing(spell))
+        {
+            var frame = new SpellParticleFrame(_spellParticles, feet, CMain.Time, 1, SpellParticleSize, actor.ObjectID, depthY: feet.Y);
+            SpellVfxPoseMasks.Draw(frame, spell, feet, (int)actor.Direction, pose);
+            TextureValid = false;
+            return;
+        }
         WeaponMaskTrace? weapon = null;
         if (spell == Spell.FlamingSword && pose is 1 or 2 && actor.WeaponTraceAt(pose) is { } trace)
         {
             Vector2 offset = feet - new Vector2(actor.DrawLocation.X + CellWidth / 2, actor.DrawLocation.Y + CellHeight / 2);
             weapon = new WeaponMaskTrace(trace.Hilt + offset, trace.Tip + offset);
         }
-        SpellVfxBladeParticles.Draw(_spellParticles, spell, phase, feet, actor.Direction, pose,
+        SpellVfxBladeParticles.DrawAttack(_spellParticles, spell, phase, feet, actor.Direction, pose,
             progress, CMain.Time, SpellParticleSize, actor.ObjectID, weapon);
         TextureValid = false;
     }
@@ -188,9 +195,12 @@ public sealed partial class MapControl
             if (elapsed >= 0 && elapsed < duration)
             {
                 var cue = visual.Phase == SpellVisualPhase.Prepare ? SpellVfxBladeFrames.DrakePrepare : SpellVfxBladeFrames.DrakeStun;
+                var mask = new SpellParticleFrame(_spellParticles, feet, CMain.Time, 1, SpellParticleSize, seed, depthY: feet.Y);
+                SpellVfxPoseMasks.Draw(mask, visual.Phase == SpellVisualPhase.Prepare ? "DrakePrepare" : "DrakeStun",
+                    feet, 0, cue.FrameAt(elapsed), 1);
                 SpellVfxBladeParticles.Draw(_spellParticles, visual.Spell, visual.Phase, feet,
                     actor?.Direction ?? effect.ParticleDirection, cue.FrameAt(elapsed),
-                    elapsed / (float)duration, CMain.Time, SpellParticleSize, seed);
+                    elapsed / (float)duration, CMain.Time, SpellParticleSize, seed, detailStrength: .38f);
                 TextureValid = false;
             }
             return;
@@ -278,7 +288,8 @@ public sealed partial class MapControl
         EmitLegacy(visual, location);
     }
 
-    internal void EmitProjectileFrame(Spell spell, Point source, Point destination, LegacyProjectileTimeline timing, bool wake)
+    internal void EmitProjectileFrame(Spell spell, Point source, Point destination, LegacyProjectileTimeline timing,
+        int direction, int pose, bool wake)
     {
         float progress = timing.Progress(CMain.Time);
         Point cell = new((int)MathF.Round(source.X + (destination.X - source.X) * progress),
@@ -288,9 +299,9 @@ public sealed partial class MapControl
         Vector2 origin = SpellWorldPoint(source);
         Vector2 target = SpellWorldPoint(destination);
         Vector2 heading = target == origin ? Vector2.UnitX : Vector2.Normalize(target - origin);
-        Vector2 head = LegacySpellEffects.ProjectileAnchor(spell, Vector2.Lerp(origin, target, progress));
-        LegacySpellEffects.ProjectileFrame(_spellParticles, spell, head, heading, CMain.Time, timing.Frame(CMain.Time),
-            (int)(timing.Impact - CMain.Time), wake, SpellParticleSize);
+        Vector2 head = LegacySpellEffects.ProjectileAnchor(spell, Vector2.Lerp(origin, target, progress), direction, pose);
+        LegacySpellEffects.ProjectileFrame(_spellParticles, spell, head, heading, CMain.Time, pose,
+            (int)(timing.Impact - CMain.Time), wake, SpellParticleSize, direction);
         TextureValid = false;
     }
 
@@ -303,7 +314,8 @@ public sealed partial class MapControl
         worldPose = new WeaponMaskTrace(screenPose.Hilt - offset, screenPose.Tip - offset);
         Vector2 feet = new Vector2(screenFeet.X, screenFeet.Y) - offset;
         LegacySpellEffects.WeaponSweep(_spellParticles, spell, worldPose, previousWorld, CMain.Time, remaining, frameInterval,
-            Facing(direction), progress, feet, previousProgress, followThrough, motionOnly: SpellVfxBladeFrames.Supports(spell));
+            Facing(direction), progress, feet, previousProgress, followThrough,
+            motionOnly: SpellVfxBladeFrames.Supports(spell) || SpellVfxPoseMasks.IsWeaponSwing(spell));
         TextureValid = false;
     }
 

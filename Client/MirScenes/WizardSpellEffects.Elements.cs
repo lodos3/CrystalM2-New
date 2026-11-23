@@ -88,6 +88,8 @@ internal static partial class WizardSpellEffects
         // Individually animated pockets of combustion; no oversized fire card.
         float radius = diameter * (tuning.Radius + tuning.Radius2 * Ease(progress * tuning.Radius3));
         float fade = 1f - Ease((progress - tuning.Fade) / tuning.FadeDivisor);
+        frame.Sprite(centre, diameter * .54f, diameter * .48f, Shape.Wisp, 0xFF902D, fade,
+            Layer.EmissiveCore, light: true);
         float time = progress * (fierce ? tuning.Time : tuning.Time2);
         int count = fierce ? tuning.Count : tuning.Count2;
         for (int i = 0; i < count; i++)
@@ -122,6 +124,7 @@ internal static partial class WizardSpellEffects
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Wizard.SearingImpact);
         float open = tuning.Open + tuning.Open2 * Ease(progress * tuning.Open3);
         float heat = 1f - Ease((progress - tuning.Heat) / tuning.HeatDivisor);
+        frame.Sprite(centre, 49, 43, Shape.Wisp, accent, heat, Layer.EmissiveCore, light: true);
         for (int i = 0; i < tuning.UserFlameCount; i++)
         {
             int seed = i * 41 + 107;
