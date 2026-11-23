@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Numerics;
+using Client.MirScenes;
 using Client.Rendering;
 using CrystalM2.Rendering.Core;
 using Vortice.Direct3D;
@@ -31,20 +32,18 @@ internal sealed class PreviewViewport : IDisposable
     }
 
     public void Render(PreviewStage? stage, int time, MirDirection direction, bool glow, bool guide,
-        bool referenceVisible, LightSetting ambient)
+        bool referenceVisible, LightSetting ambient, bool weaponImbue = false, bool weaponTrail = false)
     {
         if (!_panel.IsHandleCreated || _panel.Width <= 1 || _panel.Height <= 1) return;
         var device = Device();
         Vector2 centre = new(_width * .5f, _height * .62f);
         float angle = ((int)direction - 2) * MathF.PI / 4;
         Vector2 facing = Vector2.Normalize(new Vector2(MathF.Cos(angle), MathF.Sin(angle) * .68f));
-        var rig = new PreviewRig(centre, facing, direction);
+        var rig = new PreviewRig(centre, facing, direction) { WeaponImbue = weaponImbue, WeaponTrail = weaponTrail };
         var reference = referenceVisible ? _reference : null;
-        if (reference != null)
-        {
-            reference.Gather(device, rig, stage, time);
-            rig = reference.WithWeapon(device, rig, stage?.ActorAction ?? MirAction.Standing);
-        }
+        reference?.Gather(device, rig, stage, time);
+        if (reference != null || weaponImbue || weaponTrail || stage?.BladePose is { Library: BladeSpriteLibrary.Magic })
+            rig = _reference?.WithWeapon(device, rig, stage?.ActorAction ?? MirAction.Standing) ?? rig;
 
         _pool.Clear();
         stage?.Sample(_pool, rig, time);

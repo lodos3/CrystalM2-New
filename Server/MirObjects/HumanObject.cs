@@ -6914,7 +6914,8 @@ namespace Server.MirObjects
             if (dealt <= 0) return;
             if (userMagic != null)
             {
-                BroadcastWeaponSpellImpact(target, userMagic.Spell);
+                if (userMagic.Spell is not (Spell.FlamingSword or Spell.TwinDrakeBlade))
+                    BroadcastWeaponSpellImpact(target, userMagic.Spell);
                 ApplyLandedSpellPerks(userMagic, target, dealt, defence, finalHit);
             }
 
@@ -8612,7 +8613,7 @@ namespace Server.MirObjects
                     magic.CastTime = Envir.Time;
                     Enqueue(new S.MagicCast { Spell = spell });
                     Enqueue(new S.SpellToggle { ObjectID = ObjectID, Spell = spell, CanUse = true });
-                    BroadcastLegacyImpact(spell, CurrentLocation);
+                    CurrentMap.Broadcast(new S.ObjectEffect { ObjectID = ObjectID, Effect = SpellEffect.TwinDrakeBladePrepare }, CurrentLocation);
                     break;
                 case Spell.FlamingSword:
                     if (FlamingSword || Envir.Time < FlamingSwordTime) return;

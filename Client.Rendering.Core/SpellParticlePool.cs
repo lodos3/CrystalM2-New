@@ -13,7 +13,7 @@ public enum SpellParticleShape
     FlameSequence, FireSequence, SmokeSequence, BladeRibbon,
     WarriorCrescent, WarriorTripleCut, WarriorSpark, WarriorDust, WarriorRing, WarriorImpact, MoonRibbon, WindRibbon,
     SoulGlyph, ArmourGlyph, CurseGlyph, Trigrams, YinYang, SpiritFigure,
-    UserFlame, UserLightning, UserEmber, UserSlash, UserRock, MistFilament, IonCorona
+    UserFlame, UserLightning, UserEmber, UserSlash, UserRock, MistFilament, IonCorona, DirectionalSweep
 }
 
 public enum SpellParticleLayer : byte { Legacy, Ground, World, Emissive, EmissiveCore, Smoke, Glow, Floor }
@@ -44,7 +44,7 @@ public readonly record struct SpellParticle(Vector2 Origin, Vector2 Velocity, lo
     float Growth = 0, SpellParticleLayer Layer = SpellParticleLayer.Legacy, bool Linear = false, bool CastsLight = true,
     bool FrameOnly = false, uint FieldObjectID = 0, byte Frame = 0, SpriteQuad? Ribbon = null, float? DepthY = null,
     bool AlwaysOnTop = false, SpellParticleMotion? Motion = null, SpellParticleImpact? Impact = null, float LightEnergy = 1,
-    SpellParticleColourCurve? ColourCurve = null, float ColourCurveFullSpeed = 0, ushort OpacityNoiseSeed = 0)
+    SpellParticleColourCurve? ColourCurve = null, float ColourCurveFullSpeed = 0, ushort OpacityNoiseSeed = 0, Vector2? RibbonTextureU = null)
 {
     [System.Text.Json.Serialization.JsonIgnore]
     public SpellEmitterPlayback? Emitter { get; init; }
@@ -170,6 +170,7 @@ public sealed class SpellParticlePool
         _pending = new SpellParticle[Math.Max(1, capacity / 2)];
     }
 
+    public int Capacity => _items.Length;
     public ReadOnlySpan<SpellParticle> Active => _items.AsSpan(0, _count);
 
     public int CountEmitter(string id, int spell)
@@ -384,6 +385,11 @@ public static class SpellParticleAtlas
             ReadSmallMask(emberSlashRock, coverage, Part(SpellParticleShape.UserSlash));
             ReadSmallMask(emberSlashRock, coverage, Part(SpellParticleShape.UserRock));
             if (emberSlashRock.ReadByte() != -1) throw new InvalidDataException("Unexpected data after Ember/Slash/Rock masks.");
+        }
+        using (var sweep = ReadPack("CrystalM2.DirectionalSweep"))
+        {
+            ReadMask(sweep, coverage, Part(SpellParticleShape.DirectionalSweep));
+            if (sweep.ReadByte() != -1) throw new InvalidDataException("Unexpected data after the directional sweep mask.");
         }
         return coverage;
 

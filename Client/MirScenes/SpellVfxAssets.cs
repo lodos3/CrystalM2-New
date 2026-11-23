@@ -331,9 +331,17 @@ public static partial class SpellVfxAssets
         return data;
     }
 
+    private static SpellVfxData.WarriorNodes DecodeWarrior(JsonObject nodes)
+    {
+        var warrior = Decode<SpellVfxData.WarriorNodes>(nodes);
+        if (warrior.BladeMotion == null) throw new InvalidDataException("Missing Warrior.BladeMotion.");
+        warrior.BladeMotion.Validate();
+        return warrior;
+    }
+
     private static SpellVfxData DecodeGroup(SpellVfxData data, string group, JsonObject nodes) => group switch
     {
-        "Warrior" => data with { Warrior = Decode<SpellVfxData.WarriorNodes>(nodes) },
+        "Warrior" => data with { Warrior = DecodeWarrior(nodes) },
         "Wizard" => data with { Wizard = Decode<SpellVfxData.WizardNodes>(nodes) },
         "Taoist" => data with { Taoist = Decode<SpellVfxData.TaoistNodes>(nodes) },
         "Signature" => data with { Signature = Decode<SpellVfxData.SignatureNodes>(nodes) },

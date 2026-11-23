@@ -4837,9 +4837,13 @@ namespace Client.MirScenes
                     case SpellEffect.RedMoonEvil:
                         ob.Effects.Add(new Effect(Libraries.Monsters[(ushort)Monster.RedMoonEvil], 32, 6, 400, ob) { Blend = false });
                         break;
+                    case SpellEffect.TwinDrakeBladePrepare:
+                        var prepare = SpellVfxBladeFrames.DrakePrepare;
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.TwinDrakeBlade, SpellVisualPhase.Prepare), prepare.Duration, ob));
+                        break;
                     case SpellEffect.TwinDrakeBlade:
-                        ob.Effects.Add(new Effect(new SpellVisual(Spell.TwinDrakeBlade),
-                            SpellVfxAssets.CueDuration(Spell.TwinDrakeBlade, static cue => cue.TwinDrakeBladeImpactDurationMs), ob));
+                        var stun = SpellVfxBladeFrames.DrakeStun;
+                        ob.Effects.Add(new Effect(new SpellVisual(Spell.TwinDrakeBlade, SpellVisualPhase.Hit), stun.Duration, ob));
                         break;
                     case SpellEffect.MPEater:
                         if (MapControl.Objects.TryGetValue(p.EffectType, out var ob2))
@@ -5189,15 +5193,12 @@ namespace Client.MirScenes
                     break;
                 case Spell.TwinDrakeBlade:
                     actor.TwinDrakeBlade = p.CanUse;
-                    if (p.CanUse)
-                        MapControl.EmitLegacy(new SpellVisual(Spell.TwinDrakeBlade, SpellVisualPhase.Prepare), actor);
                     break;
                 case Spell.FlamingSword:
                     actor.FlamingSword = p.CanUse;
                     if (actor.FlamingSword)
                     {
                         if (actor.GetMagic(p.Spell) is { } magic) magic.CastTime = CMain.Time;
-                        MapControl.EmitLegacy(new SpellVisual(Spell.FlamingSword, SpellVisualPhase.Prepare), actor);
                         ChatDialog.ReceiveChat(prefix + GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.WeaponSpiritFire), ChatType.Hint);
                     }
                     else

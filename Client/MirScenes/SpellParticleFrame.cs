@@ -135,6 +135,16 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
             AlwaysOnTop: alwaysOnTop, OpacityNoiseSeed: opacityNoiseSeed));
     }
 
+    internal void TexturedRibbon(SpriteQuad edges, Vector2 textureU, Shape shape, int colour, float alpha, string emitter)
+    {
+        var (a, b, c, d) = edges;
+        var centre = Place((a + b + c + d) * .25f);
+        var ribbon = new SpriteQuad(Place(a) - centre, Place(b) - centre, Place(c) - centre, Place(d) - centre);
+        SpellVfxAssets.Emit(pool, new SpellParticle(centre, Vector2.Zero, now, 50, 1,
+            Tint(colour, alpha * strength), shape, 0, Layer: Layer.Emissive, CastsLight: false,
+            FrameOnly: true, Ribbon: ribbon, DepthY: depthY ?? pivot.Y, RibbonTextureU: textureU), emitter);
+    }
+
     internal void Orbit(Vector2 centre, float x, float y, float angle, float sweep, int colour, float width, float alpha, string emitter = null)
     {
         using var emitterScope = SpellVfxAssets.UseEmitter(emitter);

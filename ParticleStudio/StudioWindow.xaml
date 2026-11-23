@@ -138,7 +138,7 @@
                     <StackPanel Margin="12,10">
                         <TextBlock x:Name="PreviewTitle" Text="Preview" FontSize="17" FontWeight="SemiBold" />
                         <WrapPanel Margin="0,9,0,0" VerticalAlignment="Center">
-                            <ComboBox x:Name="StagePicker" Width="150" Margin="0,0,8,4" SelectionChanged="StageChanged"
+                            <ComboBox x:Name="StagePicker" Width="182" Margin="0,0,8,4" SelectionChanged="StageChanged"
                                       AutomationProperties.Name="Spell stage" />
                             <ComboBox x:Name="DirectionPicker" Width="110" Margin="0,0,9,4" SelectionChanged="ViewChanged"
                                       AutomationProperties.Name="Facing direction" />
@@ -155,6 +155,12 @@
                             <CheckBox x:Name="ReferenceVisible" Content="Reference scene" IsChecked="True"
                                       Checked="ViewChanged" Unchecked="ViewChanged" />
                         </WrapPanel>
+                        <WrapPanel x:Name="BladeExtras" Margin="0,7,0,0" Visibility="Collapsed">
+                            <CheckBox x:Name="WeaponImbue" Content="Weapon imbue" Margin="0,0,12,0"
+                                      Checked="ViewChanged" Unchecked="ViewChanged" ToolTip="Preview the optional weapon coating." />
+                            <CheckBox x:Name="WeaponTrail" Content="Weapon trail" Checked="ViewChanged" Unchecked="ViewChanged"
+                                      ToolTip="Preview an optional trail traced from the equipped weapon frames." />
+                        </WrapPanel>
                         <TextBlock x:Name="ReferenceText" Foreground="{StaticResource Muted}" Margin="0,6,0,0"
                                    TextTrimming="CharacterEllipsis" />
                     </StackPanel>
@@ -167,8 +173,8 @@
                         </DockPanel>
                         <WrapPanel Margin="0,7,0,0">
                             <Button x:Name="PlayButton" Content="Play  F1" Click="Play" />
-                            <Button Content="−16 ms" Click="StepBack" ToolTip="Step back one 16 ms sample" />
-                            <Button Content="+16 ms" Click="StepForward" ToolTip="Step forward one 16 ms sample" />
+                            <Button x:Name="PreviousFrame" Content="−16 ms" Click="StepBack" />
+                            <Button x:Name="NextFrame" Content="+16 ms" Click="StepForward" />
                             <CheckBox x:Name="Loop" Content="Loop" Margin="5,0,0,0" />
                         </WrapPanel>
                     </StackPanel>

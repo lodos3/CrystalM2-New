@@ -134,20 +134,67 @@ public sealed partial class MapControl
         return feet;
     }
 
+    internal void EmitBladeAttack(PlayerObject actor, Spell spell, SpellVisualPhase phase, int pose, float progress)
+    {
+        if (!CanEmitSpellParticles(actor.CurrentLocation)) return;
+        Vector2 feet = AuthoredEffectFeet(actor);
+        WeaponMaskTrace? weapon = null;
+        if (spell == Spell.FlamingSword && pose is 1 or 2 && actor.WeaponTraceAt(pose) is { } trace)
+        {
+            Vector2 offset = feet - new Vector2(actor.DrawLocation.X + CellWidth / 2, actor.DrawLocation.Y + CellHeight / 2);
+            weapon = new WeaponMaskTrace(trace.Hilt + offset, trace.Tip + offset);
+        }
+        SpellVfxBladeParticles.Draw(_spellParticles, spell, phase, feet, actor.Direction, pose,
+            progress, CMain.Time, SpellParticleSize, actor.ObjectID, weapon);
+        TextureValid = false;
+    }
+
+    internal void EmitFlamingSwordMotion(PlayerObject actor, int elapsed, int interval, ref int lastElapsed)
+    {
+        if (!CanEmitSpellParticles(actor.CurrentLocation)) return;
+        Vector2 feet = AuthoredEffectFeet(actor);
+        Vector2 offset = feet - new Vector2(actor.DrawLocation.X + CellWidth / 2, actor.DrawLocation.Y + CellHeight / 2);
+        SpellVfxBladeParticles.EmitFlameMotion(_spellParticles, feet, Facing(actor.Direction), actor.Direction,
+            WeaponAt, CMain.Time, elapsed, interval, ref lastElapsed, SpellParticleSize, actor.ObjectID);
+        return;
+
+        WeaponMaskTrace? WeaponAt(int pose) => actor.WeaponTraceAt(pose) is { } trace
+            ? new WeaponMaskTrace(trace.Hilt + offset, trace.Tip + offset)
+            : null;
+    }
+
+    private static Vector2 AuthoredEffectFeet(MapObject actor)
+    {
+        Vector2 feet = SpellActorFeet(actor);
+        if (SpellOffsetLinked && GraphicsTuning.Offset(GraphicsTuning.Layer(actor.Race)).Linked)
+        {
+            Point offset = GraphicsTuning.GroupOffset.Pixels;
+            feet -= new Vector2(offset.X, offset.Y);
+        }
+        return feet;
+    }
+
     internal void EmitAuthoredSpellFrame(SpellVisual visual, Effect effect, long start, int duration)
     {
         MapObject actor = effect.Owner;
         if (actor is PlayerObject { Class: MirClass.Warrior } && WarriorSpellEffects.UsesBodyMask(visual.Spell)) return;
         Point cell = actor?.CurrentLocation ?? effect.Source;
         if (!CanEmitSpellParticles(cell)) return;
-        Vector2 feet = actor != null ? SpellActorFeet(actor) : SpellWorldPoint(cell) + new Vector2(effect.DrawOffset.X, effect.DrawOffset.Y);
-        if (actor != null && SpellOffsetLinked && GraphicsTuning.Offset(GraphicsTuning.Layer(actor.Race)).Linked)
-        {
-            // The shared offset is applied to the particle pass, so keep just one copy of it.
-            Point linked = GraphicsTuning.GroupOffset.Pixels;
-            feet -= new Vector2(linked.X, linked.Y);
-        }
+        Vector2 feet = actor != null ? AuthoredEffectFeet(actor) : SpellWorldPoint(cell) + new Vector2(effect.DrawOffset.X, effect.DrawOffset.Y);
         uint seed = actor?.ObjectID ?? CellSeed(cell);
+        if (visual is { Spell: Spell.TwinDrakeBlade, Phase: SpellVisualPhase.Prepare or SpellVisualPhase.Hit })
+        {
+            int elapsed = (int)(CMain.Time - start);
+            if (elapsed >= 0 && elapsed < duration)
+            {
+                var cue = visual.Phase == SpellVisualPhase.Prepare ? SpellVfxBladeFrames.DrakePrepare : SpellVfxBladeFrames.DrakeStun;
+                SpellVfxBladeParticles.Draw(_spellParticles, visual.Spell, visual.Phase, feet,
+                    actor?.Direction ?? effect.ParticleDirection, cue.FrameAt(elapsed),
+                    elapsed / (float)duration, CMain.Time, SpellParticleSize, seed);
+                TextureValid = false;
+            }
+            return;
+        }
         if (!effect.Repeat && !effect.ImpactDebrisStarted && CMain.Time >= start)
         {
             effect.ImpactDebrisStarted = true;
@@ -191,6 +238,8 @@ public sealed partial class MapControl
 
     internal void EmitSpellImpact(Spell spell, Point location)
     {
+        if (SpellVfxBladeFrames.Supports(spell)) return;
+
         // Protective wards and Curse share the same single, aim-anchored
         // impact path. Buffs/debuffs are applied individually server-side,
         // but their rune animations must never attach to each recipient.
@@ -226,27 +275,6 @@ public sealed partial class MapControl
         // These spells already show the complete field at the cast location. The hit packets
         // confirm contacts elsewhere in that field and only need a small accent on each target.
         var visual = new SpellVisual(spell, LegacySpellEffects.ImpactPhase(spell));
-        if (spell == Spell.FlamingSword && CanEmitSpellParticles(location) &&
-            M2CellInfo[location.X, location.Y].CellObjects is { } occupants)
-        {
-            MapObject target = null;
-            foreach (MapObject actor in occupants)
-            {
-                if (actor.CurrentLocation != location || actor.Race is not (ObjectType.Player or ObjectType.Hero or ObjectType.Monster))
-                    continue;
-                if (target != null)
-                {
-                    target = null;
-                    break;
-                }
-                target = actor;
-            }
-            if (target != null)
-            {
-                EmitLegacy(visual, target);
-                return;
-            }
-        }
         EmitLegacy(visual, location);
     }
 
@@ -275,7 +303,7 @@ public sealed partial class MapControl
         worldPose = new WeaponMaskTrace(screenPose.Hilt - offset, screenPose.Tip - offset);
         Vector2 feet = new Vector2(screenFeet.X, screenFeet.Y) - offset;
         LegacySpellEffects.WeaponSweep(_spellParticles, spell, worldPose, previousWorld, CMain.Time, remaining, frameInterval,
-            Facing(direction), progress, feet, previousProgress, followThrough);
+            Facing(direction), progress, feet, previousProgress, followThrough, motionOnly: SpellVfxBladeFrames.Supports(spell));
         TextureValid = false;
     }
 

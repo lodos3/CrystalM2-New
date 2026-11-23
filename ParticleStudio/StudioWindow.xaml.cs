@@ -126,6 +126,8 @@ public partial class StudioWindow : Window
         SpellVfxAssets.PreviewSpell(_folder, entry.Spell, draft.Working);
         _spell = entry;
         PreviewTitle.Text = entry.Name;
+        bool blade = SpellVfxBladeFrames.Supports(entry.Spell);
+        BladeExtras.Visibility = blade ? Visibility.Visible : Visibility.Collapsed;
         RebuildStages();
         Status.Text = _sequence?.Stages.Count > 0
             ? $"{entry.Class} · {entry.Source} · Press F1 to play"
@@ -167,7 +169,9 @@ public partial class StudioWindow : Window
     {
         if (_sequence == null) return [];
         int index = StagePicker.SelectedIndex - 1;
-        return index >= 0 && index < _sequence.Stages.Count ? [_sequence.Stages[index]] : _sequence.Stages;
+        return index >= 0 && index < _sequence.Stages.Count
+            ? [_sequence.Stages[index]]
+            : _sequence.Stages.Where(stage => stage.InFullSequence);
     }
 
     private void SetRange(int value)
@@ -179,6 +183,9 @@ public partial class StudioWindow : Window
             Timeline.Value = Math.Min(value, Timeline.Maximum);
         }
         finally { _settingTime = false; }
+        bool spriteFrames = SelectedStages().Any(stage => stage.BladePose.HasValue);
+        PreviousFrame.Content = spriteFrames ? "Previous frame" : "−16 ms";
+        NextFrame.Content = spriteFrames ? "Next frame" : "+16 ms";
         UpdateClock();
     }
 
@@ -195,7 +202,8 @@ public partial class StudioWindow : Window
             var direction = DirectionPicker.SelectedItem is MirDirection selected ? selected : MirDirection.Right;
             float angle = ((int)direction - 2) * MathF.PI / 4;
             var facing = Vector2.Normalize(new Vector2(MathF.Cos(angle), MathF.Sin(angle) * .68f));
-            var rig = new PreviewRig(new Vector2(300, 280), facing, direction);
+            var samplePose = new PreviewRig(new Vector2(300, 280), facing, direction);
+            var rig = samplePose with { WeaponImbue = PreviewImbue, WeaponTrail = PreviewTrail, ReferenceWeapon = progress => samplePose.Weapon(progress) };
             foreach (var stage in SelectedStages())
             foreach (float fraction in new[] { 0f, .08f, .2f, .33f, .5f, .67f, .8f, .92f, .99f })
             {
@@ -208,7 +216,13 @@ public partial class StudioWindow : Window
         var items = _emitters.Select(item =>
         {
             var particle = item.Value.Particle;
-            string name = $"{particle.Shape} · {particle.Layer}";
+            string name = item.Key switch
+            {
+                "Blade.Sweep-filaments" => "Sweep sheet",
+                "Blade.Sweep-soft-edge" => "Sweep feather",
+                _ when item.Key.StartsWith("Blade.", StringComparison.Ordinal) => item.Key["Blade.".Length..].Replace('-', ' '),
+                _ => $"{particle.Shape} · {particle.Layer}"
+            };
             int number = names.GetValueOrDefault(name) + 1;
             names[name] = number;
             return new LayerChoice(item.Key, number == 1 ? name : $"{name} {number}");
@@ -232,7 +246,10 @@ public partial class StudioWindow : Window
             EmitterModules.Children.Clear();
             EmitterModules.Children.Add(new TextBlock
             {
-                Text = "No particle layers were emitted in this stage.", TextWrapping = TextWrapping.Wrap
+                Text = SelectedStages().Any(stage => stage.Name == "Readied weapon (bonus)")
+                    ? "Enable Weapon imbue to preview and edit this optional layer."
+                    : "No particle layers were emitted in this stage.",
+                TextWrapping = TextWrapping.Wrap
             });
             return;
         }
@@ -450,44 +467,83 @@ public partial class StudioWindow : Window
         Draw();
     }
 
-    private void StepBack(object sender, RoutedEventArgs e) => Step(-16);
-    private void StepForward(object sender, RoutedEventArgs e) => Step(16);
+    private void StepBack(object sender, RoutedEventArgs e) => Step(-1);
+    private void StepForward(object sender, RoutedEventArgs e) => Step(1);
 
-    private void Step(int milliseconds)
+    private void Step(int direction)
     {
         Pause();
-        Timeline.Value = Math.Clamp(Timeline.Value + milliseconds, 0, Timeline.Maximum);
+        int current = (int)Timeline.Value;
+        var boundaries = new List<int>();
+        int offset = 0;
+        foreach (var stage in SelectedStages())
+        {
+            offset += stage.Delay;
+            if (stage.BladePose is { } sprite)
+                for (int frame = 0; frame < sprite.FrameCount; frame++)
+                    boundaries.Add(offset + frame * sprite.FrameInterval);
+            offset += stage.Duration;
+        }
+
+        Timeline.Value = boundaries.Count == 0 ? Math.Clamp(current + direction * 16, 0, Timeline.Maximum)
+            : direction < 0 ? boundaries.LastOrDefault(time => time < current, boundaries[0])
+            : boundaries.FirstOrDefault(time => time > current, boundaries[^1]);
     }
 
-    private void UpdateClock() => ClockText.Text = $"{(int)Timeline.Value:n0} / {(int)Timeline.Maximum:n0} ms";
+    private (PreviewStage? Stage, int Time) CurrentSample()
+    {
+        int time = Math.Max(0, Math.Min((int)Timeline.Value, (int)Timeline.Maximum - 1));
+        foreach (var stage in SelectedStages())
+        {
+            if (time < stage.Delay) break;
+            time -= stage.Delay;
+            if (time < stage.Duration) return (stage, time);
+            time -= stage.Duration;
+        }
+
+        return (null, time);
+    }
+
+    private MirDirection PreviewDirection =>
+        DirectionPicker.SelectedItem is MirDirection direction ? direction : MirDirection.Right;
+
+    private bool PreviewImbue => BladeExtras.Visibility == Visibility.Visible && WeaponImbue.IsChecked == true;
+    private bool PreviewTrail => BladeExtras.Visibility == Visibility.Visible && WeaponTrail.IsChecked == true;
+
+    private void UpdateClock()
+    {
+        var (stage, time) = CurrentSample();
+        string elapsed = $"{(int)Timeline.Value:n0} / {(int)Timeline.Maximum:n0} ms";
+        if (stage?.BladePose is { } sprite)
+        {
+            int frame = sprite.FrameAt(time);
+            ClockText.Text = $"{frame + 1}/{sprite.FrameCount} · Ref {sprite.Library} #{sprite.FrameIndex(PreviewDirection, frame)} · {elapsed}";
+        }
+        else ClockText.Text = elapsed;
+    }
 
     private void ViewChanged(object sender, RoutedEventArgs e)
     {
         if (!_ready) return;
-        if (ReferenceEquals(sender, DirectionPicker)) Try(RefreshNodes);
+        if (ReferenceEquals(sender, DirectionPicker) || ReferenceEquals(sender, WeaponImbue) || ReferenceEquals(sender, WeaponTrail))
+            Try(RefreshNodes);
+        UpdateClock();
         Draw();
     }
 
     private void Draw()
     {
         if (!_ready || !IsVisible) return;
-        var stage = (PreviewStage?)null;
-        int time = Math.Min((int)Timeline.Value, (int)Timeline.Maximum - 1);
-        foreach (var candidate in SelectedStages())
-        {
-            if (time < candidate.Delay) break;
-            time -= candidate.Delay;
-            if (time < candidate.Duration) { stage = candidate; break; }
-            time -= candidate.Duration;
-        }
+        var (stage, time) = CurrentSample();
 
         try
         {
-            using var solo = SpellVfxAssets.SoloEmitter(SoloLayer.IsChecked == true &&
-                NodePicker.SelectedItem is LayerChoice layer ? layer.Id : null);
-            _viewport.Render(stage, time, DirectionPicker.SelectedItem is MirDirection direction ? direction : MirDirection.Right,
+            string? soloId = SoloLayer.IsChecked == true && NodePicker.SelectedItem is LayerChoice layer ? layer.Id : null;
+            using var solo = SpellVfxAssets.SoloEmitter(soloId);
+            _viewport.Render(stage, time, PreviewDirection,
                 Glow.IsChecked == true, Guide.IsChecked == true, ReferenceVisible.IsChecked == true,
-                AmbientPicker.SelectedItem is LightSetting ambient ? ambient : LightSetting.Day);
+                AmbientPicker.SelectedItem is LightSetting ambient ? ambient : LightSetting.Day,
+                PreviewImbue, PreviewTrail);
         }
         catch (Exception error) when (error is not OutOfMemoryException)
         {

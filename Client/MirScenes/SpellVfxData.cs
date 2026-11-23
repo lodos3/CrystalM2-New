@@ -3457,6 +3457,44 @@ internal sealed record SpellVfxData
             public Color ProtectionFieldColour { get; init; }
         }
 
+        public BladeMotionNode BladeMotion { get; init; }
+
+        public sealed class BladeMotionNode
+        {
+            public float[][] BodyAxis { get; init; }
+            public float[][] HotCore { get; init; }
+            public float[][] Wake { get; init; }
+            public float[][] Sweep { get; init; }
+            public float[][][] SweepOutline { get; init; }
+            public float[][] ChargedSweep { get; init; }
+            public float[][] Activation { get; init; }
+            public float[][] TargetLoop { get; init; }
+
+            internal void Validate()
+            {
+                if (BodyAxis?.Length != 48 || BodyAxis.Any(row => row?.Length != 3 ||
+                    row.Any(value => !float.IsFinite(value) || MathF.Abs(value) > 48)))
+                    throw new InvalidDataException("Invalid BladeMotion.BodyAxis. Expected 48 body pose guides.");
+                ValidateGuides(HotCore, 48, nameof(HotCore));
+                ValidateGuides(Wake, 48, nameof(Wake));
+                ValidateGuides(Sweep, 48, nameof(Sweep));
+                if (SweepOutline?.Length != 48 || SweepOutline.Any(pose => pose?.Length != 11 ||
+                    pose.Any(row => row?.Length != 4 || row.Any(value => !float.IsFinite(value) || MathF.Abs(value) > 12) ||
+                        row[1] > row[3] || row[3] > row[2])))
+                    throw new InvalidDataException("Invalid BladeMotion.SweepOutline. Expected 48 poses with 11 ordered width samples each.");
+                ValidateGuides(ChargedSweep, 48, nameof(ChargedSweep));
+                ValidateGuides(Activation, 6, nameof(Activation));
+                ValidateGuides(TargetLoop, 6, nameof(TargetLoop));
+            }
+
+            private static void ValidateGuides(float[][] guides, int count, string name)
+            {
+                if (guides?.Length != count || guides.Any(row => row?.Length != 6 ||
+                    row.Any(value => !float.IsFinite(value) || MathF.Abs(value) > 240) || row[2] < 0 || row[3] < 0))
+                    throw new InvalidDataException($"Invalid BladeMotion.{name}. Expected {count} six-value pose guides.");
+            }
+        }
+
         public AddBladeFireNode AddBladeFire { get; init; }
         public AvalancheNode Avalanche { get; init; }
         public BladeFlameNode BladeFlame { get; init; }

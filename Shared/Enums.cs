@@ -1412,7 +1412,8 @@ public enum SpellEffect : byte
     SignatureArmed,
     SpellPerkBurn,
     LightningArc,
-    SpellPerkWard
+    SpellPerkWard,
+    TwinDrakeBladePrepare
 }
 
 

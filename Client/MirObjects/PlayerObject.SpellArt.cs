@@ -12,6 +12,7 @@ public partial class PlayerObject
     private MirAction _weaponPoseAction;
     private int _weaponPoseFrame = -1, _weaponPoseIndex = -1, _weaponPoseMap = -1;
     private BodyCoat _bodyCoat;
+    private int _lastFlameElapsed = -1;
 
     [Flags]
     private enum BodyCoat { None = 0, Protection = 1, Rage = 2, ImmortalSkin = 4, Fury = 8 }
@@ -24,10 +25,30 @@ public partial class PlayerObject
         ? actor.FlamingSword ? Spell.FlamingSword : actor.TwinDrakeBlade ? Spell.TwinDrakeBlade : Spell.None
         : Spell.None;
 
+    private void ProcessBladeSpell()
+    {
+        if (!Settings.Effect || Hidden || Dead ||
+            SpellVfxBladeFrames.Attack(Spell, CurrentAction) is not { } cue ||
+            (uint)FrameIndex >= (uint)cue.FrameCount) return;
+
+        float withinFrame = FrameInterval > 0
+            ? 1 - Math.Clamp((NextMotion - CMain.Time) / (float)FrameInterval, 0, 1)
+            : 0;
+        var map = GameScene.Scene.MapControl;
+        map.EmitBladeAttack(this, Spell,
+            CurrentAction == MirAction.Attack4 ? SpellVisualPhase.FollowThrough : SpellVisualPhase.Swing,
+            FrameIndex, (FrameIndex + withinFrame) / cue.FrameCount);
+        if (Spell == Spell.FlamingSword)
+            map.EmitFlamingSwordMotion(this, (int)((FrameIndex + withinFrame) * FrameInterval),
+                Math.Max(1, FrameInterval), ref _lastFlameElapsed);
+    }
+
     private void ProcessWeaponSpellVisual()
     {
         Spell spell = BladeSpell;
-        if (spell == Spell.None || Frame == null)
+        bool legacyBlade = SpellVfxBladeFrames.Supports(spell);
+        if (spell == Spell.None || Frame == null || (legacyBlade &&
+            (!Settings.WeaponSpellTrail || !SpellVfxBladeFrames.Attack(spell, CurrentAction).HasValue)))
         {
             _lastWeaponPose = null;
             _weaponPoseFrame = -1;
@@ -54,7 +75,7 @@ public partial class PlayerObject
         var hand = new Vector2(DrawLocation.X + MapControl.CellWidth / 2, DrawLocation.Y - 24);
         WeaponMaskTrace? trace = WeaponTrace(index);
         float progress = (FrameIndex + .5f) / Math.Max(1, Frame.Count);
-        if (trace == null && WarriorSpellEffects.UsesWeaponArt(spell))
+        if (trace == null && !legacyBlade && WarriorSpellEffects.UsesWeaponArt(spell))
         {
             float angle = ((int)Direction - 2) * MathF.PI / 4 + (progress - .5f) * 1.55f;
             trace = new WeaponMaskTrace(hand, hand + new Vector2(MathF.Cos(angle) * 27, MathF.Sin(angle) * 18));
@@ -76,10 +97,12 @@ public partial class PlayerObject
     private WeaponMaskTrace? WeaponTrace(int index) =>
         Weapon >= 0 ? WeaponLibrary1?.GetWeaponTrace(index, DrawLocation) : null;
 
-    internal WeaponMaskTrace? EquippedWeaponTrace()
+    internal WeaponMaskTrace? EquippedWeaponTrace() => WeaponTraceAt(FrameIndex);
+
+    internal WeaponMaskTrace? WeaponTraceAt(int pose)
     {
         var hand = new Vector2(DrawLocation.X + MapControl.CellWidth / 2, DrawLocation.Y - 24);
-        return WeaponTrace(DrawFrame + WeaponOffSet)?.Orient(hand, null);
+        return WeaponTrace(DrawFrame - FrameIndex + pose + WeaponOffSet)?.Orient(hand, null);
     }
 
     private void ProcessSpellCoatings()
@@ -118,16 +141,12 @@ public partial class PlayerObject
         if (coat != BodyCoat.None || coat != _bodyCoat) map.TextureValid = false;
         _bodyCoat = coat;
 
-        if (!Settings.Effect || Dead || RidingMount || Hidden) return;
+        if (!Settings.Effect || !Settings.WeaponSpellImbue || Dead || RidingMount || Hidden) return;
         Spell swing = BladeSpell;
-        bool drake = swing == Spell.TwinDrakeBlade && Frame != null &&
-            (FrameIndex + .5f) / Math.Max(1, Frame.Count) is > .23f and < .89f;
-        Spell enchant = drake ? Spell.TwinDrakeBlade : ReadiedBlade;
-        if (enchant == Spell.None) return;
-        if (drake && _lastWeaponPose is { } world)
-            map.EmitWeaponEnchant(enchant, world, this, striking: true);
-        else if (EquippedWeaponTrace() is { } screen)
-            map.EmitWeaponEnchant(enchant, map.WeaponPoseInWorld(screen), this, striking: false);
+        bool striking = SpellVfxBladeFrames.Attack(swing, CurrentAction).HasValue;
+        Spell enchant = striking ? swing : ReadiedBlade;
+        if (enchant != Spell.None && EquippedWeaponTrace() is { } screen)
+            map.EmitWeaponEnchant(enchant, map.WeaponPoseInWorld(screen), this, striking);
 
         static BodyCoat Coat(BuffType type) => type switch
         {
@@ -175,28 +194,20 @@ public partial class PlayerObject
     private void DrawWeaponSpellVisual(int index)
     {
         if (!Settings.Effect || Dead) return;
-        Spell swing = BladeSpell;
-        Spell ready = ReadiedBlade;
-        Spell spell = swing is Spell.FlamingSword or Spell.TwinDrakeBlade || ready == Spell.None ? swing : ready;
-        if (spell == Spell.None) return;
+        Spell spell = BladeSpell;
+        if (spell == Spell.None || SpellVfxBladeFrames.Supports(spell)) return;
         var (colour, core) = LegacySpellEffects.WeaponColours(spell);
         float phase = Frame == null ? .5f : (FrameIndex + .5f) / Math.Max(1, Frame.Count);
         using var vfxScope = SpellVfxAssets.For(spell);
         var tuning = SpellVfxAssets.Current.Warrior.ActorMasks;
-        float pulse = spell == swing ? tuning.SwingPulseBase + tuning.SwingPulseGain * MathF.Sin(MathF.PI * phase) : tuning.ReadyIntensity;
-        SpellMaskStyle style = spell switch
-        {
-            Spell.FlamingSword => SpellMaskStyle.Fire,
-            Spell.TwinDrakeBlade => SpellMaskStyle.Storm,
-            _ => SpellMaskStyle.Sweep
-        };
+        float pulse = tuning.SwingPulseBase + tuning.SwingPulseGain * MathF.Sin(MathF.PI * phase);
         WeaponLibrary1.DrawSpellMask(index, DrawLocation, colour, core,
-            pulse * DXManager.Opacity * Settings.SpellBlendIntensityPercent / 100f, style);
+            pulse * DXManager.Opacity * Settings.SpellBlendIntensityPercent / 100f, SpellMaskStyle.Sweep);
     }
 
     private void BeginLegacySpellVisual(Spell spell)
     {
-        if (Frame == null) return;
+        if (Frame == null || SpellVfxBladeFrames.Supports(spell)) return;
         var cue = LegacySpellEffects.Windup(spell, Frame.Count, FrameInterval);
         if (cue.Duration <= 0) return;
 

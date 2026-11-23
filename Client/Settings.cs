@@ -164,6 +164,8 @@ namespace Client
             //SkillSet = true,
             Effect = true,
             LevelEffect = true,
+            WeaponSpellImbue = false,
+            WeaponSpellTrail = false,
             DropView = true,
             NameView = true,
             HPView = true,
@@ -295,6 +297,8 @@ namespace Client
             //SkillSet = Reader.ReadBoolean("Game", "SkillSet", SkillSet);
             Effect = Reader.ReadBoolean("Game", "Effect", Effect);
             LevelEffect = Reader.ReadBoolean("Game", "LevelEffect", Effect);
+            WeaponSpellImbue = Reader.ReadBoolean("Game", "WeaponSpellImbue", WeaponSpellImbue);
+            WeaponSpellTrail = Reader.ReadBoolean("Game", "WeaponSpellTrail", WeaponSpellTrail);
             DropView = Reader.ReadBoolean("Game", "DropView", DropView);
             NameView = Reader.ReadBoolean("Game", "NameView", NameView);
             HPView = Reader.ReadBoolean("Game", "HPMPView", HPView);
@@ -462,6 +466,8 @@ namespace Client
             //Reader.Write("Game", "SkillSet", SkillSet);
             Reader.Write("Game", "Effect", Effect);
             Reader.Write("Game", "LevelEffect", LevelEffect);
+            Reader.Write("Game", "WeaponSpellImbue", WeaponSpellImbue);
+            Reader.Write("Game", "WeaponSpellTrail", WeaponSpellTrail);
             Reader.Write("Game", "DropView", DropView);
             Reader.Write("Game", "NameView", NameView);
             Reader.Write("Game", "HPMPView", HPView);

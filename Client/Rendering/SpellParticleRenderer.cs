@@ -191,7 +191,16 @@ internal sealed class SpellParticleRenderer
                 // Negative depth carries the seed for overlay runes, which have no occlusion row.
                 if (particle.AlwaysOnTop && particle.OpacityNoiseSeed != 0) depth = -particle.OpacityNoiseSeed;
                 if (particle.Ribbon is { } ribbon)
+                {
+                    if (particle.RibbonTextureU is { } u)
+                    {
+                        int start = (int)MathF.Round(source.Width * u.X);
+                        int end = (int)MathF.Round(source.Width * u.Y);
+                        source.X += start;
+                        source.Width = end - start;
+                    }
                     _device.Sprite.DrawQuad(_atlas, source, ribbon.Scaled(ribbonScale), point, tint, depth);
+                }
                 else if (particle.Emitter?.Settings.RenderMode is SpellEmitterRenderMode.QuadMesh or SpellEmitterRenderMode.TriangleMesh)
                 {
                     Vector2 right = new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * (size.X * .5f);

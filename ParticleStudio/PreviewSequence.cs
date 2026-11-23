@@ -8,6 +8,8 @@ namespace CrystalM2.ParticleStudio;
 internal readonly record struct PreviewRig(Vector2 Centre, Vector2 Facing, MirDirection Direction)
 {
     public Func<float, WeaponMaskTrace?>? ReferenceWeapon { get; init; }
+    public bool WeaponImbue { get; init; }
+    public bool WeaponTrail { get; init; }
 
     public Vector2 Caster => Centre - Facing * 78;
     public Vector2 Target => Centre + Facing * 78;
@@ -22,7 +24,11 @@ internal readonly record struct PreviewRig(Vector2 Centre, Vector2 Facing, MirDi
 }
 
 internal sealed record PreviewStage(string Name, int Duration, int Delay,
-    Action<SpellParticlePool, PreviewRig, int> Sample, MirAction ActorAction, Action? InspectTiming);
+    Action<SpellParticlePool, PreviewRig, int> Sample, MirAction ActorAction, Action? InspectTiming)
+{
+    public BladePoseCue? BladePose { get; init; }
+    public bool InFullSequence { get; init; } = true;
+}
 
 internal sealed class PreviewSequence
 {
@@ -34,11 +40,95 @@ internal sealed class PreviewSequence
     public PreviewSequence(SpellVfxEntry entry)
     {
         _spell = entry.Spell;
-        if (SpecialisationAbilities.TryGet(_spell, out var ability)) AddSignature(ability);
+        if (SpellVfxBladeFrames.Supports(_spell)) AddBladeParticles();
+        else if (SpecialisationAbilities.TryGet(_spell, out var ability)) AddSignature(ability);
         else AddStandard(entry.HasStandaloneCast);
     }
 
     public IReadOnlyList<PreviewStage> Stages => _stages;
+
+    private void AddBladeParticles()
+    {
+        if (_spell == Spell.TwinDrakeBlade)
+            _stages.Add(new PreviewStage("Activation", SpellVfxBladeFrames.DrakePrepare.Duration, 0,
+                (pool, rig, elapsed) => SampleBladeBase(pool, rig, elapsed, SpellVfxBladeFrames.DrakePrepare, SpellVisualPhase.Prepare),
+                MirAction.Standing, null) { BladePose = SpellVfxBladeFrames.DrakePrepare });
+
+        AddAttack("Attack 1", MirAction.Attack1, inFullSequence: true);
+        AddAttack(_spell == Spell.TwinDrakeBlade ? "Attack 4 (follow-through)" : "Attack 4 (alternate)",
+            MirAction.Attack4, inFullSequence: _spell == Spell.TwinDrakeBlade);
+
+        if (_spell == Spell.TwinDrakeBlade)
+            _stages.Add(new PreviewStage("Stun proc (target)", SpellVfxBladeFrames.DrakeStun.Duration, 0,
+                (pool, rig, elapsed) => SampleBladeBase(pool, rig, elapsed, SpellVfxBladeFrames.DrakeStun, SpellVisualPhase.Hit),
+                MirAction.Standing, null)
+                { BladePose = SpellVfxBladeFrames.DrakeStun, InFullSequence = false });
+        else
+            AddFrame("Burn perk (target)", SpellVisualPhase.Burn, inFullSequence: false);
+
+        _stages.Add(new PreviewStage("Readied weapon (bonus)", 700, 0, SampleReadyBlade, MirAction.Standing, null)
+            { InFullSequence = false });
+
+        void AddAttack(string name, MirAction action, bool inFullSequence)
+        {
+            if (SpellVfxBladeFrames.Attack(_spell, action) is not { } cue) return;
+            var phase = action == MirAction.Attack4 ? SpellVisualPhase.FollowThrough : SpellVisualPhase.Swing;
+            _stages.Add(new PreviewStage(name, cue.Duration, 0, (pool, rig, elapsed) =>
+            {
+                SampleBladeExtras(pool, rig, elapsed, cue);
+                if (_spell == Spell.FlamingSword)
+                {
+                    int lastElapsed = -1;
+                    SpellVfxBladeParticles.EmitFlameMotion(pool, rig.Centre, rig.Facing, rig.Direction,
+                        pose => rig.ReferenceWeapon?.Invoke((pose + .5f) / cue.FrameCount),
+                        elapsed, elapsed, cue.FrameInterval, ref lastElapsed, SpellParticleFrame.ReferenceSize, Seed);
+                }
+                SampleBladeBase(pool, rig, elapsed, cue, phase);
+            }, MirAction.Attack1, null) { BladePose = cue, InFullSequence = inFullSequence });
+        }
+    }
+
+    private void SampleReadyBlade(SpellParticlePool pool, PreviewRig rig, int elapsed)
+    {
+        if (rig.WeaponImbue && rig.ReferenceWeapon?.Invoke(0) is { } pose)
+            WarriorSpellEffects.DrawWeaponEnchant(pool, _spell, pose, rig.Facing, elapsed,
+                SpellParticleFrame.ReferenceSize, Seed, false, rig.Centre.Y);
+    }
+
+    private void SampleBladeBase(SpellParticlePool pool, PreviewRig rig, int elapsed, BladePoseCue cue, SpellVisualPhase phase)
+    {
+        int pose = cue.FrameAt(elapsed);
+        var weapon = _spell == Spell.FlamingSword && pose is 1 or 2
+            ? rig.ReferenceWeapon?.Invoke((pose + .5f) / cue.FrameCount)
+            : null;
+        SpellVfxBladeParticles.Draw(pool, _spell, phase, rig.Centre, rig.Direction, pose,
+            elapsed / (float)cue.Duration, elapsed, SpellParticleFrame.ReferenceSize, Seed, weapon);
+    }
+
+    private void SampleBladeExtras(SpellParticlePool pool, PreviewRig rig, int elapsed, BladePoseCue cue)
+    {
+        if (rig.ReferenceWeapon is not { } weapon) return;
+
+        if (rig.WeaponTrail)
+        {
+            WeaponMaskTrace? previous = null;
+            for (int tick = 0; tick <= elapsed; tick += cue.FrameInterval)
+            {
+                pool.Advance(tick);
+                float progress = (cue.FrameAt(tick) + .5f) / cue.FrameCount;
+                var pose = weapon(progress);
+                if (pose is { } current && previous is { } prior)
+                    LegacySpellEffects.WeaponSweep(pool, _spell, current, prior, tick, cue.Duration - tick,
+                        cue.FrameInterval, rig.Facing, progress, rig.Centre, motionOnly: true);
+                previous = pose;
+            }
+            pool.Advance(elapsed);
+        }
+
+        if (rig.WeaponImbue && weapon((cue.FrameAt(elapsed) + .5f) / cue.FrameCount) is { } blade)
+            WarriorSpellEffects.DrawWeaponEnchant(pool, _spell, blade, rig.Facing, elapsed,
+                SpellParticleFrame.ReferenceSize, Seed, true, rig.Centre.Y);
+    }
 
     private void AddStandard(bool standalone)
     {
@@ -46,17 +136,11 @@ internal sealed class PreviewSequence
         var cue = LegacySpellEffects.Windup(_spell, cast.Count, cast.Interval);
         if (standalone && cue.Duration > 0)
             AddFrame(cue.Phase == SpellVisualPhase.Prepare ? "Prepare" : "Cast", cue.Phase, cue.Duration, cue.Delay);
-        if (_spell is Spell.FlamingSword && cue.Duration <= 0)
-            AddFrame("Prepare", SpellVisualPhase.Prepare);
-        if (_spell is Spell.FlamingSword or Spell.TwinDrakeBlade)
-            Add("Ready weapon", 700, (pool, rig, elapsed) =>
-                WarriorSpellEffects.DrawWeaponEnchant(pool, _spell, rig.Weapon(.32f), rig.Facing, elapsed,
-                    SpellParticleFrame.ReferenceSize, Seed, false, rig.Centre.Y));
 
         if (WarriorSpellEffects.UsesWeaponArt(_spell))
         {
             Add("Weapon swing", 600, (pool, rig, elapsed) => SampleWeapon(pool, rig, elapsed, followThrough: false), action: MirAction.Attack1);
-            if (_spell is Spell.TwinDrakeBlade or Spell.FlamingSword or Spell.CrossHalfMoon)
+            if (_spell == Spell.CrossHalfMoon)
                 Add("Follow-through", 600, (pool, rig, elapsed) => SampleWeapon(pool, rig, elapsed, followThrough: true), action: MirAction.Attack4);
         }
         else if (_spell == Spell.ShoulderDash)
@@ -92,7 +176,7 @@ internal sealed class PreviewSequence
                 atTarget: HasProjectile(_spell));
         }
 
-        if (_spell is Spell.FlamingSword or Spell.SoulFireBall or Spell.FireWall or Spell.FireBall or Spell.GreatFireBall)
+        if (_spell is Spell.SoulFireBall or Spell.FireWall or Spell.FireBall or Spell.GreatFireBall)
             AddFrame("Burn", SpellVisualPhase.Burn);
         if (_spell is Spell.MagicShield or Spell.EnergyShield or Spell.ProtectionField or Spell.Rage or Spell.Fury or
             Spell.ImmortalSkin or Spell.Hiding or Spell.PetEnhancer)
@@ -126,7 +210,7 @@ internal sealed class PreviewSequence
             });
     }
 
-    private void AddFrame(string name, SpellVisualPhase phase, int? duration = null, int delay = 0, bool atTarget = false)
+    private void AddFrame(string name, SpellVisualPhase phase, int? duration = null, int delay = 0, bool atTarget = false, bool inFullSequence = true)
     {
         var visual = new SpellVisual(_spell, phase);
         int window = duration ?? LegacySpellEffects.PacketDuration(visual);
@@ -152,7 +236,7 @@ internal sealed class PreviewSequence
             SpellVisualPhase.Prepare => MirAction.Spell,
             SpellVisualPhase.Swing => MirAction.Attack1,
             _ => MirAction.Standing
-        }, duration == null ? () => LegacySpellEffects.PacketDuration(visual) : null);
+        }, duration == null ? () => LegacySpellEffects.PacketDuration(visual) : null, inFullSequence);
     }
 
     private void SampleWeapon(SpellParticlePool pool, PreviewRig rig, int elapsed, bool followThrough)
@@ -168,9 +252,6 @@ internal sealed class PreviewSequence
                 progress, rig.Centre, tick == 0 ? 0 : (tick - step) / 600f, followThrough);
         }
         pool.Advance(elapsed);
-        if (_spell == Spell.TwinDrakeBlade)
-            WarriorSpellEffects.DrawWeaponEnchant(pool, _spell, rig.Weapon(elapsed / 600f), rig.Facing, elapsed,
-                SpellParticleFrame.ReferenceSize, Seed, true, rig.Centre.Y);
     }
 
     private void SampleProjectile(SpellParticlePool pool, PreviewRig rig, int elapsed)
@@ -196,9 +277,11 @@ internal sealed class PreviewSequence
     }
 
     private void Add(string name, int duration, Action<SpellParticlePool, PreviewRig, int> sample,
-        int delay = 0, MirAction action = MirAction.Standing, Action? inspectTiming = null)
+        int delay = 0, MirAction action = MirAction.Standing, Action? inspectTiming = null, bool inFullSequence = true)
     {
-        if (duration > 0) _stages.Add(new PreviewStage(name, duration, Math.Max(0, delay), sample, action, inspectTiming));
+        if (duration > 0)
+            _stages.Add(new PreviewStage(name, duration, Math.Max(0, delay), sample, action, inspectTiming)
+                { InFullSequence = inFullSequence });
     }
 
     private static bool HasProjectile(Spell spell) => spell is

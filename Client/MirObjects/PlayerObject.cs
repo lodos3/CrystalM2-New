@@ -862,6 +862,7 @@ namespace Client.MirObjects
                 DisplayRectangle = new Rectangle(DrawLocation, BodyLibrary.GetTrueSize(DrawFrame));
             }
 
+            ProcessBladeSpell();
             ProcessWeaponSpellVisual();
 
             for (int i = 0; i < Effects.Count; i++)
@@ -909,7 +910,9 @@ namespace Client.MirObjects
                 }
             }
 
-            if (User == this && !GameScene.Observing && CMain.Time < MapControl.NextAction)
+            bool drakeFollowThrough = CurrentAction == MirAction.Attack1 && Spell == Spell.TwinDrakeBlade &&
+                NextAction?.Action == MirAction.Attack4;
+            if (User == this && !GameScene.Observing && CMain.Time < MapControl.NextAction && !drakeFollowThrough)
                 return;
 
             if (ActionFeed.Count == 0)
@@ -1594,11 +1597,8 @@ namespace Client.MirObjects
                                 break;
 
                             case Spell.TwinDrakeBlade:
-                                //FrameInterval = FrameInterval * 9 / 10; //70% Faster Animation
-                                //EffectFrameInterval = EffectFrameInterval * 9 / 10;
-                                //action = new QueuedAction { Action = MirAction.Attack4, Direction = Direction, Location = CurrentLocation, Params = new List<object>() };
-                                //action.Params.Add(Spell);
-                                //ActionFeed.Insert(0, action);
+                                FrameInterval = SpellVfxBladeFrames.DrakeStrikeInterval;
+                                EffectFrameInterval /= 2;
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -1607,6 +1607,7 @@ namespace Client.MirObjects
                                 break;
 
                             case Spell.FlamingSword:
+                                _lastFlameElapsed = -1;
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
                                 break;
 
@@ -1615,6 +1616,7 @@ namespace Client.MirObjects
                         break;
                     case MirAction.Attack4:
                         Spell = (Spell)action.Params[0];
+                        if (Spell == Spell.FlamingSword) _lastFlameElapsed = -1;
                         if (LegacySpellEffects.UsesWeaponMask(Spell) && !WarriorSpellEffects.UsesWeaponArt(Spell) &&
                             (WeaponLibrary1 == null || Weapon < 0))
                             Effects.Add(new Effect(new SpellVisual(Spell, SpellVisualPhase.FollowThrough), Frame.Count * FrameInterval, this));
@@ -1627,8 +1629,8 @@ namespace Client.MirObjects
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10 + 1);
                                 break;
                             case Spell.TwinDrakeBlade:
-                                FrameInterval = FrameInterval * 9 / 10; //80% Animation Speed
-                                EffectFrameInterval = EffectFrameInterval * 9 / 10;
+                                FrameInterval = SpellVfxBladeFrames.DrakeFollowThroughInterval;
+                                EffectFrameInterval = EffectFrameInterval * 45 / 100;
                                 break;
                             case Spell.FlashDash:
                                 int attackDelay = (User.AttackSpeed - 120) <= 300 ? 300 : (User.AttackSpeed - 120);
@@ -2070,6 +2072,8 @@ namespace Client.MirObjects
                             #region TwinDrakeBlade
 
                             case Spell.TwinDrakeBlade:
+                                var prepare = SpellVfxBladeFrames.DrakePrepare;
+                                Effects.Add(new Effect(new SpellVisual(Spell, SpellVisualPhase.Prepare), prepare.Duration, this));
                                 SoundManager.PlaySound(20000 + (ushort)Spell * 10);
                                 break;
 
@@ -2497,6 +2501,15 @@ namespace Client.MirObjects
 
                             StanceTime = CMain.Time + StanceDelay;
                             FrameIndex = Frame.Count - 1;
+                            if (CurrentAction == MirAction.Attack1 && Spell == Spell.TwinDrakeBlade && !Dead)
+                            {
+                                // Both damage events already belong to the initial attack request.
+                                ActionFeed.Insert(0, new QueuedAction
+                                {
+                                    Action = MirAction.Attack4, Direction = Direction, Location = CurrentLocation,
+                                    Params = new List<object> { Spell }
+                                });
+                            }
                             SetAction();
                         }
                         else

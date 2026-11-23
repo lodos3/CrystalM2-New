@@ -16,7 +16,7 @@ internal static partial class WarriorSpellEffects
 
     internal static void WeaponSweep(SpellParticlePool pool, Spell spell, Look look, WeaponMaskTrace pose, WeaponMaskTrace? previous,
         Vector2 facing, Vector2 feet, long now, int remaining, int interval, float progress, float previousProgress,
-        bool followThrough)
+        bool followThrough, bool motionOnly = false)
     {
         using var emitterTime = SpellVfxAssets.AtProgress(progress);
         using var vfxScope = SpellVfxAssets.For(spell);
@@ -29,7 +29,7 @@ internal static partial class WarriorSpellEffects
         if (facing == Vector2.Zero) facing = Vector2.Normalize(blade);
         float angle = MathF.Atan2(facing.Y, facing.X);
         var effect = new Effect(pool, look, now, window: life, referenceDuration: life, depthY: feet.Y);
-        if (spell == Spell.TwinDrakeBlade && followThrough && previousProgress == 0)
+        if (!motionOnly && spell == Spell.TwinDrakeBlade && followThrough && previousProgress == 0)
         {
             // Releasing the stored charge: several short, hairline arcs peel
             // from the blade itself, rather than one huge 67px lightning card.
@@ -64,7 +64,7 @@ internal static partial class WarriorSpellEffects
                 float outer = moon || spell == Spell.TwinDrakeBlade ? fields.Read(tuning.Outer) : heavy ? fields.Read(tuning.Outer2) : fields.Read(tuning.Outer3);
                 Layer depth = facing.Y < -.27f && (old.Tip.Y + pose.Tip.Y) * fields.Read(tuning.Depth) < pose.Hilt.Y - fields.Read(tuning.Depth2)
                     ? fields.Read(tuning.Depth3) : fields.Read(tuning.Depth4);
-                if (spell == Spell.TwinDrakeBlade)
+                if (spell == Spell.TwinDrakeBlade && !motionOnly)
                     DrakeEdgeSweep(pool, old, pose, feet.Y, now, life);
                 else
                 {
@@ -77,7 +77,7 @@ internal static partial class WarriorSpellEffects
             }
         }
 
-        if (progress < .23f || progress > .87f) return;
+        if (motionOnly || progress < .23f || progress > .87f) return;
         bool cut = previousProgress < .38f && progress >= .38f;
         Vector2 forwardTip = pose.Hilt + facing * MathF.Max(fields.Read(tuning.ForwardTip), Vector2.Dot(blade, facing));
         switch (spell)

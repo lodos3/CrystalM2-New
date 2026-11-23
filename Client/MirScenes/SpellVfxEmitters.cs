@@ -95,11 +95,11 @@ public static partial class SpellVfxAssets
     }
 
     internal static void Emit(SpellParticlePool pool, SpellParticle particle, string id = null,
-        bool schedule = false, long? sampleTime = null)
+        bool schedule = false, long? sampleTime = null, uint? randomKey = null)
     {
         id ??= _emitter;
         var emitters = _scoped?.Emitters;
-        uint index = emitters != null ? ++_particleIndex : 0;
+        uint index = emitters != null ? randomKey ?? ++_particleIndex : 0;
         if (_soloEmitter != null && id != _soloEmitter) return;
         if (id != null)
         {

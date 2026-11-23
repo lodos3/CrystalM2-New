@@ -154,7 +154,7 @@ internal static class LegacySpellEffects
 
     internal static void WeaponSweep(SpellParticlePool pool, Spell spell, WeaponMaskTrace pose, WeaponMaskTrace? last,
         long now, int remaining, int interval, Vector2 facing = default, float progress = .58f,
-        Vector2? feet = null, float previousProgress = 0, bool followThrough = false)
+        Vector2? feet = null, float previousProgress = 0, bool followThrough = false, bool motionOnly = false)
     {
         using var emitterTime = SpellVfxAssets.AtProgress(progress);
         using var vfxScope = SpellVfxAssets.For(spell);
@@ -166,7 +166,8 @@ internal static class LegacySpellEffects
         if (WarriorSpellEffects.UsesWeaponArt(spell))
         {
             WarriorSpellEffects.WeaponSweep(pool, spell, look, pose, last, facing,
-                feet ?? pose.Hilt + Vector2.UnitY * fields.Read(tuning.Offset), now, remaining, interval, progress, previousProgress, followThrough);
+                feet ?? pose.Hilt + Vector2.UnitY * fields.Read(tuning.Offset), now, remaining, interval, progress,
+                previousProgress, followThrough, motionOnly);
             return;
         }
         var effect = new Effect(pool, look, now);
