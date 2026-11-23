@@ -8,7 +8,7 @@ using CrystalM2.ArmourCreate;
 using CrystalM2.Rendering.Core;
 
 if (args.Length is < 3 or > 4)
-    throw new ArgumentException("Usage: ArmourCreate <client Data directory> <Art/CArmour directory> <new CArmour/NN.Lib> [preview.png]");
+    throw new ArgumentException("Usage: ArmourCreate <client Data directory> <Art/CArmour directory> <new GArmour/NN.Lib> [preview.png]");
 
 string dataRoot = Path.GetFullPath(args[0]);
 string artRoot = Path.GetFullPath(args[1]);
@@ -21,7 +21,10 @@ if (File.Exists(destination))
 if (previewFile is not null && File.Exists(previewFile))
     throw new IOException($"Refusing to overwrite the preview: {previewFile}");
 if (Path.GetFileName(destination).Equals("00.Lib", StringComparison.OrdinalIgnoreCase))
-    throw new ArgumentException("CArmour/00.Lib is the naked reference and must not be replaced.");
+    throw new ArgumentException("GArmour/00.Lib is reserved; the naked body is always CArmour/00.Lib.");
+if (!Path.GetFileName(Path.GetDirectoryName(destination)!).Equals("GArmour", StringComparison.OrdinalIgnoreCase) ||
+    !System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileName(destination), @"^(0[1-9]|[1-9][0-9])\.Lib$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+    throw new ArgumentException("Generated armour must be saved to GArmour/01.Lib through GArmour/99.Lib.");
 
 using var source = new LegacyMirLibReader(File.OpenRead(Path.Combine(dataRoot, "CArmour", "00.Lib")));
 using var poses = JsonDocument.Parse(File.ReadAllText(Path.Combine(artRoot, "poses.json")));
@@ -54,7 +57,7 @@ try
 
         for (int index = 0; index < source.Count; index++)
         {
-            if (!source.TryReadFrame(index, out LegacySpriteFrame? naked, includeMask: true)
+            if (!source.TryReadFrame(index, out LegacySpriteFrame? naked)
                 || naked is null) continue;
             offsets[index] = checked((int)stream.Position);
             byte[] pixels;
@@ -71,9 +74,9 @@ try
                 pixels = Bgra(composite);
                 created++;
             }
-            else pixels = naked.Bgra;
+            else throw new InvalidDataException($"Missing pose mapping for frame {index}.");
 
-            WriteFrame(writer, naked, width, height, originX, originY, pixels);
+            WriteFrame(writer, width, height, originX, originY, pixels);
             int slot = Array.IndexOf(featured, index);
             if (slot >= 0 && composite is not null && previewGraphics is not null)
             {
@@ -109,6 +112,13 @@ try
             var rect = mapped[index].GetProperty("rect");
             if (image.Width != rect[2].GetInt32() || image.Height != rect[3].GetInt32())
                 throw new InvalidDataException($"Generated frame {index} has incorrect dimensions.");
+            int transparent = 0, painted = 0;
+            for (int p = 3; p < image.Bgra.Length; p += 4)
+            {
+                if (image.Bgra[p] == 0) transparent++; else painted++;
+            }
+            if (painted == 0 || transparent == 0 || image.Mask != null || image.ShadowFlags != 0)
+                throw new InvalidDataException($"Frame {index} is not a transparent armour-only overlay.");
         }
     }
 
@@ -141,15 +151,9 @@ static Bitmap Compose(LegacySpriteFrame naked, JsonElement pose, string artRoot,
         rect[1]+rect[3] > sheet.Height)
         throw new InvalidDataException("CArmour pose points beyond its mask sheet.");
 
-    using var baseImage = new Bitmap(naked.Width, naked.Height, PixelFormat.Format32bppArgb);
-    SetBgra(baseImage, naked.Bgra);
+    // The source body is drawn by the client. LIB output contains ONLY authored armour
+    // pixels, otherwise the source character would be blended twice on every frame.
     var result = new Bitmap(rect[2], rect[3], PixelFormat.Format32bppArgb);
-    using (var canvas = Graphics.FromImage(result))
-    {
-        canvas.Clear(Color.Transparent);
-        canvas.DrawImageUnscaled(baseImage, naked.OffsetX-origin[0], naked.OffsetY-origin[1]);
-    }
-
     using var design = new Bitmap(result.Width, result.Height, PixelFormat.Format32bppArgb);
     using (var paint = Graphics.FromImage(design)) ArmourPainter.Paint(paint, anchors);
     byte[] overlay = Bgra(design);
@@ -168,27 +172,18 @@ static Bitmap Compose(LegacySpriteFrame naked, JsonElement pose, string artRoot,
     return result;
 }
 
-static void WriteFrame(BinaryWriter writer, LegacySpriteFrame original,
+static void WriteFrame(BinaryWriter writer,
     int width, int height, int offsetX, int offsetY, byte[] bgra)
 {
     writer.Write(checked((short)width));
     writer.Write(checked((short)height));
     writer.Write(checked((short)offsetX));
     writer.Write(checked((short)offsetY));
-    writer.Write(checked((short)original.ShadowOffsetX));
-    writer.Write(checked((short)original.ShadowOffsetY));
-    writer.Write(original.ShadowFlags);
+    // No inherited baked shadow offsets or original body's secondary effect mask.
+    writer.Write((short)0);
+    writer.Write((short)0);
+    writer.Write((byte)0);
     WriteCompressed(writer, bgra);
-    if ((original.ShadowFlags & 0x80) != 0)
-    {
-        LegacySpriteFrame mask = original.Mask
-            ?? throw new InvalidDataException("Source sprite declares a mask but has no mask data.");
-        writer.Write(checked((short)mask.Width));
-        writer.Write(checked((short)mask.Height));
-        writer.Write(checked((short)mask.OffsetX));
-        writer.Write(checked((short)mask.OffsetY));
-        WriteCompressed(writer, mask.Bgra);
-    }
 }
 
 static void WriteCompressed(BinaryWriter writer, byte[] bytes)
