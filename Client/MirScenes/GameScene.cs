@@ -11337,11 +11337,11 @@ namespace Client.MirScenes
                 if (MapObject.User.Direction is MirDirection.Up or MirDirection.UpLeft or MirDirection.UpRight or MirDirection.Right or MirDirection.Left)
                 {
                     MapObject.User.DrawHead(spellMask: false);
-                    MapObject.User.DrawWings();
+                    if (!MapObject.User.ParticleWings) MapObject.User.DrawWings();
                 }
                 else
                 {
-                    MapObject.User.DrawWings();
+                    if (!MapObject.User.ParticleWings) MapObject.User.DrawWings();
                     MapObject.User.DrawHead(spellMask: false);
                 }
             }

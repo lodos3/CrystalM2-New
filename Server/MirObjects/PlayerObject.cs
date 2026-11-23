@@ -1710,6 +1710,7 @@ namespace Server.MirObjects
 
             Enqueue(packet, c);
             if (c == Connection && SpellPerks.Supports(Class)) Enqueue(SpellPerkState(), c);
+            if (_wingPreview.HasValue) Enqueue(GetUpdateInfo(), c);
         }
         private void GetMapInfo(MirConnection c)
         {
@@ -3430,6 +3431,26 @@ namespace Server.MirObjects
                         LastHitter = null;
                         Die();
                         break;
+                    case "WINGS":
+                        if (!IsGM) return;
+                        if (parts.Length != 3 || !ArmourWings.TrySelect(parts[2], out byte? wings))
+                        {
+                            ReceiveChat("@wings USERNAME ID — " + ArmourWings.Choices, ChatType.System);
+                            return;
+                        }
+                        player = Envir.GetPlayer(parts[1]);
+                        if (player == null)
+                        {
+                            ReceiveChat("That character is not online.", ChatType.System);
+                            return;
+                        }
+                        player._wingPreview = wings;
+                        player._lastOwnerWings = player.VisibleWings;
+                        var wingUpdate = player.GetUpdateInfo();
+                        player.Enqueue(wingUpdate);
+                        player.Broadcast(wingUpdate);
+                        ReceiveChat($"Wings for {player.Name}: {parts[2]} (this session).", ChatType.System);
+                        break;
                     case "HAIR":
                         if (!IsGM && !Settings.TestServer) return;
 
@@ -4726,9 +4747,18 @@ namespace Server.MirObjects
 
             return true;
         }
+        private byte? _wingPreview;
+        private byte? _lastOwnerWings;
+        protected override byte VisibleWings => _wingPreview ?? Looks_Wings;
+
         protected override void UpdateLooks(short OldLooks_Weapon)
         {
             base.UpdateLooks(OldLooks_Weapon);
+            if (CurrentMap != null && _lastOwnerWings != VisibleWings)
+            {
+                Enqueue(GetUpdateInfo());
+                _lastOwnerWings = VisibleWings;
+            }
 
             if (Globals.FishingRodShapes.Contains(OldLooks_Weapon) != Globals.FishingRodShapes.Contains(Looks_Weapon))
             {
@@ -4774,7 +4804,7 @@ namespace Server.MirObjects
                 Dead = Dead,
                 Hidden = Hidden,
                 Effect = HasBuff(BuffType.MagicShield, out _) ? SpellEffect.MagicShieldUp : HasBuff(BuffType.ElementalBarrier, out _) ? SpellEffect.ElementalBarrierUp : SpellEffect.None,
-                WingEffect = Looks_Wings,
+                WingEffect = VisibleWings,
                 MountType = Mount.MountType,
                 RidingMount = RidingMount,
                 Fishing = Fishing,

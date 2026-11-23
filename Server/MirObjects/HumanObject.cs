@@ -163,6 +163,7 @@ namespace Server.MirObjects
         public short TransformType;
         public short Looks_Armour = 0, Looks_Weapon = -1, Looks_WeaponEffect = 0;
         public byte Looks_Wings = 0;
+        protected virtual byte VisibleWings => Looks_Wings;
 
         public int CurrentHandWeight,
                    CurrentWearWeight,
@@ -7109,7 +7110,7 @@ namespace Server.MirObjects
                 WeaponEffect = Looks_WeaponEffect,
                 Armour = Looks_Armour,
                 Light = Light,
-                WingEffect = Looks_Wings
+                WingEffect = VisibleWings
             };
         }
         protected virtual void UpdateLooks(short OldLooks_Weapon)

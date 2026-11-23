@@ -19,6 +19,7 @@
     <Compile Include="../../Client/MirScenes/WarriorSpellEffects*.cs" Link="Rendering/%(Filename)%(Extension)" />
     <Compile Include="../../Client/MirScenes/TaoistSpellEffects*.cs" Link="Rendering/%(Filename)%(Extension)" />
     <Compile Include="../../Client/MirScenes/SpellParticleFrame.cs" Link="Rendering/SpellParticleFrame.cs" />
+    <Compile Include="../../Client/MirScenes/ArmourWingParticles.cs" Link="Rendering/ArmourWingParticles.cs" />
     <Compile Include="../../Client/MirScenes/SpellImpactDebris.cs" Link="Rendering/SpellImpactDebris.cs" />
     <Compile Include="../../Client/MirScenes/SpellVfx*.cs" Link="Rendering/%(Filename)%(Extension)" />
     <EmbeddedResource Include="../../Client/Data/SpellVfx/*.json" LogicalName="SpellVfx.%(Filename)%(Extension)" />

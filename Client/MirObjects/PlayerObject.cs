@@ -7,6 +7,8 @@ using S = ServerPackets;
 using C = ClientPackets;
 using Client.MirScenes.Dialogs;
 using System.Reflection;
+using System.Numerics;
+using CrystalM2.Rendering.Core;
 
 namespace Client.MirObjects
 {
@@ -76,6 +78,12 @@ namespace Client.MirObjects
         public Effect ElementalBarrierEffect;
 
         public byte WingEffect;
+        private int _wingFamily;
+        private SpellParticlePool _wingParticles;
+        private long _wingAnimationTick = -1;
+        internal bool ParticleWings => TransformType < 0 && ArmourWings.IsParticle(WingEffect);
+        private bool DrawWingsBehindBody => WingEffect >= ArmourWings.Phoenix && ParticleWings &&
+            Direction is MirDirection.Down or MirDirection.DownLeft or MirDirection.DownRight;
         private short StanceDelay = 2500;
 
         //ArcherSpells - Elemental system
@@ -170,6 +178,7 @@ namespace Client.MirObjects
         }
         public void Update(S.PlayerUpdate info)
         {
+            if (this is UserObject user) user.ServerWings = info.WingEffect;
             Weapon = info.Weapon;
 			WeaponEffect = info.WeaponEffect;
 			Armour = info.Armour;
@@ -266,6 +275,7 @@ namespace Client.MirObjects
             //24 - red2 footballer - 791
 
             bool altAnim = false;
+            WingLibrary = null;
 
             bool showMount = true;
             bool showFishing = true;
@@ -345,8 +355,7 @@ namespace Client.MirObjects
 
                 if (TransformType == 19)
                 {
-                    WingEffect = 2;
-                    WingLibrary = WingEffect - 1 < Libraries.TransformEffect.Length ? Libraries.TransformEffect[WingEffect - 1] : null;
+                    WingLibrary = Libraries.TransformEffect.Length > 1 ? Libraries.TransformEffect[1] : null;
                 }
                 else
                 {
@@ -433,7 +442,7 @@ namespace Client.MirObjects
                         #endregion
 
                         #region WingEffects
-                        if (WingEffect > 0 && WingEffect < 100)
+                        if (WingEffect > 2 && WingEffect < 100)
                         {
                             if (altAnim)
                                 WingLibrary = (WingEffect - 1) < Libraries.ARHumEffect.Length ? Libraries.ARHumEffect[WingEffect - 1] : null;
@@ -524,7 +533,7 @@ namespace Client.MirObjects
                         #endregion
 
                         #region WingEffects
-                        if (WingEffect > 0 && WingEffect < 100)
+                        if (WingEffect > 2 && WingEffect < 100)
                         {
                             if (altAnim)
                                 WingLibrary = (WingEffect - 1) < Libraries.AHumEffect.Length ? Libraries.AHumEffect[WingEffect - 1] : null;
@@ -575,7 +584,7 @@ namespace Client.MirObjects
 						#endregion
 
 						#region WingEffects
-						if (WingEffect > 0 && WingEffect < 100)
+						if (WingEffect > 2 && WingEffect < 100)
                         {
                             WingLibrary = (WingEffect - 1) < Libraries.CHumEffect.Length ? Libraries.CHumEffect[WingEffect - 1] : null;
                         }
@@ -595,6 +604,7 @@ namespace Client.MirObjects
             }
 
             #region Common
+            _wingFamily = altAnim ? Class == MirClass.Assassin ? 1 : 2 : 0;
             //Harvest
             if (CurrentAction == MirAction.Harvest && TransformType < 0)
             {
@@ -863,6 +873,12 @@ namespace Client.MirObjects
             }
 
             ProcessBladeSpell();
+            if (Settings.Effect && ParticleWings && WingEffect >= ArmourWings.Phoenix &&
+                !Dead && _wingAnimationTick != CMain.Time / 50)
+            {
+                _wingAnimationTick = CMain.Time / 50;
+                GameScene.Scene.MapControl.TextureValid = false;
+            }
             ProcessWeaponSpellVisual();
 
             for (int i = 0; i < Effects.Count; i++)
@@ -3500,7 +3516,7 @@ namespace Client.MirObjects
 
         private void UpdateWingEffect()
         {
-            if (WingEffect > 0 && CMain.Time >= NextMotion2)
+            if ((WingEffect > 0 || TransformType == 19) && CMain.Time >= NextMotion2)
             {
                 GameScene.Scene.MapControl.TextureValid = false;
 
@@ -4882,19 +4898,20 @@ namespace Client.MirObjects
                     DrawWeapon2();
             }
 
+            if (DrawWingsBehindBody) DrawWings();
             DrawBody();
 
             if (Direction == MirDirection.Up || Direction == MirDirection.UpLeft || Direction == MirDirection.UpRight || Direction == MirDirection.Right || Direction == MirDirection.Left)
             {
                 DrawHead();
-                if (this != User)
+                if (!DrawWingsBehindBody && (this != User || ParticleWings))
                 {
                     DrawWings();
                 }
             }
             else
             {
-                if (this != User)
+                if (!DrawWingsBehindBody && (this != User || ParticleWings))
                 {
                     DrawWings();
                 }
@@ -5021,10 +5038,38 @@ namespace Client.MirObjects
         }
         public void DrawWings()
         {
-            if (WingEffect <= 0 || WingEffect >= 100) return;
+            if (ParticleWings)
+            {
+                if (!Settings.Effect || Dead) return;
+                _wingParticles ??= new SpellParticlePool(128);
+                ArmourWingParticles.Emit(_wingParticles, WingEffect, _wingFamily * 2 + WingEffect - 1,
+                    DrawWingFrame + WingOffset, WingShoulder, Direction, CMain.Time, ObjectID);
+                DXManager.Device.SpellParticles.Draw(_wingParticles.Active, new Vector2(DrawLocation.X, DrawLocation.Y),
+                    CMain.Time, ground: false, emissiveOverlay: true, exposure: 1.22f);
+                return;
+            }
+            if (TransformType != 19 && (WingEffect <= 0 || WingEffect >= 100)) return;
 
             if (WingLibrary != null)
                 WingLibrary.DrawBlend(DrawWingFrame + WingOffset, DrawLocation, DrawColour, true);
+        }
+
+        private Vector2 WingShoulder => ArmourWingParticles.Shoulder(WingEffect, RidingMount);
+
+        internal bool TryGetWingLight(out Point point, out Color colour)
+        {
+            point = DrawLocation;
+            colour = default;
+            if (!Settings.Effect || !ParticleWings || Dead || Hidden) return false;
+            if (WingEffect is 1 or 2)
+            {
+                var pose = WingPoseAtlas.GetPose(_wingFamily * 2 + WingEffect - 1, DrawWingFrame + WingOffset);
+                if (pose.Width == 0) return false;
+                point.Offset(pose.X + pose.Width / 2, pose.Y + pose.Height / 2);
+            }
+            else point.Offset((int)WingShoulder.X, (int)WingShoulder.Y);
+            colour = ArmourWingParticles.LightColour(WingEffect);
+            return true;
         }
 
 

@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Assets/WingPoses.bin" LogicalName="CrystalM2.WingPoses" />
     <EmbeddedResource Include="Assets/SpellPoseMasks.gz" LogicalName="CrystalM2.SpellPoseMasks" />
     <EmbeddedResource Include="Assets/BrackeysSpellMasks.r8.gz" LogicalName="CrystalM2.SpellMasks" />
     <EmbeddedResource Include="Assets/WarriorParticleMasks.r8.gz" LogicalName="CrystalM2.WarriorMasks" />

@@ -38,11 +38,14 @@ internal static class SpellPoseComparisons
                 }
                 if (mask.FirstPlane == 0 || mask.Offset != new Point(original.OffsetX - 24, original.OffsetY - 16))
                     throw new InvalidDataException($"Incorrect anchor for {s.Name} #{index}.");
+                var energy = new System.Numerics.Vector3();
                 for (int c = 0; c < 3; c++)
                 {
                     var plane = SpellPoseAtlas.GetPlane(mask.FirstPlane + c);
                     var pixels = SpellPoseAtlas.GetPage(plane.Page);
                     var rect = plane.Source;
+                    if (c != 0 && plane.HaloColour.HasValue)
+                        throw new InvalidDataException($"Duplicate halo in {s.Name} #{index}.");
                     if (rect.Width != (original.Width + s.Step - 1) / s.Step ||
                         rect.Height != (original.Height + s.Step - 1) / s.Step ||
                         mask.WorldSize != new Size(rect.Width * s.Step, rect.Height * s.Step))
@@ -59,14 +62,19 @@ internal static class SpellPoseComparisons
                         }
                         int divisor = 255 * s.Step * s.Step;
                         int expected = (sum + divisor / 2) / divisor;
+                        energy[2 - c] += expected;
                         byte actual = pixels[(rect.Y + y) * SpellPoseAtlas.PageSize + rect.X + x];
                         if (Math.Abs(actual - expected) > 1)
                             throw new InvalidDataException($"Coverage mismatch in {s.Name} #{index} at {x},{y}, channel {c}.");
                     }
                 }
+                var halo = SpellPoseAtlas.GetPlane(mask.FirstPlane).HaloColour;
+                float peak = Math.Max(energy.X, Math.Max(energy.Y, energy.Z));
+                if (peak > 0 && (!halo.HasValue || System.Numerics.Vector3.Distance(halo.Value, energy / peak) > .01f))
+                    throw new InvalidDataException($"Halo hue differs from the original frame for {s.Name} #{index}.");
                 checkedFrames++;
             }
         }
-        Console.WriteLine($"Compared {checkedFrames} nonempty directional poses with the source spell libraries.");
+        Console.WriteLine($"Compared coverage and halo colours for {checkedFrames} nonempty directional poses with the source spell libraries.");
     }
 }

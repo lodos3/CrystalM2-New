@@ -100,6 +100,19 @@ internal static class ShapedLightPass
             // still contribute to the shaped pass, including all the smaller sparks.
             float energy = intensity * particle.LightEnergy * particle.Fade(age) * particle.Colour.A / 255f;
             if (energy <= .025f || particle.Size < 18) continue;
+            // The three coverage planes form one coloured emitter at the same position.
+            // Only its first plane carries the combined, frame-specific halo colour.
+            Vector3 rgb;
+            if (particle.CoveragePlane > 0)
+            {
+                if (SpellPoseAtlas.GetPlane(particle.CoveragePlane).HaloColour is not { } combined) continue;
+                rgb = combined;
+            }
+            else
+            {
+                Color tintAtAge = particle.ColourAt(age);
+                rgb = new Vector3(tintAtAge.R, tintAtAge.G, tintAtAge.B) / 255f;
+            }
             int index = -1, weakest = 0;
             for (int i = 0; i < glowCount; i++)
             {
@@ -113,8 +126,7 @@ internal static class ShapedLightPass
                 if (index < 0) index = weakest;
                 if (energy <= glowCentres[index].Energy) continue;
             }
-            Color tintAtAge = particle.ColourAt(age);
-            Vector3 rgb = colour ?? new Vector3(tintAtAge.R, tintAtAge.G, tintAtAge.B) / 255f;
+            rgb = colour ?? rgb;
             rgb = Vector3.Clamp(rgb * new Vector3(1 + warmth, 1, 1 - warmth), Vector3.Zero, Vector3.One);
             Color tint = Color.FromArgb((int)(rgb.X * 255), (int)(rgb.Y * 255), (int)(rgb.Z * 255));
             glowCentres[index] = new ParticleHalo(point, tint.ToArgb(), energy);

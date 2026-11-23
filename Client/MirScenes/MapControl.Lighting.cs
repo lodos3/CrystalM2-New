@@ -66,7 +66,8 @@ public sealed partial class MapControl
 
     private bool HasSpellLights() => Settings.Effect && Settings.SpellLightIntensityPercent > 0 &&
         (!_spellParticles.Active.IsEmpty || Effects.Count != 0 || Objects.Values.Any(ob =>
-            ob is SpellObject { Light: > 0 } || ob.Effects.Count != 0));
+            ob is SpellObject { Light: > 0 } || ob.Effects.Count != 0 ||
+            ob is PlayerObject { ParticleWings: true, Hidden: false, Dead: false }));
 
     private bool HasDaylightEmitters()
     {
@@ -186,6 +187,11 @@ public sealed partial class MapControl
         int pixelBudget = ShapedLightPixelBudget;
         foreach (MapObject actor in Objects.Values)
         {
+            if (spellIntensity > 0 && actor is PlayerObject winged && winged.TryGetWingLight(out var wingPoint, out var wingColour))
+            {
+                wingPoint = GraphicsTuning.LightPosition(LightSource.Spell, wingPoint, GraphicsTuning.Offset(GraphicsLayer.Player).Linked);
+                DrawRadialLight(2, wingPoint, TintLight(wingColour, LightSource.Spell, blind), LightSource.Spell, spellIntensity * .48f);
+            }
             if (actor.Light > 0)
             {
                 if (actor is SpellObject spell)

@@ -114,6 +114,7 @@ namespace Client.MirObjects
 
         public virtual void Load(S.UserInformation info)
         {
+            ServerWings = null;
             Id = info.RealId;
             Name = info.Name;
             Settings.LoadTrackedQuests(info.Name);
@@ -247,12 +248,13 @@ namespace Client.MirObjects
             }
         }
 
+        internal byte? ServerWings;
         private void RefreshEquipmentStats()
         {
             Weapon = -1;
             WeaponEffect = 0;
             Armour = 0;
-            WingEffect = 0;
+            WingEffect = ServerWings ?? 0;
             MountType = -1;
 
             CurrentWearWeight = 0;
@@ -281,7 +283,7 @@ namespace Client.MirObjects
                 if (realItem.Type == ItemType.Armour)
                 {
                     Armour = realItem.Shape;
-                    WingEffect = realItem.Effect;
+                    WingEffect = ServerWings ?? realItem.Effect;
                 }
                 if (realItem.Type == ItemType.Weapon)
                 {

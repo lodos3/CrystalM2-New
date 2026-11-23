@@ -16,6 +16,33 @@ internal sealed class SpellParticleRenderer
     private readonly RendererDevice _device;
     private readonly Texture _atlas;
     private readonly Dictionary<int, Texture> _posePages = new();
+    private readonly Dictionary<int, (Texture Texture, long LastUse)> _wingPages = new();
+    private long _wingUse;
+
+    private Texture WingPage(int index)
+    {
+        if (_wingPages.TryGetValue(index, out var cached))
+        {
+            _wingPages[index] = (cached.Texture, ++_wingUse);
+            return cached.Texture;
+        }
+        if (_wingPages.Count >= 24)
+        {
+            var oldest = _wingPages.MinBy(entry => entry.Value.LastUse);
+            _device.Sprite.Flush();
+            _wingPages.Remove(oldest.Key);
+            oldest.Value.Texture.Dispose();
+        }
+        var texture = Texture.CreateCoverageAtlas(_device, WingPoseAtlas.PageSize, WingPoseAtlas.PageSize, 1);
+        try
+        {
+            texture.BeginUpload().Data.Write(WingPoseAtlas.ReadPage(index));
+            texture.EndUpload();
+            _wingPages.Add(index, (texture, ++_wingUse));
+            return texture;
+        }
+        catch { texture.Dispose(); throw; }
+    }
 
     private Texture PosePage(int index)
     {
@@ -144,6 +171,7 @@ internal sealed class SpellParticleRenderer
 
         void DrawLayer(ReadOnlySpan<SpellParticle> layer, SpellParticleLayer? filter = null, bool glowPass = false)
         {
+            var layerBlend = _device.ArtworkBlend;
             foreach (ref readonly SpellParticle particle in layer)
             {
                 if (particle.Ground != ground || (emission && !particle.CastsLight) ||
@@ -201,12 +229,21 @@ internal sealed class SpellParticleRenderer
                 }
                 var source = SpellParticleAtlas.Part(particle.Shape, particle.Direction, particle.AnimationFrame(age));
                 Texture atlas = _atlas;
-                if (particle.CoveragePlane != 0)
+                if (particle.CoveragePlane < 0)
+                {
+                    var wing = WingPoseAtlas.Plane(particle.CoveragePlane);
+                    source = wing.Source;
+                    atlas = WingPage(wing.Page);
+                }
+                else if (particle.CoveragePlane > 0)
                 {
                     var plane = SpellPoseAtlas.GetPlane(particle.CoveragePlane);
                     source = plane.Source;
                     atlas = PosePage(plane.Page);
                 }
+                // These are independent channel masks. Blending one over another as alpha
+                // would discard light from the earlier channels and change the frame hue.
+                _device.ArtworkBlend = particle.CoveragePlane != 0 && !glowPass ? SpriteBlendMode.Additive : layerBlend;
                 float depth = occlusion != null && !ground && !emission && !particle.AlwaysOnTop &&
                     (particle.DepthY.HasValue || particle.Motion.HasValue)
                     ? Math.Max(1, MathF.Floor(particle.DepthAt(now) / cellHeight) - depthOrigin)
@@ -236,6 +273,7 @@ internal sealed class SpellParticleRenderer
                 else
                     _device.Sprite.DrawRotated(atlas, source, point, size, angle, tint, depth);
             }
+            _device.ArtworkBlend = layerBlend;
         }
     }
 

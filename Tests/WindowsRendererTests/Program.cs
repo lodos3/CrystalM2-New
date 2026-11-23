@@ -9,6 +9,11 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        if (args is ["--wing-preview", var data, var output])
+        {
+            ArmourWingChecks.Render(data, output);
+            return;
+        }
         if (args is ["--compare-spell-poses", var directory])
         {
             SpellPoseComparisons.Run(directory);
