@@ -29,8 +29,9 @@ namespace Client.MirObjects
         public byte Hair;
         public ushort Level;
 
-        public MLibrary WeaponLibrary1, WeaponEffectLibrary1, WeaponLibrary2, HairLibrary, WingLibrary, MountLibrary;
+        public MLibrary WeaponLibrary1, WeaponEffectLibrary1, WeaponLibrary2, HairLibrary, WingLibrary, MountLibrary, GeneratedArmourLibrary;
         public int Armour, Weapon, WeaponEffect, ArmourOffSet, HairOffSet, WeaponOffSet, WingOffset, MountOffset;
+        public byte GeneratedArmour;
 
         public int DieSound, FlinchSound, AttackSound;
 
@@ -138,7 +139,8 @@ namespace Client.MirObjects
 
             Weapon = info.Weapon;
 			WeaponEffect = info.WeaponEffect;
-			Armour = info.Armour;
+            GeneratedArmourVisual.Decode(info.Armour, out short loadedArmour, out GeneratedArmour);
+            Armour = loadedArmour;
             Light = info.Light;
 
             Poison = info.Poison;
@@ -181,7 +183,8 @@ namespace Client.MirObjects
             if (this is UserObject user) user.ServerWings = info.WingEffect;
             Weapon = info.Weapon;
 			WeaponEffect = info.WeaponEffect;
-			Armour = info.Armour;
+            GeneratedArmourVisual.Decode(info.Armour, out short updatedArmour, out GeneratedArmour);
+            Armour = updatedArmour;
             Light = info.Light;
             WingEffect = info.WingEffect;
 
@@ -601,6 +604,16 @@ namespace Client.MirObjects
                         break;
                     #endregion
                 }
+            }
+
+            // Generated CArmour overlays are painted on the original naked CArmour/00.
+            // Alternate assassin/archer poses use incompatible atlas indices.
+            GeneratedArmourLibrary = null;
+            if (GeneratedArmour > 0 && TransformType < 0 && !altAnim && Libraries.CArmours.Length > 0)
+            {
+                BodyLibrary = Libraries.CArmours[0];
+                if (GeneratedArmour < Libraries.GArmours.Length)
+                    GeneratedArmourLibrary = Libraries.GArmours[GeneratedArmour];
             }
 
             #region Common
@@ -5000,6 +5013,7 @@ namespace Client.MirObjects
             if (BodyLibrary != null)
             {
                 BodyLibrary.Draw(DrawFrame + ArmourOffSet, DrawLocation, drawColour, true);
+                GeneratedArmourLibrary?.Draw(DrawFrame + ArmourOffSet, DrawLocation, drawColour, true);
                 if (spellMask) DrawBodySpellVisual(BodyLibrary, DrawFrame + ArmourOffSet);
             }
 
