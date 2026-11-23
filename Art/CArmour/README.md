@@ -19,23 +19,41 @@ The head and pelvis use the matching CHair/00 silhouette and the base body's col
 Regenerate from the repository root with `dotnet run --project tasks/ArmourPoseBake -c Release -- Build/Client/Release/Data Art/CArmour`.
 
 
-## Original black / white / blue armour
+## Generated armour overlays: `g01` – `g99`
 
-`tasks/ArmourCreate` produces a **new** CArmour set, not a recolour of `01.Lib`. The shape is drawn around the existing 11 landmarks for each pose: jointed black enamel torso and greaves, white segmented chest plates, blue central inlays, and restrained gold collar/belt/shoulder details. The original naked frames remain underneath so uncovered skin stays consistent with animations and directional lighting.
+The authoring tool creates a **separate transparent GArmour layer**. The client draws the unchanged CArmour/00 naked body, paints the generated armour above it, then draws the normal hair, weapons and wings in the established order. The new armour is original procedural artwork (black enamel, white plates, blue inlays and gold trim). Existing armour libraries are reference silhouettes only: their pixels and material colours are not reused.
 
-The mask atlas limits generated plate coverage using the naked-body alpha (R), fitted silhouette (G) and loose examples (B). Existing armour samples define **where pieces may extend**, not the new art's colour or textures. The masks cannot infer actual depth or correctly resolve every overlapping limb, so dead/fallen and heavily foreshortened poses may need manual anchor corrections.
+The server's `@arm` command is a **GM-only, session-only visual preview**. It does not equip armour or change AC, MAC, DC, durability, item shapes, database records or any combat properties. The player-spawn and player-update packets carry a reserved negative appearance code (-1 through -99) to signal the generated visual; packet length is unchanged. Existing positive armour IDs continue to use the original graphics and item system.
 
-From the repository root on Windows, with the game's original `Data/CArmour/00.Lib` available, choose a **new unused two-digit number** (for example `NN`, not necessarily `13`):
+### Build and install generated `g01`
+
+Run in the repository root on **Windows**, with the existing client Data assets present:
 
 ```powershell
+dotnet run --project Tests/GeneratedArmourVisualTests -c Release
 dotnet run --project Tests/ArmourAuthoringTests -c Release -- Art/CArmour
-dotnet run --project tasks/ArmourCreate -c Release -- "Build/Client/Release/Data" "Art/CArmour" "Build/Client/Release/Data/CArmour/NN.Lib" "Art/CArmour/NN-preview.png"
+dotnet run --project tasks/ArmourCreate -c Release -- "Build/Client/Release/Data" "Art/CArmour" "Build/Client/Release/Data/GArmour/01.Lib" "Art/CArmour/g01-preview.png"
+dotnet build Client/Client.csproj -c Release
+dotnet build Server.MirForms/Server.csproj -c Release
 ```
 
-Replace `NN` with an actual unused CArmour slot. The generator refuses to overwrite an existing library or preview, writes to a temporary file before publishing, and reopens the result through `LegacyMirLibReader`. It writes the same v3 GZip-BGRA layout the current `MLibrary` supports, with the naked source's masks and shadow metadata preserved. The preview contains north-facing, walking, combat and female samples. Restart the client so `Libraries.CArmours` enumerates the new numbered file.
+The `GArmour` directory is created automatically. `01.Lib` maps to `g01`, `02.Lib` to `g02`, and so on through `99.Lib`. Existing numbers in `CArmour` are unaffected. The generator refuses to overwrite an existing generated armour file or preview, writes via a temporary file and verifies sample frames with the same LIB decoder used by production. It also checks the generated frames are **transparent overlays**, not duplicate bodies or inherited baked shadows.
 
-**Using it in-game:** Adding a `.Lib` alone does not equip or register an item. Set up an armour item in the existing server item database with its `Shape` referring to the new CArmour index, using the normal item-editor workflow; do not edit account or world database binaries to force a shape. A client's existing armour shape must also be within its loaded CArmour library array.
+**Restart the new client** after adding an asset so `Libraries.GArmours` discovers the newly added bank. Supply the same `GArmour/NN.Lib` asset to every player's client if others should see it; the server does not transfer these libraries over the network.
 
-**Scope:** This generator targets the standard `CArmour` character bank (warrior/wizard/taoist and compatible shared poses). Assassin `AArmour` and archer alternate `ARArmour` use different frame layouts and need separately baked anchor atlases. It does not replace the live renderer, item schema, or original artwork.
+In-game, using a GM account:
 
-The generated library and preview are local build outputs, not committed binary assets. Validate the appearance in-game by walking/attacking in eight directions on both genders before using the set for live players.
+```text
+@arm PlayerName g01
+@arm PlayerName g02
+@arm PlayerName off
+```
+
+The appearance changes immediately for the target player and nearby players. A new viewer receives it from the player-spawn packet. `off` returns to the appearance provided by the character's equipped armour. The override also ends on disconnect; it is deliberately not stored in the character database.
+
+### Constraints
+
+- Generated `gNN` looks are visual-only previews, not traditional item `Shape` IDs. Do **not** add them to normal item tables or overwrite any `CArmour/*.Lib` file.
+- Character models that use classic CArmour frame indices are supported. The special alternate animation banks for Assassin and Archer have different frame numbering. Those frames fall back to their existing naked base until separate AArmour/ARArmour mask atlases are authored. Transformed characters do not use the overlay.
+- The 11 anatomical anchors and RGB coverage maps are estimates, not rigged 3D bone meshes. Fallen and severely foreshortened poses may require hand-edited anchor positions.
+- Source `CArmour/00.Lib` is required **locally** for generation and is not in the GitHub repository. The generated `.Lib` and preview are local build outputs. Preview, build and live appearance must be checked on both genders, all eight directions, movement, attacks and death poses before release.
