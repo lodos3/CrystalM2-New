@@ -7,6 +7,59 @@ using Vortice.Direct3D;
 
 internal static class ArmourWingChecks
 {
+    // These designs are geometry-only and can be checked without a GPU or
+    // installed LIB files. Exercise actual production emission and selectors.
+    internal static void CheckElementalDesigns()
+    {
+        for (int id = 10; id < 20; id++)
+        {
+            if (!ArmourWings.TrySelect(id.ToString(), out byte? selection) ||
+                selection != 118 + id - 10 || !ArmourWings.IsParticle(selection.Value))
+                throw new InvalidDataException($"Incorrect elemental wing selector {id}.");
+            byte effect = selection.Value;
+            var pool = new SpellParticlePool(ArmourWingParticles.ParticleCapacity);
+            foreach (MirDirection facing in Enum.GetValues<MirDirection>())
+            foreach (int time in new[] { 0, 233, 719, 1530, 3100 })
+            {
+                Vector2 shoulder = ArmourWingParticles.Shoulder(effect, false);
+                ArmourWingParticles.Emit(pool, effect, 0, 0, shoulder, facing, time, 101);
+                var full = pool.Active.ToArray();
+                if (full.Length < 12 || full.Length >= pool.Capacity ||
+                    full.Any(p => p.CoveragePlane != 0 || p.Colour.A == 0 || p.Ground ||
+                        !float.IsFinite(p.Origin.X) || !float.IsFinite(p.Origin.Y)))
+                    throw new InvalidDataException($"Invalid procedural effect {id}, {facing}.");
+                if (full.Select(p => p.Shape).Distinct().Count() < 2 ||
+                    !full.Any(p => p.Layer == SpellParticleLayer.Emissive) ||
+                    !full.Any(p => p.Layer == SpellParticleLayer.EmissiveCore))
+                    throw new InvalidDataException($"Missing material layers for {id}.");
+                foreach (var particle in full)
+                {
+                    if (particle.Ribbon is { } quad &&
+                        (!float.IsFinite(quad.TopLeft.X) || !float.IsFinite(quad.BottomRight.Y) ||
+                        quad.Bounds(particle.Origin).Width <= 0 || quad.Bounds(particle.Origin).Height <= 0))
+                        throw new InvalidDataException($"Degenerate elemental surface {id}.");
+                }
+                int near = ArmourWingParticles.NearSide(facing);
+                ArmourWingParticles.Emit(pool, effect, 0, 0, shoulder, facing, time, 101, -near);
+                int farCount = pool.Active.Length;
+                ArmourWingParticles.Emit(pool, effect, 0, 0, shoulder, facing, time, 101, near);
+                if (farCount == 0 || pool.Active.Length == 0 || farCount + pool.Active.Length != full.Length)
+                    throw new InvalidDataException($"Incorrect elemental occlusion split {id}.");
+                Vector2 movement = new(18, 12);
+                ArmourWingParticles.Emit(pool, effect, 0, 0, shoulder + movement, facing, time, 101);
+                var moved = pool.Active.ToArray();
+                if (moved.Length != full.Length) throw new InvalidDataException("Pose changed the particle budget.");
+                for (int i = 0; i < full.Length; i++)
+                    if (Vector2.Distance(moved[i].Origin - full[i].Origin, movement) > .01f)
+                        throw new InvalidDataException($"Elemental effect {id} detached from body motion.");
+            }
+        }
+        if (ArmourWings.TrySelect("20", out _) || ArmourWings.TrySelect("-1", out _) ||
+            ArmourWings.IsParticle(128))
+            throw new InvalidDataException("Invalid elemental wing ID accepted.");
+        Console.WriteLine("Verified ten elemental designs across eight facings, five times, split layers and pose motion.");
+    }
+
     internal static void Render(string data, string output)
     {
         const int previewWidth = 224, previewHeight = 180;
@@ -17,7 +70,9 @@ internal static class ArmourWingChecks
         device.SetRenderTarget(surface);
         var pool = new SpellParticlePool(ArmourWingParticles.ParticleCapacity);
         using var armour = new LegacyMirLibReader(File.OpenRead(Path.Combine(data, "CArmour", "00.Lib")));
-        string[] labels = ["Silver", "Gold", "Phoenix", "Frost", "Moon Moth", "Celestial Electric", "Fel Fire", "Demonic Bone", "Archangel", "Dawn Seraph"];
+        string[] labels = ["Silver", "Gold", "Phoenix", "Frost", "Moon Moth", "Celestial Electric", "Fel Fire", "Demonic Bone", "Archangel", "Dawn Seraph",
+            "Magma Wyrm", "Tidal Leviathan", "Geode Titan", "Tempest", "Verdant Monarch",
+            "Thunderstorm", "Venom", "Solar Ascendant", "Eclipse", "Astral Convergence"];
         // First eight rows are the original direction comparison. Additional
         // rows exercise body motion at a fixed wing animation time.
         (MirDirection Facing, int BodyFrame)[] extra =
@@ -34,8 +89,9 @@ internal static class ArmourWingChecks
         CheckBlendKeepsColour();
         CheckNorthFelFireTips();
         CheckGeneratedVolume();
+        CheckElementalDesigns();
         if (!ArmourWings.TrySelect("auto", out var auto) || auto.HasValue ||
-            !ArmourWings.TrySelect("off", out var off) || off != 0 || ArmourWings.TrySelect("10", out _) ||
+            !ArmourWings.TrySelect("off", out var off) || off != 0 || ArmourWings.TrySelect("20", out _) ||
             !ArmourWings.TrySelect("8", out var archangel) || archangel != ArmourWings.Archangel ||
             !ArmourWings.TrySelect("9", out var dawn) || dawn != ArmourWings.DawnSeraph ||
             !ArmourWings.TrySelect("6", out var fel) || fel != ArmourWings.FelFire ||
@@ -61,7 +117,8 @@ internal static class ArmourWingChecks
             if (pool.Active.Length < 3 || pool.Active.Length >= pool.Capacity)
                 throw new InvalidOperationException($"Invalid particle count for {labels[id]}.");
             bool behind = id >= 2 && facing is (MirDirection.Down or MirDirection.DownLeft or MirDirection.DownRight);
-            bool split = id >= 2 && facing is (MirDirection.Left or MirDirection.Right);
+            bool split = ArmourWings.IsAura(effect.Value) ||
+                (id >= 2 && facing is (MirDirection.Left or MirDirection.Right));
             int near = ArmourWingParticles.NearSide(facing);
             if (split)
             {
@@ -73,7 +130,7 @@ internal static class ArmourWingChecks
             device.Sprite.Draw(body, null, new Vector3(origin.X + actor.OffsetX, origin.Y + actor.OffsetY, 0), Vector4.One);
             if (split)
                 ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, near);
-            if (!behind) Wings();
+            if (split || !behind) Wings();
             using var image = device.Capture(surface);
             canvas.DrawImageUnscaled(image, id * previewWidth, 30 + row * previewHeight);
             if (row == 0) canvas.DrawString($"{id}   {labels[id]}", SystemFonts.MessageBoxFont!, Brushes.White, id * previewWidth + 12, 8);

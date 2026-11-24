@@ -32,7 +32,12 @@ internal static class ArmourWingParticles
         1 => 0xA9CCFF, 2 => 0xFFAF48, ArmourWings.Phoenix => 0xFF7635,
         ArmourWings.Frost => 0x68DEFF, ArmourWings.CelestialElectric => 0xA5ACFF,
         ArmourWings.FelFire => 0x9CF438, ArmourWings.DemonicBone => 0xB34241,
-        ArmourWings.Archangel => 0xCBDFFF, ArmourWings.DawnSeraph => 0xFFD28B, _ => 0xB78AFF
+        ArmourWings.Archangel => 0xCBDFFF, ArmourWings.DawnSeraph => 0xFFD28B,
+        ArmourWings.MagmaWyrm => 0xFF7430, ArmourWings.TidalLeviathan => 0x52CDE5,
+        ArmourWings.GeodeTitan => 0x96B7C6, ArmourWings.Tempest => 0xB7F1E8,
+        ArmourWings.VerdantMonarch => 0x83D052, ArmourWings.Thunderstorm => 0x82A9FF,
+        ArmourWings.Venom => 0xB9EA47, ArmourWings.SolarAscendant => 0xFFD36B,
+        ArmourWings.Eclipse => 0x9466DC, ArmourWings.AstralConvergence => 0x9CA8FF, _ => 0xB78AFF
     } | unchecked((int)0xFF000000));
 
     internal static void Emit(SpellParticlePool pool, byte effect, int bank, int pose, Vector2 shoulder,
@@ -53,6 +58,11 @@ internal static class ArmourWingParticles
             return;
         }
         if (!ArmourWings.IsParticle(effect)) return;
+        if (ArmourWings.IsElemental(effect))
+        {
+            EmitElemental(pool, effect, shoulder, direction, now, seed, onlySide);
+            return;
+        }
 
         float yaw = (int)direction * (MathF.PI / 4);
         Vector2 across = new(MathF.Cos(yaw), MathF.Sin(yaw) * .49f);
@@ -192,6 +202,280 @@ internal static class ArmourWingParticles
                 Layer: SpellParticleLayer.EmissiveCore, FrameOnly: true));
         }
     }
+    // Original geometry built from shared particle brushes. No wing pose
+    // atlas, external LIB, per-character texture creation or per-frame heap
+    // allocations are needed for these ten styles.
+    private static void EmitElemental(SpellParticlePool pool, byte effect, Vector2 shoulder,
+        MirDirection direction, long now, uint seed, int onlySide)
+    {
+        float yaw = (int)direction * MathF.PI / 4;
+        Vector2 across = new(MathF.Cos(yaw), MathF.Sin(yaw) * .49f);
+        Vector2 back = new(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f);
+        float profile = MathF.Abs(MathF.Sin(yaw));
+        float clock = (now % 4800) * MathF.Tau / 4800 + (seed % 97) * .065f;
+        Vector2 attachment = BackAttachment(shoulder, direction);
+        int nearSide = NearSide(direction);
+        int light = LightColour(effect).ToArgb() & 0xFFFFFF;
+
+        // Particle colour is deliberately not full white: the cool/warm
+        // surface, luminous ridge and shadowed underside stay distinguishable.
+        void Dot(Vector2 position, float width, float height, Shape shape, int rgb, int alpha,
+            SpellParticleLayer layer = SpellParticleLayer.Emissive, float rotation = 0)
+        {
+            int w = Math.Max(1, (int)MathF.Round(width));
+            pool.TryAdd(new SpellParticle(position, Vector2.Zero, now, 100, w,
+                Color.FromArgb(Math.Clamp(alpha, 1, 255), Color.FromArgb(unchecked((int)0xFF000000) | rgb)),
+                shape, 0, Aspect: Math.Max(1f, height) / w, Rotation: rotation, Layer: layer,
+                CastsLight: false, FrameOnly: true));
+        }
+
+        void Strip(Vector2 a, Vector2 b, float wa, float wb, Shape shape, int rgb, int alpha,
+            SpellParticleLayer layer = SpellParticleLayer.Emissive)
+        {
+            Vector2 axis = b - a;
+            if (axis.LengthSquared() < .15f) return;
+            Vector2 n = Vector2.Normalize(new Vector2(-axis.Y, axis.X));
+            Vector2 mid = (a + b) * .5f;
+            var quad = new SpriteQuad(a - mid - n * wa, b - mid - n * wb,
+                a - mid + n * wa, b - mid + n * wb);
+            pool.TryAdd(new SpellParticle(mid, Vector2.Zero, now, 100, 1,
+                Color.FromArgb(Math.Clamp(alpha, 1, 255), Color.FromArgb(unchecked((int)0xFF000000) | rgb)),
+                shape, 0, Layer: layer, CastsLight: false, FrameOnly: true, Ribbon: quad));
+        }
+
+        if (ArmourWings.IsAura(effect))
+        {
+            // Orbit half-selection is based on actual projected ground depth,
+            // not the facing's left/right order. Far half draws before body,
+            // near half after body. Both halves translate with the same pose.
+            const int steps = 24;
+            float pulse = .5f + .5f * MathF.Sin(clock * 2);
+            Vector2 centre = shoulder + new Vector2(0, 17);
+            for (int i = 0; i < steps; i++)
+            {
+                float a = i * MathF.Tau / steps + clock * .38f;
+                float b = a + MathF.Tau / steps;
+                float mid = (a + b) * .5f;
+                int side = MathF.Sin(mid) >= 0 ? nearSide : -nearSide;
+                if (onlySide != 0 && onlySide != side) continue;
+
+                if (effect == ArmourWings.SolarAscendant)
+                {
+                    Vector2 Ring(float q) => centre + new Vector2(MathF.Cos(q) * (28 + pulse * 2),
+                        MathF.Sin(q) * 12 - 12);
+                    Vector2 x = Ring(a), y = Ring(b);
+                    Strip(x, y, 3, 3, Shape.WindRibbon, 0xB46B22, 170);
+                    Strip(x, y, 1.2f, 1.2f, Shape.WindRibbon, 0xFFDD7D, 195, SpellParticleLayer.EmissiveCore);
+                    if (i % 2 == 0)
+                    {
+                        Vector2 ray = new(MathF.Cos(mid) * 7, MathF.Sin(mid) * 4 - 5);
+                        Strip(x, x + ray, 2.4f, .3f, Shape.WindRibbon, 0xE99035, 190);
+                        Dot(x + ray, 4, 7, Shape.Spark, 0xFFF1BB, 170, SpellParticleLayer.EmissiveCore);
+                    }
+                }
+                else if (effect == ArmourWings.Eclipse)
+                {
+                    Vector2 Ring(float q) => centre + new Vector2(MathF.Cos(q) * 29,
+                        MathF.Sin(q) * 13 - 8);
+                    Vector2 x = Ring(a), y = Ring(b);
+                    Strip(x, y, 5, 5, Shape.WindRibbon, 0x251635, 210);
+                    Strip(x, y, 1, 1, Shape.WindRibbon, 0xA15CEA, 160, SpellParticleLayer.EmissiveCore);
+                    if (i % 3 == 0)
+                    {
+                        Vector2 end = x + new Vector2(5 * MathF.Sin(mid * 3 + clock),
+                            -18 - 12 * (.5f + .5f * MathF.Cos(mid + clock)));
+                        Strip(x, end, 5, .5f, Shape.WindRibbon, 0x582875, 145);
+                        Dot(end, 5, 8, Shape.Wisp, 0xB890F8, 115, SpellParticleLayer.EmissiveCore);
+                    }
+                }
+                else
+                {
+                    // Two inclined orbital planes cross above the waist.
+                    for (int ring = 0; ring < 2; ring++)
+                    {
+                        float slope = ring == 0 ? .54f : -.54f;
+                        Vector2 Orbit(float q) => centre + new Vector2(32 * MathF.Cos(q),
+                            11 * MathF.Sin(q) + slope * 32 * MathF.Cos(q) - 15);
+                        Vector2 x = Orbit(a), y = Orbit(b);
+                        Strip(x, y, 1.9f, 1.9f, Shape.WindRibbon,
+                            ring == 0 ? 0x4B74C4 : 0x7953B8, 135);
+                        Strip(x, y, .7f, .7f, Shape.WindRibbon, 0xBEC9FF, 175, SpellParticleLayer.EmissiveCore);
+                        if ((i + ring) % 6 == 0)
+                            Dot(x, 6, 6, Shape.Flash, ring == 0 ? 0xDCEFFF : 0xE5BEFF,
+                                190, SpellParticleLayer.EmissiveCore);
+                    }
+                }
+            }
+            return;
+        }
+
+        foreach (int side in Sides)
+        {
+            if (onlySide != 0 && side != onlySide) continue;
+            bool near = profile < .001f || side == nearSide;
+            Vector2 root = attachment + across * (side * 5.5f);
+            float flap = MathF.Sin(clock * 2 + (near ? 0 : .45f));
+            float sweep = 22 + profile * (near ? 23 : 12);
+            // A bent, volumetric fan: the direct side projection still has
+            // a rearward sweep and visible material width. Tip coordinates
+            // can lift/drop independently without moving the root.
+            Vector2 P(float u, float height, float depth = 0)
+            {
+                float spread = effect == ArmourWings.GeodeTitan ? 44 : 55;
+                float s = u * (spread + 3 * flap);
+                float rear = u * sweep + 7 * u * u + depth;
+                float projectedX = across.X * side * s + back.X * rear;
+                // Diagonal cancellation is avoided with a small outward
+                // bias that grows only away from the attachment.
+                if (profile > .55f && profile < .9f)
+                    projectedX += back.X * 7 * u;
+                return root + new Vector2(projectedX,
+                    across.Y * side * s + back.Y * rear - height - 3 * u * flap);
+            }
+
+            // A material blade uses a shadowed underside, convex coloured
+            // surface and narrow highlight. Brush is lengthwise on the quad.
+            void Blade(Vector2 a, Vector2 b, float width, int dark, int body, int rim)
+            {
+                Vector2 axis = b - a;
+                if (axis.LengthSquared() < .15f) return;
+                Vector2 n = Vector2.Normalize(new Vector2(-axis.Y, axis.X));
+                Vector2 shade = n * (width * .35f) + new Vector2(0, 1.4f);
+                Strip(a + shade, b + shade * .25f, width, width * .18f, Shape.WindRibbon, dark, near ? 225 : 182);
+                Strip(a, b, width * .84f, width * .10f, Shape.WindRibbon, body, near ? 228 : 190);
+                Strip(a - n * width * .34f, b, width * .19f, .25f, Shape.WindRibbon, rim, 158,
+                    SpellParticleLayer.EmissiveCore);
+            }
+
+            switch (effect)
+            {
+                case ArmourWings.MagmaWyrm:
+                    for (int i = 0; i < 5; i++)
+                    {
+                        float t = i / 4f;
+                        Vector2 joint = P(.36f + .12f * t, 13 - 22 * t, 3);
+                        Vector2 tip = P(.62f + .38f * t, 35 - 67 * t, 5);
+                        Blade(root, joint, 6, 0x3D1A1B, 0x8A3024, 0xFF8735);
+                        Blade(joint, tip, 5.5f, 0x402023, 0xA83D23, 0xFFAA45);
+                        Dot(tip + new Vector2(0, -3 - 4 * MathF.Sin(clock * 3 + i)), 5, 9,
+                            Shape.FlameTongue, 0xFF9D3A, 180, SpellParticleLayer.EmissiveCore);
+                    }
+                    break;
+
+                case ArmourWings.TidalLeviathan:
+                    for (int i = 0; i < 5; i++)
+                    {
+                        float t = i / 4f;
+                        Vector2 bend = P(.39f + .10f * t, 13 - 23 * t, 4);
+                        Vector2 tip = P(.72f + .28f * t, 27 - 53 * t + 4 * MathF.Sin(clock * 3 + i), 8);
+                        Blade(root, bend, 5.5f, 0x143B5B, 0x2379A0, 0x7AD9F0);
+                        Blade(bend, tip, 6.5f, 0x173D69, 0x369FC2, 0xB0F3FF);
+                        Dot(Vector2.Lerp(bend, tip, .8f), 5, 5, Shape.Orb, 0xBCEEFF, 122,
+                            SpellParticleLayer.EmissiveCore);
+                    }
+                    break;
+
+                case ArmourWings.GeodeTitan:
+                    for (int i = 0; i < 6; i++)
+                    {
+                        float t = i / 5f;
+                        Vector2 start = P(.12f + .07f * i, 8 - i * 4, 2);
+                        Vector2 tip = P(.63f + .32f * MathF.Sin(t * MathF.PI), 33 - 58 * t, 8);
+                        Vector2 d = tip - start;
+                        Blade(start, tip, 8.5f - 3 * t, 0x25323B, 0x678B9F, 0xC8E4EB);
+                        Dot(Vector2.Lerp(start, tip, .64f), 8, 17, Shape.Shard,
+                            i % 2 == 0 ? 0x80D1DD : 0xB2C7FF, 185, SpellParticleLayer.EmissiveCore,
+                            MathF.Atan2(d.Y, d.X) + MathF.PI / 2);
+                    }
+                    Dot(root, 13, 17, Shape.UserRock, 0x526573, 235);
+                    break;
+
+                case ArmourWings.Tempest:
+                    for (int i = 0; i < 4; i++)
+                    {
+                        float t = i / 3f;
+                        Vector2 last = root;
+                        for (int j = 1; j <= 5; j++)
+                        {
+                            float u = j / 5f;
+                            Vector2 next = P(u * (.78f + .22f * t),
+                                u * (32 - 61 * t) + 8 * MathF.Sin(u * MathF.PI + clock + i) * u,
+                                5 * MathF.Sin(u * MathF.PI));
+                            Strip(last, next, 3.8f * (1 - .6f * u), 3.3f * (1 - .7f * u),
+                                Shape.WindRibbon, 0x6DA6B4, 150);
+                            Strip(last, next, .9f, .65f, Shape.WindRibbon, 0xD1F6EF, 160,
+                                SpellParticleLayer.EmissiveCore);
+                            last = next;
+                        }
+                        Dot(last, 7, 8, Shape.MistFilament, 0xCBEBE6, 124);
+                    }
+                    break;
+
+                case ArmourWings.VerdantMonarch:
+                    for (int i = 0; i < 5; i++)
+                    {
+                        float t = i / 4f;
+                        Vector2 joint = P(.39f, 15 - 29 * t, 4);
+                        Vector2 tip = P(.67f + .33f * t, 29 - 58 * t, 6);
+                        Blade(root, joint, 4.8f, 0x193A24, 0x47783B, 0x97CE65);
+                        Blade(joint, tip, 7, 0x25472A, 0x598F3A, 0xB0D878);
+                        Vector2 vein = tip - joint;
+                        Dot(Vector2.Lerp(joint, tip, .62f), 7, 16, Shape.Feather,
+                            0x80B94F, 195, SpellParticleLayer.Emissive,
+                            MathF.Atan2(vein.Y, vein.X) + MathF.PI / 2);
+                        Dot(tip + new Vector2(0, -3), 3, 4, Shape.Spark, 0xF0ECA4, 140,
+                            SpellParticleLayer.EmissiveCore);
+                    }
+                    break;
+
+                case ArmourWings.Thunderstorm:
+                    for (int i = 0; i < 4; i++)
+                    {
+                        float t = i / 3f;
+                        Vector2 previous = root;
+                        for (int j = 1; j <= 6; j++)
+                        {
+                            float u = j / 6f;
+                            float jag = j == 6 ? 0 : 6 * MathF.Sin(clock * 4 + j * 5.31f + i * 2.4f);
+                            Vector2 next = P(u * (.85f + .15f * t), u * (36 - 67 * t) + jag, 3 + u * 5);
+                            Strip(previous, next, 3.5f, 2.4f, Shape.WindRibbon, 0x3653AC, 175);
+                            Strip(previous, next, .85f, .65f, Shape.WindRibbon, 0xD2E8FF, 225,
+                                SpellParticleLayer.EmissiveCore);
+                            previous = next;
+                        }
+                        Dot(previous, 6, 6, Shape.Flash, 0xADC9FF, 180, SpellParticleLayer.EmissiveCore);
+                    }
+                    break;
+
+                case ArmourWings.Venom:
+                    for (int i = 0; i < 5; i++)
+                    {
+                        float t = i / 4f;
+                        Vector2 joint = P(.46f, 18 - 29 * t, 5);
+                        Vector2 tip = P(.70f + .30f * t, 28 - 58 * t, 6);
+                        Blade(root, joint, 6.5f, 0x223C25, 0x52682B, 0x9ED949);
+                        Blade(joint, tip, 7, 0x263F21, 0x618A30, 0xC6F45F);
+                        float drip = (clock / MathF.Tau * 2 + i * .271f) % 1;
+                        Dot(tip + new Vector2(0, 12 * drip), 4, 7, Shape.Orb, 0xBCEB42,
+                            (int)(180 * (1 - drip) + 10), SpellParticleLayer.EmissiveCore);
+                    }
+                    break;
+            }
+
+            // A physical-looking shoulder socket masks small gaps and
+            // gives the thin edges a visibly attached, rounded root.
+            int socket = effect switch
+            {
+                ArmourWings.MagmaWyrm => 0x702A22, ArmourWings.TidalLeviathan => 0x24586C,
+                ArmourWings.GeodeTitan => 0x536B77, ArmourWings.Tempest => 0x658A95,
+                ArmourWings.VerdantMonarch => 0x3D5930, ArmourWings.Thunderstorm => 0x344A80,
+                _ => 0x465D24
+            };
+            Dot(root, 10, 13, Shape.Orb, socket, 210);
+            Dot(root - new Vector2(1, 2), 5, 7, Shape.Wisp, light, 128, SpellParticleLayer.EmissiveCore);
+        }
+    }
+
     private static readonly int[] Sides = [-1, 1];
 }
 

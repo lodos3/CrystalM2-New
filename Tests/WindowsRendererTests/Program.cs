@@ -19,6 +19,8 @@ internal static class Program
             SpellPoseComparisons.Run(directory);
             return;
         }
+        ArmourWingChecks.CheckElementalDesigns();
+        if (args is ["--elemental-wings"]) return;
         SpellVfxAssetChecks.Run();
         if (args is ["--spell-vfx-assets"]) return;
 

@@ -87,7 +87,7 @@ namespace Client.MirObjects
         private bool DrawWingsBehindBody => WingEffect >= ArmourWings.Phoenix && ParticleWings &&
             Direction is MirDirection.Down or MirDirection.DownLeft or MirDirection.DownRight;
         private bool SplitParticleWings => WingEffect >= ArmourWings.Phoenix && ParticleWings &&
-            Direction is MirDirection.Left or MirDirection.Right;
+            (ArmourWings.IsAura(WingEffect) || Direction is MirDirection.Left or MirDirection.Right);
         private short StanceDelay = 2500;
 
         //ArcherSpells - Elemental system
@@ -4933,10 +4933,8 @@ namespace Client.MirObjects
             }
             else
             {
-                if (!DrawWingsBehindBody && (this != User || ParticleWings))
-                {
-                    DrawWings();
-                }
+                if (SplitParticleWings) DrawWingSide(ArmourWingParticles.NearSide(Direction));
+                else if (!DrawWingsBehindBody && (this != User || ParticleWings)) DrawWings();
                 DrawHead();
             }
             
