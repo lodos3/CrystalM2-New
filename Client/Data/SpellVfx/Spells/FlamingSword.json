@@ -42,7 +42,7 @@
         "ColourOverLifetime": [
           {
             "Time": 0,
-            "Colour": "#FFCE65"
+            "Colour": "#FFE09A"
           },
           {
             "Time": 0.21,
@@ -95,7 +95,7 @@
         "ColourOverLifetime": [
           {
             "Time": 0,
-            "Colour": "#FFE38C"
+            "Colour": "#FFF4C8"
           },
           {
             "Time": 0.39,
@@ -212,7 +212,7 @@
           { "Time": 1, "Value": 0.32 }
         ],
         "ColourOverLifetime": [
-          { "Time": 0, "Colour": "#FFDE86" },
+          { "Time": 0, "Colour": "#FFF0B2" },
           { "Time": 0.27, "Colour": "#FF9B36" },
           { "Time": 0.66, "Colour": "#E84618" },
           { "Time": 1, "Colour": "#8C2616" }

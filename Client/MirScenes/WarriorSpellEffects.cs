@@ -558,12 +558,16 @@ internal static partial class WarriorSpellEffects
         float release = Ease((progress - tuning.Release) / tuning.ReleaseDivisor) *
             (1 - Ease((progress - tuning.Release2) / tuning.ReleaseDivisor2));
         Vector2 frost = feet + ProjectGround(heading * 15) - Vector2.UnitY * 22;
+        float anticipation = Ease(progress * 7) * (1 - Ease((progress - .28f) / .22f));
+        frame.Sprite(frost, 26 + release * 10, 19 + release * 7, Shape.Flash, 0xD7F4FF,
+            anticipation * .48f + release * .32f, Layer.EmissiveCore, light: true,
+            emitter: "WarriorSpellEffects.Avalanche.FrostPulse");
         for (int i = 0; i < 5; i++)
         {
             float offset = (i - 2) * 7f;
             frame.Clip(frost + ProjectGround(side * offset), 24 + i * 2, 15,
                 Shape.SmokeSequence, progress * 1.4f + i * .19f,
-                i % 2 == 0 ? 0xC6EEFF : 0x8C9CE8, release * .25f,
+                i % 2 == 0 ? 0xC6EEFF : 0x8C9CE8, anticipation * .18f + release * .25f,
                 Layer.Smoke, sortY: feet.Y, emitter: "WarriorSpellEffects.Avalanche.FrostRelease");
         }
 

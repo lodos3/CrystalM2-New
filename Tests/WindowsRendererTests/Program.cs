@@ -374,6 +374,9 @@ internal static class Program
         foreach (Spell spell in spells)
         {
             Check(LegacySpellEffects.HasProfile(spell), $"Author a particle profile for {spell}.");
+            // This spell intentionally has no separate impact; the swing below
+            // and the dedicated all-direction tests verify its visible art.
+            if (spell == Spell.CrossHalfMoon) continue;
             bool field = spell is Spell.FireWall or Spell.Blizzard or Spell.MeteorStrike;
             var phase = field ? SpellVisualPhase.Field : SpellVisualPhase.Impact;
             long sampleTime = spell switch
@@ -744,6 +747,11 @@ internal static class Program
             spikes.Max(p => p.Origin.X) > feet.X + 132 &&
             advancing.Where(p => p.Shape == SpellParticleShape.WarriorDust).Select(p => p.Origin.Y).Distinct().Count() >= 5,
             "Blade Avalanche gathers at the warrior, then sends spreading lanes and rising spikes forward.");
+        Check(initial.Length > 0 && initial.All(p => p.Shape is not (SpellParticleShape.Filament or SpellParticleShape.WarriorTripleCut)),
+            "Blade Avalanche must anticipate with frost rather than long pre-swing lines.");
+        Check(advancing.Any(p => p.Shape == SpellParticleShape.SmokeSequence && p.Colour.B > p.Colour.R) &&
+            spikes.Any(p => p.Colour.B > p.Colour.R && p.Colour.R > p.Colour.G),
+            "Blade Avalanche needs cool mist and distinct violet shard tips.");
         SpellParticle[] fire = Sample(Spell.FlamingSword, SpellVisualPhase.Contact, 240, 640);
         Check(fire.Any(p => p.Shape == SpellParticleShape.FlameSequence && p.Ground && p.CastsLight) &&
             fire.Any(p => p.Shape == SpellParticleShape.FlameSequence && p.Emissive && p.Origin.Y < feet.Y - 40),

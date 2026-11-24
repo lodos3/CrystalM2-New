@@ -57,7 +57,9 @@ internal static class SpellVfxAssetChecks
                 Check(surfaces.Any(p => p.Ground && p.GroundDepth < feet.Y) &&
                     surfaces.Any(p => !p.Ground && p.GroundDepth >= feet.Y),
                     "The release must wrap both behind and in front of the warrior.");
-                Check(surfaces.Max(p => MathF.Abs(p.Origin.X - feet.X)) > 65,
+                Check(surfaces.SelectMany(p => new[] { p.Origin + p.Ribbon!.Value.TopLeft,
+                    p.Origin + p.Ribbon.Value.TopRight, p.Origin + p.Ribbon.Value.BottomLeft,
+                    p.Origin + p.Ribbon.Value.BottomRight }).Max(p => MathF.Abs(p.X - feet.X)) > 65,
                     "The Cross Half Moon release must extend well beyond the previous short sweep.");
             }
             var offset = new Vector2(23, -17);
@@ -245,8 +247,8 @@ internal static class SpellVfxAssetChecks
 
         var before = SampleFlame();
         var emitters = SpellVfxAssets.CollectEmitters(() => SampleFlame());
-        Check(emitters.Keys.ToHashSet().SetEquals(["Blade.Hot-core", "Blade.Heat-sheet", "Blade.Wake-glow"]),
-            "Flaming Sword must expose independent core, heat sheet and glow layers.");
+        Check(emitters.Keys.ToHashSet().SetEquals(["Blade.Hot-core", "Blade.Heat-sheet", "Blade.Wake-glow", "Blade.Flame-teeth"]),
+            "Flaming Sword must expose independent core, heat sheet, glow and sharpened flame-edge layers.");
         CheckFlameMotion(pool, feet);
 
         pool.Clear();

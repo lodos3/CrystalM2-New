@@ -454,7 +454,8 @@ internal static partial class WarriorSpellEffects
                     (striking ? tuning.Jitter2 : tuning.Jitter3);
                 Vector2 point = pose.Hilt + blade * along +
                     normal * (jitter + (behind ? tuning.Point : tuning.Point2));
-                int colour = step % 4 == 0 ? White : Ice;
+                int colour = behind ? (step % 3 == 0 ? 0xEAF8FF : 0x318FFF) :
+                    (step % 3 == 1 ? 0x55BAFF : 0xF9FDFF);
                 frame.Thread(previous, point, tuning.ThreadStartWidth, tuning.ThreadEndWidth, colour,
                     behind ? tuning.ThreadAlpha : tuning.ThreadAlpha2, layer,
                     light: !behind && step == segments / 2, sortY: depth, emitter: "WarriorSpellEffects.Weapons.DrawWeaponEnchant.3");
@@ -486,7 +487,7 @@ internal static partial class WarriorSpellEffects
             float fade = tuning.Fade * (1 - age * tuning.Fade2);
             frame.Sprite(point, tuning.SparkWidth + frame.Unit(sample + 19) * tuning.SparkWidth2,
                 tuning.SparkHeight + frame.Unit(sample + 23) * tuning.SparkHeight2, tuning.SparkShape,
-                i % 3 == 0 ? White : Ice, fade, layer,
+                i % 3 == 1 ? 0x389DFF : 0xF5FCFF, fade, layer,
                 sortY: depth, emitter: "WarriorSpellEffects.Weapons.DrawWeaponEnchant.5");
             if (i % 9 == 0)
                 frame.Sprite(root, tuning.WispWidth, tuning.WispHeight, tuning.WispShape, tuning.WispColour,
