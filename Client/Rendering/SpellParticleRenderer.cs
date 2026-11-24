@@ -52,8 +52,18 @@ internal sealed class SpellParticleRenderer
             DataRectangle upload = _atlas.BeginUpload();
             upload.Data.Write(SpellParticleAtlas.Generate());
             _atlas.EndUpload();
+            // Material generation and uploads happen at renderer creation,
+            // not on the first in-game @wings selection.
+            for (int i = 0; i < WingPoseAtlas.ElementalPageCount; i++)
+                WingPage(WingPoseAtlas.FirstElementalPage + i);
         }
-        catch { _atlas.Dispose(); throw; }
+        catch
+        {
+            foreach (var page in _wingPages.Values) page.Texture.Dispose();
+            _wingPages.Clear();
+            _atlas.Dispose();
+            throw;
+        }
     }
 
     public void Draw(ReadOnlySpan<SpellParticle> particles, Vector2 camera, long now, bool ground,

@@ -70,3 +70,13 @@ The original sparse attachment painter has been replaced with native-resolution 
 ### Head protection and plate relief
 
 The head is not an armour material. A conservative head-to-neck collar guard plus a radial head exclusion takes precedence over both body and fitted coverage. It also masks out false positives from the fitted RGB difference map. No implicit helmet is generated. The renderer builds a separate relief surface per pose and derives normals from adjacent heights, adding directional diffuse lighting, metallic highlights, bevels and recessed flexible joints. This is a 2D relief approximation, not an actual rigged 3D mesh; unusual head/limb overlaps may need manual anchor correction. Both the runtime and LIB exporter share this code. Regression checks assert the protected area stays transparent and the remaining fitted coverage and tonal range are maintained.
+
+## Wing intersection diagnostics
+
+Run on Windows with .NET 8 from the repository root:
+
+```powershell
+dotnet run --project Tests/WindowsRendererTests -c Release -- --wing-intersections "Build/Client/Release/Data" "wing-intersections" 4
+```
+
+Pass a single classic CArmour LIB instead of the Data folder to inspect only that armour. The Data folder mode uses any installed 00, 01, 03, 06 and 12 libraries. The command renders all 1,616 body frames per armour, all 20 wing IDs, eight facings and four time samples per body frame by default. Use 1 instead of 4 for a quicker body-frame-only pass. It emits one GIF per gender, action and wing; the 8 direction cells are ordered Up, UpRight, Right, DownRight, Down, DownLeft, Left, UpLeft. Black is the actual decoded body/armour alpha silhouette with checker shadows stripped; pink is wing coverage captured from the real WARP renderer. Far layers are hidden by body alpha; near layers remain visible. The CSV records overlaps, overlaps outside a 12px socket neighbourhood, root lag and missing legacy wing art. Overlap is not intrinsically incorrect (near wings and orbit auras may legitimately overlap). The test draws wings on death frames to inspect geometry, even though the gameplay renderer hides them after death. Legacy fishing effects have no separate authored frame mapping in FrameSet; these use the actual default effect slot. This exhaustive diagnostic can generate many files and take substantial time. No source LIB is copied to the repository.

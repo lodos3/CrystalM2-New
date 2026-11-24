@@ -194,10 +194,17 @@ namespace Client.MirObjects
             GeneratedArmourVisual.Decode(info.Armour, out short updatedArmour, out GeneratedArmour);
             Armour = updatedArmour;
             Light = info.Light;
+            byte previousWing = WingEffect;
             WingEffect = info.WingEffect;
 
             SetLibraries();
             SetEffects();
+            if (previousWing != WingEffect)
+            {
+                _wingPoseReady = false;
+                _wingAnimationTick = -1;
+                if (GameScene.Scene?.MapControl != null) GameScene.Scene.MapControl.TextureValid = false;
+            }
         }
 
         public override bool ShouldDrawHealth()

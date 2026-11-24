@@ -34,6 +34,9 @@ public static class WingPoseAtlas
     }
 
     private static Stream Open() => typeof(WingPoseAtlas).Assembly.GetManifestResourceStream("CrystalM2.WingPoses")!;
+    public static int FirstElementalPage => Pages.Length;
+    public const int ElementalPageCount = 10;
+
     public static int FrameCount(int bank) => bank >= ElementalStart ? ElementalWingArt.FrameCount(bank - ElementalStart) : Banks[bank].Length;
     public static Pose GetPose(int bank, int frame) => bank >= ElementalStart ? ElementalWingArt.Pose(bank - ElementalStart, frame, Pages.Length) :
         (uint)frame < Banks[bank].Length ? Banks[bank][frame] : default;

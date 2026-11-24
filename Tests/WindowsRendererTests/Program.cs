@@ -9,6 +9,17 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        if (args is ["--wing-intersections", var root, var destination])
+        {
+            WingIntersectionChecks.Render(root, destination, 4);
+            return;
+        }
+        if (args is ["--wing-intersections", var singleRoot, var singleDestination, var samples] &&
+            int.TryParse(samples, out int subframes))
+        {
+            WingIntersectionChecks.Render(singleRoot, singleDestination, subframes);
+            return;
+        }
         if (args is ["--wing-preview", var data, var output])
         {
             ArmourWingChecks.Render(data, output);
