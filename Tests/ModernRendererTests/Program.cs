@@ -60,9 +60,35 @@ static class Program
             "Alternate animation bank cannot be mistaken for classic CArmour.");
     }
 
+    private static void CheckWingPoseMotion()
+    {
+        Assertions.True(WingBodyPose.TryGetMotion(8, 0, 2, false, out var idle) &&
+            idle == WingPoseMotion.Zero, "Idle pose is the motion reference.");
+        Assertions.True(WingBodyPose.TryGetMotion(149, 0, 2, false, out var windup) &&
+            windup.Roll < -.1f && windup.Yaw > .1f, "Right attack windup must lean and turn.");
+        Assertions.True(WingBodyPose.TryGetMotion(152, 0, 2, false, out var follow) &&
+            follow.Roll > .3f && follow.Yaw < -.1f, "Right attack follow-through must lean and turn.");
+        var smooth = new WingPoseSmoother();
+        smooth.Advance(idle, 100, true);
+        var first = smooth.Advance(follow, 116, false);
+        Assertions.True(first.Offset.Length() > 0 && first.Offset.Length() < follow.Offset.Length() &&
+            first.Roll > 0 && first.Roll < follow.Roll, "Pose changes must interpolate.");
+        Assertions.True(smooth.Advance(follow, 116, false) == first, "Draw passes share a sample.");
+        var later = smooth.Advance(follow, 216, false);
+        Assertions.True(Vector2.Distance(later.Offset, follow.Offset) < Vector2.Distance(first.Offset, follow.Offset),
+            "Smoothed root converges on the pose.");
+        Assertions.True(smooth.Advance(idle, 217, true) == idle, "Reset must not retain the old pose.");
+        foreach (int bank in new[] {0, 808})
+        for (int frame = 0; frame < 808; frame++)
+            Assertions.True(WingBodyPose.TryGetMotion(bank + frame, bank, 2, false, out var motion) &&
+                float.IsFinite(motion.Roll) && float.IsFinite(motion.Yaw) &&
+                MathF.Abs(motion.Roll) <= .56f && MathF.Abs(motion.Yaw) <= .43f, $"Invalid motion frame {bank + frame}.");
+    }
+
     private static void Main()
     {
         CheckWingBodyTracking();
+        CheckWingPoseMotion();
 
         Span<SpriteVertex> vertices = stackalloc SpriteVertex[6];
         Assertions.True(SpriteGeometry.WriteQuad(vertices, new Rectangle(16, 8, 32, 24),

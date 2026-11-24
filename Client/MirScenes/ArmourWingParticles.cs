@@ -13,15 +13,21 @@ internal static class ArmourWingParticles
     internal static int NearSide(MirDirection direction) =>
         direction is MirDirection.UpRight or MirDirection.Right or MirDirection.DownRight ? 1 : -1;
 
-    internal static Vector2 BackAttachment(Vector2 shoulder, MirDirection direction)
+    private const float RearDepthScale = .8f;
+
+    internal static Vector2 BackAttachment(Vector2 shoulder, MirDirection direction, float twist = 0, float roll = 0)
     {
-        float yaw = (int)direction * MathF.PI / 4;
+        float yaw = (int)direction * MathF.PI / 4 + twist;
         float profile = MathF.Abs(MathF.Sin(yaw));
-        // Keep the root seated on the back: the previous 13px profile
-        // offset left a visible gap. Volume and sweep are independent of
-        // this attachment translation and remain unchanged.
-        return shoulder + new Vector2(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f) *
-            (7f + profile * profile);
+        return shoulder + Rotate(new Vector2(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f) *
+            ((7f + profile * profile) * RearDepthScale), roll);
+    }
+
+    private static Vector2 Rotate(Vector2 v, float angle)
+    {
+        if (angle == 0) return v;
+        float c = MathF.Cos(angle), s = MathF.Sin(angle);
+        return new Vector2(v.X * c - v.Y * s, v.X * s + v.Y * c);
     }
 
     internal static Vector2 Shoulder(byte effect, bool mounted) =>
@@ -41,7 +47,7 @@ internal static class ArmourWingParticles
     } | unchecked((int)0xFF000000));
 
     internal static void Emit(SpellParticlePool pool, byte effect, int bank, int pose, Vector2 shoulder,
-        MirDirection direction, long now, uint seed, int onlySide = 0)
+        MirDirection direction, long now, uint seed, int onlySide = 0, float torsoYaw = 0, float torsoRoll = 0)
     {
         pool.Clear();
         if (effect is 1 or 2)
@@ -60,15 +66,15 @@ internal static class ArmourWingParticles
         if (!ArmourWings.IsParticle(effect)) return;
         if (ArmourWings.IsElemental(effect))
         {
-            EmitElemental(pool, effect, shoulder, direction, now, seed, onlySide);
+            EmitElemental(pool, effect, shoulder, direction, now, seed, onlySide, torsoYaw, torsoRoll);
             return;
         }
 
-        float yaw = (int)direction * (MathF.PI / 4);
+        float yaw = (int)direction * (MathF.PI / 4) + torsoYaw;
         Vector2 across = new(MathF.Cos(yaw), MathF.Sin(yaw) * .49f);
         Vector2 back = new(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f);
         float profile = MathF.Abs(MathF.Sin(yaw));
-        Vector2 attachment = BackAttachment(shoulder, direction);
+        Vector2 attachment = BackAttachment(shoulder, direction, torsoYaw, torsoRoll);
         float phase = now % 1800 * (MathF.Tau / 1800) + (seed % 97) * .065f;
         float flap = MathF.Sin(phase);
         int design = effect - ArmourWings.Phoenix;
@@ -93,15 +99,15 @@ internal static class ArmourWingParticles
         {
             if (onlySide != 0 && side != onlySide) continue;
             bool near = profile < .001f || side == NearSide(direction);
-            Vector2 root = attachment + across * (side * 5.5f);
+            Vector2 root = attachment + Rotate(across * (side * 5.5f), torsoRoll);
             int opacity = (int)(218 + 12 * MathF.Sin(yaw) * side + 8 * flap);
 
             // Sweep the actual wing behind the actor as it turns edge-on.
             // The near wing extends farther back than the far wing, so they
             // do not collapse into the same line at a 90-degree facing.
             float spanLength = seraph ? 66 + 2 * flap : (felFire ? 60 : 48) + 6 * flap;
-            float sweepLength = 19 + 6 * flap + profile * profile * (near ? 23 : 12);
-            float sweepCurve = 5 + 7 * profile;
+            float sweepLength = (19 + 6 * flap + profile * profile * (near ? 23 : 12)) * RearDepthScale;
+            float sweepCurve = (5 + 7 * profile) * RearDepthScale;
             // On a diagonal one wing's transverse and rear axes can cancel.
             // Keep its projected extent nonzero rather than flattening the art.
             float endpoint = across.X * side * spanLength + back.X * (sweepLength + sweepCurve);
@@ -130,10 +136,10 @@ internal static class ArmourWingParticles
                 // Match the vertical thickness offset to the projected rear
                 // axis so a south-facing wing cannot cancel its own depth.
                 float rearSign = MathF.Cos(yaw) < 0 ? -1f : 1f;
-                return across * (side * (span + shell * depth * .23f)) +
-                    back * (sweep + camber + twist + shell * depth) +
+                return Rotate(across * (side * (span + shell * depth * .23f)) +
+                    back * (sweep + (camber + twist + shell * depth) * RearDepthScale) +
                     Vector2.UnitY * (height * .55f - 4 * u * flap + 4 * t * t - arch +
-                    shell * depth * .30f * rearSign);
+                    shell * depth * .30f * rearSign), torsoRoll);
             }
 
             int firstFrame = 0, nextFrame = 0;
@@ -206,14 +212,14 @@ internal static class ArmourWingParticles
     // atlas, external LIB, per-character texture creation or per-frame heap
     // allocations are needed for these ten styles.
     private static void EmitElemental(SpellParticlePool pool, byte effect, Vector2 shoulder,
-        MirDirection direction, long now, uint seed, int onlySide)
+        MirDirection direction, long now, uint seed, int onlySide, float torsoYaw, float torsoRoll)
     {
-        float yaw = (int)direction * MathF.PI / 4;
+        float yaw = (int)direction * MathF.PI / 4 + torsoYaw;
         Vector2 across = new(MathF.Cos(yaw), MathF.Sin(yaw) * .49f);
         Vector2 back = new(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f);
         float profile = MathF.Abs(MathF.Sin(yaw));
         float clock = (now % 4800) * MathF.Tau / 4800 + (seed % 97) * .065f;
-        Vector2 attachment = BackAttachment(shoulder, direction);
+        Vector2 attachment = BackAttachment(shoulder, direction, torsoYaw, torsoRoll);
         int nearSide = NearSide(direction);
         int light = LightColour(effect).ToArgb() & 0xFFFFFF;
 
@@ -313,9 +319,9 @@ internal static class ArmourWingParticles
         {
             if (onlySide != 0 && side != onlySide) continue;
             bool near = profile < .001f || side == nearSide;
-            Vector2 root = attachment + across * (side * 5.5f);
+            Vector2 root = attachment + Rotate(across * (side * 5.5f), torsoRoll);
             float flap = MathF.Sin(clock * 2 + (near ? 0 : .45f));
-            float sweep = 22 + profile * (near ? 23 : 12);
+            float sweep = (22 + profile * (near ? 23 : 12)) * RearDepthScale;
             // A bent, volumetric fan: the direct side projection still has
             // a rearward sweep and visible material width. Tip coordinates
             // can lift/drop independently without moving the root.
@@ -323,14 +329,14 @@ internal static class ArmourWingParticles
             {
                 float spread = effect == ArmourWings.GeodeTitan ? 44 : 55;
                 float s = u * (spread + 3 * flap);
-                float rear = u * sweep + 7 * u * u + depth;
+                float rear = u * sweep + (7 * u * u + depth) * RearDepthScale;
                 float projectedX = across.X * side * s + back.X * rear;
                 // Diagonal cancellation is avoided with a small outward
                 // bias that grows only away from the attachment.
                 if (profile > .55f && profile < .9f)
-                    projectedX += back.X * 7 * u;
-                return root + new Vector2(projectedX,
-                    across.Y * side * s + back.Y * rear - height - 3 * u * flap);
+                    projectedX += back.X * 7 * u * RearDepthScale;
+                return root + Rotate(new Vector2(projectedX,
+                    across.Y * side * s + back.Y * rear - height - 3 * u * flap), torsoRoll);
             }
 
             // A material blade uses a shadowed underside, convex coloured

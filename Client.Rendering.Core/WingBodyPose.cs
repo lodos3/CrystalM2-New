@@ -11,7 +11,16 @@ namespace CrystalM2.Rendering.Core;
 public static class WingBodyPose
 {
     private const int GenderStride = 808;
-    private static readonly Lazy<Vector2[]> Anchors = new(Load);
+    private readonly record struct Sample(Vector2 Position, float Roll);
+    private static readonly Lazy<Sample[]> Anchors = new(Load);
+
+    // Conservative authored twist estimates from the visible windup and
+    // follow-through of the supplied CArmour/00.Lib. A 2D LIB cannot
+    // provide exact 3D joint rotations.
+    private static readonly float[] Attack1Yaw = [12, 24, 0, -18, -20, -8];
+    private static readonly float[] Attack2Yaw = [10, 22, 12, -16, -12, 0];
+    private static readonly float[] Attack3Yaw = [12, 20, 24, 12, -8, -18, -8, 0];
+    private static readonly float[] MountedAttackYaw = [6, 10, 3, -10, -6, 0];
 
     public static bool TryGetDelta(int bodyFrame, int bankStart, int direction, bool mounted,
         out Vector2 delta)
@@ -23,11 +32,34 @@ public static class WingBodyPose
         var anchors = Anchors.Value;
         if ((uint)bodyFrame >= (uint)anchors.Length || (uint)reference >= (uint)anchors.Length)
             return false;
-        delta = anchors[bodyFrame] - anchors[reference];
+        delta = anchors[bodyFrame].Position - anchors[reference].Position;
         return float.IsFinite(delta.X) && float.IsFinite(delta.Y);
     }
 
-    private static Vector2[] Load()
+    public static bool TryGetMotion(int bodyFrame, int bankStart, int direction, bool mounted,
+        out WingPoseMotion motion)
+    {
+        motion = WingPoseMotion.Zero;
+        if (!TryGetDelta(bodyFrame, bankStart, direction, mounted, out var delta)) return false;
+        var samples = Anchors.Value;
+        int reference = bankStart + (mounted ? 416 : 0) + direction * 4;
+        float angle = samples[bodyFrame].Roll - samples[reference].Roll;
+        angle = MathF.Atan2(MathF.Sin(angle), MathF.Cos(angle));
+        float roll = Math.Clamp(angle * .65f, -.55f, .55f);
+        int local = bodyFrame - bankStart;
+        float degrees = local switch
+        {
+            >= 136 and < 184 => Attack1Yaw[(local - 136) % 6],
+            >= 184 and < 232 => Attack2Yaw[(local - 184) % 6],
+            >= 232 and < 296 => Attack3Yaw[(local - 232) % 8],
+            >= 584 and < 632 => MountedAttackYaw[(local - 584) % 6],
+            _ => 0
+        };
+        motion = new WingPoseMotion(delta, roll, degrees * MathF.PI / 180f);
+        return true;
+    }
+
+    private static Sample[] Load()
     {
         using var stream = typeof(WingBodyPose).Assembly.GetManifestResourceStream("CrystalM2.ArmourBodyPoses")
             ?? throw new InvalidDataException("Missing embedded CArmour pose atlas.");
@@ -37,7 +69,7 @@ public static class WingBodyPose
         if (root.GetProperty("femaleFrameOffset").GetInt32() != GenderStride ||
             frames.GetArrayLength() != GenderStride * 2)
             throw new InvalidDataException("Unexpected classic CArmour pose bank.");
-        var result = new Vector2[frames.GetArrayLength()];
+        var result = new Sample[frames.GetArrayLength()];
         int index = 0;
         foreach (var frame in frames.EnumerateArray())
         {
@@ -47,7 +79,9 @@ public static class WingBodyPose
             Vector2 neck = Read(points[1]);
             Vector2 shoulderA = Read(points[2]);
             Vector2 shoulderB = Read(points[3]);
-            result[index++] = neck * .35f + (shoulderA + shoulderB) * .325f;
+            Vector2 torso = neck - Read(points[6]);
+            float roll = torso.LengthSquared() > 1f ? MathF.Atan2(torso.X, -torso.Y) : 0f;
+            result[index++] = new Sample(neck * .35f + (shoulderA + shoulderB) * .325f, roll);
         }
         return result;
 

@@ -83,6 +83,11 @@ namespace Client.MirObjects
         private int _wingFamily;
         private SpellParticlePool _wingParticles;
         private long _wingAnimationTick = -1;
+        private WingPoseSmoother _wingPoseSmoother;
+        private bool _wingPoseReady, _wingPoseMounted;
+        private byte _wingPoseEffect;
+        private int _wingPoseFamily, _wingPoseBank;
+        private MirDirection _wingPoseDirection;
         internal bool ParticleWings => TransformType < 0 && ArmourWings.IsParticle(WingEffect);
         private bool DrawWingsBehindBody => WingEffect >= ArmourWings.Phoenix && ParticleWings &&
             Direction is MirDirection.Down or MirDirection.DownLeft or MirDirection.DownRight;
@@ -889,12 +894,19 @@ namespace Client.MirObjects
             }
 
             ProcessBladeSpell();
-            if (Settings.Effect && ParticleWings && WingEffect >= ArmourWings.Phoenix &&
-                !Dead && _wingAnimationTick != CMain.Time / 50)
+            if (Settings.Effect && ParticleWings && WingEffect >= ArmourWings.Phoenix && !Dead)
             {
-                _wingAnimationTick = CMain.Time / 50;
-                GameScene.Scene.MapControl.TextureValid = false;
+                UpdateWingPose();
+                // Refresh the cached scene at 40 Hz while the root is moving.
+                // Idle keeps the existing 20 Hz wing animation refresh.
+                long interval = CurrentAction == MirAction.Standing ? 50 : 25;
+                if (_wingAnimationTick < 0 || CMain.Time - _wingAnimationTick >= interval)
+                {
+                    _wingAnimationTick = CMain.Time;
+                    GameScene.Scene.MapControl.TextureValid = false;
+                }
             }
+            else { _wingPoseReady = false; _wingAnimationTick = -1; }
             ProcessWeaponSpellVisual();
 
             for (int i = 0; i < Effects.Count; i++)
@@ -5063,7 +5075,9 @@ namespace Client.MirObjects
                 if (!Settings.Effect || Dead) return;
                 _wingParticles ??= new SpellParticlePool(ArmourWingParticles.ParticleCapacity);
                 ArmourWingParticles.Emit(_wingParticles, WingEffect, _wingFamily * 2 + WingEffect - 1,
-                    DrawWingFrame + WingOffset, WingShoulder, Direction, CMain.Time, ObjectID, onlySide);
+                    DrawWingFrame + WingOffset, WingShoulder, Direction, CMain.Time, ObjectID, onlySide,
+                    _wingPoseReady ? _wingPoseSmoother.Current.Yaw : 0f,
+                    _wingPoseReady ? _wingPoseSmoother.Current.Roll : 0f);
                 DXManager.Device.SpellParticles.Draw(_wingParticles.Active, new Vector2(DrawLocation.X, DrawLocation.Y),
                     CMain.Time, ground: false, emissiveOverlay: true, exposure: 1.22f);
                 return;
@@ -5074,7 +5088,29 @@ namespace Client.MirObjects
                 WingLibrary.DrawBlend(DrawWingFrame + WingOffset, DrawLocation, DrawColour, true);
         }
 
-        private Vector2 WingShoulder
+        private Vector2 WingShoulder => _wingPoseReady && WingEffect >= ArmourWings.Phoenix
+            ? ArmourWingParticles.Shoulder(WingEffect, RidingMount) + _wingPoseSmoother.Current.Offset
+            : RawWingShoulder;
+
+        private void UpdateWingPose()
+        {
+            Vector2 baseline = ArmourWingParticles.Shoulder(WingEffect, RidingMount);
+            WingPoseMotion target;
+            if (_wingFamily != 0 || !WingBodyPose.TryGetMotion(DrawFrame + ArmourOffSet, ArmourOffSet,
+                (int)Direction, RidingMount, out target))
+                target = new WingPoseMotion(RawWingShoulder - baseline, 0f, 0f);
+            bool reset = !_wingPoseReady || _wingPoseEffect != WingEffect || _wingPoseFamily != _wingFamily ||
+                _wingPoseBank != ArmourOffSet || _wingPoseMounted != RidingMount || _wingPoseDirection != Direction;
+            _wingPoseSmoother.Advance(target, CMain.Time, reset);
+            _wingPoseEffect = WingEffect;
+            _wingPoseFamily = _wingFamily;
+            _wingPoseBank = ArmourOffSet;
+            _wingPoseMounted = RidingMount;
+            _wingPoseDirection = Direction;
+            _wingPoseReady = true;
+        }
+
+        private Vector2 RawWingShoulder
         {
             get
             {
@@ -5132,7 +5168,10 @@ namespace Client.MirObjects
             }
             else
             {
-                Vector2 attachment = ArmourWingParticles.BackAttachment(WingShoulder, Direction);
+                Vector2 attachment = ArmourWings.IsAura(WingEffect) ? WingShoulder :
+                    ArmourWingParticles.BackAttachment(WingShoulder, Direction,
+                        _wingPoseReady ? _wingPoseSmoother.Current.Yaw : 0f,
+                        _wingPoseReady ? _wingPoseSmoother.Current.Roll : 0f);
                 point.Offset((int)MathF.Round(attachment.X), (int)MathF.Round(attachment.Y));
             }
             colour = ArmourWingParticles.LightColour(WingEffect);

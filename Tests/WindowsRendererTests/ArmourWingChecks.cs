@@ -155,7 +155,7 @@ internal static class ArmourWingChecks
                 {
                     float offset = (attachment.X - shoulder.X) *
                         (facing == MirDirection.Right ? -1f : 1f);
-                    if (offset < 7f || offset > 9f)
+                    if (MathF.Abs(offset - 6.4f) > .01f)
                         throw new InvalidDataException($"Side wing root must hug the back, not penetrate or float: {offset}px in {facing}.");
                 }
                 for (int time = 0; time < 1800; time += 225)
