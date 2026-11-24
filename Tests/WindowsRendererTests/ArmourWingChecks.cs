@@ -10,6 +10,7 @@ internal static class ArmourWingChecks
     // Check production geometry, channel masks and selectors without installed LIBs.
     internal static void CheckElementalDesigns()
     {
+        CheckFacingCant();
         CheckAttackLean();
         CheckArtworkRootContact();
         for (int id = 10; id < 20; id++)
@@ -72,6 +73,35 @@ internal static class ArmourWingChecks
                 throw new InvalidDataException($"Blank or duplicate elemental atlas {id}.");
         }
         Console.WriteLine("Verified ten elemental designs across eight facings, five times, split layers and pose motion.");
+    }
+
+    private static void CheckFacingCant()
+    {
+        // Screen Y increases downwards: positive rotation turns the upper
+        // crown clockwise (towards the right). Mirrored facings reverse it.
+        Vector2 crown = new(0, -40), hem = new(0, 40);
+        foreach (MirDirection facing in Enum.GetValues<MirDirection>())
+        {
+            var mirror = (MirDirection)((8 - (int)facing) % 8);
+            float angle = ArmourWingParticles.FacingCant(facing);
+            float expected = .11f * MathF.Sin((int)facing * MathF.PI / 4);
+            if (MathF.Abs(angle - expected) > .00001f ||
+                MathF.Abs(angle + ArmourWingParticles.FacingCant(mirror)) > .00001f)
+                throw new InvalidDataException($"Incorrect mirrored facing cant in {facing}.");
+
+            Vector2 upper = ArmourWingParticles.ApplyFacingCant(crown, facing);
+            Vector2 lower = ArmourWingParticles.ApplyFacingCant(hem, facing);
+            Vector2 mirrored = ArmourWingParticles.ApplyFacingCant(crown, mirror);
+            if (ArmourWingParticles.ApplyFacingCant(Vector2.Zero, facing) != Vector2.Zero ||
+                Vector2.Distance(upper, -lower) > .001f ||
+                Vector2.Distance(upper, new(-mirrored.X, mirrored.Y)) > .001f ||
+                MathF.Abs(upper.Length() - crown.Length()) > .001f ||
+                MathF.Abs(upper.X - 40 * MathF.Sin(expected)) > .001f)
+                throw new InvalidDataException($"Facing cant must rotate around the fixed root in {facing}.");
+        }
+        if (ArmourWingParticles.ApplyFacingCant(crown, MirDirection.Right).X <= 0 ||
+            ArmourWingParticles.ApplyFacingCant(crown, MirDirection.Left).X >= 0)
+            throw new InvalidDataException("Right must cant clockwise and left anticlockwise.");
     }
 
     private static void CheckArtworkRootContact()

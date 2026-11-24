@@ -44,6 +44,21 @@ internal static class ArmourWingParticles
         _ => new(4, 44)
     };
 
+    // A static orientation bias, independent of animation phase and spring
+    // velocity. Positive angles rotate clockwise in screen coordinates.
+    private const float MaximumFacingCant = .11f;
+    internal static float FacingCant(MirDirection direction) => direction switch
+    {
+        MirDirection.Right => MaximumFacingCant,
+        MirDirection.Left => -MaximumFacingCant,
+        MirDirection.UpRight or MirDirection.DownRight => MaximumFacingCant * .70710678f,
+        MirDirection.UpLeft or MirDirection.DownLeft => -MaximumFacingCant * .70710678f,
+        _ => 0f
+    };
+
+    internal static Vector2 ApplyFacingCant(Vector2 rootRelativePoint, MirDirection direction) =>
+        Rotate(rootRelativePoint, FacingCant(direction));
+
     private static Vector2 Rotate(Vector2 v, float angle)
     {
         if (angle == 0) return v;
@@ -244,7 +259,11 @@ internal static class ArmourWingParticles
             // prevent flap, camber, pitch or padding from opening a gap.
             int top = membrane.Y, bottom = top + membrane.Height;
             Vector2 correction = Vector2.Lerp(Project(rootU, top), Project(rootU, bottom), rootTextureV);
-            Vector2 Pinned(float u, float y, float shell = 0) => Project(u, y, shell) - correction;
+            // Apply the facing cant AFTER subtracting the rendered root.
+            // This rotates both membrane layers and motes about their own
+            // physical socket without changing attachment, scale or damping.
+            Vector2 Pinned(float u, float y, float shell = 0) =>
+                ApplyFacingCant(Project(u, y, shell) - correction, direction);
             for (int segment = 0; segment < segments; segment++)
             {
                 float a = Boundary(segment);
