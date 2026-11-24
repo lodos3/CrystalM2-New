@@ -3499,7 +3499,9 @@ namespace Server.MirObjects
                         var wingUpdate = player.GetUpdateInfo();
                         player.Enqueue(wingUpdate);
                         player.Broadcast(wingUpdate);
-                        ReceiveChat($"Wings for {player.Name}: {parts[2]} (this session).", ChatType.System);
+                        string wingMessage = $"Wings for {player.Name}: {parts[2]} (effect {player.VisibleWings}, this session).";
+                        ReceiveChat(wingMessage, ChatType.System);
+                        if (player != this) player.ReceiveChat(wingMessage, ChatType.System);
                         break;
                     case "HAIR":
                         if (!IsGM && !Settings.TestServer) return;

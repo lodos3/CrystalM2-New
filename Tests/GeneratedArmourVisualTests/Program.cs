@@ -45,3 +45,18 @@ try
         "Generated armour export instruction must round-trip.");
 }
 finally { Packet.IsServer = wasServer; }
+
+for (int id = 10; id < 20; id++)
+{
+    Check(ArmourWings.TrySelect(id.ToString(), out byte? effect) && effect == id + 108 &&
+        ArmourWings.IsParticle(effect.Value), $"New wing {id} must resolve on the server.");
+    try
+    {
+        Packet.IsServer = false;
+        var update = new ServerPackets.PlayerUpdate { ObjectID = 42, WingEffect = effect.Value };
+        var decoded = Packet.ReceivePacket(update.GetPacketBytes().ToArray(), out byte[] extra);
+        Check(decoded is ServerPackets.PlayerUpdate wing && wing.WingEffect == effect.Value && extra.Length == 0,
+            $"Wing {id} must survive the actual appearance packet.");
+    }
+    finally { Packet.IsServer = wasServer; }
+}

@@ -7,8 +7,7 @@ using Vortice.Direct3D;
 
 internal static class ArmourWingChecks
 {
-    // These designs are geometry-only and can be checked without a GPU or
-    // installed LIB files. Exercise actual production emission and selectors.
+    // Check production geometry, channel masks and selectors without installed LIBs.
     internal static void CheckElementalDesigns()
     {
         for (int id = 10; id < 20; id++)
@@ -25,10 +24,10 @@ internal static class ArmourWingChecks
                 ArmourWingParticles.Emit(pool, effect, 0, 0, shoulder, facing, time, 101);
                 var full = pool.Active.ToArray();
                 if (full.Length < 12 || full.Length >= pool.Capacity ||
-                    full.Any(p => p.CoveragePlane != 0 || p.Colour.A == 0 || p.Ground ||
+                    full.Any(p => p.CoveragePlane > 0 || p.Colour.A == 0 || p.Ground ||
                         !float.IsFinite(p.Origin.X) || !float.IsFinite(p.Origin.Y)))
                     throw new InvalidDataException($"Invalid procedural effect {id}, {facing}.");
-                if (full.Select(p => p.Shape).Distinct().Count() < 2 ||
+                if (!full.Any(p => p.CoveragePlane < 0) || full.Select(p => p.Shape).Distinct().Count() < 2 ||
                     !full.Any(p => p.Layer == SpellParticleLayer.Emissive) ||
                     !full.Any(p => p.Layer == SpellParticleLayer.EmissiveCore))
                     throw new InvalidDataException($"Missing material layers for {id}.");
@@ -57,6 +56,19 @@ internal static class ArmourWingChecks
         if (ArmourWings.TrySelect("20", out _) || ArmourWings.TrySelect("-1", out _) ||
             ArmourWings.IsParticle(128))
             throw new InvalidDataException("Invalid elemental wing ID accepted.");
+        var fingerprints = new HashSet<string>();
+        for (int id = 0; id < 10; id++)
+        {
+            int bank = WingPoseAtlas.DesignBank + 8 + id;
+            var plane = WingPoseAtlas.Plane(WingPoseAtlas.Handle(bank, 0, 2));
+            byte[] page = WingPoseAtlas.ReadPage(plane.Page);
+            var pixels = new List<byte>();
+            for (int y = plane.Source.Top; y < plane.Source.Bottom; y++)
+                pixels.AddRange(page.AsSpan(y * WingPoseAtlas.PageSize + plane.Source.Left, plane.Source.Width).ToArray());
+            if (pixels.Count(v => v > 30) < 100 || pixels.Distinct().Count() < 20 ||
+                !fingerprints.Add(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(pixels.ToArray()))))
+                throw new InvalidDataException($"Blank or duplicate elemental atlas {id}.");
+        }
         Console.WriteLine("Verified ten elemental designs across eight facings, five times, split layers and pose motion.");
     }
 
