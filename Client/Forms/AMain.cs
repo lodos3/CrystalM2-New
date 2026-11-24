@@ -144,12 +144,7 @@ namespace Launcher
                 using MemoryStream stream = new MemoryStream(data);
                 using BinaryReader reader = new BinaryReader(stream);
 
-                if (reader.ReadByte() == 60)
-                {
-                    //assume we got a html page back with an error code so it's not a patchlist
-                    return;
-                }
-                reader.BaseStream.Seek(0,SeekOrigin.Begin);
+                // Validate the binary count directly: a valid count may also start with byte 60.
                 int count = reader.ReadInt32();
                 // Each record occupies at least one byte. Reject impossible
                 // counts before trying to allocate or enumerate the manifest.
