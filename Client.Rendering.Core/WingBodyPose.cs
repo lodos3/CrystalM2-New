@@ -11,7 +11,7 @@ namespace CrystalM2.Rendering.Core;
 public static class WingBodyPose
 {
     private const int GenderStride = 808;
-    private readonly record struct Sample(Vector2 Position, Vector2 Attachment, float Roll, Vector2 Torso);
+    private readonly record struct Sample(Vector2 Position, Vector2 Attachment, Vector2 UpperBack, float Roll, Vector2 Torso);
     private static readonly Lazy<Sample[]> Anchors = new(Load);
 
     // Conservative authored twist estimates from the visible windup and
@@ -34,6 +34,16 @@ public static class WingBodyPose
             return false;
         delta = anchors[bodyFrame].Position - anchors[reference].Position;
         return float.IsFinite(delta.X) && float.IsFinite(delta.Y);
+    }
+
+    // Absolute cell-relative upper-back point from the actual displayed sprite.
+    // Unlike a delta from an idle waist, this follows the lean of the spine.
+    public static bool TryGetUpperBack(int bodyFrame, int bankStart, int direction, out Vector2 position)
+    {
+        position = Vector2.Zero;
+        if (!TryGetDelta(bodyFrame, bankStart, direction, false, out _)) return false;
+        position = Anchors.Value[bodyFrame].UpperBack;
+        return float.IsFinite(position.X) && float.IsFinite(position.Y);
     }
 
     public static bool TryGetAttachmentDelta(int bodyFrame, int bankStart, int direction, bool mounted,
@@ -107,7 +117,14 @@ public static class WingBodyPose
             // Lower thoracic socket, not the head/shoulder centroid. The chest
             // and waist landmarks move with the part of the body the wing joins.
             Vector2 attachment = Vector2.Lerp(Read(points[4]), Read(points[5]), .65f);
-            result[index++] = new Sample(neck * .35f + (shoulderA + shoulderB) * .325f, attachment, roll, torso);
+            // Weight the visible upper shoulder continuously when the torso
+            // banks. A midpoint alone sits too low in a steep side-on lunge.
+            Vector2 midShoulder = (shoulderA + shoulderB) * .5f;
+            float bank = Math.Clamp((shoulderB.Y - shoulderA.Y) / 12f, -1f, 1f);
+            Vector2 upperShoulder = midShoulder + (shoulderA - shoulderB) * (.25f * bank);
+            Vector2 upperBack = Vector2.Lerp(upperShoulder, neck, .25f);
+            result[index++] = new Sample(neck * .35f + (shoulderA + shoulderB) * .325f,
+                attachment, upperBack, roll, torso);
         }
         return result;
 

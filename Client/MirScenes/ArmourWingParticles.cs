@@ -34,6 +34,19 @@ internal static class ArmourWingParticles
     internal static Vector2 Shoulder(byte effect, bool mounted) =>
         new(24, (mounted ? -42 : -24) - (effect is ArmourWings.FelFire or ArmourWings.Archangel or ArmourWings.DawnSeraph ? 8 : 0));
 
+    // Shared by live rendering and the visual regression exporters. Keep
+    // orbiting auras on their existing centre; only physical wings use a
+    // direct skeletal upper-back socket, independent of the design's rest height.
+    internal static bool TryGetBodyMotion(byte effect, int bodyFrame, int bank,
+        MirDirection direction, bool mounted, out WingPoseMotion motion)
+    {
+        if (!WingBodyPose.TryGetMotion(bodyFrame, bank, (int)direction, mounted, out motion)) return false;
+        if (ArmourWings.IsAura(effect)) return true;
+        if (!WingBodyPose.TryGetUpperBack(bodyFrame, bank, (int)direction, out Vector2 upperBack)) return false;
+        motion = motion with { Offset = upperBack - Shoulder(effect, mounted) };
+        return true;
+    }
+
     internal static Color LightColour(byte effect) => Color.FromArgb(effect switch
     {
         1 => 0xA9CCFF, 2 => 0xFFAF48, ArmourWings.Phoenix => 0xFF7635,

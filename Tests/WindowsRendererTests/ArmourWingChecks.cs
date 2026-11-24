@@ -177,7 +177,7 @@ internal static class ArmourWingChecks
             device.Clear(Color.FromArgb(22, 25, 30));
             Vector2 trackedShoulder = ArmourWingParticles.Shoulder(effect.Value, false);
             WingPoseMotion motion = WingPoseMotion.Zero;
-            if (id >= 2 && WingBodyPose.TryGetMotion(pose, 0, (int)facing, false, out motion))
+            if (id >= 2 && ArmourWingParticles.TryGetBodyMotion(effect.Value, pose, 0, facing, false, out motion))
                 trackedShoulder += motion.Offset;
             ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101,
                 torsoYaw: motion.Yaw, torsoRoll: motion.Roll, torsoPitch: motion.Pitch);

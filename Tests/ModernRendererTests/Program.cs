@@ -124,10 +124,40 @@ static class Program
                 motion.Offset == socket, $"Invalid or detached motion frame {bank + frame}.");
     }
 
+    private static void CheckUpperBackTracking()
+    {
+        // Frame 152: neck (44,-20), shoulders (36,-24)/(47,-10).
+        // The upper shoulder must pull the anchor upwards and forwards,
+        // rather than letting the lower waist drag the socket behind.
+        Assertions.True(WingBodyPose.TryGetUpperBack(152, 0, 2, out var strike) &&
+            Vector2.Distance(strike, new Vector2(40.0625f, -20.375f)) < .001f,
+            "The right-facing follow-through must attach to the visible upper back.");
+        var smoother = new WingPoseSmoother();
+        foreach (int bank in new[] { 0, 808 })
+        for (int direction = 0; direction < 8; direction++)
+        {
+            // Classic Attack4 uses 416 + direction * 6; the same pixels
+            // are also used by other actions. Do not infer mounting here.
+            foreach (int start in new[] { 136, 184, 416, 584 })
+            for (int frame = 0; frame < 6; frame++)
+            {
+                int index = bank + start + direction * 6 + frame;
+                Assertions.True(WingBodyPose.TryGetUpperBack(index, bank, direction, out var upper) &&
+                    float.IsFinite(upper.X) && float.IsFinite(upper.Y),
+                    $"Missing upper-back anchor for frame {index}.");
+                var pose = smoother.Advance(new WingPoseMotion(upper, .1f, .1f, .2f), index * 16L, false);
+                Assertions.True(pose.Offset == upper, $"The attachment must not lag at frame {index}.");
+            }
+        }
+        Assertions.True(!WingBodyPose.TryGetUpperBack(808, 0, 0, out _),
+            "Do not sample the other gender's atlas bank.");
+    }
+
     private static void Main()
     {
         CheckWingBodyTracking();
         CheckWingPoseMotion();
+        CheckUpperBackTracking();
 
         Span<SpriteVertex> vertices = stackalloc SpriteVertex[6];
         Assertions.True(SpriteGeometry.WriteQuad(vertices, new Rectangle(16, 8, 32, 24),

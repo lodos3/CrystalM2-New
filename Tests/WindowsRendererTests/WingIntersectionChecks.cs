@@ -9,7 +9,8 @@ using Vortice.Direct3D;
 internal static class WingIntersectionChecks
 {
     // Exactly partitions the 808 classic frames. Same effect indices and
-    // intervals as FrameSet.Player. Attack4 shares the mounted frame range.
+    // intervals as FrameSet.Player. Attack4 aliases part of the mounted bank
+    // and is exported separately below without changing the partition.
     private readonly record struct Sequence(string Name,int Start,int Count,int Delay,int WingStart,int WingCount,bool Mounted=false);
     private static readonly Sequence[] Sequences =
     [
@@ -73,7 +74,7 @@ internal static class WingIntersectionChecks
                     throw new InvalidDataException($"Missing wing selector {id}.");
                 byte effect=selection.Value;
                 for(int gender=0;gender<2;gender++)
-                foreach(var seq in Sequences)
+                foreach(var seq in Sequences.Append(new Sequence("attack4",416,6,100,448,6)))
                 {
                     int bank=gender*808;
                     string directory=Path.Combine(destination,armourName,$"wing-{id:00}",gender==0?"male":"female");
@@ -93,7 +94,7 @@ internal static class WingIntersectionChecks
                             var mask=masks[index];
                             bool idle=seq.Name is "standing" or "stance" or "mount-standing";
                             bool move=seq.Name is "walking" or "running" or "mount-walking" or "mount-running";
-                            WingBodyPose.TryGetMotion(index,bank,d,seq.Mounted,out var targetMotion);
+                            ArmourWingParticles.TryGetBodyMotion(effect,index,bank,facing,seq.Mounted,out var targetMotion);
                             targetMotion=WingPoseMotion.Stabilize(targetMotion,idle,move);
                             WingPoseMotion motion=smoothers[d].Advance(targetMotion,now,frame==0&&sub==0,
                                 (idle || move) ? .065f : .045f, idle || move ? .30f : .90f);

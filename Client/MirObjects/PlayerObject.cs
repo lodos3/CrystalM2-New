@@ -5095,8 +5095,8 @@ namespace Client.MirObjects
         {
             Vector2 baseline = ArmourWingParticles.Shoulder(WingEffect, RidingMount);
             WingPoseMotion target;
-            if (_wingFamily != 0 || !WingBodyPose.TryGetMotion(DrawFrame + ArmourOffSet, ArmourOffSet,
-                (int)Direction, RidingMount, out target))
+            if (_wingFamily != 0 || !ArmourWingParticles.TryGetBodyMotion(WingEffect, DrawFrame + ArmourOffSet, ArmourOffSet,
+                Direction, RidingMount, out target))
             {
                 Vector2 travel = RawWingShoulder - baseline;
                 bool attack = CurrentAction is MirAction.Attack1 or MirAction.Attack2 or MirAction.Attack3 or
@@ -5128,9 +5128,9 @@ namespace Client.MirObjects
                 Vector2 shoulder = ArmourWingParticles.Shoulder(WingEffect, RidingMount);
                 if (WingEffect < ArmourWings.Phoenix) return shoulder;
                 int bodyFrame = DrawFrame + ArmourOffSet;
-                if (_wingFamily == 0 && WingBodyPose.TryGetAttachmentDelta(bodyFrame, ArmourOffSet,
-                    (int)Direction, RidingMount, out Vector2 delta))
-                    return shoulder + delta;
+                if (_wingFamily == 0 && ArmourWingParticles.TryGetBodyMotion(WingEffect, bodyFrame, ArmourOffSet,
+                    Direction, RidingMount, out var tracked))
+                    return shoulder + tracked.Offset;
 
                 // Alternate archer/assassin banks have different frame layouts.
                 // Track their actual head sprite centre against the matching
