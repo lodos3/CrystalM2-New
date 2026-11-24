@@ -78,7 +78,9 @@ internal static class ArmourWingParticles
             return;
         }
 
-        float yaw = baseYaw + torsoYaw;
+        // Nominal geometry is calculated in the body's fixed facing basis.
+        // Dynamic angles may only deform the free span, never the socket.
+        float yaw = baseYaw;
         Vector2 across = new(MathF.Cos(yaw), MathF.Sin(yaw) * .49f);
         Vector2 back = new(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f);
         float profile = MathF.Abs(MathF.Sin(yaw));
@@ -161,7 +163,8 @@ internal static class ArmourWingParticles
                 float rearSign = MathF.Cos(yaw) < 0 ? -1f : 1f;
                 // Distal deformation with a fixed root and a minimum rear
                 // half-plane in profile. Rotation cannot swing the socket.
-                float flex = t * t * (3 - 2 * t);
+                float free = Math.Clamp((t - .12f) / .88f, 0, 1);
+                float flex = free * free * (3 - 2 * free);
                 float localYaw = baseYaw + torsoYaw * flex;
                 Vector2 localAcross = new(MathF.Cos(localYaw), MathF.Sin(localYaw) * .49f);
                 Vector2 localBack = new(-MathF.Sin(localYaw), MathF.Cos(localYaw) * .49f);
@@ -169,12 +172,15 @@ internal static class ArmourWingParticles
                 Vector2 projected = Rotate(localAcross * (side * (span + shell * depth * .23f * flex)) +
                     localBack * (sweep + (camber + twist + shell * depth * (.25f + .75f * flex)) * RearDepthScale) +
                     Vector2.UnitY * down, torsoRoll * flex);
+                // In particular, the lower hem at the root must not be
+                // dragged forward or backward by the pitch spring.
+                projected += lean * (down * flex);
                 if ((direction is MirDirection.Left or MirDirection.Right) && u >= 0)
                 {
                     float sign = direction == MirDirection.Right ? -1f : 1f;
                     projected.X = sign * Math.Max(0, sign * projected.X);
                 }
-                return projected + lean * down;
+                return projected;
             }
 
             int firstFrame = 0, nextFrame = 0;

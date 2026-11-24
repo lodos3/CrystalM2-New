@@ -71,25 +71,57 @@ static class Program
         for (int direction = 0; direction < 8; direction++)
         for (int index = 0; index < 4; index++)
             Assertions.True(WingBodyPose.TryGetMotion(direction * 4 + index, 0, direction, false, out var rest) &&
-                rest == WingPoseMotion.Zero, "Standing frames must retain the same attachment.");
+                rest.Roll == 0 && rest.Yaw == 0 && rest.Pitch == 0,
+                "Standing frames track the socket without introducing extra rotation.");
         var bounded = WingPoseMotion.LimitOffset(new Vector2(25, -10), follow.Offset, 1.5f);
         Assertions.True(Vector2.Distance(bounded, follow.Offset) <= 1.501f, "Smoothing must not detach from the current torso.");
         var smooth = new WingPoseSmoother();
         smooth.Advance(idle, 100, true);
         var first = smooth.Advance(follow, 116, false);
-        Assertions.True(first.Offset.Length() > 0 && first.Offset.Length() < follow.Offset.Length() &&
+        Assertions.True(first.Offset == follow.Offset &&
             first.Roll > 0 && first.Roll < follow.Roll &&
-            first.Pitch > 0 && first.Pitch < follow.Pitch, "Pose changes must interpolate.");
+            first.Pitch > 0 && first.Pitch < follow.Pitch,
+            "The socket must track the body immediately while the wing angles ease.");
         Assertions.True(smooth.Advance(follow, 116, false) == first, "Draw passes share a sample.");
         var later = smooth.Advance(follow, 216, false);
-        Assertions.True(Vector2.Distance(later.Offset, follow.Offset) < Vector2.Distance(first.Offset, follow.Offset),
-            "Smoothed root converges on the pose.");
+        Assertions.True(later.Offset == follow.Offset && later.Roll > first.Roll && later.Roll <= follow.Roll,
+            "The angles converge without introducing positional lag.");
+        var reverse = smooth.Advance(windup, 232, false);
+        Assertions.True(reverse.Offset == windup.Offset &&
+            MathF.Abs(reverse.Roll - later.Roll) <= .9f * .016f + .0001f &&
+            MathF.Abs(reverse.Yaw - later.Yaw) <= .9f * .016f + .0001f &&
+            MathF.Abs(reverse.Pitch - later.Pitch) <= .9f * .016f + .0001f,
+            "An abrupt strike reversal must not snap any wing angle.");
+        var sameTime = smooth.Advance(follow, 232, false);
+        Assertions.True(sameTime.Offset == follow.Offset && sameTime.Roll == reverse.Roll,
+            "A body frame change at the same clock tick still pins the socket.");
+        var slow = new WingPoseSmoother();
+        var fast = new WingPoseSmoother();
+        slow.Advance(idle, 0, true);
+        fast.Advance(idle, 0, true);
+        var small = new WingPoseMotion(new Vector2(2, 1), .015f, -.015f, .01f);
+        for (int time = 10; time <= 100; time += 10) fast.Advance(small, time, false);
+        slow.Advance(small, 100, false);
+        Assertions.True(MathF.Abs(fast.Current.Roll - slow.Current.Roll) < .0002f &&
+            fast.Current.Offset == slow.Current.Offset, "The unclamped spring is frame-rate independent.");
+        for (int time = 116; time <= 600; time += 16)
+        {
+            var old = fast.Current;
+            var next = fast.Advance(follow, time, false, .060f, .30f);
+            Assertions.True(next.Offset == follow.Offset &&
+                MathF.Abs(next.Roll - old.Roll) <= .30f * .016f + .0001f &&
+                MathF.Abs(next.Yaw - old.Yaw) <= .30f * .016f + .0001f &&
+                MathF.Abs(next.Pitch - old.Pitch) <= .30f * .016f + .0001f,
+                "Locomotion angular speed remains bounded independently of the socket.");
+        }
         Assertions.True(smooth.Advance(idle, 217, true) == idle, "Reset must not retain the old pose.");
         foreach (int bank in new[] {0, 808})
         for (int frame = 0; frame < 808; frame++)
             Assertions.True(WingBodyPose.TryGetMotion(bank + frame, bank, 2, false, out var motion) &&
                 float.IsFinite(motion.Roll) && float.IsFinite(motion.Yaw) &&
-                MathF.Abs(motion.Roll) <= .181f && MathF.Abs(motion.Yaw) <= .141f, $"Invalid motion frame {bank + frame}.");
+                MathF.Abs(motion.Roll) <= .181f && MathF.Abs(motion.Yaw) <= .141f &&
+                WingBodyPose.TryGetAttachmentDelta(bank + frame, bank, 2, false, out var socket) &&
+                motion.Offset == socket, $"Invalid or detached motion frame {bank + frame}.");
     }
 
     private static void Main()

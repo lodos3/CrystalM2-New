@@ -27,40 +27,66 @@ public readonly record struct WingPoseMotion(Vector2 Offset, float Roll, float Y
 
     public static WingPoseMotion Stabilize(WingPoseMotion motion, bool idle, bool locomotion)
     {
-        if (idle) return Zero;
-        Vector2 offset = locomotion && motion.Offset.LengthSquared() < .64f ? Vector2.Zero : motion.Offset;
-        return new(offset, Math.Clamp(motion.Roll, locomotion ? -.055f : -.18f, locomotion ? .055f : .18f),
+        if (idle) return new WingPoseMotion(motion.Offset, 0, 0);
+        return new(motion.Offset, Math.Clamp(motion.Roll, locomotion ? -.055f : -.18f, locomotion ? .055f : .18f),
             Math.Clamp(motion.Yaw, locomotion ? -.04f : -.14f, locomotion ? .04f : .14f),
             locomotion ? 0 : motion.Pitch);
     }
 }
 
-// Frame-rate-independent 30 ms exponential interpolation. Both draw passes
-// and the light use the same sample, advanced by the player's Process loop.
+// Hard positional constraint plus a critically damped rotational spring.
+// One update per actor, shared by both draw passes and the light source.
 public struct WingPoseSmoother
 {
     private bool _initialized;
     private long _lastTime;
+    private Vector3 _velocity;
     public WingPoseMotion Current { get; private set; }
 
-    public WingPoseMotion Advance(WingPoseMotion target, long now, bool reset, float tau = .035f, float maxLag = 1.5f)
+    public WingPoseMotion Advance(WingPoseMotion target, long now, bool reset,
+        float tau = .045f, float maxAngularSpeed = .9f)
     {
         if (!_initialized || reset || now < _lastTime || now - _lastTime > 250)
         {
             _initialized = true;
             _lastTime = now;
-            return Current = target;
+            _velocity = Vector3.Zero;
+            return Current = new WingPoseMotion(target.Offset, 0, 0);
         }
-        if (now == _lastTime) return Current;
+
         float dt = (now - _lastTime) * .001f;
         _lastTime = now;
-        float weight = 1 - MathF.Exp(-dt / Math.Clamp(tau, .015f, .080f));
-        // The socket must track discrete sprite frames closely. The broad
-        // upper and lower spans can ease into the strike over a longer interval.
-        float pitchWeight = 1 - MathF.Exp(-dt / .055f);
-        return Current = new WingPoseMotion(WingPoseMotion.LimitOffset(Vector2.Lerp(Current.Offset, target.Offset, weight), target.Offset, maxLag),
-            Current.Roll + (target.Roll - Current.Roll) * weight,
-            Current.Yaw + (target.Yaw - Current.Yaw) * weight,
-            Current.Pitch + (target.Pitch - Current.Pitch) * pitchWeight);
+        // A sprite can change even at the same timer tick. No positional
+        // spring, velocity or dead zone is allowed on the physical socket.
+        if (dt == 0) return Current = Current with { Offset = target.Offset };
+
+        float omega = 2f / Math.Clamp(tau, .025f, .100f);
+        float decay = MathF.Exp(-omega * dt);
+        float speed = Math.Clamp(maxAngularSpeed, .10f, 1.5f);
+        float roll = Step(Current.Roll, target.Roll, ref _velocity.X, .18f);
+        float yaw = Step(Current.Yaw, target.Yaw, ref _velocity.Y, .14f);
+        float pitch = Step(Current.Pitch, target.Pitch, ref _velocity.Z, .33f);
+        return Current = new WingPoseMotion(target.Offset, roll, yaw, pitch);
+
+        float Step(float value, float goal, ref float velocity, float bound)
+        {
+            goal = Math.Clamp(goal, -bound, bound);
+            float error = value - goal;
+            float temp = (velocity + omega * error) * dt;
+            float unconstrained = goal + (error + temp) * decay;
+            float nextVelocity = (velocity - omega * temp) * decay;
+            float next = Math.Clamp(unconstrained, value - speed * dt, value + speed * dt);
+            next = Math.Clamp(next, -bound, bound);
+            // A reversing target may initially move away due to inertia, but
+            // the spring cannot overshoot through the target or its limits.
+            if ((goal - value) * (next - goal) > 0)
+            {
+                velocity = 0;
+                return goal;
+            }
+            velocity = MathF.Abs(next - unconstrained) > .00001f
+                ? (next - value) / dt : Math.Clamp(nextVelocity, -speed, speed);
+            return next;
+        }
     }
 }

@@ -76,22 +76,43 @@ internal static class ArmourWingChecks
     private static void CheckAttackLean()
     {
         var pool = new SpellParticlePool(ArmourWingParticles.ParticleCapacity);
+        for (byte effect = ArmourWings.Phoenix; effect < ArmourWings.SolarAscendant; effect++)
+        foreach (bool mounted in new[] { false, true })
         foreach (MirDirection facing in Enum.GetValues<MirDirection>())
         {
-            Vector2 shoulder = ArmourWingParticles.Shoulder(ArmourWings.MagmaWyrm, false);
-            float yaw = (int)facing * MathF.PI / 4;
-            Vector2 forward = new(MathF.Sin(yaw), -.49f * MathF.Cos(yaw));
-            ArmourWingParticles.Emit(pool, ArmourWings.MagmaWyrm, 0, 0, shoulder, facing, 400, 1);
+            Vector2 shoulder = ArmourWingParticles.Shoulder(effect, mounted);
+            var atlas = WingPoseAtlas.GetPose(WingPoseAtlas.DesignBank + effect - ArmourWings.Phoenix, 0);
+            float artWidth = atlas.Width + 2 * atlas.X;
+            ArmourWingParticles.Emit(pool, effect, 0, 0, shoulder, facing, 400, 1);
             var rest = pool.Active.ToArray();
-            ArmourWingParticles.Emit(pool, ArmourWings.MagmaWyrm, 0, 0, shoulder, facing, 400, 1, torsoPitch: .28f);
+            ArmourWingParticles.Emit(pool, effect, 0, 0, shoulder, facing, 400, 1,
+                torsoYaw: .14f, torsoRoll: .18f, torsoPitch: .28f);
+            var tilted = pool.Active.ToArray();
+            if (tilted.Length != rest.Length) throw new InvalidDataException("A strike changed the wing particle budget.");
+            bool pinned = false, flexed = false;
             for (int i = 0; i < rest.Length; i++)
             {
-                if (rest[i].Ribbon is not { } before) continue;
-                var after = pool.Active[i].Ribbon!.Value;
-                if (pool.Active[i].Origin != rest[i].Origin ||
-                    Vector2.Dot(after.TopRight - before.TopRight, forward) <= 0 ||
-                    Vector2.Dot(after.BottomRight - before.BottomRight, forward) >= 0)
-                    throw new InvalidDataException($"Wing pitch must turn the crown forward and the hem back about a fixed socket in {facing}.");
+                if (rest[i].Ribbon is not { } before || rest[i].RibbonTextureU is not { } uv) continue;
+                var after = tilted[i].Ribbon!.Value;
+                if (tilted[i].Origin != rest[i].Origin)
+                    throw new InvalidDataException($"Wing {effect} moved its physical socket in {facing}.");
+                float left = (atlas.X + atlas.Width * uv.X) / artWidth;
+                float right = (atlas.X + atlas.Width * uv.Y) / artWidth;
+                VerifyEdge(left, before.TopLeft, before.BottomLeft, after.TopLeft, after.BottomLeft);
+                VerifyEdge(right, before.TopRight, before.BottomRight, after.TopRight, after.BottomRight);
+            }
+            if (!pinned || !flexed) throw new InvalidDataException($"Wing {effect} lacks a pinned root or flexible span in {facing}.");
+
+            void VerifyEdge(float u, Vector2 top, Vector2 bottom, Vector2 movedTop, Vector2 movedBottom)
+            {
+                float movement = Math.Max(Vector2.Distance(top, movedTop), Vector2.Distance(bottom, movedBottom));
+                if (u <= .12f)
+                {
+                    pinned = true;
+                    if (movement > .001f)
+                        throw new InvalidDataException($"Wing {effect} proximal geometry detached by {movement}px in {facing}.");
+                }
+                if (u >= .65f && movement > .5f) flexed = true;
             }
         }
     }

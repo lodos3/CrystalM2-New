@@ -5110,8 +5110,9 @@ namespace Client.MirObjects
             bool locomotion = CurrentAction is MirAction.Walking or MirAction.Running or MirAction.MountWalking or MirAction.MountRunning or
                 MirAction.WalkingBow or MirAction.RunningBow or MirAction.Sneek;
             target = WingPoseMotion.Stabilize(target, idle, locomotion);
-            _wingPoseSmoother.Advance(target, CMain.Time, reset, idle || locomotion ? .055f : .027f,
-                idle ? .5f : locomotion ? 1f : 1.5f);
+            _wingPoseSmoother.Advance(target, CMain.Time, reset,
+                idle || locomotion ? .065f : .045f,
+                idle ? .30f : locomotion ? .30f : .90f);
             _wingPoseEffect = WingEffect;
             _wingPoseFamily = _wingFamily;
             _wingPoseBank = ArmourOffSet;
@@ -5127,7 +5128,7 @@ namespace Client.MirObjects
                 Vector2 shoulder = ArmourWingParticles.Shoulder(WingEffect, RidingMount);
                 if (WingEffect < ArmourWings.Phoenix) return shoulder;
                 int bodyFrame = DrawFrame + ArmourOffSet;
-                if (_wingFamily == 0 && WingBodyPose.TryGetDelta(bodyFrame, ArmourOffSet,
+                if (_wingFamily == 0 && WingBodyPose.TryGetAttachmentDelta(bodyFrame, ArmourOffSet,
                     (int)Direction, RidingMount, out Vector2 delta))
                     return shoulder + delta;
 

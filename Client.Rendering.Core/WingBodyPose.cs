@@ -11,7 +11,7 @@ namespace CrystalM2.Rendering.Core;
 public static class WingBodyPose
 {
     private const int GenderStride = 808;
-    private readonly record struct Sample(Vector2 Position, float Roll, Vector2 Torso);
+    private readonly record struct Sample(Vector2 Position, Vector2 Attachment, float Roll, Vector2 Torso);
     private static readonly Lazy<Sample[]> Anchors = new(Load);
 
     // Conservative authored twist estimates from the visible windup and
@@ -36,11 +36,22 @@ public static class WingBodyPose
         return float.IsFinite(delta.X) && float.IsFinite(delta.Y);
     }
 
+    public static bool TryGetAttachmentDelta(int bodyFrame, int bankStart, int direction, bool mounted,
+        out Vector2 delta)
+    {
+        delta = Vector2.Zero;
+        if (!TryGetDelta(bodyFrame, bankStart, direction, mounted, out _)) return false;
+        int reference = bankStart + (mounted ? 416 : 0) + direction * 4;
+        var anchors = Anchors.Value;
+        delta = anchors[bodyFrame].Attachment - anchors[reference].Attachment;
+        return float.IsFinite(delta.X) && float.IsFinite(delta.Y);
+    }
+
     public static bool TryGetMotion(int bodyFrame, int bankStart, int direction, bool mounted,
         out WingPoseMotion motion)
     {
         motion = WingPoseMotion.Zero;
-        if (!TryGetDelta(bodyFrame, bankStart, direction, mounted, out var delta)) return false;
+        if (!TryGetAttachmentDelta(bodyFrame, bankStart, direction, mounted, out var delta)) return false;
         var samples = Anchors.Value;
         int reference = bankStart + (mounted ? 416 : 0) + direction * 4;
         float angle = samples[bodyFrame].Roll - samples[reference].Roll;
@@ -56,11 +67,13 @@ public static class WingBodyPose
             _ => 0
         };
         if (local < 32 || local is >= 128 and < 136 || (local is >= 416 and < 448 && mounted))
+        {
+            motion = new WingPoseMotion(delta, 0, 0);
             return true;
+        }
         bool locomotion = local is >= 32 and < 128 or >= 448 and < 560;
         if (locomotion)
         {
-            if (delta.LengthSquared() < .64f) delta = Vector2.Zero;
             roll = Math.Clamp(roll * .30f, -.055f, .055f);
         }
         bool attack = local is >= 136 and < 296 or >= 584 and < 632;
@@ -91,7 +104,10 @@ public static class WingBodyPose
             Vector2 shoulderB = Read(points[3]);
             Vector2 torso = neck - Read(points[6]);
             float roll = torso.LengthSquared() > 1f ? MathF.Atan2(torso.X, -torso.Y) : 0f;
-            result[index++] = new Sample(neck * .35f + (shoulderA + shoulderB) * .325f, roll, torso);
+            // Lower thoracic socket, not the head/shoulder centroid. The chest
+            // and waist landmarks move with the part of the body the wing joins.
+            Vector2 attachment = Vector2.Lerp(Read(points[4]), Read(points[5]), .65f);
+            result[index++] = new Sample(neck * .35f + (shoulderA + shoulderB) * .325f, attachment, roll, torso);
         }
         return result;
 

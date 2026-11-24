@@ -96,7 +96,7 @@ internal static class WingIntersectionChecks
                             WingBodyPose.TryGetMotion(index,bank,d,seq.Mounted,out var targetMotion);
                             targetMotion=WingPoseMotion.Stabilize(targetMotion,idle,move);
                             WingPoseMotion motion=smoothers[d].Advance(targetMotion,now,frame==0&&sub==0,
-                                (idle || move) ? .055f : .027f, idle ? .5f : move ? 1f : 1.5f);
+                                (idle || move) ? .065f : .045f, idle || move ? .30f : .90f);
                             Vector2 shoulder=ArmourWingParticles.Shoulder(effect,seq.Mounted)+(id>=2?motion.Offset:Vector2.Zero);
                             Vector2 socket=Origin+ArmourWingParticles.BackAttachment(shoulder,facing);
                             int wingPose=(gender==1?840:0)+seq.WingStart+
