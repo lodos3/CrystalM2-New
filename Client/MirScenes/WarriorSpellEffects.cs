@@ -59,8 +59,6 @@ internal static partial class WarriorSpellEffects
         float cycle = aura ? now % duration / (float)duration : progress;
         float strength = aura ? 1 : visual.Spell is Spell.BladeAvalanche or Spell.Entrapment or Spell.TwinDrakeBlade
             ? Envelope(progress, fields.Read(tuning.EnvelopeFadeStart), fields.Read(tuning.EnvelopeTail)) : Envelope(progress);
-        if (SpellVfxPoseMasks.DrawWarriorCast(new Frame(pool, feet, now, 1, size, seed), visual, feet, facing, progress))
-            strength *= visual.Spell == Spell.SlashingBurst ? .30f * Ease(progress * 6) : .30f;
         var frame = new Frame(pool, feet, now, strength, size, seed ^ (uint)visual.Spell * 34763);
 
         switch (visual.Phase)
@@ -97,9 +95,7 @@ internal static partial class WarriorSpellEffects
                 DrakeContact(frame, feet, progress, (now - start) / 1000f);
                 break;
             case Spell.BladeAvalanche when visual.Phase == SpellVisualPhase.Swing:
-                SpellVfxPoseMasks.Draw(new Frame(pool, feet, now, 1, size, seed), Spell.BladeAvalanche,
-                    feet, SpellVfxPoseMasks.Facing(facing, 8), Math.Clamp((int)(progress * 15), 0, 14), .96f);
-                Avalanche(new Frame(pool, feet, now, strength * .19f, size, seed), feet, facing, progress);
+                Avalanche(frame, feet, facing, progress);
                 break;
             case Spell.SlashingBurst when visual.Phase == SpellVisualPhase.Swing:
                 Burst(frame, feet, facing, progress);

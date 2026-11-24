@@ -32,21 +32,6 @@ internal readonly struct SpellParticleFrame(SpellParticlePool pool, Vector2 pivo
     internal static Color Tint(int rgb, float opacity) => Color.FromArgb((int)(255 * Math.Clamp(opacity, 0, 1)) << 24 | rgb);
 
     internal float Scale => size / ReferenceSize;
-    internal void PoseMask(Vector2 cell, SpellPoseAtlas.Pose pose, float opacity)
-    {
-        Vector2 half = new(pose.WorldSize.Width * .5f, pose.WorldSize.Height * .5f);
-        Vector2 centre = Place(cell + new Vector2(pose.Offset.X, pose.Offset.Y) + half);
-        int width = Math.Max(1, (int)MathF.Round(2 * half.X / ReferenceSize));
-        float heightRatio = 2 * half.Y / (width * ReferenceSize);
-        for (int channel = 0; channel < 3; channel++)
-        {
-            int colour = 255 << (8 * channel);
-            SpellVfxAssets.Emit(pool, new SpellParticle(centre, Vector2.Zero, now, 50, width, Tint(colour, opacity * strength),
-                Shape.Wisp, 0, heightRatio, Layer: Layer.EmissiveCore, FrameOnly: true, DepthY: depthY ?? pivot.Y,
-                AlwaysOnTop: alwaysOnTop, FieldObjectID: field, OpacityNoiseSeed: opacityNoiseSeed)
-                { CoveragePlane = pose.FirstPlane + channel }, "Spell.Pose-mask");
-        }
-    }
     private Vector2 Place(Vector2 point) => scalePositions ? pivot + (point - pivot) * Scale : point;
 
     internal float Unit(int index)

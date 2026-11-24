@@ -78,7 +78,7 @@ public partial class PlayerObject
         _weaponPoseSpell = spell;
 
         var hand = new Vector2(DrawLocation.X + MapControl.CellWidth / 2, DrawLocation.Y - 24);
-        WeaponMaskTrace? trace = WeaponTrace(index);
+        WeaponMaskTrace? trace = WeaponTraceAt(FrameIndex);
         float progress = (FrameIndex + .5f) / Math.Max(1, Frame.Count);
         if (trace == null && !legacyBlade && WarriorSpellEffects.UsesWeaponArt(spell))
         {
@@ -99,15 +99,19 @@ public partial class PlayerObject
         _lastWeaponPose = pose;
     }
 
-    private WeaponMaskTrace? WeaponTrace(int index) =>
-        Weapon >= 0 ? WeaponLibrary1?.GetWeaponTrace(index, DrawLocation) : null;
-
     internal WeaponMaskTrace? EquippedWeaponTrace() => WeaponTraceAt(FrameIndex);
 
     internal WeaponMaskTrace? WeaponTraceAt(int pose)
     {
-        var hand = new Vector2(DrawLocation.X + MapControl.CellWidth / 2, DrawLocation.Y - 24);
-        return WeaponTrace(DrawFrame - FrameIndex + pose + WeaponOffSet)?.Orient(hand, null);
+        if (Weapon < 0) return null;
+        float progress = (Math.Max(0, pose) + .5f) / Math.Max(1, Frame?.Count ?? 6);
+        float facing = ((int)Direction - 2) * MathF.PI / 4;
+        bool striking = CurrentAction is MirAction.Attack1 or MirAction.Attack4;
+        float angle = facing + (striking ? (progress - .5f) * 2.4f : .2f);
+        Vector2 hand = new(DrawLocation.X + MapControl.CellWidth / 2, DrawLocation.Y - 24);
+        hand += new Vector2(MathF.Cos(facing) * 6, MathF.Sin(facing) * 4);
+        Vector2 tip = hand + new Vector2(MathF.Cos(angle) * 30, MathF.Sin(angle) * 20);
+        return new WeaponMaskTrace(hand, tip);
     }
 
     private void ProcessSpellCoatings()
@@ -145,6 +149,10 @@ public partial class PlayerObject
         }
         if (coat != BodyCoat.None || coat != _bodyCoat) map.TextureValid = false;
         _bodyCoat = coat;
+        if ((coat & BodyCoat.Protection) != 0) map.EmitActorCoating(this, Spell.ProtectionField, 0x77BFFF);
+        if ((coat & BodyCoat.ImmortalSkin) != 0) map.EmitActorCoating(this, Spell.ImmortalSkin, 0xFFD582);
+        if ((coat & BodyCoat.Rage) != 0) map.EmitActorCoating(this, Spell.Rage, 0xFF7030);
+        if ((coat & BodyCoat.Fury) != 0) map.EmitActorCoating(this, Spell.Fury, 0xFFAF55);
 
         if (!Settings.Effect || !Settings.WeaponSpellImbue || Dead || RidingMount || Hidden) return;
         Spell swing = BladeSpell;
@@ -161,53 +169,6 @@ public partial class PlayerObject
             BuffType.Fury => BodyCoat.Fury,
             _ => BodyCoat.None
         };
-    }
-
-    private void DrawBodySpellVisual(MLibrary library, int index)
-    {
-        float intensity = DXManager.Opacity * Settings.SpellBlendIntensityPercent / 100f;
-        if ((_bodyCoat & BodyCoat.Protection) != 0)
-        {
-            using var vfxScope = SpellVfxAssets.For(Spell.ProtectionField);
-            var tuning = SpellVfxAssets.Current.Warrior.ActorMasks;
-            library.DrawSpellMask(index, DrawLocation, tuning.ProtectionFieldColour, tuning.ProtectionFieldCore,
-                intensity * tuning.ProtectionFieldIntensity, SpellMaskStyle.Storm);
-        }
-        if ((_bodyCoat & BodyCoat.ImmortalSkin) != 0)
-        {
-            using var vfxScope = SpellVfxAssets.For(Spell.ImmortalSkin);
-            var tuning = SpellVfxAssets.Current.Warrior.ActorMasks;
-            library.DrawSpellMask(index, DrawLocation, tuning.ImmortalSkinColour, tuning.ImmortalSkinCore,
-                intensity * tuning.ImmortalSkinIntensity, SpellMaskStyle.Frost);
-        }
-        if ((_bodyCoat & BodyCoat.Rage) != 0)
-        {
-            using var vfxScope = SpellVfxAssets.For(Spell.Rage);
-            var tuning = SpellVfxAssets.Current.Warrior.ActorMasks;
-            library.DrawSpellMask(index, DrawLocation, tuning.RageColour, tuning.RageCore,
-                intensity * tuning.RageIntensity, SpellMaskStyle.Fire);
-        }
-        if ((_bodyCoat & BodyCoat.Fury) != 0)
-        {
-            using var vfxScope = SpellVfxAssets.For(Spell.Fury);
-            var tuning = SpellVfxAssets.Current.Warrior.ActorMasks;
-            library.DrawSpellMask(index, DrawLocation, tuning.FuryColour, tuning.FuryCore,
-                intensity * tuning.FuryIntensity, SpellMaskStyle.Sweep);
-        }
-    }
-
-    private void DrawWeaponSpellVisual(int index)
-    {
-        if (!Settings.Effect || Dead) return;
-        Spell spell = BladeSpell;
-        if (spell == Spell.None || SpellVfxBladeFrames.Supports(spell)) return;
-        var (colour, core) = LegacySpellEffects.WeaponColours(spell);
-        float phase = Frame == null ? .5f : (FrameIndex + .5f) / Math.Max(1, Frame.Count);
-        using var vfxScope = SpellVfxAssets.For(spell);
-        var tuning = SpellVfxAssets.Current.Warrior.ActorMasks;
-        float pulse = tuning.SwingPulseBase + tuning.SwingPulseGain * MathF.Sin(MathF.PI * phase);
-        WeaponLibrary1.DrawSpellMask(index, DrawLocation, colour, core,
-            pulse * DXManager.Opacity * Settings.SpellBlendIntensityPercent / 100f, SpellMaskStyle.Sweep);
     }
 
     private void BeginLegacySpellVisual(Spell spell)

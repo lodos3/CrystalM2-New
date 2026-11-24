@@ -208,7 +208,7 @@ internal static partial class WizardSpellEffects
         if (spell is not (Spell.FireBall or Spell.GreatFireBall or Spell.FireBounce or Spell.MeteorShower or Spell.FrostCrunch)) return false;
         if (remaining <= 0) return true;
 
-        var frame = new Frame(pool, head, now, .34f, size, (uint)spell, depthY: head.Y + fields.Read(tuning.DepthY));
+        var frame = new Frame(pool, head, now, 1f, size, (uint)spell, depthY: head.Y + fields.Read(tuning.DepthY));
         float angle = MathF.Atan2(heading.Y, heading.X);
         Vector2 side = new(-heading.Y, heading.X);
         bool frost = spell == Spell.FrostCrunch;

@@ -226,23 +226,18 @@ internal static class LegacySpellEffects
     {
         using var vfxScope = SpellVfxAssets.For(spell);
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Legacy.ProjectileFrame);
-        int poses = spell switch
+        if (remaining <= 0) return;
+        if (spell == Spell.CatTongue)
         {
-            Spell.FireBall or Spell.GreatFireBall or Spell.FireBounce or Spell.MeteorShower or Spell.CatTongue => 6,
-            Spell.FrostCrunch => 4,
-            Spell.SoulFireBall or Spell.MassHiding or Spell.SoulShield or Spell.BlessedArmour or Spell.Curse or
-                Spell.Hallucination or Spell.Plague or Spell.PoisonCloud => 3,
-            _ => 0
-        };
-        if (poses != 0)
-        {
-            if (remaining <= 0) return;
-            int facing = direction >= 0 ? direction : SpellVfxPoseMasks.Facing(heading, 16);
-            int height = poses == 3 ? 36 : spell == Spell.CatTongue ? 24 : 47;
-            Vector2 feet = head + new Vector2(0, height) - SpellVfxLegacyFrames.ProjectileOffset(spell, facing, frame);
-            var particles = new SpellParticleFrame(pool, feet, now, 1, size, (uint)frame, depthY: feet.Y);
-            SpellVfxPoseMasks.Draw(particles, spell, feet, facing, frame % poses, 1);
-            if (spell == Spell.CatTongue) return;
+            // A narrow organic projectile with a moving tapered core and independent wake.
+            var trail = new SpellParticleFrame(pool, head, now, 1, size, (uint)frame, depthY: head.Y + 24);
+            Vector2 side = new(-heading.Y, heading.X);
+            Vector2 from = head - heading * 24 + side * MathF.Sin(frame * .9f) * 5;
+            trail.Thread(from, head, 2.5f, 5f, 0xA34876, .85f, emitter: "Procedural.CatTongue.Trail");
+            trail.Thread(from + heading * 5, head, .8f, 2.4f, 0xF6ADBE, .8f, Layer.EmissiveCore, emitter: "Procedural.CatTongue.Core");
+            trail.Sprite(head, 13, 8, Shape.Wisp, 0xFFB6D2, .75f, rotation: MathF.Atan2(heading.Y, heading.X),
+                emitter: "Procedural.CatTongue.Head");
+            return;
         }
         if (WizardSpellEffects.DrawProjectile(pool, spell, head, heading, now, frame, remaining, leaveWake, size)) return;
         if (TaoistSpellEffects.DrawProjectile(pool, spell, head, heading, now, frame, remaining, leaveWake, size)) return;

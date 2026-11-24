@@ -15,7 +15,6 @@ internal sealed class SpellParticleRenderer
 {
     private readonly RendererDevice _device;
     private readonly Texture _atlas;
-    private readonly Dictionary<int, Texture> _posePages = new();
     private readonly Dictionary<int, (Texture Texture, long LastUse)> _wingPages = new();
     private long _wingUse;
 
@@ -39,21 +38,6 @@ internal sealed class SpellParticleRenderer
             texture.BeginUpload().Data.Write(WingPoseAtlas.ReadPage(index));
             texture.EndUpload();
             _wingPages.Add(index, (texture, ++_wingUse));
-            return texture;
-        }
-        catch { texture.Dispose(); throw; }
-    }
-
-    private Texture PosePage(int index)
-    {
-        if (_posePages.TryGetValue(index, out var texture)) return texture;
-        texture = Texture.CreateCoverageAtlas(_device, SpellPoseAtlas.PageSize, SpellPoseAtlas.PageSize, 1);
-        try
-        {
-            var upload = texture.BeginUpload();
-            upload.Data.Write(SpellPoseAtlas.GetPage(index));
-            texture.EndUpload();
-            _posePages.Add(index, texture);
             return texture;
         }
         catch { texture.Dispose(); throw; }
@@ -235,12 +219,9 @@ internal sealed class SpellParticleRenderer
                     source = wing.Source;
                     atlas = WingPage(wing.Page);
                 }
-                else if (particle.CoveragePlane > 0)
-                {
-                    var plane = SpellPoseAtlas.GetPlane(particle.CoveragePlane);
-                    source = plane.Source;
-                    atlas = PosePage(plane.Page);
-                }
+                // Positive coverage IDs belonged to legacy spell silhouettes. They are
+                // deliberately not rendered; negative IDs remain dedicated to cosmetic wings.
+                else if (particle.CoveragePlane > 0) continue;
                 // These are independent channel masks. Blending one over another as alpha
                 // would discard light from the earlier channels and change the frame hue.
                 _device.ArtworkBlend = particle.CoveragePlane != 0 && !glowPass ? SpriteBlendMode.Additive : layerBlend;

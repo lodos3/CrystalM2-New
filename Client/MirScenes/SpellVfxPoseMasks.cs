@@ -1,8 +1,12 @@
 using System.Numerics;
 using CrystalM2.Rendering.Core;
+using Layer = CrystalM2.Rendering.Core.SpellParticleLayer;
+using Shape = CrystalM2.Rendering.Core.SpellParticleShape;
 
 namespace Client.MirScenes;
 
+// Directional effects are constructed from geometry. No legacy sprite plane,
+// sprite decompression, or per-pose GPU texture is needed to render them.
 internal static class SpellVfxPoseMasks
 {
     internal static bool IsWeaponSwing(Spell spell) =>
@@ -14,49 +18,39 @@ internal static class SpellVfxPoseMasks
         return ((int)MathF.Round(turn * directions / MathF.Tau) + directions) % directions;
     }
 
-    internal static void Draw(SpellParticleFrame frame, Spell spell, Vector2 feet, int direction, int pose,
-        float opacity = .70f, bool followThrough = false)
+    internal static void DrawSwing(SpellParticleFrame frame, Spell spell, Vector2 feet,
+        int direction, float progress)
     {
-        string sequence = spell switch
+        float heading = (direction - 2) * MathF.PI / 4;
+        float t = Math.Clamp(progress, 0, 1);
+        float fade = .8f * MathF.Sin(MathF.PI * Math.Clamp(t + .12f, 0, 1));
+        Vector2 centre = feet - Vector2.UnitY * 23;
+        Vector2 forward = new(MathF.Cos(heading), MathF.Sin(heading) * .68f);
+        if (spell == Spell.Thrusting)
         {
-            Spell.TwinDrakeBlade when followThrough => "TwinDrakeFollow",
-            Spell.GreatFireBall or Spell.FireBounce or Spell.MeteorShower => nameof(Spell.GreatFireBall),
-            Spell.SoulShield or Spell.BlessedArmour or Spell.MassHiding or Spell.Curse or Spell.Hallucination or
-                Spell.Plague or Spell.PoisonCloud => nameof(Spell.SoulFireBall),
-            _ => spell.ToString()
-        };
-        Draw(frame, sequence, feet, direction, pose, opacity);
-    }
-
-    internal static void Draw(SpellParticleFrame frame, string sequence, Vector2 feet, int direction, int pose, float opacity)
-    {
-        var mask = SpellPoseAtlas.GetPose(sequence, direction, pose);
-        if (mask.FirstPlane != 0) frame.PoseMask(feet, mask, opacity);
-    }
-
-    internal static bool DrawWarriorCast(SpellParticleFrame frame, SpellVisual visual, Vector2 feet, Vector2 facing, float progress)
-    {
-        (string name, int count) = (visual.Spell, visual.Phase) switch
+            Vector2 tip = centre + forward * (27 + 29 * t);
+            frame.Thread(centre + forward * 5, tip, 3.3f, .6f, 0x94C9FF, fade, emitter: "Procedural.Swing.Thrust");
+            frame.Thread(centre + forward * 13, tip, 1.2f, .3f, 0xF2FAFF, fade, Layer.EmissiveCore, emitter: "Procedural.Swing.ThrustCore");
+            return;
+        }
+        float span = spell == Spell.CrossHalfMoon ? MathF.PI * 1.75f :
+            spell == Spell.HalfMoon ? MathF.PI * 1.1f : MathF.PI * .67f;
+        float radius = spell == Spell.CrossHalfMoon ? 47 : spell == Spell.HalfMoon ? 40 : 29;
+        float leading = heading + span * (t - .42f);
+        float trail = span * (.32f + .44f * t);
+        const int segments = 9;
+        Vector2 previous = centre + SpellParticleFrame.Ellipse(leading - trail, radius, radius * .68f);
+        for (int i = 1; i <= segments; i++)
         {
-            (Spell.LionRoar or Spell.BattleCry, SpellVisualPhase.Impact) => ("LionRoar", 20),
-            (Spell.Entrapment, SpellVisualPhase.Prepare) => ("Entrapment", 10),
-            (Spell.ProtectionField, SpellVisualPhase.Impact) => ("ProtectionField", 10),
-            (Spell.Rage, SpellVisualPhase.Impact) => ("Rage", 10),
-            (Spell.Fury, SpellVisualPhase.Impact) => ("Fury", 10),
-            (Spell.ImmortalSkin, SpellVisualPhase.Impact) => ("ImmortalSkin", 17),
-            (Spell.SlashingBurst, SpellVisualPhase.Swing) => ("SlashingBurst", 9),
-            (Spell.CounterAttack, SpellVisualPhase.Swing) => ("CounterAttack", 10),
-            _ => (null, 0)
-        };
-        if (count == 0) return false;
-        int direction = visual.Spell is Spell.SlashingBurst or Spell.CounterAttack ? Facing(facing, 8) : 0;
-        Draw(frame, name, feet, direction, (int)(progress * count), 1);
-        if (visual.Spell == Spell.Fury && progress < .8f)
-            Draw(frame, "FuryFlash", feet, 0, (int)(progress * 10), 1);
-        if (visual.Spell == Spell.ImmortalSkin && progress < .25f)
-            Draw(frame, "SkinFlash", feet, 0, (int)(progress * 20), 1);
-        if (visual.Spell == Spell.CounterAttack && progress < .2f)
-            Draw(frame, "CounterFlash", feet, 0, (int)(progress * 10), 1);
-        return true;
+            float u = i / (float)segments;
+            Vector2 point = centre + SpellParticleFrame.Ellipse(leading - trail + trail * u, radius, radius * .68f);
+            frame.Thread(previous, point, 2.2f * u, 3.1f * u, 0x81ABEB, fade * u,
+                emitter: "Procedural.Swing.Wake");
+            frame.Thread(previous, point, .7f * u, 1f * u, 0xF0F8FF, fade * u, Layer.EmissiveCore,
+                emitter: "Procedural.Swing.Core");
+            previous = point;
+        }
+        frame.Sprite(previous, 10, 8, Shape.Flash, 0xD6EEFF, fade, Layer.EmissiveCore,
+            light: true, emitter: "Procedural.Swing.Tip");
     }
 }

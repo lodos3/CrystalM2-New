@@ -141,7 +141,8 @@ public sealed partial class MapControl
         if (SpellVfxPoseMasks.IsWeaponSwing(spell))
         {
             var frame = new SpellParticleFrame(_spellParticles, feet, CMain.Time, 1, SpellParticleSize, actor.ObjectID, depthY: feet.Y);
-            SpellVfxPoseMasks.Draw(frame, spell, feet, (int)actor.Direction, pose);
+            using var profile = SpellVfxAssets.For(spell);
+            SpellVfxPoseMasks.DrawSwing(frame, spell, feet, (int)actor.Direction, progress);
             TextureValid = false;
             return;
         }
@@ -195,12 +196,9 @@ public sealed partial class MapControl
             if (elapsed >= 0 && elapsed < duration)
             {
                 var cue = visual.Phase == SpellVisualPhase.Prepare ? SpellVfxBladeFrames.DrakePrepare : SpellVfxBladeFrames.DrakeStun;
-                var mask = new SpellParticleFrame(_spellParticles, feet, CMain.Time, 1, SpellParticleSize, seed, depthY: feet.Y);
-                SpellVfxPoseMasks.Draw(mask, visual.Phase == SpellVisualPhase.Prepare ? "DrakePrepare" : "DrakeStun",
-                    feet, 0, cue.FrameAt(elapsed), 1);
                 SpellVfxBladeParticles.Draw(_spellParticles, visual.Spell, visual.Phase, feet,
                     actor?.Direction ?? effect.ParticleDirection, cue.FrameAt(elapsed),
-                    elapsed / (float)duration, CMain.Time, SpellParticleSize, seed, detailStrength: .38f);
+                    elapsed / (float)duration, CMain.Time, SpellParticleSize, seed);
                 TextureValid = false;
             }
             return;
@@ -324,6 +322,30 @@ public sealed partial class MapControl
         Point camera = SpellParticleOrigin();
         Vector2 offset = new(camera.X, camera.Y);
         return new WeaponMaskTrace(screen.Hilt - offset, screen.Tip - offset);
+    }
+
+    internal void EmitActorCoating(MapObject actor, Spell spell, int colour)
+    {
+        if (!CanEmitSpellParticles(actor.CurrentLocation) ||
+            _spellParticles.Active.Length >= SpellParticleCapacity * 3 / 4) return;
+        using var profile = SpellVfxAssets.For(spell);
+        Vector2 feet = AuthoredEffectFeet(actor);
+        var frame = new SpellParticleFrame(_spellParticles, feet, CMain.Time, 1, SpellParticleSize,
+            actor.ObjectID, depthY: feet.Y);
+        float time = (CMain.Time % 2400) / 2400f * MathF.Tau;
+        frame.Sprite(feet - new Vector2(0, 25), 38, 57, SpellParticleShape.Wisp, colour, .22f,
+            emitter: "Procedural.Coat.Body");
+        frame.Sprite(feet, 40, 17, SpellParticleShape.Halo, colour, .45f,
+            SpellParticleLayer.Ground, emitter: "Procedural.Coat.Ring");
+        for (int i = 0; i < 5; i++)
+        {
+            float phase = time + i * MathF.Tau / 5;
+            float rise = (float)((CMain.Time + i * 137L) % 900) / 900;
+            Vector2 p = feet + new Vector2(MathF.Cos(phase) * 17, MathF.Sin(phase) * 8 - rise * 48);
+            frame.Sprite(p, 5, 11, spell == Spell.Rage || spell == Spell.Fury ? SpellParticleShape.FlameTongue : SpellParticleShape.Spark,
+                colour, .75f * MathF.Sin(rise * MathF.PI), emitter: "Procedural.Coat.Mote");
+        }
+        TextureValid = false;
     }
 
     internal void EmitWeaponEnchant(Spell spell, WeaponMaskTrace world, MapObject actor, bool striking)

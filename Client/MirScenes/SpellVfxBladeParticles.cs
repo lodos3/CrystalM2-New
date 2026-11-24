@@ -11,9 +11,7 @@ internal static partial class SpellVfxBladeParticles
     internal static void DrawAttack(SpellParticlePool pool, Spell spell, SpellVisualPhase phase, Vector2 feet,
         MirDirection direction, int pose, float progress, long now, float size, uint seed, WeaponMaskTrace? weapon)
     {
-        var mask = new Frame(pool, feet, now, 1, size, seed, depthY: feet.Y);
-        SpellVfxPoseMasks.Draw(mask, spell, feet, (int)direction, pose, .67f, phase == SpellVisualPhase.FollowThrough);
-        Draw(pool, spell, phase, feet, direction, pose, progress, now, size, seed, weapon, .40f);
+        Draw(pool, spell, phase, feet, direction, pose, progress, now, size, seed, weapon);
     }
 
     internal static void Draw(SpellParticlePool pool, Spell spell, SpellVisualPhase phase, Vector2 feet,

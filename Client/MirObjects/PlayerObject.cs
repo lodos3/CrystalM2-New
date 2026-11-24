@@ -5015,7 +5015,6 @@ namespace Client.MirObjects
             {
                 BodyLibrary.Draw(DrawFrame + ArmourOffSet, DrawLocation, drawColour, true);
                 if (_drawGeneratedArmour) GeneratedArmourRuntime.Draw(GeneratedArmour, DrawFrame + ArmourOffSet, DrawLocation, drawColour);
-                if (spellMask) DrawBodySpellVisual(BodyLibrary, DrawFrame + ArmourOffSet);
             }
 
             DXManager.SetGrayscale(oldGrayScale);
@@ -5027,7 +5026,6 @@ namespace Client.MirObjects
             if (HairLibrary != null)
             {
                 HairLibrary.Draw(DrawFrame + HairOffSet, DrawLocation, DrawColour, true);
-                if (spellMask) DrawBodySpellVisual(HairLibrary, DrawFrame + HairOffSet);
             }
         }
 		public void DrawWeapon()
@@ -5041,7 +5039,6 @@ namespace Client.MirObjects
 
 				if (WeaponEffectLibrary1 != null)
 					WeaponEffectLibrary1.DrawBlend(weaponFrame, DrawLocation, DrawColour, true, 0.4F);
-				DrawWeaponSpellVisual(weaponFrame);
 			}
 		}
 		public void DrawWeapon2()

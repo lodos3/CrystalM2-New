@@ -433,3 +433,30 @@ foreach (Spell ward in new[] { Spell.SoulShield, Spell.BlessedArmour })
 }
 
 Console.WriteLine("Taoist particle composition tests passed.");
+
+
+// Spell rendering must never request an archived spell coverage plane.
+// Inspect the actual emitted particles without a D3D device.
+foreach (Spell spell in new[] { Spell.LionRoar, Spell.BattleCry, Spell.Entrapment, Spell.ProtectionField,
+    Spell.Rage, Spell.Fury, Spell.ImmortalSkin, Spell.BladeAvalanche, Spell.SlashingBurst, Spell.CounterAttack })
+{
+    var phase = spell == Spell.Entrapment ? SpellVisualPhase.Prepare :
+        spell is Spell.BladeAvalanche or Spell.SlashingBurst or Spell.CounterAttack ? SpellVisualPhase.Swing : SpellVisualPhase.Impact;
+    var particles = RenderWarrior(spell, phase, 350);
+    Check(particles.Length > 0 && particles.All(p => p.CoveragePlane == 0),
+        $"{spell} must use only original particle geometry and brushes.");
+}
+foreach (Spell spell in new[] { Spell.SoulShield, Spell.BlessedArmour, Spell.Curse })
+    Check(Render(spell, SpellVisualPhase.Impact, 800, 1600).All(p => p.CoveragePlane == 0),
+        $"{spell} must not emit archived spell silhouettes.");
+
+var legacyProjectile = typeof(SpellVisual).Assembly.GetType("Client.MirScenes.LegacySpellEffects")!
+    .GetMethod("ProjectileFrame", BindingFlags.Static | BindingFlags.NonPublic)!;
+foreach (Spell spell in new[] { Spell.FireBall, Spell.GreatFireBall, Spell.FireBounce, Spell.MeteorShower,
+    Spell.FrostCrunch, Spell.SoulFireBall, Spell.CatTongue })
+{
+    var pool = new SpellParticlePool(2048);
+    legacyProjectile.Invoke(null, [pool, spell, new Vector2(400, 400), Vector2.UnitX, 100L, 2, 400, true, 1.28f, 4]);
+    Check(pool.Active.Length > 0 && pool.Active.ToArray().All(p => p.CoveragePlane == 0),
+        $"{spell} projectile must be generated without legacy texture coverage.");
+}
