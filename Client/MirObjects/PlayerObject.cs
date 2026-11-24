@@ -86,6 +86,8 @@ namespace Client.MirObjects
         internal bool ParticleWings => TransformType < 0 && ArmourWings.IsParticle(WingEffect);
         private bool DrawWingsBehindBody => WingEffect >= ArmourWings.Phoenix && ParticleWings &&
             Direction is MirDirection.Down or MirDirection.DownLeft or MirDirection.DownRight;
+        private bool SplitParticleWings => WingEffect >= ArmourWings.Phoenix && ParticleWings &&
+            Direction is MirDirection.Left or MirDirection.Right;
         private short StanceDelay = 2500;
 
         //ArcherSpells - Elemental system
@@ -4912,15 +4914,21 @@ namespace Client.MirObjects
                     DrawWeapon2();
             }
 
-            if (DrawWingsBehindBody) DrawWings();
+            if (SplitParticleWings) DrawWingSide(-ArmourWingParticles.NearSide(Direction));
+            else if (DrawWingsBehindBody) DrawWings();
             DrawBody();
 
             if (Direction == MirDirection.Up || Direction == MirDirection.UpLeft || Direction == MirDirection.UpRight || Direction == MirDirection.Right || Direction == MirDirection.Left)
             {
-                DrawHead();
-                if (!DrawWingsBehindBody && (this != User || ParticleWings))
+                if (SplitParticleWings)
                 {
-                    DrawWings();
+                    DrawWingSide(ArmourWingParticles.NearSide(Direction));
+                    DrawHead();
+                }
+                else
+                {
+                    DrawHead();
+                    if (!DrawWingsBehindBody && (this != User || ParticleWings)) DrawWings();
                 }
             }
             else
@@ -5048,14 +5056,16 @@ namespace Client.MirObjects
             if (WeaponLibrary2 != null)
                 WeaponLibrary2.Draw(DrawFrame + WeaponOffSet, DrawLocation, DrawColour, true);
         }
-        public void DrawWings()
+        public void DrawWings() => DrawWingSide(0);
+
+        private void DrawWingSide(int onlySide)
         {
             if (ParticleWings)
             {
                 if (!Settings.Effect || Dead) return;
-                _wingParticles ??= new SpellParticlePool(128);
+                _wingParticles ??= new SpellParticlePool(ArmourWingParticles.ParticleCapacity);
                 ArmourWingParticles.Emit(_wingParticles, WingEffect, _wingFamily * 2 + WingEffect - 1,
-                    DrawWingFrame + WingOffset, WingShoulder, Direction, CMain.Time, ObjectID);
+                    DrawWingFrame + WingOffset, WingShoulder, Direction, CMain.Time, ObjectID, onlySide);
                 DXManager.Device.SpellParticles.Draw(_wingParticles.Active, new Vector2(DrawLocation.X, DrawLocation.Y),
                     CMain.Time, ground: false, emissiveOverlay: true, exposure: 1.22f);
                 return;
@@ -5079,7 +5089,11 @@ namespace Client.MirObjects
                 if (pose.Width == 0) return false;
                 point.Offset(pose.X + pose.Width / 2, pose.Y + pose.Height / 2);
             }
-            else point.Offset((int)WingShoulder.X, (int)WingShoulder.Y);
+            else
+            {
+                Vector2 attachment = ArmourWingParticles.BackAttachment(WingShoulder, Direction);
+                point.Offset((int)MathF.Round(attachment.X), (int)MathF.Round(attachment.Y));
+            }
             colour = ArmourWingParticles.LightColour(WingEffect);
             return true;
         }

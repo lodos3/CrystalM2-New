@@ -6,6 +6,21 @@ namespace Client.MirScenes;
 
 internal static class ArmourWingParticles
 {
+    // Eight strips, at most two interpolated colour frames and one low-energy
+    // depth shell per strip; both wings plus their motes fit without eviction.
+    internal const int ParticleCapacity = 160;
+
+    internal static int NearSide(MirDirection direction) =>
+        direction is MirDirection.UpRight or MirDirection.Right or MirDirection.DownRight ? 1 : -1;
+
+    internal static Vector2 BackAttachment(Vector2 shoulder, MirDirection direction)
+    {
+        float yaw = (int)direction * MathF.PI / 4;
+        float profile = MathF.Abs(MathF.Sin(yaw));
+        return shoulder + new Vector2(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f) *
+            (8.5f + 4.5f * profile * profile);
+    }
+
     internal static Vector2 Shoulder(byte effect, bool mounted) =>
         new(24, (mounted ? -42 : -24) - (effect is ArmourWings.FelFire or ArmourWings.Archangel or ArmourWings.DawnSeraph ? 8 : 0));
 
@@ -18,7 +33,7 @@ internal static class ArmourWingParticles
     } | unchecked((int)0xFF000000));
 
     internal static void Emit(SpellParticlePool pool, byte effect, int bank, int pose, Vector2 shoulder,
-        MirDirection direction, long now, uint seed)
+        MirDirection direction, long now, uint seed, int onlySide = 0)
     {
         pool.Clear();
         if (effect is 1 or 2)
@@ -39,6 +54,8 @@ internal static class ArmourWingParticles
         float yaw = (int)direction * (MathF.PI / 4);
         Vector2 across = new(MathF.Cos(yaw), MathF.Sin(yaw) * .49f);
         Vector2 back = new(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f);
+        float profile = MathF.Abs(MathF.Sin(yaw));
+        Vector2 attachment = BackAttachment(shoulder, direction);
         float phase = now % 1800 * (MathF.Tau / 1800) + (seed % 97) * .065f;
         float flap = MathF.Sin(phase);
         int design = effect - ArmourWings.Phoenix;
@@ -50,21 +67,55 @@ internal static class ArmourWingParticles
         bool seraph = effect is ArmourWings.Archangel or ArmourWings.DawnSeraph;
         float north = MathF.Max(0, MathF.Cos(yaw));
         float tipLift = felFire ? 36 * north * north : seraph ? 9 + 14 * north * north : 0;
-        int segments = felFire || seraph ? 8 : 4;
+        int segments = felFire || seraph ? 8 : 6;
+        float thickness = effect switch
+        {
+            ArmourWings.Phoenix => 9f, ArmourWings.Frost => 8f,
+            ArmourWings.Moth => 6f, ArmourWings.CelestialElectric => 7f,
+            ArmourWings.FelFire => 11f, ArmourWings.DemonicBone => 8.5f,
+            ArmourWings.Archangel => 9.5f, ArmourWings.DawnSeraph => 10f, _ => 8f
+        };
         int edge = LightColour(effect).ToArgb();
         foreach (int side in Sides)
         {
-            Vector2 root = shoulder + across * (side * 4);
-            int opacity = (int)(232 + 12 * MathF.Sin(yaw) * side + 8 * flap);
-            Vector2 Project(float u, float y)
+            if (onlySide != 0 && side != onlySide) continue;
+            bool near = side == NearSide(direction);
+            Vector2 root = attachment + across * (side * 5.5f);
+            int opacity = (int)(218 + 12 * MathF.Sin(yaw) * side + 8 * flap);
+
+            // Sweep the actual wing behind the actor as it turns edge-on.
+            // The near wing extends farther back than the far wing, so they
+            // do not collapse into the same line at a 90-degree facing.
+            float spanLength = seraph ? 66 + 2 * flap : (felFire ? 60 : 48) + 6 * flap;
+            float sweepLength = 19 + 6 * flap + profile * profile * (near ? 23 : 12);
+            float sweepCurve = 5 + 7 * profile;
+            // On a diagonal one wing's transverse and rear axes can cancel.
+            // Keep its projected extent nonzero rather than flattening the art.
+            float endpoint = across.X * side * spanLength + back.X * (sweepLength + sweepCurve);
+            if (MathF.Abs(endpoint) < 13 && MathF.Abs(back.X) > .25f)
+                sweepLength += (13 - endpoint * MathF.Sign(back.X)) / MathF.Abs(back.X);
+
+            Vector2 Project(float u, float y, float shell = 0)
             {
-                float sweep = u * (18 + 7 * flap) + 3 * u * u;
-                float span = u * (seraph ? 66 + 2 * flap : (felFire ? 60 : 48) + 6 * flap);
-                // Bend upwards progressively from the shoulder. The padded glow,
-                // flame fronts and embers all follow this same projected surface.
-                float arch = tipLift * MathF.Max(0, u) * MathF.Max(0, u);
-                return across * (side * span) + back * sweep + Vector2.UnitY *
-                    ((y - (design == 2 ? 52 : 42)) * .55f - 4 * u * flap + 4 * u * u - arch);
+                float t = Math.Clamp(u, 0, 1);
+                float sweep = u * sweepLength + t * t * sweepCurve;
+                float span = u * spanLength;
+                float height = y - (design == 2 ? 52 : 42);
+                // Cup the wing into a three-dimensional cross-section.
+                // Upper/lower feathers recede at different depths instead of
+                // all rows occupying a single flat projected ribbon.
+                float cross = Math.Clamp(height / 78f, -1f, 1f);
+                float camber = MathF.Sin(t * MathF.PI * .86f) *
+                    (2.5f + 5.5f * cross * cross + 2.5f * cross);
+                float twist = 3.5f * cross * t * MathF.Sin(phase + t * 1.8f);
+                // Rounded root and mid-span, tapering toward the tips.
+                // The small terminal thickness also covers padded glow strips.
+                float depth = thickness * (.34f + .66f * (1 - t) + .24f * MathF.Sin(t * MathF.PI)) *
+                    (1 + .32f * profile) * (1 - .20f * MathF.Abs(cross));
+                float arch = tipLift * t * t;
+                return across * (side * span) + back * (sweep + camber + twist + shell * depth) +
+                    Vector2.UnitY * (height * .55f - 4 * u * flap + 4 * t * t - arch +
+                    shell * depth * .30f);
             }
 
             int firstFrame = 0, nextFrame = 0;
@@ -88,17 +139,28 @@ internal static class ArmourWingParticles
                 float right = (membrane.X + membrane.Width * b) / artWidth;
                 int top = membrane.Y, bottom = top + membrane.Height;
                 var quad = new SpriteQuad(Project(left, top), Project(right, top), Project(left, bottom), Project(right, bottom));
-                AddFrame(firstFrame, 1 - mix);
-                if (mix > 0) AddFrame(nextFrame, mix);
+                var underside = new SpriteQuad(Project(left, top, 1), Project(right, top, 1),
+                    Project(left, bottom, 1), Project(right, bottom, 1));
+                // A dimmer rear surface creates a visible thickness edge
+                // without doubling the bright additive front surface. Use
+                // the dominant animation sample for this low-energy shell.
+                int shellFrame = mix > .5f ? nextFrame : firstFrame;
+                float shellEnergy = .29f + .10f * profile;
+                AddFrame(shellFrame, shellEnergy, underside, SpellParticleLayer.Emissive);
+                float mid = Math.Clamp((left + right) * .5f, 0, 1);
+                float light = .82f + .12f * MathF.Sin(mid * MathF.PI);
+                if (!near) light *= .88f;
+                AddFrame(firstFrame, (1 - mix) * light, quad, SpellParticleLayer.EmissiveCore);
+                if (mix > 0) AddFrame(nextFrame, mix * light, quad, SpellParticleLayer.EmissiveCore);
 
-                void AddFrame(int index, float weight)
+                void AddFrame(int index, float weight, SpriteQuad surface, SpellParticleLayer layer)
                 {
-                    int alpha = (int)MathF.Round(opacity * weight);
+                    int alpha = Math.Clamp((int)MathF.Round(opacity * weight), 0, 255);
                     if (alpha == 0) return;
                     for (int channel = 0; channel < 3; channel++)
                         pool.TryAdd(new SpellParticle(root, Vector2.Zero, now, 100, 1,
                             Color.FromArgb((alpha << 24) | (255 << (channel * 8))),
-                            Shape.Wisp, 0, Layer: SpellParticleLayer.EmissiveCore, Ribbon: quad,
+                            Shape.Wisp, 0, Layer: layer, Ribbon: surface,
                             RibbonTextureU: new Vector2(a, b), FrameOnly: true)
                             { CoveragePlane = WingPoseAtlas.Handle(designBank, index, channel) });
                 }

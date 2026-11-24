@@ -14,15 +14,16 @@ internal static class ArmourWingChecks
         using var target = new Texture(device, 160, 144, true);
         using var surface = target.GetSurface();
         device.SetRenderTarget(surface);
-        var pool = new SpellParticlePool(128);
+        var pool = new SpellParticlePool(ArmourWingParticles.ParticleCapacity);
         using var armour = new LegacyMirLibReader(File.OpenRead(Path.Combine(data, "CArmour", "00.Lib")));
         string[] labels = ["Silver", "Gold", "Phoenix", "Frost", "Moon Moth", "Celestial Electric", "Fel Fire", "Demonic Bone", "Archangel", "Dawn Seraph"];
-        using var sheet = new Bitmap(labels.Length * 160, 324);
+        using var sheet = new Bitmap(labels.Length * 160, 30 + 8 * 144);
         using var canvas = Graphics.FromImage(sheet);
         canvas.Clear(Color.FromArgb(22, 25, 30));
         var origin = new Vector2(56, 90);
         CheckBlendKeepsColour();
         CheckNorthFelFireTips();
+        CheckGeneratedVolume();
         if (!ArmourWings.TrySelect("auto", out var auto) || auto.HasValue ||
             !ArmourWings.TrySelect("off", out var off) || off != 0 || ArmourWings.TrySelect("10", out _) ||
             !ArmourWings.TrySelect("8", out var archangel) || archangel != ArmourWings.Archangel ||
@@ -32,10 +33,10 @@ internal static class ArmourWingChecks
             !ArmourWings.TrySelect("5", out var electric) || electric != ArmourWings.CelestialElectric)
             throw new InvalidOperationException("Invalid wing preview selector mapping.");
         for (int id = 0; id < labels.Length; id++)
-        for (int row = 0; row < 2; row++)
+        for (int row = 0; row < 8; row++)
         {
             if (!ArmourWings.TrySelect(id.ToString(), out var effect) || !effect.HasValue) throw new InvalidDataException();
-            MirDirection facing = row == 0 ? MirDirection.Up : MirDirection.DownRight;
+            MirDirection facing = (MirDirection)row;
             int pose = (int)facing * 4;
             if (!armour.TryReadFrame(pose, out var actor)) throw new InvalidDataException("Missing actor pose.");
             using var body = new Texture(device, actor.Width, actor.Height);
@@ -45,18 +46,82 @@ internal static class ArmourWingChecks
             ArmourWingParticles.Emit(pool, effect.Value, id, pose, ArmourWingParticles.Shoulder(effect.Value, false), facing, 480, 101);
             if (pool.Active.Length < 3 || pool.Active.Length >= pool.Capacity)
                 throw new InvalidOperationException($"Invalid particle count for {labels[id]}.");
-            bool behind = row != 0 && id >= 2;
-            if (behind) Wings();
+            bool behind = id >= 2 && facing is (MirDirection.Down or MirDirection.DownLeft or MirDirection.DownRight);
+            bool split = id >= 2 && facing is (MirDirection.Left or MirDirection.Right);
+            int near = ArmourWingParticles.NearSide(facing);
+            if (split)
+            {
+                ArmourWingParticles.Emit(pool, effect.Value, id, pose, ArmourWingParticles.Shoulder(effect.Value, false), facing, 480, 101, -near);
+                Wings();
+            }
+            else if (behind) Wings();
             device.Blend = SpriteBlendMode.Alpha;
             device.Sprite.Draw(body, null, new Vector3(origin.X + actor.OffsetX, origin.Y + actor.OffsetY, 0), Vector4.One);
+            if (split)
+                ArmourWingParticles.Emit(pool, effect.Value, id, pose, ArmourWingParticles.Shoulder(effect.Value, false), facing, 480, 101, near);
             if (!behind) Wings();
             using var image = device.Capture(surface);
             canvas.DrawImageUnscaled(image, id * 160, 30 + row * 144);
             if (row == 0) canvas.DrawString($"{id}   {labels[id]}", SystemFonts.MessageBoxFont!, Brushes.White, id * 160 + 12, 8);
         }
         sheet.Save(output, ImageFormat.Png);
-        Console.WriteLine($"Rendered {labels.Length} wing IDs in two facings through the game particle renderer.");
+        Console.WriteLine($"Rendered {labels.Length} wing IDs in all eight facings through the game particle renderer.");
         void Wings() => device.SpellParticles.Draw(pool.Active, origin, 480, false, emissiveOverlay: true, exposure: 1.22f);
+
+        void CheckGeneratedVolume()
+        {
+            foreach (byte effect in Enumerable.Range(ArmourWings.Phoenix, 8).Select(i => (byte)i))
+            foreach (bool mounted in new[] { false, true })
+            foreach (MirDirection facing in Enum.GetValues<MirDirection>())
+            {
+                Vector2 shoulder = ArmourWingParticles.Shoulder(effect, mounted);
+                Vector2 attachment = ArmourWingParticles.BackAttachment(shoulder, facing);
+                float yaw = (int)facing * MathF.PI / 4;
+                Vector2 rear = new(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f);
+                if (Vector2.Dot(attachment - shoulder, rear) < 2)
+                    throw new InvalidDataException($"Wing {effect} is not attached behind the shoulder in {facing}.");
+                if ((facing == MirDirection.Right && attachment.X > shoulder.X - 10) ||
+                    (facing == MirDirection.Left && attachment.X < shoulder.X + 10))
+                    throw new InvalidDataException($"Side attachment penetrates the torso in {facing}.");
+                for (int time = 0; time < 1800; time += 225)
+                {
+                    ArmourWingParticles.Emit(pool, effect, 0, 0, shoulder, facing, time, 101);
+                    var all = pool.Active.ToArray();
+                    if (all.Length == 0 || all.Length >= pool.Capacity)
+                        throw new InvalidDataException($"Wing {effect} exceeded its particle budget.");
+                    var shells = all.Where(p => p.CoveragePlane < 0 && p.Layer == SpellParticleLayer.Emissive && p.Ribbon.HasValue).ToArray();
+                    var faces = all.Where(p => p.CoveragePlane < 0 && p.Layer == SpellParticleLayer.EmissiveCore && p.Ribbon.HasValue).ToArray();
+                    if (shells.Length == 0 || faces.Length == 0)
+                        throw new InvalidDataException($"Wing {effect} has no volume shell.");
+                    foreach (var shell in shells)
+                    {
+                        var face = faces.First(p => p.Origin == shell.Origin &&
+                            p.RibbonTextureU == shell.RibbonTextureU &&
+                            p.CoveragePlane == shell.CoveragePlane);
+                        var s = shell.Ribbon.Value;
+                        var f = face.Ribbon.Value;
+                        float separation = Vector2.Distance(s.TopLeft, f.TopLeft);
+                        if (!float.IsFinite(separation) || separation < 1)
+                            throw new InvalidDataException($"Wing {effect} collapsed to a single plane in {facing}.");
+                        if (s.Bounds(shell.Origin).Width < 1 || f.Bounds(face.Origin).Width < 1)
+                            throw new InvalidDataException($"Wing {effect} contains a degenerate projection in {facing}.");
+                    }
+                    if (facing is MirDirection.Right or MirDirection.Left)
+                    {
+                        int near = ArmourWingParticles.NearSide(facing);
+                        ArmourWingParticles.Emit(pool, effect, 0, 0, shoulder, facing, time, 101, -near);
+                        var far = pool.Active.ToArray();
+                        ArmourWingParticles.Emit(pool, effect, 0, 0, shoulder, facing, time, 101, near);
+                        var front = pool.Active.ToArray();
+                        if (far.Length + front.Length != all.Length ||
+                            far.Any(p => p.Ribbon.HasValue && p.Origin.Y >= attachment.Y) ||
+                            front.Any(p => p.Ribbon.HasValue && p.Origin.Y <= attachment.Y))
+                            throw new InvalidDataException($"Wing {effect} has incorrect near/far separation.");
+                    }
+                }
+            }
+            Console.WriteLine("Verified all eight generated wing styles, directions, mount offsets and animation phases.");
+        }
 
         void CheckNorthFelFireTips()
         {
@@ -82,12 +147,14 @@ internal static class ArmourWingChecks
 
         void CheckBlendKeepsColour()
         {
-            var pose = SpellPoseAtlas.GetPose("FireBall", 0, 1);
+            pool.Clear();
+            int bank = WingPoseAtlas.DesignBank + 7;
+            var pose = WingPoseAtlas.GetPose(bank, 0);
             for (int c = 0; c < 3; c++)
-                pool.TryAdd(new SpellParticle(new Vector2(80, 72), Vector2.Zero, 480, 50, pose.WorldSize.Width,
+                pool.TryAdd(new SpellParticle(new Vector2(80, 72), Vector2.Zero, 480, 50, pose.Width,
                     Color.FromArgb(unchecked((int)0xff000000) | (255 << (c * 8))), SpellParticleShape.Wisp, 0,
-                    Aspect: pose.WorldSize.Height / (float)pose.WorldSize.Width, Layer: SpellParticleLayer.EmissiveCore)
-                    { CoveragePlane = pose.FirstPlane + c });
+                    Aspect: pose.Height / (float)pose.Width, Layer: SpellParticleLayer.EmissiveCore)
+                    { CoveragePlane = WingPoseAtlas.Handle(bank, 0, c) });
             using var reference = RenderPose(null);
             using var alpha = RenderPose(SpriteBlendMode.Alpha);
             long red = 0, blue = 0;
@@ -99,7 +166,7 @@ internal static class ArmourWingChecks
                 red += pixel.R;
                 blue += pixel.B;
             }
-            if (red <= blue) throw new InvalidDataException("FireBall lost its warm colours.");
+            if (red <= blue) throw new InvalidDataException("Dawn Seraph lost its warm colours.");
             Bitmap RenderPose(SpriteBlendMode? blend)
             {
                 device.Clear(Color.Black);
