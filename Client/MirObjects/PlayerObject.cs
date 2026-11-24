@@ -2552,15 +2552,8 @@ namespace Client.MirObjects
 
                             StanceTime = CMain.Time + StanceDelay;
                             FrameIndex = Frame.Count - 1;
-                            if (CurrentAction == MirAction.Attack1 && Spell == Spell.TwinDrakeBlade && !Dead)
-                            {
-                                // Both damage events already belong to the initial attack request.
-                                ActionFeed.Insert(0, new QueuedAction
-                                {
-                                    Action = MirAction.Attack4, Direction = Direction, Location = CurrentLocation,
-                                    Params = new List<object> { Spell }
-                                });
-                            }
+                            // Twin Drake now completes in this single attack; its electrical
+                            // release is rendered concurrently with the weapon sweep.
                             SetAction();
                         }
                         else

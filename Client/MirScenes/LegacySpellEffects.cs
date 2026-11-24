@@ -41,8 +41,8 @@ internal static class LegacySpellEffects
             Spell.MagicBooster => new(SpellVisualPhase.Impact, fields.Read(tuning.MagicBoosterDuration) * interval),
             Spell.PetEnhancer => new(SpellVisualPhase.Prepare, fields.Read(tuning.PetEnhancerDuration) * interval),
             Spell.TwinDrakeBlade => new(SpellVisualPhase.Prepare, fields.Read(tuning.TwinDrakeBladeDuration)),
-            Spell.Thrusting => new(SpellVisualPhase.Swing, (frames - frames / fields.Read(tuning.ThrustingDurationDivisor)) * interval, frames / fields.Read(tuning.ThrustingDelayDivisor) * interval),
-            Spell.BladeAvalanche => new(SpellVisualPhase.Swing, fields.Read(tuning.BladeAvalancheDuration) * interval, AtCell: true),
+            Spell.Thrusting => new(SpellVisualPhase.Swing, WarriorStrikeTiming.ThrustDuration, AtCell: true),
+            Spell.BladeAvalanche => new(SpellVisualPhase.Swing, WarriorStrikeTiming.AvalancheDuration, AtCell: true),
             Spell.SlashingBurst => new(SpellVisualPhase.Swing, fields.Read(tuning.SlashingBurstDuration) * interval, fields.Read(tuning.SlashingBurstDelay), AtCell: true),
             Spell.CounterAttack => new(SpellVisualPhase.Swing, fields.Read(tuning.CounterAttackDuration) * interval),
             Spell.Repulsion or Spell.EnergyRepulsor or Spell.Rage or Spell.ProtectionField or Spell.Hiding
@@ -291,7 +291,7 @@ internal static class LegacySpellEffects
     internal static void Emit(SpellParticlePool pool, SpellVisual visual, Vector2 feet, Vector2 facing, long now,
         int duration = 0, long? sampleTime = null, uint fieldObjectID = 0)
     {
-        if (visual.Spell == Spell.CrossHalfMoon &&
+        if (WarriorStrikeTiming.SuppressTargetArt(visual.Spell) &&
             visual.Phase is SpellVisualPhase.Contact or SpellVisualPhase.Hit or SpellVisualPhase.Impact) return;
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
         var tuning = SpellVfxAssets.Current.Legacy.Emit;

@@ -126,12 +126,22 @@ internal static class SpellVfxPoseMasks
                     0xF3FAFF, alpha * .84f, core, sortY: depth, emitter: "Procedural.CrossHalfMoon.Edge");
 
                 // Small torn streaks rather than a large flash billboard.
-                if (i % 4 == 2 && power > .3f)
+                if (power > .25f && i % 2 == 0)
                 {
                     Vector2 drift = next.Rim - prior.Rim;
-                    frame.Sprite(next.Rim, 4 + 4 * taper, 1.4f, Shape.WarriorSpark, 0xD5EDFF,
-                        alpha * .7f, core, MathF.Atan2(drift.Y, drift.X), light: fan == 0 && i == 6,
-                        sortY: depth, emitter: "Procedural.CrossHalfMoon.Sparks");
+                    float angle = MathF.Atan2(drift.Y, drift.X);
+                    for (int spark = 0; spark < 3; spark++)
+                    {
+                        int seed = fan * 301 + i * 13 + spark * 5;
+                        float along = frame.Unit(seed + 120);
+                        Vector2 point = Vector2.Lerp(next.Rim, next.Inner, along * .85f) +
+                            drift * ((frame.Unit(seed + 150) - .5f) * .65f);
+                        frame.Sprite(point, 3 + 5 * taper * frame.Unit(seed + 170),
+                            1.2f + frame.Unit(seed + 190) * 1.2f, Shape.WarriorSpark,
+                            spark == 0 ? 0x91C9FF : 0xF1FAFF, alpha * (.58f + .3f * along),
+                            core, angle, light: fan == 0 && i == 6 && spark == 0,
+                            sortY: depth, emitter: "Procedural.CrossHalfMoon.Sparks");
+                    }
                 }
                 prior = next;
             }

@@ -3242,16 +3242,9 @@ namespace Server.MirObjects
                         break;
                     case Spell.TwinDrakeBlade:
                         magic = GetMagic(Spell.TwinDrakeBlade);
-                        damageFinal = magic.GetDamage(damageBase);
+                        damageFinal = WarriorStrikeTiming.DrakeDamage(magic.GetDamage(damageBase),
+                            magic.Perk(SpellPerk.DrakeEcho));
                         TwinDrakeBlade = false;
-                        action = new DelayedAction(DelayedType.Damage, Envir.Time + 400,
-                            ob,                     //Object (Target)
-                            damageFinal,            //Damage
-                            DefenceType.Agility,    //Defence to target
-                            false,                  //Damage Weapon
-                            magic,                  //Magic
-                            true);                  //Final hit
-                        ActionList.Add(action);
                         ResolveSpellPerks(magic);
                         break;
                     case Spell.FlamingSword:
@@ -3266,9 +3259,13 @@ namespace Server.MirObjects
                 }
 
                 //if (ob.Attacked(this, damage, defence) <= 0) break;
-                action = spell == Spell.None
-                    ? new DelayedAction(DelayedType.Damage, Envir.Time + 300, ob, damageFinal, defence, true)
-                    : new DelayedAction(DelayedType.Damage, Envir.Time + 300, ob, damageFinal, defence, true, magic);
+                action = spell switch
+                {
+                    Spell.None => new DelayedAction(DelayedType.Damage, Envir.Time + 300, ob, damageFinal, defence, true),
+                    Spell.TwinDrakeBlade => new DelayedAction(DelayedType.Damage, Envir.Time + WarriorStrikeTiming.DrakeImpact,
+                        ob, damageFinal, defence, true, magic, true),
+                    _ => new DelayedAction(DelayedType.Damage, Envir.Time + 300, ob, damageFinal, defence, true, magic)
+                };
                 ActionList.Add(action);
                 break;
             }
@@ -3290,8 +3287,8 @@ namespace Server.MirObjects
                         if (ob.Race is not (ObjectType.Player or ObjectType.Monster or ObjectType.Hero) || !ob.IsAttackTarget(this)) continue;
                         if (distance > 2 && ob is not MonsterObject { Info.IsBoss: false, Master: null }) continue;
                         var defenceType = ob is MonsterObject { Info.AI: 49 } ? DefenceType.Repulsion : DefenceType.Agility;
-                        if (ob.Attacked(this, damageFinal, defenceType, false) > 0)
-                            BroadcastWeaponSpellImpact(ob, spell);
+                        QueueWarriorWave(magic, ob, target, damageFinal, defenceType,
+                            WarriorStrikeTiming.ThrustImpact(distance), null);
                         break;
                     }
                 }
@@ -5021,7 +5018,7 @@ namespace Server.MirObjects
                 lanes.Add(Functions.PointMove(lanes[2], Functions.NextDir(Direction), 1));
             }
             var hit = new HashSet<uint>();
-            bool train = false;
+            var credit = new WarriorWaveCredit();
             for (int i = 0; i < lanes.Count; i++)
             {
                 Point startPoint = lanes[i];
@@ -5049,22 +5046,43 @@ namespace Server.MirObjects
                                     if (i > 2 && target is not MonsterObject { Info.IsBoss: false, Master: null }) break;
                                     if (!hit.Add(target.ObjectID)) break;
                                     DefenceType defence = target is MonsterObject { Info.AI: 49 } ? DefenceType.Repulsion : DefenceType.MAC;
-                                    int damage = target.Attacked(this, j <= 1 ? damageFinal : ScaleSignature(damageFinal, 60), defence, false);
-                                    if (damage > 0)
-                                    {
-                                        train = true;
-                                        BroadcastLegacyImpact(magic.Spell, target.CurrentLocation);
-                                        ApplyLandedSpellPerks(magic, target, damage, defence);
-                                    }
+                                    QueueWarriorWave(magic, target, hitPoint,
+                                        j <= 1 ? damageFinal : ScaleSignature(damageFinal, 60), defence,
+                                        WarriorStrikeTiming.AvalancheImpact(j), credit);
                                 }
                                 break;
                         }
                     }
                 }
             }
-            if (train)
-                ResolveSpellPerks(magic);
         }
+
+        private sealed class WarriorWaveCredit { public bool Trained; }
+        private sealed record WarriorWaveHit(MapObject Target, Map Map, Point Cell, int Damage,
+            DefenceType Defence, WarriorWaveCredit Credit);
+
+        private void QueueWarriorWave(UserMagic magic, MapObject target, Point cell, int damage,
+            DefenceType defence, int delay, WarriorWaveCredit credit)
+        {
+            ActionList.Add(new DelayedAction(DelayedType.Magic, Envir.Time + delay, magic,
+                new WarriorWaveHit(target, CurrentMap, cell, damage, defence, credit)));
+        }
+
+        private void ResolveWarriorWave(UserMagic magic, WarriorWaveHit hit)
+        {
+            var target = hit.Target;
+            if (Dead || magic == null || CurrentMap != hit.Map || target.CurrentMap != hit.Map ||
+                target.Node == null || target.CurrentLocation != hit.Cell || !target.IsAttackTarget(this)) return;
+            int damage = target.Attacked(this, hit.Damage, hit.Defence, false);
+            if (damage <= 0 || magic.Spell != Spell.BladeAvalanche) return;
+            ApplyLandedSpellPerks(magic, target, damage, hit.Defence);
+            if (!hit.Credit.Trained)
+            {
+                hit.Credit.Trained = true;
+                ResolveSpellPerks(magic);
+            }
+        }
+
         private void ProtectionField(UserMagic magic)
         {
             int duration = 45 + (15 * magic.Level);
@@ -6007,6 +6025,11 @@ namespace Server.MirObjects
         protected void CompleteMagic(IList<object> data, DelayedAction pending)
         {
             UserMagic magic = (UserMagic)data[0];
+            if (data.Count > 1 && data[1] is WarriorWaveHit wave)
+            {
+                ResolveWarriorWave(magic, wave);
+                return;
+            }
             if (data.Count > 1 && data[1] is PerkDamage perkDamage)
             {
                 ResolvePerkDamage(perkDamage);
@@ -6952,7 +6975,8 @@ namespace Server.MirObjects
         }
         private void BroadcastWeaponSpellImpact(MapObject target, Spell spell)
         {
-            BroadcastLegacyImpact(spell, target.CurrentLocation);
+            if (!WarriorStrikeTiming.SuppressTargetArt(spell))
+                BroadcastLegacyImpact(spell, target.CurrentLocation);
         }
 
         protected void CompleteDamageIndicator(IList<object> data)

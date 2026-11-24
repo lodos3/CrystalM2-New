@@ -45,8 +45,10 @@ internal static partial class SpellVfxBladeParticles
                 else
                 {
                     ArcSweep(frame, feet, Guide.Read(motion.Sweep[index]), motion.SweepOutline[index], pose);
-                    if (phase == SpellVisualPhase.FollowThrough)
+                    if (spell == Spell.TwinDrakeBlade)
                     {
+                        // The former second swing is an overlapping electric release
+                        // on the same six-pose animation, not another attack.
                         var charge = new Frame(pool, feet, now, strength, size,
                             seed ^ ((uint)pose * 69069) ^ ((uint)(progress * 15) * 18311), depthY: feet.Y);
                         ChargedSweep(pool, charge, feet, Guide.Read(motion.ChargedSweep[index]), motion.BodyAxis[index],

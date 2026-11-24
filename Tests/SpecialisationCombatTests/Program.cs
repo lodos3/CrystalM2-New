@@ -87,10 +87,46 @@ static void CheckWarriorPerks()
     Check(caster.Sent.OfType<S.MapEffect>().Any(effect => effect.Effect == SpellEffect.SpellPerkBurn && effect.Location == nearby.CurrentLocation),
         "Burn sends its own particle event");
 
-    int hp = primary.HP;
-    caster.Process(new DelayedAction(DelayedType.Damage, Envir.Main.Time, primary, 20, DefenceType.AC, false, caster.GetMagic(Spell.TwinDrakeBlade), true));
-    Drain(caster);
-    Check(hp - primary.HP > 20, "The confirmed second drake hit schedules a third hit");
+    Check(WarriorStrikeTiming.DrakeDamage(100, 0) == 200 &&
+        WarriorStrikeTiming.DrakeDamage(100, 1) == 235 &&
+        WarriorStrikeTiming.DrakeDamage(int.MaxValue, 2) == int.MaxValue,
+        "Twin Drake combines both blades and the optional perk into one bounded damage value.");
+    var (drakeCaster, drakeMap) = MakeCaster(MirClass.Warrior);
+    var drakeTarget = MakeMonster("Drake target", drakeMap, new Point(5, 4));
+    SetTime(40000);
+    drakeCaster.Apply([new(Spell.TwinDrakeBlade, SpellPerk.DrakeEcho, 1)]);
+    drakeCaster.SpellToggle(Spell.TwinDrakeBlade, SpellToggleState.True);
+    Check(drakeCaster.TwinDrakeBlade, "Twin Drake arms normally.");
+    drakeCaster.Attack(MirDirection.Right, Spell.TwinDrakeBlade);
+    var drakeHits = drakeCaster.ActionList.Where(action => action.Type == DelayedType.Damage &&
+        action.Params[0] == drakeTarget && action.Params.Length >= 5 &&
+        action.Params[4] is UserMagic { Spell: Spell.TwinDrakeBlade }).ToArray();
+    Check(drakeHits.Length == 1 && drakeHits[0].Time == Envir.Main.Time + WarriorStrikeTiming.DrakeImpact &&
+        drakeTarget.HP == drakeTarget.MaxHealth, "Twin Drake schedules exactly one landed attack.");
+    Drain(drakeCaster);
+    Check(drakeTarget.HP < drakeTarget.MaxHealth, "Twin Drake's single combined strike resolves.");
+
+    var (waveCaster, waveMap) = MakeCaster(MirClass.Warrior);
+    var nearWave = MakeMonster("Near wave", waveMap, new Point(5, 4));
+    var farWave = MakeMonster("Far wave", waveMap, new Point(7, 4));
+    SetTime(50000);
+    waveCaster.Magic(Spell.BladeAvalanche, MirDirection.Right, 0, waveCaster.CurrentLocation);
+    Check(nearWave.HP == nearWave.MaxHealth && farWave.HP == farWave.MaxHealth &&
+        waveCaster.ActionList.Any(a => a.Time == Envir.Main.Time + WarriorStrikeTiming.AvalancheImpact(0)) &&
+        waveCaster.ActionList.Any(a => a.Time == Envir.Main.Time + WarriorStrikeTiming.AvalancheImpact(2)),
+        "Avalanche damage waits for the corresponding wave row.");
+    Drain(waveCaster);
+    Check(nearWave.HP < nearWave.MaxHealth && farWave.HP < farWave.MaxHealth,
+        "Avalanche still damages the selected rows.");
+    var (thrustCaster, thrustMap) = MakeCaster(MirClass.Warrior);
+    var thrustTarget = MakeMonster("Thrust target", thrustMap, new Point(6, 4));
+    SetTime(55000);
+    thrustCaster.Attack(MirDirection.Right, Spell.Thrusting);
+    Check(thrustTarget.HP == thrustTarget.MaxHealth &&
+        thrustCaster.ActionList.Any(a => a.Time == Envir.Main.Time + WarriorStrikeTiming.ThrustImpact(2)),
+        "The distant thrust waits for the travelling slash.");
+    Drain(thrustCaster);
+    Check(thrustTarget.HP < thrustTarget.MaxHealth, "The distant thrust resolves after travel.");
 
     caster.LogTime = Envir.Main.Time + 500;
     caster.Apply([]);

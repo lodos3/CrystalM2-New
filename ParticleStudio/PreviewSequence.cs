@@ -54,9 +54,9 @@ internal sealed class PreviewSequence
                 (pool, rig, elapsed) => SampleBladeBase(pool, rig, elapsed, SpellVfxBladeFrames.DrakePrepare, SpellVisualPhase.Prepare),
                 MirAction.Standing, null) { BladePose = SpellVfxBladeFrames.DrakePrepare });
 
-        AddAttack("Attack 1", MirAction.Attack1, inFullSequence: true);
-        AddAttack(_spell == Spell.TwinDrakeBlade ? "Attack 4 (follow-through)" : "Attack 4 (alternate)",
-            MirAction.Attack4, inFullSequence: _spell == Spell.TwinDrakeBlade);
+        AddAttack(_spell == Spell.TwinDrakeBlade ? "Combined strike" : "Attack 1", MirAction.Attack1, inFullSequence: true);
+        if (_spell != Spell.TwinDrakeBlade)
+            AddAttack("Attack 4 (alternate)", MirAction.Attack4, inFullSequence: false);
 
         if (_spell == Spell.TwinDrakeBlade)
             _stages.Add(new PreviewStage("Stun proc (target)", SpellVfxBladeFrames.DrakeStun.Duration, 0,
@@ -134,7 +134,7 @@ internal sealed class PreviewSequence
     {
         Frame cast = FrameSet.Player[MirAction.Spell];
         var cue = LegacySpellEffects.Windup(_spell, cast.Count, cast.Interval);
-        if (standalone && cue.Duration > 0)
+        if ((standalone || _spell == Spell.Thrusting) && cue.Duration > 0)
             AddFrame(cue.Phase == SpellVisualPhase.Prepare ? "Prepare" : "Cast", cue.Phase, cue.Duration, cue.Delay);
 
         if (WarriorSpellEffects.UsesWeaponArt(_spell))
@@ -169,7 +169,7 @@ internal sealed class PreviewSequence
             AddFrame("Departure", SpellVisualPhase.Departure);
             AddFrame("Arrival", SpellVisualPhase.Arrival, atTarget: true);
         }
-        else if (_spell != Spell.CrossHalfMoon && (standalone || WarriorSpellEffects.UsesWeaponArt(_spell)))
+        else if (!WarriorStrikeTiming.SuppressTargetArt(_spell) && (standalone || WarriorSpellEffects.UsesWeaponArt(_spell)))
         {
             var phase = LegacySpellEffects.ImpactPhase(_spell);
             AddFrame(phase == SpellVisualPhase.Contact ? "Contact" : "Impact", phase,

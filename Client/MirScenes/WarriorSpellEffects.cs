@@ -45,7 +45,7 @@ internal static partial class WarriorSpellEffects
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
         var tuning = SpellVfxAssets.Current.Warrior.DrawFrame;
         var fields = SpellVfxAssets.Fields("Warrior", "DrawFrame");
-        if (visual.Spell == Spell.CrossHalfMoon &&
+        if (WarriorStrikeTiming.SuppressTargetArt(visual.Spell) &&
             visual.Phase is SpellVisualPhase.Contact or SpellVisualPhase.Hit or SpellVisualPhase.Impact) return;
         if (duration <= 0 || now < start || now - start >= duration) return;
         float progress = (now - start) / (float)duration;
@@ -54,14 +54,16 @@ internal static partial class WarriorSpellEffects
             // Keep the source and reach in world pixels as the artwork size is adjusted.
             float windStrength = (fields.Read(tuning.WindStrength) + fields.Read(tuning.WindStrength2) * Ease(progress * fields.Read(tuning.WindStrength3))) * (1 - fields.Read(tuning.WindStrength4) * Ease((progress - fields.Read(tuning.WindStrength5)) / fields.Read(tuning.WindStrengthDivisor)));
             var wind = new Frame(pool, feet, now, windStrength, size, seed, scalePositions: false);
-            ThrustWind(wind, feet, facing, progress, visual.ExtraReach);
+            float flight = Math.Clamp((now - start) / (float)WarriorStrikeTiming.ThrustTravel, 0, 1);
+            ThrustWind(wind, feet, facing, progress, flight, visual.ExtraReach);
             return;
         }
         bool aura = visual.Phase == SpellVisualPhase.Aura;
         float cycle = aura ? now % duration / (float)duration : progress;
         float strength = aura ? 1 : visual.Spell is Spell.BladeAvalanche or Spell.Entrapment or Spell.TwinDrakeBlade
             ? Envelope(progress, fields.Read(tuning.EnvelopeFadeStart), fields.Read(tuning.EnvelopeTail)) : Envelope(progress);
-        var frame = new Frame(pool, feet, now, strength, size, seed ^ (uint)visual.Spell * 34763);
+        var frame = new Frame(pool, feet, now, strength, size, seed ^ (uint)visual.Spell * 34763,
+            scalePositions: visual.Spell != Spell.BladeAvalanche);
 
         switch (visual.Phase)
         {
@@ -97,7 +99,7 @@ internal static partial class WarriorSpellEffects
                 DrakeContact(frame, feet, progress, (now - start) / 1000f);
                 break;
             case Spell.BladeAvalanche when visual.Phase == SpellVisualPhase.Swing:
-                Avalanche(frame, feet, facing, progress);
+                Avalanche(frame, feet, facing, progress, (float)(now - start));
                 break;
             case Spell.SlashingBurst when visual.Phase == SpellVisualPhase.Swing:
                 Burst(frame, feet, facing, progress);
@@ -448,7 +450,7 @@ internal static partial class WarriorSpellEffects
     private static Vector2 GroundDirection(Vector2 facing) =>
         facing / MathF.Max(MathF.Abs(facing.X), MathF.Abs(facing.Y) * SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.GroundDirection).Y);
 
-    private static void ThrustWind(Frame frame, Vector2 feet, Vector2 facing, float progress, int extraReach)
+    private static void ThrustWind(Frame frame, Vector2 feet, Vector2 facing, float progress, float flight, int extraReach)
     {
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.ThrustWind);
         Vector2 source = feet - Vector2.UnitY * tuning.Source;
@@ -462,7 +464,7 @@ internal static partial class WarriorSpellEffects
             _ => tuning.Factor4
         };
         bool edgeOn = direction is MirDirection.Up or MirDirection.DownRight;
-        float unfold = Ease(progress * tuning.Unfold);
+        float unfold = Ease(flight * tuning.Unfold);
         float spread = width * (tuning.Spread + tuning.Spread2 * unfold);
         Vector2 travel = (GroundDirection(facing) * ((tuning.Travel + extraReach) * tuning.Travel2) +
             new Vector2(0, facing.Y * tuning.Y)) * (tuning.Travel3 + tuning.Travel4 * unfold);
@@ -480,7 +482,7 @@ internal static partial class WarriorSpellEffects
                 source + travel * tuning.Pull + side * (splay * tuning.Pull2 + sway),
                 source + travel * tuning.Bend + side * (splay * tuning.Bend2 - sway * tuning.Bend3),
                 source + travel * tuning.End + side * (splay * tuning.End2),
-                tuning.Thickness + tuning.Thickness2 * unfold, lane == 0 ? Ice : Steel, tuning.Alpha - tuning.Alpha2 * unfold, tuning.Segments);
+                tuning.Thickness + tuning.Thickness2 * unfold, lane == 0 ? 0xF1FAFF : 0xA6D6FF, tuning.Alpha - tuning.Alpha2 * unfold, tuning.Segments);
         }
 
         float bank = spread * (tuning.Bank + tuning.Bank2 * MathF.Sin(progress * tuning.Bank3));
@@ -497,8 +499,39 @@ internal static partial class WarriorSpellEffects
         Vector2 curlUpper = crown + axis * (spread * tuning.CurlUpper) - opening * tuning.CurlUpper2;
         Vector2 curlLower = crown + axis * (spread * tuning.CurlLower) + opening * tuning.CurlLower2;
         Vector2 curlEnd = crown - axis * (spread * tuning.CurlEnd) + opening;
-        Strand(curlStart, curlUpper, curlLower, curlEnd, tuning.Thickness3 + unfold * tuning.Thickness4, tuning.Colour, tuning.Alpha3, tuning.Segments2);
-        Strand(curlStart, curlUpper, curlLower, curlEnd, tuning.Thickness5 + unfold * tuning.Thickness6, tuning.Colour2, tuning.Alpha4, tuning.Segments3);
+        Strand(curlStart, curlUpper, curlLower, curlEnd, tuning.Thickness3 + unfold * tuning.Thickness4, 0x90C6F4, tuning.Alpha3, tuning.Segments2);
+        Strand(curlStart, curlUpper, curlLower, curlEnd, tuning.Thickness5 + unfold * tuning.Thickness6, 0xF5FCFF, tuning.Alpha4, tuning.Segments3);
+
+        // Successively older copies of the bow remain behind the moving
+        // pressure front, feathering into white mist rather than abrupt lines.
+        float trailFade = 1 - Ease((progress - .52f) / .48f);
+        for (int trail = 1; trail <= 3; trail++)
+        {
+            float lag = Math.Min(travel.Length() * .7f, trail * (7 + unfold * 9));
+            Vector2 offset = -axis * lag;
+            float opacity = trailFade * (.25f / trail) * unfold;
+            Strand(curlStart + offset, curlUpper + offset, curlLower + offset, curlEnd + offset,
+                (tuning.Thickness3 + unfold * tuning.Thickness4) * (1 + trail * .11f),
+                0xC2E5FF, opacity, 10);
+            Strand(curlStart + offset, curlUpper + offset, curlLower + offset, curlEnd + offset,
+                tuning.Thickness5 * .75f, 0xF5FCFF, opacity * .9f, 10);
+        }
+        for (int i = 0; i < 18; i++)
+        {
+            float u = (i + .5f) / 18;
+            var (crest, tangent) = Cubic(curlStart, curlUpper, curlLower, curlEnd, u);
+            float lag = (3 + frame.Unit(840 + i) * 35) * unfold;
+            Vector2 fleck = crest - axis * lag + side * ((frame.Unit(900 + i) - .5f) * 9);
+            float alpha = trailFade * (.35f + .5f * frame.Unit(950 + i)) * unfold;
+            frame.Sprite(fleck, 3 + frame.Unit(970 + i) * 5, 1.4f,
+                Shape.WarriorSpark, i % 3 == 0 ? 0x84C8FF : 0xF7FCFF, alpha,
+                Layer.EmissiveCore, MathF.Atan2(tangent.Y, tangent.X),
+                emitter: "WarriorSpellEffects.ThrustWind.Particles");
+            if (i % 3 == 0)
+                frame.Sprite(fleck, 14 + lag * .36f, 7 + unfold * 7, Shape.Wisp, 0xD5EEFF,
+                    alpha * .30f, Layer.Emissive, MathF.Atan2(axis.Y, axis.X),
+                    emitter: "WarriorSpellEffects.ThrustWind.Blur");
+        }
 
         // The curved wisps ride the pressure front. Their trailing ends peel inward
         // at different angles, leaving open air between the bands.
@@ -511,10 +544,10 @@ internal static partial class WarriorSpellEffects
             Vector2 tail = crest - axis * length + side * roll;
             Strand(tail, tail + axis * (length * tuning.Pull3) + side * (roll * tuning.Pull4),
                 crest - axis * (length * tuning.Bend4) - side * (roll * tuning.Bend5), crest - axis * tuning.End3,
-                tuning.Thickness7 + unfold * tuning.Thickness8, i % 3 == 0 ? White : i % 3 == 1 ? tuning.Colour3 : tuning.Colour4, tuning.Alpha5, tuning.Segments4);
+                tuning.Thickness7 + unfold * tuning.Thickness8, i % 3 == 0 ? 0xFFFFFF : i % 3 == 1 ? 0xD5EFFF : 0x9FD4FF, tuning.Alpha5, tuning.Segments4);
         }
         frame.Sprite(source + travel * tuning.WispOffset, tuning.WispWidth + spread * tuning.WispWidth2, tuning.WispHeight + spread * tuning.WispHeight2,
-            tuning.WispShape, Ice, tuning.WispAlpha, rotation: MathF.Atan2(axis.Y, axis.X), light: tuning.WispLight, emitter: "WarriorSpellEffects.ThrustWind.1");
+            tuning.WispShape, 0xE2F4FF, tuning.WispAlpha * 1.18f, rotation: MathF.Atan2(axis.Y, axis.X), light: tuning.WispLight, emitter: "WarriorSpellEffects.ThrustWind.1");
 
         void Strand(Vector2 start, Vector2 pull, Vector2 bend, Vector2 end, float thickness, int colour, float alpha, int segments)
         {
@@ -546,7 +579,7 @@ internal static partial class WarriorSpellEffects
         }
     }
 
-    private static void Avalanche(Frame frame, Vector2 feet, Vector2 facing, float progress)
+    private static void Avalanche(Frame frame, Vector2 feet, Vector2 facing, float progress, float elapsed)
     {
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Avalanche);
         Vector2 heading = GroundHeading(facing);
@@ -572,32 +605,51 @@ internal static partial class WarriorSpellEffects
         }
 
         for (int lane = -1; lane <= tuning.LaneCount; lane++)
-        for (int step = 0; step < tuning.StepCount; step++)
+        for (int step = 0; step < Math.Max(6, tuning.StepCount); step++)
         {
-            float age = progress - (tuning.Age + step * tuning.Age2 + Math.Abs(lane) * tuning.Age3);
+            float age = (elapsed - WarriorStrikeTiming.AvalancheFirstRise -
+                step * WarriorStrikeTiming.AvalancheStepInterval - Math.Abs(lane) * 8) /
+                WarriorStrikeTiming.AvalancheDuration;
             if (age < 0 || age >= .55f) continue;
             int index = step + (lane + 1) * tuning.Index;
             float rise = Ease(age * tuning.Rise);
             float fade = 1 - Ease((age - tuning.Fade) / tuning.FadeDivisor);
             float opacity = (tuning.Opacity + tuning.Opacity2 * rise) * fade;
-            float stride = tuning.Stride + step * tuning.Stride2 + tuning.Stride3 * Ease(age * tuning.Stride4);
-            float breadth = lane * (tuning.Breadth + step * tuning.Breadth2);
-            Vector2 root = feet + ProjectGround(heading * stride + side * breadth);
+            float stride = (step + 1) * 24f;
+            float laneAngle = MathF.Atan2(heading.Y, heading.X) + lane * MathF.PI / 4;
+            Vector2 laneHeading = new(MathF.Cos(laneAngle), MathF.Sin(laneAngle));
+            laneHeading /= MathF.Max(MathF.Abs(laneHeading.X), MathF.Abs(laneHeading.Y));
+            Vector2 root = feet + ProjectGround(laneHeading * Math.Min(stride, 48) +
+                heading * Math.Max(0, stride - 48));
             frame.Sprite(root, tuning.WarriorDustWidth + step * tuning.WarriorDustWidth2, tuning.WarriorDustHeight + step * tuning.WarriorDustHeight2, tuning.WarriorDustShape, tuning.WarriorDustColour, tuning.WarriorDustAlpha * opacity,
                 tuning.WarriorDustLayer, angle, sortY: root.Y, emitter: "WarriorSpellEffects.Avalanche.6");
             frame.Sprite(root, tuning.WispWidth2 + step * tuning.WispWidth3, tuning.WispHeight3 + step * tuning.WispHeight4, tuning.WispShape2, tuning.WispColour2, tuning.WispAlpha2 * opacity,
                 tuning.WispLayer2, angle, sortY: root.Y, emitter: "WarriorSpellEffects.Avalanche.7");
 
             // Soft floor mist trails each eruption; no drawn guide lanes.
-            for (int fog = 0; fog < 2; fog++)
+            for (int fog = 0; fog < 3; fog++)
             {
                 float drift = age * (12 + fog * 8);
-                Vector2 plume = root + ProjectGround(side * ((fog == 0 ? -1 : 1) * (5 + drift))) -
+                Vector2 plume = root + ProjectGround(side * ((fog - 1) * (5 + drift))) -
                     Vector2.UnitY * (3 + age * 8);
                 frame.Clip(plume, 20 + age * 30 + step * 2, 10 + age * 12,
                     Shape.SmokeSequence, age * 2.2f + frame.Unit(index * 17 + fog),
                     fog == 0 ? 0xB4E8FF : 0xD5ECFF, opacity * .30f,
                     Layer.Smoke, sortY: root.Y, emitter: "WarriorSpellEffects.Avalanche.IceFog");
+            }
+
+            // Fine crystals scatter from the floor eruption. Stable per-cell
+            // seeds keep the particles moving without random frame flicker.
+            for (int shard = 0; shard < 8; shard++)
+            {
+                float life = Math.Clamp(age * (2.1f + frame.Unit(index * 67 + shard) * 2), 0, 1);
+                float yaw = frame.Unit(index * 71 + shard + 200) * MathF.Tau;
+                Vector2 drift = ProjectGround(Ellipse(yaw, 9 + 28 * life, 9 + 28 * life));
+                Vector2 point = root + drift - Vector2.UnitY * (MathF.Sin(life * MathF.PI) * (12 + step * 3));
+                frame.Sprite(point, 2 + frame.Unit(index * 73 + shard + 500) * 3, 3 + 2 * (1 - life),
+                    Shape.WarriorSpark, shard % 4 == 0 ? 0xA99BFF : shard % 3 == 0 ? 0x8CDFFF : 0xF4FBFF,
+                    opacity * (1 - life) * rise * .82f, Layer.EmissiveCore, yaw, sortY: root.Y,
+                    emitter: "WarriorSpellEffects.Avalanche.IceFragments");
             }
 
             for (int blade = -1; blade <= tuning.BladeCount; blade++)

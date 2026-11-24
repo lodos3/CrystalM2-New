@@ -101,9 +101,8 @@ public partial class HumanObject
             }
         }
 
-        int echo = magic.Perk(SpellPerk.DrakeEcho);
-        if (secondaryBlade && echo > 0 && !target.Dead)
-            QueuePerkDamage(new PerkDamage(target, magic.Spell, Math.Max(1, ScaleSignature(damage, 25 + 10 * echo)), defence, 1), 260);
+        // DrakeEcho is now included in the single combined damage event.
+        // Do not schedule a separate perk hit.
     }
 
     private void QueuePerkDamage(PerkDamage impact, int delay) =>

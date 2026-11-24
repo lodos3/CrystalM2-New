@@ -44,12 +44,15 @@ internal static class SpellVfxAssetChecks
         for (int pose = 0; pose < 6; pose++)
         {
             SpellParticle[] particles = Sample(feet, direction, pose);
-            Check(particles.Length > 0 && particles.Length <= 200,
+            Check(particles.Length > 0 && particles.Length <= 300,
                 $"Cross Half Moon direction {direction}, pose {pose}: bounded nonempty emission.");
             Check(particles.All(p => p.FrameOnly && p.CoveragePlane == 0 &&
                 float.IsFinite(p.Origin.X) && float.IsFinite(p.Origin.Y)),
                 "Cross Half Moon must use finite frame-local procedural particles, not legacy sprite planes.");
             var surfaces = particles.Where(p => p.Shape == SpellParticleShape.DirectionalSweep && p.Ribbon.HasValue).ToArray();
+            if (pose is >= 2 and <= 4)
+                Check(particles.Count(p => p.Shape == SpellParticleShape.WarriorSpark) >= 18,
+                    "The Cross Half Moon release must shed dense fine fragments.");
             Check(surfaces.Length >= 24 && surfaces.All(p => p.RibbonTextureU.HasValue),
                 "Each Cross Half Moon pose must contain multiple textured cutting surfaces.");
             if (pose is >= 2 and <= 4)

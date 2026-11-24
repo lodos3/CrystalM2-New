@@ -31,7 +31,10 @@ public partial class PlayerObject
         var map = GameScene.Scene.MapControl;
         if (SpellVfxPoseMasks.IsWeaponSwing(Spell) && CurrentAction == MirAction.Attack1)
         {
-            map.EmitBladeAttack(this, Spell, SpellVisualPhase.Swing, FrameIndex, FrameIndex / 6f);
+            float swingFraction = FrameInterval > 0
+                ? 1 - Math.Clamp((NextMotion - CMain.Time) / (float)FrameInterval, 0, 1) : 0;
+            map.EmitBladeAttack(this, Spell, SpellVisualPhase.Swing, FrameIndex,
+                Spell == Spell.CrossHalfMoon ? (FrameIndex + swingFraction) / 6f : FrameIndex / 6f);
             return;
         }
         if (SpellVfxBladeFrames.Attack(Spell, CurrentAction) is not { } cue ||

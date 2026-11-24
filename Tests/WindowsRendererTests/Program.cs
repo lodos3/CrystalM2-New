@@ -376,7 +376,7 @@ internal static class Program
             Check(LegacySpellEffects.HasProfile(spell), $"Author a particle profile for {spell}.");
             // This spell intentionally has no separate impact; the swing below
             // and the dedicated all-direction tests verify its visible art.
-            if (spell == Spell.CrossHalfMoon) continue;
+            if (WarriorStrikeTiming.SuppressTargetArt(spell)) continue;
             bool field = spell is Spell.FireWall or Spell.Blizzard or Spell.MeteorStrike;
             var phase = field ? SpellVisualPhase.Field : SpellVisualPhase.Impact;
             long sampleTime = spell switch
@@ -589,7 +589,7 @@ internal static class Program
         var burst = LegacySpellEffects.Windup(Spell.SlashingBurst, 6, 100);
         long start = cast + burst.Delay;
         Check(burst.AtCell && burst.Duration == 900 &&
-            LegacySpellEffects.Windup(Spell.BladeAvalanche, 6, 100).Duration == 1500 &&
+            LegacySpellEffects.Windup(Spell.BladeAvalanche, 6, 100).Duration == WarriorStrikeTiming.AvalancheDuration &&
             LegacySpellEffects.Windup(Spell.CounterAttack, 6, 100).Duration == 1000,
             "Warrior effects retain the original cast durations and Slashing Burst's delayed tile origin.");
         var visual = new SpellVisual(Spell.SlashingBurst, burst.Phase);
@@ -678,8 +678,8 @@ internal static class Program
             "Thrusting keeps the weapon trail separate from the player's wind.");
 
         var thrust = LegacySpellEffects.Windup(Spell.Thrusting, 6, 100);
-        Check(thrust is { Phase: SpellVisualPhase.Swing, Duration: 300, Delay: 300, AtCell: false },
-            "The gust opens on the fourth legacy frame, after the three weapon frames.");
+        Check(thrust is { Phase: SpellVisualPhase.Swing, Duration: WarriorStrikeTiming.ThrustDuration, Delay: 0, AtCell: true },
+            "The travelling gust starts immediately at the cast origin and retains a fading wake.");
         Vector2 chest = feet - Vector2.UnitY * 36;
         SpellParticle[] earlyWind = Wind(24, Vector2.UnitX);
         SpellParticle[] fullWind = Wind(230, Vector2.UnitX);
@@ -691,7 +691,8 @@ internal static class Program
         Check(strands.Length > 50 && Thickness(strands[4]) > Thickness(strands[0]) * 5 &&
             Vector2.DistanceSquared(strands[0].Origin + strands[0].Ribbon.Value.TopRight,
                 strands[1].Origin + strands[1].Ribbon.Value.TopLeft) < .0001f &&
-            fullWind.All(p => p.Shape is SpellParticleShape.WindRibbon or SpellParticleShape.Wisp),
+            fullWind.Any(p => p.Shape == SpellParticleShape.WarriorSpark) &&
+            fullWind.Any(p => p.Shape == SpellParticleShape.Wisp),
             "The gust uses joined, tapered strands with soft light around the curl.");
         SpellParticle[] northWind = Wind(230, -Vector2.UnitY);
         float endOnWidth = northWind.Max(p => p.Origin.X) - northWind.Min(p => p.Origin.X);
@@ -740,18 +741,21 @@ internal static class Program
             "Twin Drake weapon sweep must trace the full blade edge through both scene depths with thin segmented electricity.");
 
 
-        SpellParticle[] initial = Sample(Spell.BladeAvalanche, SpellVisualPhase.Swing, 280, 1500);
-        SpellParticle[] advancing = Sample(Spell.BladeAvalanche, SpellVisualPhase.Swing, 1160, 1500);
+        SpellParticle[] initial = Sample(Spell.BladeAvalanche, SpellVisualPhase.Swing, 24, WarriorStrikeTiming.AvalancheDuration);
+        SpellParticle[] advancing = Sample(Spell.BladeAvalanche, SpellVisualPhase.Swing, 340, WarriorStrikeTiming.AvalancheDuration);
         SpellParticle[] spikes = advancing.Where(p => p.Shape == SpellParticleShape.IceSpire).ToArray();
         Check(initial.All(p => p.Shape != SpellParticleShape.IceSpire) && spikes.Length >= 9 &&
             spikes.Max(p => p.Origin.X) > feet.X + 132 &&
             advancing.Where(p => p.Shape == SpellParticleShape.WarriorDust).Select(p => p.Origin.Y).Distinct().Count() >= 5,
             "Blade Avalanche gathers at the warrior, then sends spreading lanes and rising spikes forward.");
-        Check(initial.Length > 0 && initial.All(p => p.Shape is not (SpellParticleShape.Filament or SpellParticleShape.WarriorTripleCut)),
+        Check(initial.All(p => p.Shape is not (SpellParticleShape.Filament or SpellParticleShape.WarriorTripleCut)),
             "Blade Avalanche must anticipate with frost rather than long pre-swing lines.");
         Check(advancing.Any(p => p.Shape == SpellParticleShape.SmokeSequence && p.Colour.B > p.Colour.R) &&
             spikes.Any(p => p.Colour.B > p.Colour.R && p.Colour.R > p.Colour.G),
             "Blade Avalanche needs cool mist and distinct violet shard tips.");
+        foreach (var spell in new[] { Spell.Thrusting, Spell.BladeAvalanche, Spell.CrossHalfMoon })
+        foreach (var phase in new[] { SpellVisualPhase.Contact, SpellVisualPhase.Hit, SpellVisualPhase.Impact })
+            Check(Sample(spell, phase, 180, 600).Length == 0, $"{spell} must not create duplicate target art.");
         SpellParticle[] fire = Sample(Spell.FlamingSword, SpellVisualPhase.Contact, 240, 640);
         Check(fire.Any(p => p.Shape == SpellParticleShape.FlameSequence && p.Ground && p.CastsLight) &&
             fire.Any(p => p.Shape == SpellParticleShape.FlameSequence && p.Emissive && p.Origin.Y < feet.Y - 40),

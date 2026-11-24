@@ -35,7 +35,7 @@ public static class SpellPerks
         [Spell.Thrusting] = [Power, new(SpellPerk.ThrustReach, "Long Point", "Reach one extra tile along the thrust line.", 1)],
         [Spell.HalfMoon] = [Power, new(SpellPerk.CrescentReach, "Wide Crescent", "Extend the crescent to the two outer front tiles.", 1), Economy],
         [Spell.CrossHalfMoon] = [Power, new(SpellPerk.CrescentReach, "Extended Cross", "Strike one extra tile along each cardinal direction.", 1), Economy],
-        [Spell.TwinDrakeBlade] = [Power, new(SpellPerk.DrakeEcho, "Third Fang", "A confirmed second blade leaves a weaker delayed third strike."), Economy],
+        [Spell.TwinDrakeBlade] = [Power, new(SpellPerk.DrakeEcho, "Third Fang", "Adds 25% plus 10% per rank of one blade's power to the combined strike."), Economy],
         [Spell.FlamingSword] = [Splash, Burn, Recharge],
         [Spell.ShoulderDash] = [new(SpellPerk.DashDistance, "Long Stride", "Dash two additional tiles.", 1, ExclusiveGroup: 1),
             new(SpellPerk.DashImpact, "Battering Dash", "Dash up to two tiles and hit harder on the first collision.", 1, ExclusiveGroup: 1),
