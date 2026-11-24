@@ -17,8 +17,11 @@ internal static class ArmourWingParticles
     {
         float yaw = (int)direction * MathF.PI / 4;
         float profile = MathF.Abs(MathF.Sin(yaw));
+        // Keep the root seated on the back: the previous 13px profile
+        // offset left a visible gap. Volume and sweep are independent of
+        // this attachment translation and remain unchanged.
         return shoulder + new Vector2(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f) *
-            (8.5f + 4.5f * profile * profile);
+            (7f + profile * profile);
     }
 
     internal static Vector2 Shoulder(byte effect, bool mounted) =>

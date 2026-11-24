@@ -81,9 +81,13 @@ internal static class ArmourWingChecks
                 Vector2 rear = new(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f);
                 if (Vector2.Dot(attachment - shoulder, rear) < 2)
                     throw new InvalidDataException($"Wing {effect} is not attached behind the shoulder in {facing}.");
-                if ((facing == MirDirection.Right && attachment.X > shoulder.X - 10) ||
-                    (facing == MirDirection.Left && attachment.X < shoulder.X + 10))
-                    throw new InvalidDataException($"Side attachment penetrates the torso in {facing}.");
+                if (facing is MirDirection.Right or MirDirection.Left)
+                {
+                    float offset = (attachment.X - shoulder.X) *
+                        (facing == MirDirection.Right ? -1f : 1f);
+                    if (offset < 7f || offset > 9f)
+                        throw new InvalidDataException($"Side wing root must hug the back, not penetrate or float: {offset}px in {facing}.");
+                }
                 for (int time = 0; time < 1800; time += 225)
                 {
                     ArmourWingParticles.Emit(pool, effect, 0, 0, shoulder, facing, time, 101);
