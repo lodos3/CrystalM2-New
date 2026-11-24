@@ -19,10 +19,30 @@ internal static class ArmourWingParticles
     {
         // Anchor in the unrotated body basis: only distal geometry twists.
         float yaw = (int)direction * MathF.PI / 4;
-        float profile = MathF.Abs(MathF.Sin(yaw));
-        return shoulder + new Vector2(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f) *
-            ((7f + profile * profile) * RearDepthScale);
+        // The tracked shoulder is already the upper back, not the body centre.
+        // Seat the socket just inside the armour instead of adding a second
+        // six-pixel stand-off before the membrane projection.
+        return shoulder + new Vector2(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f) * 1.5f;
     }
+
+    // Authored quill/membrane roots, in unpadded art coordinates. These
+    // correspond to the starts in paint-armour-wings, paint-infernal-wings,
+    // paint-seraph-wings and elemental-wings/bake, not the texture's corner.
+    internal static Vector2 ArtworkRoot(byte effect) => effect switch
+    {
+        ArmourWings.Phoenix or ArmourWings.Frost => new(5, 43),
+        ArmourWings.Moth => new(10, 52),
+        ArmourWings.CelestialElectric => new(5, 46),
+        ArmourWings.FelFire => new(4, 44),
+        ArmourWings.DemonicBone => new(5, 46),
+        ArmourWings.Archangel or ArmourWings.DawnSeraph => new(4, 45),
+        ArmourWings.MagmaWyrm or ArmourWings.TidalLeviathan => new(5, 45),
+        ArmourWings.GeodeTitan => new(7, 45),
+        ArmourWings.Tempest or ArmourWings.Thunderstorm => new(5, 47),
+        ArmourWings.VerdantMonarch => new(8, 47),
+        ArmourWings.Venom => new(6, 47),
+        _ => new(4, 44)
+    };
 
     private static Vector2 Rotate(Vector2 v, float angle)
     {
@@ -111,6 +131,16 @@ internal static class ArmourWingParticles
         bool elemental = ArmourWings.IsElemental(effect);
         float tipLift = felFire ? 36 * north * north : seraph ? 9 + 14 * north * north : 0;
         int segments = felFire || seraph || elemental ? 8 : 6;
+        Vector2 artRoot = ArtworkRoot(effect);
+        int rootColumn = (int)artRoot.X - membrane.X;
+        float rootTextureU = rootColumn / (float)membrane.Width;
+        float rootTextureV = (artRoot.Y - membrane.Y) / membrane.Height;
+        float rootU = artRoot.X / artWidth;
+        int rootSegment = Math.Clamp((int)MathF.Round(rootTextureU * segments), 1, segments - 1);
+        // Keep the existing strip count and texture sampling. Insert the
+        // physical root as an exact shared edge of two neighbouring strips.
+        float Boundary(int segment) => segment == rootSegment ? rootTextureU :
+            MathF.Round(segment * membrane.Width / (float)segments) / membrane.Width;
         float thickness = effect switch
         {
             ArmourWings.Phoenix => 9f, ArmourWings.Frost => 8f,
@@ -183,7 +213,7 @@ internal static class ArmourWingParticles
                 Vector2 localBack = new(-MathF.Sin(localYaw), MathF.Cos(localYaw) * .49f);
                 float down = height * .55f - 4 * u * flap + 4 * t * t - arch + shell * depth * .30f * rearSign * flex;
                 Vector2 projected = Rotate(localAcross * (side * (span + shell * depth * .23f * flex)) +
-                    localBack * (sweep + (camber + twist + shell * depth * (.25f + .75f * flex)) * RearDepthScale) +
+                    localBack * (sweep + (camber + twist + shell * depth * flex) * RearDepthScale) +
                     Vector2.UnitY * down, torsoRoll * flex);
                 // In particular, the lower hem at the root must not be
                 // dragged forward or backward by the pitch spring.
@@ -208,17 +238,22 @@ internal static class ArmourWingParticles
                 mix = frame - index;
             }
 
-            // Project the padded glow with the same curvature and attachment as the quills.
+            // Pin the actual rendered material, not the analytical curve at
+            // its centre. The rasterizer linearly interpolates the two ends
+            // of a shared mesh edge. Subtract that exact projected root to
+            // prevent flap, camber, pitch or padding from opening a gap.
+            int top = membrane.Y, bottom = top + membrane.Height;
+            Vector2 correction = Vector2.Lerp(Project(rootU, top), Project(rootU, bottom), rootTextureV);
+            Vector2 Pinned(float u, float y, float shell = 0) => Project(u, y, shell) - correction;
             for (int segment = 0; segment < segments; segment++)
             {
-                float a = MathF.Round(segment * membrane.Width / (float)segments) / membrane.Width;
-                float b = MathF.Round((segment + 1) * membrane.Width / (float)segments) / membrane.Width;
-                float left = (membrane.X + membrane.Width * a) / artWidth;
-                float right = (membrane.X + membrane.Width * b) / artWidth;
-                int top = membrane.Y, bottom = top + membrane.Height;
-                var quad = new SpriteQuad(Project(left, top), Project(right, top), Project(left, bottom), Project(right, bottom));
-                var underside = new SpriteQuad(Project(left, top, 1), Project(right, top, 1),
-                    Project(left, bottom, 1), Project(right, bottom, 1));
+                float a = Boundary(segment);
+                float b = Boundary(segment + 1);
+                float left = segment == rootSegment ? rootU : (membrane.X + membrane.Width * a) / artWidth;
+                float right = segment + 1 == rootSegment ? rootU : (membrane.X + membrane.Width * b) / artWidth;
+                var quad = new SpriteQuad(Pinned(left, top), Pinned(right, top), Pinned(left, bottom), Pinned(right, bottom));
+                var underside = new SpriteQuad(Pinned(left, top, 1), Pinned(right, top, 1),
+                    Pinned(left, bottom, 1), Pinned(right, bottom, 1));
                 // A dimmer rear surface creates a visible thickness edge
                 // without doubling the bright additive front surface. Use
                 // the dominant animation sample for this low-energy shell.
@@ -250,7 +285,7 @@ internal static class ArmourWingParticles
                 float span = .22f + i * .096f;
                 float y = effect == ArmourWings.FelFire ? 44 - 17 * span - age * 34 :
                     120 - 106 * span + age * (design == 0 ? -24 : 18);
-                var mote = root + Project(span, y);
+                var mote = root + Pinned(span, y);
                 Shape accent = effect switch
                 {
                     ArmourWings.MagmaWyrm => Shape.FlameTongue, ArmourWings.TidalLeviathan or ArmourWings.Venom => Shape.Orb,

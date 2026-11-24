@@ -11,6 +11,7 @@ internal static class ArmourWingChecks
     internal static void CheckElementalDesigns()
     {
         CheckAttackLean();
+        CheckArtworkRootContact();
         for (int id = 10; id < 20; id++)
         {
             if (!ArmourWings.TrySelect(id.ToString(), out byte? selection) ||
@@ -71,6 +72,55 @@ internal static class ArmourWingChecks
                 throw new InvalidDataException($"Blank or duplicate elemental atlas {id}.");
         }
         Console.WriteLine("Verified ten elemental designs across eight facings, five times, split layers and pose motion.");
+    }
+
+    private static void CheckArtworkRootContact()
+    {
+        // Verify the actual textured geometry, not just the particle origins.
+        // Each art root lies on a mesh seam: its projected position must
+        // stay attached for every facing, texture frame and flap phase.
+        var pool = new SpellParticlePool(ArmourWingParticles.ParticleCapacity);
+        for (byte effect = ArmourWings.Phoenix; effect < ArmourWings.SolarAscendant; effect++)
+        {
+            int bank = WingPoseAtlas.DesignBank + effect - ArmourWings.Phoenix;
+            var art = WingPoseAtlas.GetPose(bank, 0);
+            Vector2 sourceRoot = ArmourWingParticles.ArtworkRoot(effect);
+            float u = (sourceRoot.X - art.X) / art.Width;
+            float v = (sourceRoot.Y - art.Y) / art.Height;
+            foreach (MirDirection facing in Enum.GetValues<MirDirection>())
+            foreach (int time in new[] { 0, 73, 233, 459, 719, 1057, 1530, 2399 })
+            foreach (int side in new[] { -1, 1 })
+            {
+                Vector2 shoulder = new(24, -31);
+                Vector2 socket = ArmourWingParticles.BackAttachment(shoulder, facing);
+                if (Vector2.Distance(socket, shoulder) > 1.501f)
+                    throw new InvalidDataException("A physical socket must be seated within the torso.");
+                float yaw = (int)facing * MathF.PI / 4;
+                Vector2 expected = socket + new Vector2(MathF.Cos(yaw), MathF.Sin(yaw) * .49f) * (side * 5.5f);
+                ArmourWingParticles.Emit(pool, effect, 0, 0, shoulder, facing, time, 101, side,
+                    torsoYaw: .14f, torsoRoll: -.18f, torsoPitch: .28f);
+                int left = 0, right = 0;
+                foreach (var particle in pool.Active)
+                {
+                    if (particle.CoveragePlane >= 0 || particle.Layer != SpellParticleLayer.EmissiveCore ||
+                        particle.Ribbon is not { } quad || particle.RibbonTextureU is not { } uv) continue;
+                    if (MathF.Abs(uv.X - u) < .00001f)
+                    {
+                        left++;
+                        if (Vector2.Distance(particle.Origin + Vector2.Lerp(quad.TopLeft, quad.BottomLeft, v), expected) > .01f)
+                            throw new InvalidDataException($"Wing {effect} left artwork root detached in {facing} at {time}ms.");
+                    }
+                    if (MathF.Abs(uv.Y - u) < .00001f)
+                    {
+                        right++;
+                        if (Vector2.Distance(particle.Origin + Vector2.Lerp(quad.TopRight, quad.BottomRight, v), expected) > .01f)
+                            throw new InvalidDataException($"Wing {effect} right artwork root detached in {facing} at {time}ms.");
+                    }
+                }
+                if (left == 0 || right == 0)
+                    throw new InvalidDataException($"Missing artwork root seam for {effect}.");
+            }
+        }
     }
 
     private static void CheckAttackLean()
@@ -242,13 +292,13 @@ internal static class ArmourWingChecks
                 float yaw = (int)facing * MathF.PI / 4;
                 Vector2 rear = new(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f);
                 float rearDistance = Vector2.Dot(attachment - shoulder, rear) / rear.LengthSquared();
-                if (rearDistance < 5.59f || rearDistance > 6.41f)
-                    throw new InvalidDataException($"Wing {effect} rear depth is not reduced by 20% in {facing}.");
+                if (MathF.Abs(rearDistance - 1.5f) > .01f)
+                    throw new InvalidDataException($"Wing {effect} socket is not seated in the back in {facing}.");
                 if (facing is MirDirection.Right or MirDirection.Left)
                 {
                     float offset = (attachment.X - shoulder.X) *
                         (facing == MirDirection.Right ? -1f : 1f);
-                    if (MathF.Abs(offset - 6.4f) > .01f)
+                    if (MathF.Abs(offset - 1.5f) > .01f)
                         throw new InvalidDataException($"Side wing root must hug the back, not penetrate or float: {offset}px in {facing}.");
                 }
                 for (int time = 0; time < 1800; time += 225)
