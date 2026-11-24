@@ -185,12 +185,65 @@ static class Program
         }
     }
 
+    private static void CheckIndependentWingSockets()
+    {
+        Assertions.True(WingBodyPose.TryGetTorsoFrame(152, 0, 2, false, out var release) &&
+            release.NegativeShoulder == new Vector2(36, -24) &&
+            release.PositiveShoulder == new Vector2(47, -10),
+            "The actual right-facing follow-through uses independent shoulder landmarks.");
+        foreach (int bank in new[] { 0, 808 })
+        foreach (var (start, count, mounted) in new (int, int, bool)[]
+        {
+            (32, 6, false), (80, 6, false), (136, 6, false), (184, 6, false),
+            (232, 8, false), (296, 6, false), (416, 6, false),
+            (448, 8, true), (512, 6, true), (584, 6, true)
+        })
+        for (int direction = 0; direction < 8; direction++)
+        for (int index = 0; index < count; index++)
+        {
+            int frame = bank + start + direction * count + index;
+            Assertions.True(WingBodyPose.TryGetTorsoFrame(frame, bank, direction, mounted, out var body),
+                $"Missing shoulder pair for body frame {frame}.");
+            float angle = direction * MathF.PI / 4;
+            Vector2 nominal = new(MathF.Cos(angle), MathF.Sin(angle) * .49f);
+            Vector2 rear = new Vector2(-MathF.Sin(angle), MathF.Cos(angle) * .49f) * 1.5f;
+            float handedness = Vector2.Dot(nominal, body.ReferenceAcross) < 0 ? -1 : 1;
+            Vector2[] roots = new Vector2[2];
+            foreach (int side in new[] { -1, 1 })
+            {
+                bool positive = side * handedness > 0;
+                Vector2 referenceShoulder = positive ? body.ReferencePositiveShoulder : body.ReferenceNegativeShoulder;
+                Vector2 currentShoulder = positive ? body.PositiveShoulder : body.NegativeShoulder;
+                Vector2 rest = body.ReferenceCentre + rear +
+                    body.ReferenceAcross * (side * handedness * 5.5f * nominal.Length()) - referenceShoulder;
+                Vector2 actual = body.Centre + body.SocketOffset(nominal, side, 5.5f, rear) - currentShoulder;
+                Vector2 expected = body.Transform(rest);
+                float width = Vector2.Distance(body.NegativeShoulder, body.PositiveShoulder);
+                float refWidth = Vector2.Distance(body.ReferenceNegativeShoulder, body.ReferencePositiveShoulder);
+                if (width - refWidth + 11 * nominal.Length() >= 1)
+                    Assertions.True(Vector2.Distance(actual, expected) < .001f,
+                        $"Wing {side} lost its own shoulder attachment at frame {frame}.");
+                Vector2 perpendicular = new(-body.Across.Y, body.Across.X);
+                Assertions.True(MathF.Abs(Vector2.Dot(actual - expected, perpendicular)) < .001f,
+                    $"Wing {side} changed its back/height offset at {frame}.");
+                roots[(side + 1) / 2] = body.SocketOffset(nominal, side, 5.5f, rear);
+                Vector2 idleRoot = body.AtRest().SocketOffset(nominal, side, 5.5f, rear);
+                Assertions.True(Vector2.Distance(idleRoot, rear + body.ReferenceAcross *
+                    (side * handedness * 5.5f * nominal.Length())) < .001f,
+                    "Idle must retain its established root spacing.");
+            }
+            Assertions.True(Vector2.Dot(roots[1] - roots[0], body.Across) * handedness >= .999f,
+                $"Wing sockets crossed at {frame}.");
+        }
+    }
+
     private static void Main()
     {
         CheckWingBodyTracking();
         CheckWingPoseMotion();
         CheckUpperBackTracking();
         CheckTorsoFrameTracking();
+        CheckIndependentWingSockets();
 
         Span<SpriteVertex> vertices = stackalloc SpriteVertex[6];
         Assertions.True(SpriteGeometry.WriteQuad(vertices, new Rectangle(16, 8, 32, 24),

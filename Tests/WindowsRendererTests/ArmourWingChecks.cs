@@ -81,15 +81,23 @@ internal static class ArmourWingChecks
         for (byte effect = ArmourWings.Phoenix; effect < ArmourWings.SolarAscendant; effect++)
         foreach (int bank in new[] { 0, 808 })
         foreach (MirDirection facing in Enum.GetValues<MirDirection>())
-        foreach (int index in new[] { (int)facing * 4, 32 + (int)facing * 6 + 3,
-            136 + (int)facing * 6 + 1, 136 + (int)facing * 6 + 4,
-            416 + (int)facing * 6 + 5 })
+        foreach (var (start, count, mounted) in new (int, int, bool)[]
         {
-            if (!ArmourWingParticles.TryGetBodyMotion(effect, bank + index, bank, facing, false, out var motion) ||
-                motion.TorsoFrame is not { } torso)
+            (0, 4, false), (32, 6, false), (80, 6, false), (136, 6, false),
+            (184, 6, false), (232, 8, false), (296, 6, false), (416, 6, false),
+            (448, 8, true), (512, 6, true), (584, 6, true)
+        })
+        for (int frame = 0; frame < count; frame++)
+        {
+            int index = start + (int)facing * count + frame;
+            if (!ArmourWingParticles.TryGetBodyMotion(effect, bank + index, bank, facing, mounted, out var motion))
                 throw new InvalidDataException("Missing physical torso basis.");
-            Vector2 shoulder = ArmourWingParticles.Shoulder(effect, false) + motion.Offset;
+            motion = WingPoseMotion.Stabilize(motion, start == 0, start is 32 or 80 or 448 or 512);
+            if (motion.TorsoFrame is not { } torso) throw new InvalidDataException("Missing shoulder pair.");
+            Vector2 shoulder = ArmourWingParticles.Shoulder(effect, mounted) + motion.Offset;
             Vector2 socket = ArmourWingParticles.BackAttachment(shoulder, facing);
+            float yaw = (int)facing * MathF.PI / 4;
+            Vector2 nominal = new(MathF.Cos(yaw), MathF.Sin(yaw) * .49f);
             Vector2[] roots = new Vector2[2];
             int artBank = WingPoseAtlas.DesignBank + effect - ArmourWings.Phoenix;
             var art = WingPoseAtlas.GetPose(artBank, 0);
@@ -111,6 +119,9 @@ internal static class ArmourWingChecks
                     if (Vector2.Distance(root, particle.Origin) > .01f)
                         throw new InvalidDataException("Twist detached the visible artwork root.");
                     roots[i] = root;
+                    Vector2 expected = shoulder + torso.SocketOffset(nominal, side, 5.5f, socket - shoulder);
+                    if (Vector2.Distance(root, expected) > .01f)
+                        throw new InvalidDataException($"Wing {effect} missed its shoulder socket at {bank + index}.");
                     found = true;
                     break;
                 }
@@ -118,7 +129,7 @@ internal static class ArmourWingChecks
             }
             Vector2 axis = Vector2.Normalize(roots[1] - roots[0]);
             if (MathF.Abs(Vector2.Dot(axis, torso.Across)) < .9999f ||
-                Vector2.Distance((roots[0] + roots[1]) * .5f, socket) > .01f)
+                Vector2.Distance(roots[0], roots[1]) < .999f)
                 throw new InvalidDataException($"Wing roots are not aligned to the shoulders at {bank + index}.");
         }
     }
@@ -277,7 +288,10 @@ internal static class ArmourWingChecks
             Vector2 trackedShoulder = ArmourWingParticles.Shoulder(effect.Value, false);
             WingPoseMotion motion = WingPoseMotion.Zero;
             if (id >= 2 && ArmourWingParticles.TryGetBodyMotion(effect.Value, pose, 0, facing, false, out motion))
+            {
+                motion = WingPoseMotion.Stabilize(motion, pose < 32, pose is >= 32 and < 128);
                 trackedShoulder += motion.Offset;
+            }
             ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101,
                 torsoYaw: motion.Yaw, torsoRoll: motion.Roll, torsoPitch: motion.Pitch, torsoFrame: motion.TorsoFrame);
             if (pool.Active.Length < 3 || pool.Active.Length >= pool.Capacity)

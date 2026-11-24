@@ -5,7 +5,10 @@ namespace CrystalM2.Rendering.Core;
 // Screen-projected anatomical shoulder basis from the actual body frame.
 // A proper rotation maps the reference pose to the current pose, preserving
 // the length and shape of the wing. No arbitrary per-direction screen cant.
-public readonly record struct WingTorsoFrame(Vector2 Across, Vector2 ReferenceAcross)
+public readonly record struct WingTorsoFrame(Vector2 Across, Vector2 ReferenceAcross,
+    Vector2 Centre, Vector2 ReferenceCentre,
+    Vector2 NegativeShoulder, Vector2 PositiveShoulder,
+    Vector2 ReferenceNegativeShoulder, Vector2 ReferencePositiveShoulder)
 {
     public Vector2 Transform(Vector2 point)
     {
@@ -14,13 +17,38 @@ public readonly record struct WingTorsoFrame(Vector2 Across, Vector2 ReferenceAc
         return new Vector2(point.X * c - point.Y * s, point.X * s + point.Y * c);
     }
 
-    public Vector2 SocketOffset(Vector2 nominalAcross, int side, float halfWidth)
+    public Vector2 SocketOffset(Vector2 nominalAcross, int side, float halfWidth, Vector2 rear)
     {
-        // Stable side correspondence is chosen from the reference, not the
-        // current shoulder slope, so a swing cannot exchange the two roots.
+        // Preserve the established rest offset from each individual shoulder.
         float handedness = Vector2.Dot(nominalAcross, ReferenceAcross) < 0 ? -1 : 1;
-        return Across * (side * halfWidth * nominalAcross.Length() * handedness);
+        float signedSide = side * handedness;
+        bool positive = signedSide > 0;
+        Vector2 referenceShoulder = positive ? ReferencePositiveShoulder : ReferenceNegativeShoulder;
+        Vector2 currentShoulder = positive ? PositiveShoulder : NegativeShoulder;
+        float restHalfWidth = halfWidth * nominalAcross.Length();
+        Vector2 restRoot = ReferenceCentre + rear + ReferenceAcross * (signedSide * restHalfWidth);
+        Vector2 local = restRoot - referenceShoulder;
+
+        // On extreme compressed projections only, reduce the longitudinal
+        // inset to prevent crossing; preserve the perpendicular offset.
+        float referenceWidth = Vector2.Distance(ReferenceNegativeShoulder, ReferencePositiveShoulder);
+        float currentWidth = Vector2.Distance(NegativeShoulder, PositiveShoulder);
+        float combinedInset = referenceWidth - 2 * restHalfWidth;
+        if (combinedInset > 0 && currentWidth - combinedInset < 1)
+        {
+            float scale = Math.Clamp((currentWidth - 1) / combinedInset, 0, 1);
+            local += ReferenceAcross * (Vector2.Dot(local, ReferenceAcross) * (scale - 1));
+        }
+        return currentShoulder - Centre + Transform(local);
     }
+
+    // Standing may translate with the body; spacing and twist stay neutral.
+    public WingTorsoFrame AtRest() => this with
+    {
+        Across = ReferenceAcross,
+        NegativeShoulder = ReferenceNegativeShoulder + Centre - ReferenceCentre,
+        PositiveShoulder = ReferencePositiveShoulder + Centre - ReferenceCentre
+    };
 }
 
 public readonly record struct WingPoseMotion(Vector2 Offset, float Roll, float Yaw, float Pitch = 0)
@@ -49,7 +77,10 @@ public readonly record struct WingPoseMotion(Vector2 Offset, float Roll, float Y
 
     public static WingPoseMotion Stabilize(WingPoseMotion motion, bool idle, bool locomotion)
     {
-        if (idle) return motion with { Roll = 0, Yaw = 0, Pitch = 0 };
+        if (idle) return motion with
+        {
+            Roll = 0, Yaw = 0, Pitch = 0, TorsoFrame = motion.TorsoFrame?.AtRest()
+        };
         return motion with
         {
             Roll = Math.Clamp(motion.Roll, locomotion ? -.055f : -.18f, locomotion ? .055f : .18f),

@@ -159,9 +159,9 @@ internal static class ArmourWingParticles
             if (onlySide != 0 && side != onlySide) continue;
             bool near = profile < .001f || side == NearSide(direction);
             Vector2 nominalAcross = new(MathF.Cos(baseYaw), MathF.Sin(baseYaw) * .49f);
-            Vector2 root = attachment + (torsoFrame is { } torso
-                ? torso.SocketOffset(nominalAcross, side, 5.5f)
-                : nominalAcross * (side * 5.5f));
+            Vector2 root = torsoFrame is { } torso
+                ? shoulder + torso.SocketOffset(nominalAcross, side, 5.5f, attachment - shoulder)
+                : attachment + nominalAcross * (side * 5.5f);
             int opacity = (int)(218 + 12 * MathF.Sin(yaw) * side + 8 * flap);
 
             // Sweep the actual wing behind the actor as it turns edge-on.

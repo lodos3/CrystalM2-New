@@ -11,7 +11,8 @@ namespace CrystalM2.Rendering.Core;
 public static class WingBodyPose
 {
     private const int GenderStride = 808;
-    private readonly record struct Sample(Vector2 Position, Vector2 Attachment, Vector2 UpperBack, Vector2 Across, float Roll, Vector2 Torso);
+    private readonly record struct Sample(Vector2 Position, Vector2 Attachment, Vector2 UpperBack, Vector2 Across,
+        Vector2 NegativeShoulder, Vector2 PositiveShoulder, float Roll, Vector2 Torso);
     private static readonly Lazy<Sample[]> Anchors = new(Load);
 
     // Conservative authored twist estimates from the visible windup and
@@ -53,7 +54,10 @@ public static class WingBodyPose
         if (!TryGetDelta(bodyFrame, bankStart, direction, mounted, out _)) return false;
         int reference = bankStart + (mounted ? 416 : 0) + direction * 4;
         var samples = Anchors.Value;
-        frame = new WingTorsoFrame(samples[bodyFrame].Across, samples[reference].Across);
+        var current = samples[bodyFrame];
+        var rest = samples[reference];
+        frame = new WingTorsoFrame(current.Across, rest.Across, current.UpperBack, rest.UpperBack,
+            current.NegativeShoulder, current.PositiveShoulder, rest.NegativeShoulder, rest.PositiveShoulder);
         return true;
     }
 
@@ -138,10 +142,14 @@ public static class WingBodyPose
             Vector2 expectedAcross = new(-torso.Y, torso.X);
             if (across.LengthSquared() < 1) across = expectedAcross;
             if (across.LengthSquared() < 1) across = Vector2.UnitX;
-            if (Vector2.Dot(across, expectedAcross) < 0) across = -across;
+            if (Vector2.Dot(across, expectedAcross) < 0)
+            {
+                across = -across;
+                (shoulderA, shoulderB) = (shoulderB, shoulderA);
+            }
             across = Vector2.Normalize(across);
             result[index++] = new Sample(neck * .35f + (shoulderA + shoulderB) * .325f,
-                attachment, upperBack, across, roll, torso);
+                attachment, upperBack, across, shoulderA, shoulderB, roll, torso);
         }
         return result;
 
