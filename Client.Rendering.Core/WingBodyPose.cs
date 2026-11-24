@@ -11,7 +11,7 @@ namespace CrystalM2.Rendering.Core;
 public static class WingBodyPose
 {
     private const int GenderStride = 808;
-    private readonly record struct Sample(Vector2 Position, Vector2 Attachment, Vector2 UpperBack, float Roll, Vector2 Torso);
+    private readonly record struct Sample(Vector2 Position, Vector2 Attachment, Vector2 UpperBack, Vector2 Across, float Roll, Vector2 Torso);
     private static readonly Lazy<Sample[]> Anchors = new(Load);
 
     // Conservative authored twist estimates from the visible windup and
@@ -44,6 +44,17 @@ public static class WingBodyPose
         if (!TryGetDelta(bodyFrame, bankStart, direction, false, out _)) return false;
         position = Anchors.Value[bodyFrame].UpperBack;
         return float.IsFinite(position.X) && float.IsFinite(position.Y);
+    }
+
+    public static bool TryGetTorsoFrame(int bodyFrame, int bankStart, int direction, bool mounted,
+        out WingTorsoFrame frame)
+    {
+        frame = default;
+        if (!TryGetDelta(bodyFrame, bankStart, direction, mounted, out _)) return false;
+        int reference = bankStart + (mounted ? 416 : 0) + direction * 4;
+        var samples = Anchors.Value;
+        frame = new WingTorsoFrame(samples[bodyFrame].Across, samples[reference].Across);
+        return true;
     }
 
     public static bool TryGetAttachmentDelta(int bodyFrame, int bankStart, int direction, bool mounted,
@@ -123,8 +134,14 @@ public static class WingBodyPose
             float bank = Math.Clamp((shoulderB.Y - shoulderA.Y) / 12f, -1f, 1f);
             Vector2 upperShoulder = midShoulder + (shoulderA - shoulderB) * (.25f * bank);
             Vector2 upperBack = Vector2.Lerp(upperShoulder, neck, .25f);
+            Vector2 across = shoulderB - shoulderA;
+            Vector2 expectedAcross = new(-torso.Y, torso.X);
+            if (across.LengthSquared() < 1) across = expectedAcross;
+            if (across.LengthSquared() < 1) across = Vector2.UnitX;
+            if (Vector2.Dot(across, expectedAcross) < 0) across = -across;
+            across = Vector2.Normalize(across);
             result[index++] = new Sample(neck * .35f + (shoulderA + shoulderB) * .325f,
-                attachment, upperBack, roll, torso);
+                attachment, upperBack, across, roll, torso);
         }
         return result;
 

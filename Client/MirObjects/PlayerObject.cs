@@ -5076,7 +5076,8 @@ namespace Client.MirObjects
                     DrawWingFrame + WingOffset, WingShoulder, Direction, CMain.Time, ObjectID, onlySide,
                     _wingPoseReady ? _wingPoseSmoother.Current.Yaw : 0f,
                     _wingPoseReady ? _wingPoseSmoother.Current.Roll : 0f,
-                    _wingPoseReady ? _wingPoseSmoother.Current.Pitch : 0f);
+                    _wingPoseReady ? _wingPoseSmoother.Current.Pitch : 0f,
+                    _wingPoseReady ? _wingPoseSmoother.Current.TorsoFrame : null);
                 DXManager.Device.SpellParticles.Draw(_wingParticles.Active, new Vector2(DrawLocation.X, DrawLocation.Y),
                     CMain.Time, ground: false, emissiveOverlay: true, exposure: 1.22f);
                 return;

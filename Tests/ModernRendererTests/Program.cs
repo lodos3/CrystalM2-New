@@ -153,11 +153,44 @@ static class Program
             "Do not sample the other gender's atlas bank.");
     }
 
+    private static void CheckTorsoFrameTracking()
+    {
+        Assertions.True(WingBodyPose.TryGetTorsoFrame(8, 0, 2, false, out var idle) &&
+            Vector2.Distance(idle.Across, Vector2.Normalize(new Vector2(10, -2))) < .0001f,
+            "The reference must use the actual shoulder line.");
+        Assertions.True(WingBodyPose.TryGetTorsoFrame(149, 0, 2, false, out var windup) &&
+            Vector2.Distance(windup.Across, Vector2.Normalize(new Vector2(14, -8))) < .0001f,
+            "Windup shoulder orientation must come from the displayed frame.");
+        Assertions.True(WingBodyPose.TryGetTorsoFrame(152, 0, 2, false, out var follow) &&
+            Vector2.Distance(follow.Across, Vector2.Normalize(new Vector2(11, 14))) < .0001f,
+            "Follow-through must twist with the shoulder line, not the facing.");
+        Assertions.True(Vector2.Distance(follow.Transform(follow.ReferenceAcross), follow.Across) < .0001f &&
+            Vector2.Distance(windup.Transform(windup.ReferenceAcross), windup.Across) < .0001f &&
+            idle.Transform(Vector2.Zero) == Vector2.Zero,
+            "The rigid torso transform must map the reference shoulder axis to the current shoulder axis around the socket.");
+        var smoother = new WingPoseSmoother();
+        smoother.Advance(new WingPoseMotion(Vector2.Zero, 0, 0) { TorsoFrame = idle }, 100, true);
+        var changed = smoother.Advance(new WingPoseMotion(Vector2.One, .15f, .1f) { TorsoFrame = follow }, 100, false);
+        Assertions.True(changed.TorsoFrame == follow && changed.Offset == Vector2.One && changed.Yaw == 0,
+            "Rigid orientation and attachment update with the body even at the same tick; distal inertia stays separate.");
+        foreach (int bank in new[] { 0, 808 })
+        for (int frame = 0; frame < 808; frame++)
+        for (int direction = 0; direction < 8; direction++)
+        {
+            Assertions.True(WingBodyPose.TryGetTorsoFrame(bank + frame, bank, direction, false, out var pose) &&
+                MathF.Abs(pose.Across.Length() - 1) < .0001f &&
+                MathF.Abs(pose.Transform(Vector2.UnitY).Length() - 1) < .0001f &&
+                Vector2.Distance(pose.Transform(pose.ReferenceAcross), pose.Across) < .0001f,
+                $"Invalid torso basis for {bank + frame}.");
+        }
+    }
+
     private static void Main()
     {
         CheckWingBodyTracking();
         CheckWingPoseMotion();
         CheckUpperBackTracking();
+        CheckTorsoFrameTracking();
 
         Span<SpriteVertex> vertices = stackalloc SpriteVertex[6];
         Assertions.True(SpriteGeometry.WriteQuad(vertices, new Rectangle(16, 8, 32, 24),

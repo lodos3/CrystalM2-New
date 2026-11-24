@@ -2,8 +2,30 @@ using System.Numerics;
 
 namespace CrystalM2.Rendering.Core;
 
+// Screen-projected anatomical shoulder basis from the actual body frame.
+// A proper rotation maps the reference pose to the current pose, preserving
+// the length and shape of the wing. No arbitrary per-direction screen cant.
+public readonly record struct WingTorsoFrame(Vector2 Across, Vector2 ReferenceAcross)
+{
+    public Vector2 Transform(Vector2 point)
+    {
+        float c = Vector2.Dot(ReferenceAcross, Across);
+        float s = ReferenceAcross.X * Across.Y - ReferenceAcross.Y * Across.X;
+        return new Vector2(point.X * c - point.Y * s, point.X * s + point.Y * c);
+    }
+
+    public Vector2 SocketOffset(Vector2 nominalAcross, int side, float halfWidth)
+    {
+        // Stable side correspondence is chosen from the reference, not the
+        // current shoulder slope, so a swing cannot exchange the two roots.
+        float handedness = Vector2.Dot(nominalAcross, ReferenceAcross) < 0 ? -1 : 1;
+        return Across * (side * halfWidth * nominalAcross.Length() * handedness);
+    }
+}
+
 public readonly record struct WingPoseMotion(Vector2 Offset, float Roll, float Yaw, float Pitch = 0)
 {
+    public WingTorsoFrame? TorsoFrame { get; init; }
     public static WingPoseMotion Zero => new(Vector2.Zero, 0, 0);
 
     // Recover forward travel from its projection onto the isometric ground.
@@ -27,10 +49,13 @@ public readonly record struct WingPoseMotion(Vector2 Offset, float Roll, float Y
 
     public static WingPoseMotion Stabilize(WingPoseMotion motion, bool idle, bool locomotion)
     {
-        if (idle) return new WingPoseMotion(motion.Offset, 0, 0);
-        return new(motion.Offset, Math.Clamp(motion.Roll, locomotion ? -.055f : -.18f, locomotion ? .055f : .18f),
-            Math.Clamp(motion.Yaw, locomotion ? -.04f : -.14f, locomotion ? .04f : .14f),
-            locomotion ? 0 : motion.Pitch);
+        if (idle) return motion with { Roll = 0, Yaw = 0, Pitch = 0 };
+        return motion with
+        {
+            Roll = Math.Clamp(motion.Roll, locomotion ? -.055f : -.18f, locomotion ? .055f : .18f),
+            Yaw = Math.Clamp(motion.Yaw, locomotion ? -.04f : -.14f, locomotion ? .04f : .14f),
+            Pitch = locomotion ? 0 : motion.Pitch
+        };
     }
 }
 
@@ -51,14 +76,14 @@ public struct WingPoseSmoother
             _initialized = true;
             _lastTime = now;
             _velocity = Vector3.Zero;
-            return Current = new WingPoseMotion(target.Offset, 0, 0);
+            return Current = target with { Roll = 0, Yaw = 0, Pitch = 0 };
         }
 
         float dt = (now - _lastTime) * .001f;
         _lastTime = now;
         // A sprite can change even at the same timer tick. No positional
         // spring, velocity or dead zone is allowed on the physical socket.
-        if (dt == 0) return Current = Current with { Offset = target.Offset };
+        if (dt == 0) return Current = Current with { Offset = target.Offset, TorsoFrame = target.TorsoFrame };
 
         float omega = 2f / Math.Clamp(tau, .025f, .100f);
         float decay = MathF.Exp(-omega * dt);
@@ -66,7 +91,7 @@ public struct WingPoseSmoother
         float roll = Step(Current.Roll, target.Roll, ref _velocity.X, .18f);
         float yaw = Step(Current.Yaw, target.Yaw, ref _velocity.Y, .14f);
         float pitch = Step(Current.Pitch, target.Pitch, ref _velocity.Z, .33f);
-        return Current = new WingPoseMotion(target.Offset, roll, yaw, pitch);
+        return Current = target with { Roll = roll, Yaw = yaw, Pitch = pitch };
 
         float Step(float value, float goal, ref float velocity, float bound)
         {

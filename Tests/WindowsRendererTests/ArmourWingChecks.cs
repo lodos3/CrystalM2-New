@@ -10,7 +10,7 @@ internal static class ArmourWingChecks
     // Check production geometry, channel masks and selectors without installed LIBs.
     internal static void CheckElementalDesigns()
     {
-        CheckFacingCant();
+        CheckTorsoAlignedRoots();
         CheckAttackLean();
         CheckArtworkRootContact();
         for (int id = 10; id < 20; id++)
@@ -75,33 +75,52 @@ internal static class ArmourWingChecks
         Console.WriteLine("Verified ten elemental designs across eight facings, five times, split layers and pose motion.");
     }
 
-    private static void CheckFacingCant()
+    private static void CheckTorsoAlignedRoots()
     {
-        // Screen Y increases downwards: positive rotation turns the upper
-        // crown clockwise (towards the right). Mirrored facings reverse it.
-        Vector2 crown = new(0, -40), hem = new(0, 40);
+        var pool = new SpellParticlePool(ArmourWingParticles.ParticleCapacity);
+        for (byte effect = ArmourWings.Phoenix; effect < ArmourWings.SolarAscendant; effect++)
+        foreach (int bank in new[] { 0, 808 })
         foreach (MirDirection facing in Enum.GetValues<MirDirection>())
+        foreach (int index in new[] { (int)facing * 4, 32 + (int)facing * 6 + 3,
+            136 + (int)facing * 6 + 1, 136 + (int)facing * 6 + 4,
+            416 + (int)facing * 6 + 5 })
         {
-            var mirror = (MirDirection)((8 - (int)facing) % 8);
-            float angle = ArmourWingParticles.FacingCant(facing);
-            float expected = .11f * MathF.Sin((int)facing * MathF.PI / 4);
-            if (MathF.Abs(angle - expected) > .00001f ||
-                MathF.Abs(angle + ArmourWingParticles.FacingCant(mirror)) > .00001f)
-                throw new InvalidDataException($"Incorrect mirrored facing cant in {facing}.");
-
-            Vector2 upper = ArmourWingParticles.ApplyFacingCant(crown, facing);
-            Vector2 lower = ArmourWingParticles.ApplyFacingCant(hem, facing);
-            Vector2 mirrored = ArmourWingParticles.ApplyFacingCant(crown, mirror);
-            if (ArmourWingParticles.ApplyFacingCant(Vector2.Zero, facing) != Vector2.Zero ||
-                Vector2.Distance(upper, -lower) > .001f ||
-                Vector2.Distance(upper, new(-mirrored.X, mirrored.Y)) > .001f ||
-                MathF.Abs(upper.Length() - crown.Length()) > .001f ||
-                MathF.Abs(upper.X - 40 * MathF.Sin(expected)) > .001f)
-                throw new InvalidDataException($"Facing cant must rotate around the fixed root in {facing}.");
+            if (!ArmourWingParticles.TryGetBodyMotion(effect, bank + index, bank, facing, false, out var motion) ||
+                motion.TorsoFrame is not { } torso)
+                throw new InvalidDataException("Missing physical torso basis.");
+            Vector2 shoulder = ArmourWingParticles.Shoulder(effect, false) + motion.Offset;
+            Vector2 socket = ArmourWingParticles.BackAttachment(shoulder, facing);
+            Vector2[] roots = new Vector2[2];
+            int artBank = WingPoseAtlas.DesignBank + effect - ArmourWings.Phoenix;
+            var art = WingPoseAtlas.GetPose(artBank, 0);
+            Vector2 source = ArmourWingParticles.ArtworkRoot(effect);
+            float u = (source.X - art.X) / art.Width;
+            float v = (source.Y - art.Y) / art.Height;
+            for (int i = 0; i < 2; i++)
+            {
+                int side = i * 2 - 1;
+                ArmourWingParticles.Emit(pool, effect, 0, 0, shoulder, facing, 459, 101, side,
+                    torsoYaw: .14f, torsoPitch: .20f, torsoFrame: torso);
+                bool found = false;
+                foreach (var particle in pool.Active)
+                {
+                    if (particle.CoveragePlane >= 0 || particle.Layer != SpellParticleLayer.EmissiveCore ||
+                        particle.Ribbon is not { } quad || particle.RibbonTextureU is not { } uv ||
+                        MathF.Abs(uv.X - u) > .00001f) continue;
+                    Vector2 root = particle.Origin + Vector2.Lerp(quad.TopLeft, quad.BottomLeft, v);
+                    if (Vector2.Distance(root, particle.Origin) > .01f)
+                        throw new InvalidDataException("Twist detached the visible artwork root.");
+                    roots[i] = root;
+                    found = true;
+                    break;
+                }
+                if (!found) throw new InvalidDataException("Missing root seam.");
+            }
+            Vector2 axis = Vector2.Normalize(roots[1] - roots[0]);
+            if (MathF.Abs(Vector2.Dot(axis, torso.Across)) < .9999f ||
+                Vector2.Distance((roots[0] + roots[1]) * .5f, socket) > .01f)
+                throw new InvalidDataException($"Wing roots are not aligned to the shoulders at {bank + index}.");
         }
-        if (ArmourWingParticles.ApplyFacingCant(crown, MirDirection.Right).X <= 0 ||
-            ArmourWingParticles.ApplyFacingCant(crown, MirDirection.Left).X >= 0)
-            throw new InvalidDataException("Right must cant clockwise and left anticlockwise.");
     }
 
     private static void CheckArtworkRootContact()
@@ -260,7 +279,7 @@ internal static class ArmourWingChecks
             if (id >= 2 && ArmourWingParticles.TryGetBodyMotion(effect.Value, pose, 0, facing, false, out motion))
                 trackedShoulder += motion.Offset;
             ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101,
-                torsoYaw: motion.Yaw, torsoRoll: motion.Roll, torsoPitch: motion.Pitch);
+                torsoYaw: motion.Yaw, torsoRoll: motion.Roll, torsoPitch: motion.Pitch, torsoFrame: motion.TorsoFrame);
             if (pool.Active.Length < 3 || pool.Active.Length >= pool.Capacity)
                 throw new InvalidOperationException($"Invalid particle count for {labels[id]}.");
             bool behind = id >= 2 && facing is (MirDirection.Down or MirDirection.DownLeft or MirDirection.DownRight);
@@ -269,14 +288,14 @@ internal static class ArmourWingChecks
             int near = ArmourWingParticles.NearSide(facing);
             if (split)
             {
-                ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, -near, motion.Yaw, motion.Roll, motion.Pitch);
+                ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, -near, motion.Yaw, motion.Roll, motion.Pitch, motion.TorsoFrame);
                 Wings();
             }
             else if (behind) Wings();
             device.Blend = SpriteBlendMode.Alpha;
             device.Sprite.Draw(body, null, new Vector3(origin.X + actor.OffsetX, origin.Y + actor.OffsetY, 0), Vector4.One);
             if (split)
-                ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, near, motion.Yaw, motion.Roll, motion.Pitch);
+                ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, near, motion.Yaw, motion.Roll, motion.Pitch, motion.TorsoFrame);
             if (split || !behind) Wings();
             using var image = device.Capture(surface);
             int x = (elementalOnly ? (id-first)%5 : id)*previewWidth;

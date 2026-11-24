@@ -44,21 +44,6 @@ internal static class ArmourWingParticles
         _ => new(4, 44)
     };
 
-    // A static orientation bias, independent of animation phase and spring
-    // velocity. Positive angles rotate clockwise in screen coordinates.
-    private const float MaximumFacingCant = .11f;
-    internal static float FacingCant(MirDirection direction) => direction switch
-    {
-        MirDirection.Right => MaximumFacingCant,
-        MirDirection.Left => -MaximumFacingCant,
-        MirDirection.UpRight or MirDirection.DownRight => MaximumFacingCant * .70710678f,
-        MirDirection.UpLeft or MirDirection.DownLeft => -MaximumFacingCant * .70710678f,
-        _ => 0f
-    };
-
-    internal static Vector2 ApplyFacingCant(Vector2 rootRelativePoint, MirDirection direction) =>
-        Rotate(rootRelativePoint, FacingCant(direction));
-
     private static Vector2 Rotate(Vector2 v, float angle)
     {
         if (angle == 0) return v;
@@ -78,7 +63,10 @@ internal static class ArmourWingParticles
         if (!WingBodyPose.TryGetMotion(bodyFrame, bank, (int)direction, mounted, out motion)) return false;
         if (ArmourWings.IsAura(effect)) return true;
         if (!WingBodyPose.TryGetUpperBack(bodyFrame, bank, (int)direction, out Vector2 upperBack)) return false;
-        motion = motion with { Offset = upperBack - Shoulder(effect, mounted) };
+        if (!WingBodyPose.TryGetTorsoFrame(bodyFrame, bank, (int)direction, mounted, out var torso)) return false;
+        // The rigid shoulder basis already contains the torso bank. Do not
+        // apply the same body lean a second time via the secondary roll spring.
+        motion = motion with { Offset = upperBack - Shoulder(effect, mounted), TorsoFrame = torso, Roll = 0 };
         return true;
     }
 
@@ -97,7 +85,7 @@ internal static class ArmourWingParticles
 
     internal static void Emit(SpellParticlePool pool, byte effect, int bank, int pose, Vector2 shoulder,
         MirDirection direction, long now, uint seed, int onlySide = 0, float torsoYaw = 0, float torsoRoll = 0,
-        float torsoPitch = 0)
+        float torsoPitch = 0, WingTorsoFrame? torsoFrame = null)
     {
         pool.Clear();
         if (effect is 1 or 2)
@@ -170,7 +158,10 @@ internal static class ArmourWingParticles
         {
             if (onlySide != 0 && side != onlySide) continue;
             bool near = profile < .001f || side == NearSide(direction);
-            Vector2 root = attachment + new Vector2(MathF.Cos(baseYaw), MathF.Sin(baseYaw) * .49f) * (side * 5.5f);
+            Vector2 nominalAcross = new(MathF.Cos(baseYaw), MathF.Sin(baseYaw) * .49f);
+            Vector2 root = attachment + (torsoFrame is { } torso
+                ? torso.SocketOffset(nominalAcross, side, 5.5f)
+                : nominalAcross * (side * 5.5f));
             int opacity = (int)(218 + 12 * MathF.Sin(yaw) * side + 8 * flap);
 
             // Sweep the actual wing behind the actor as it turns edge-on.
@@ -259,11 +250,14 @@ internal static class ArmourWingParticles
             // prevent flap, camber, pitch or padding from opening a gap.
             int top = membrane.Y, bottom = top + membrane.Height;
             Vector2 correction = Vector2.Lerp(Project(rootU, top), Project(rootU, bottom), rootTextureV);
-            // Apply the facing cant AFTER subtracting the rendered root.
-            // This rotates both membrane layers and motes about their own
-            // physical socket without changing attachment, scale or damping.
-            Vector2 Pinned(float u, float y, float shell = 0) =>
-                ApplyFacingCant(Project(u, y, shell) - correction, direction);
+            // Twist the complete local wing frame with the measured shoulder
+            // line AFTER pinning the visible root. Distal yaw/pitch remain
+            // secondary motion; the torso basis never lags the body sprite.
+            Vector2 Pinned(float u, float y, float shell = 0)
+            {
+                Vector2 local = Project(u, y, shell) - correction;
+                return torsoFrame is { } body ? body.Transform(local) : local;
+            }
             for (int segment = 0; segment < segments; segment++)
             {
                 float a = Boundary(segment);
