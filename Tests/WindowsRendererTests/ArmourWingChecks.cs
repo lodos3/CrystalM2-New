@@ -149,6 +149,8 @@ internal static class ArmourWingChecks
             {
                 Vector2 shoulder = ArmourWingParticles.Shoulder(effect, mounted);
                 Vector2 attachment = ArmourWingParticles.BackAttachment(shoulder, facing);
+                if (ArmourWingParticles.BackAttachment(shoulder, facing, .14f, .18f) != attachment)
+                    throw new InvalidDataException("Torso rotation moved the physical wing socket.");
                 float yaw = (int)facing * MathF.PI / 4;
                 Vector2 rear = new(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f);
                 float rearDistance = Vector2.Dot(attachment - shoulder, rear) / rear.LengthSquared();

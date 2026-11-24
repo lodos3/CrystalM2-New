@@ -5101,7 +5101,12 @@ namespace Client.MirObjects
                 target = new WingPoseMotion(RawWingShoulder - baseline, 0f, 0f);
             bool reset = !_wingPoseReady || _wingPoseEffect != WingEffect || _wingPoseFamily != _wingFamily ||
                 _wingPoseBank != ArmourOffSet || _wingPoseMounted != RidingMount || _wingPoseDirection != Direction;
-            _wingPoseSmoother.Advance(target, CMain.Time, reset);
+            bool idle = CurrentAction is MirAction.Standing or MirAction.Stance or MirAction.Stance2 or MirAction.MountStanding;
+            bool locomotion = CurrentAction is MirAction.Walking or MirAction.Running or MirAction.MountWalking or MirAction.MountRunning or
+                MirAction.WalkingBow or MirAction.RunningBow or MirAction.Sneek;
+            target = WingPoseMotion.Stabilize(target, idle, locomotion);
+            _wingPoseSmoother.Advance(target, CMain.Time, reset, idle || locomotion ? .055f : .027f,
+                idle ? .5f : locomotion ? 1f : 1.5f);
             _wingPoseEffect = WingEffect;
             _wingPoseFamily = _wingFamily;
             _wingPoseBank = ArmourOffSet;

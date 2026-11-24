@@ -45,7 +45,7 @@ public static class WingBodyPose
         int reference = bankStart + (mounted ? 416 : 0) + direction * 4;
         float angle = samples[bodyFrame].Roll - samples[reference].Roll;
         angle = MathF.Atan2(MathF.Sin(angle), MathF.Cos(angle));
-        float roll = Math.Clamp(angle * .65f, -.55f, .55f);
+        float roll = Math.Clamp(angle * .24f, -.18f, .18f);
         int local = bodyFrame - bankStart;
         float degrees = local switch
         {
@@ -55,7 +55,15 @@ public static class WingBodyPose
             >= 584 and < 632 => MountedAttackYaw[(local - 584) % 6],
             _ => 0
         };
-        motion = new WingPoseMotion(delta, roll, degrees * MathF.PI / 180f);
+        if (local < 32 || local is >= 128 and < 136 || (local is >= 416 and < 448 && mounted))
+            return true;
+        bool locomotion = local is >= 32 and < 128 or >= 448 and < 560;
+        if (locomotion)
+        {
+            if (delta.LengthSquared() < .64f) delta = Vector2.Zero;
+            roll = Math.Clamp(roll * .30f, -.055f, .055f);
+        }
+        motion = new WingPoseMotion(delta, roll, Math.Clamp(degrees * MathF.PI / 180f * .32f, -.14f, .14f));
         return true;
     }
 

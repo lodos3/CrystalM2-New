@@ -17,10 +17,11 @@ internal static class ArmourWingParticles
 
     internal static Vector2 BackAttachment(Vector2 shoulder, MirDirection direction, float twist = 0, float roll = 0)
     {
-        float yaw = (int)direction * MathF.PI / 4 + twist;
+        // Anchor in the unrotated body basis: only distal geometry twists.
+        float yaw = (int)direction * MathF.PI / 4;
         float profile = MathF.Abs(MathF.Sin(yaw));
-        return shoulder + Rotate(new Vector2(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f) *
-            ((7f + profile * profile) * RearDepthScale), roll);
+        return shoulder + new Vector2(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f) *
+            ((7f + profile * profile) * RearDepthScale);
     }
 
     private static Vector2 Rotate(Vector2 v, float angle)
@@ -99,7 +100,8 @@ internal static class ArmourWingParticles
         {
             if (onlySide != 0 && side != onlySide) continue;
             bool near = profile < .001f || side == NearSide(direction);
-            Vector2 root = attachment + Rotate(across * (side * 5.5f), torsoRoll);
+            float baseYaw = (int)direction * MathF.PI / 4;
+            Vector2 root = attachment + new Vector2(MathF.Cos(baseYaw), MathF.Sin(baseYaw) * .49f) * (side * 5.5f);
             int opacity = (int)(218 + 12 * MathF.Sin(yaw) * side + 8 * flap);
 
             // Sweep the actual wing behind the actor as it turns edge-on.
@@ -136,10 +138,22 @@ internal static class ArmourWingParticles
                 // Match the vertical thickness offset to the projected rear
                 // axis so a south-facing wing cannot cancel its own depth.
                 float rearSign = MathF.Cos(yaw) < 0 ? -1f : 1f;
-                return Rotate(across * (side * (span + shell * depth * .23f)) +
-                    back * (sweep + (camber + twist + shell * depth) * RearDepthScale) +
+                // Distal deformation with a fixed root and a minimum rear
+                // half-plane in profile. Rotation cannot swing the socket.
+                float flex = t * t * (3 - 2 * t);
+                float localYaw = baseYaw + torsoYaw * flex;
+                Vector2 localAcross = new(MathF.Cos(localYaw), MathF.Sin(localYaw) * .49f);
+                Vector2 localBack = new(-MathF.Sin(localYaw), MathF.Cos(localYaw) * .49f);
+                Vector2 projected = Rotate(localAcross * (side * (span + shell * depth * .23f * flex)) +
+                    localBack * (sweep + (camber + twist + shell * depth * (.25f + .75f * flex)) * RearDepthScale) +
                     Vector2.UnitY * (height * .55f - 4 * u * flap + 4 * t * t - arch +
-                    shell * depth * .30f * rearSign), torsoRoll);
+                    shell * depth * .30f * rearSign * flex), torsoRoll * flex);
+                if ((direction is MirDirection.Left or MirDirection.Right) && u >= 0)
+                {
+                    float sign = direction == MirDirection.Right ? -1f : 1f;
+                    projected.X = sign * Math.Max(0, sign * projected.X);
+                }
+                return projected;
             }
 
             int firstFrame = 0, nextFrame = 0;
@@ -319,7 +333,8 @@ internal static class ArmourWingParticles
         {
             if (onlySide != 0 && side != onlySide) continue;
             bool near = profile < .001f || side == nearSide;
-            Vector2 root = attachment + Rotate(across * (side * 5.5f), torsoRoll);
+            float baseYaw = (int)direction * MathF.PI / 4;
+            Vector2 root = attachment + new Vector2(MathF.Cos(baseYaw), MathF.Sin(baseYaw) * .49f) * (side * 5.5f);
             float flap = MathF.Sin(clock * 2 + (near ? 0 : .45f));
             float sweep = (22 + profile * (near ? 23 : 12)) * RearDepthScale;
             // A bent, volumetric fan: the direct side projection still has

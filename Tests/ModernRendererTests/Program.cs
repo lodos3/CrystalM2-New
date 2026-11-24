@@ -65,9 +65,15 @@ static class Program
         Assertions.True(WingBodyPose.TryGetMotion(8, 0, 2, false, out var idle) &&
             idle == WingPoseMotion.Zero, "Idle pose is the motion reference.");
         Assertions.True(WingBodyPose.TryGetMotion(149, 0, 2, false, out var windup) &&
-            windup.Roll < -.1f && windup.Yaw > .1f, "Right attack windup must lean and turn.");
+            windup.Roll < -.02f && windup.Yaw > .02f, "Right attack windup must lean and turn.");
         Assertions.True(WingBodyPose.TryGetMotion(152, 0, 2, false, out var follow) &&
-            follow.Roll > .3f && follow.Yaw < -.1f, "Right attack follow-through must lean and turn.");
+            follow.Roll > .08f && follow.Yaw < -.02f, "Right attack follow-through must lean and turn.");
+        for (int direction = 0; direction < 8; direction++)
+        for (int index = 0; index < 4; index++)
+            Assertions.True(WingBodyPose.TryGetMotion(direction * 4 + index, 0, direction, false, out var rest) &&
+                rest == WingPoseMotion.Zero, "Standing frames must retain the same attachment.");
+        var bounded = WingPoseMotion.LimitOffset(new Vector2(25, -10), follow.Offset, 1.5f);
+        Assertions.True(Vector2.Distance(bounded, follow.Offset) <= 1.501f, "Smoothing must not detach from the current torso.");
         var smooth = new WingPoseSmoother();
         smooth.Advance(idle, 100, true);
         var first = smooth.Advance(follow, 116, false);
@@ -82,7 +88,7 @@ static class Program
         for (int frame = 0; frame < 808; frame++)
             Assertions.True(WingBodyPose.TryGetMotion(bank + frame, bank, 2, false, out var motion) &&
                 float.IsFinite(motion.Roll) && float.IsFinite(motion.Yaw) &&
-                MathF.Abs(motion.Roll) <= .56f && MathF.Abs(motion.Yaw) <= .43f, $"Invalid motion frame {bank + frame}.");
+                MathF.Abs(motion.Roll) <= .181f && MathF.Abs(motion.Yaw) <= .141f, $"Invalid motion frame {bank + frame}.");
     }
 
     private static void Main()
