@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Numerics;
 
 namespace CrystalM2.ArmourCreate;
 
@@ -48,6 +49,12 @@ public static class ArmourPainter
         float dx = ax / torso, dy = ay / torso;
         float sx = dy, sy = -dx;
         float longest = torso + 5;
+        float hx = neck.X - head.X, hy = neck.Y - head.Y;
+        float headLength = MathF.Sqrt(hx * hx + hy * hy);
+        float guardX = headLength >= 3 ? hx / headLength : dx;
+        float guardY = headLength >= 3 ? hy / headLength : dy;
+        float collar = Math.Max(3f, headLength) + 1.25f;
+        float headRadius = Math.Max(6f, headLength + 2.5f);
         float shoulder = Math.Clamp(MathF.Abs((anchors[3].X - anchors[2].X) * sx +
             (anchors[3].Y - anchors[2].Y) * sy) * .5f, 4f, 13f);
 
@@ -59,11 +66,16 @@ public static class ArmourPainter
         {
             int i = y * width + x, p = i * 4;
             float along = (x + .5f - neck.X) * dx + (y + .5f - neck.Y) * dy;
+            // Head exclusion takes precedence over every source channel. The
+            // fitted-difference mask can contain head pixels from shading changes.
+            // A conservative collar cut and radial guard protect the face even
+            // when the actor bends or rotates. Never paint a helmet implicitly.
+            float px = x + .5f - head.X, py = y + .5f - head.Y;
+            if (px * guardX + py * guardY <= collar ||
+                px * px + py * py <= headRadius * headRadius) continue;
             int skin = geometry[p + 2], fitted = geometry[p + 1];
             int cover = fitted;
             if (along >= 1.5f) cover = Math.Max(cover, skin);
-            // Preserve face/hair. The green mask is allowed to cover raised arms
-            // even when an attack brings them above the neck.
             alpha[i] = (byte)cover;
             if (cover >= 96) longest = Math.Max(longest, along);
         }
@@ -97,6 +109,12 @@ public static class ArmourPainter
         // projected torso; a back view gets its own spine and panel pattern.
         float seamShift = yaw * (profile ? .55f : .28f);
         float legLength = Math.Max(5, longest - torso);
+        // Author a relief surface before lighting it. Separate pieces have raised
+        // centres, bevelled rims and recessed seams; each projects onto the same
+        // native sprite pixel grid as the body.
+        int[] material = new int[count];
+        float[] relief = new float[count];
+        byte[] metal = new byte[count]; // 0 cloth, 1 steel, 2 enamel, 3 gold
 
         for (int y = 0; y < height; y++)
         for (int x = 0; x < width; x++)
@@ -120,53 +138,138 @@ public static class ArmourPainter
             bool boot = leg > .79f;
             bool knee = leg > .34f && leg < .49f;
 
-            // Dark flexible joints connect the plate sections; blue enamel,
-            // steel facets and gold edges are original material choices.
-            int rgb;
+            // The primary design is dark mail under raised silver plates.
+            // Plate boundaries curve with the cross-section rather than forming
+            // flat horizontal stripes across the entire character.
+            float arch = 1 - Math.Clamp(local * local, 0, 1);
+            float curve = MathF.Abs(local);
+            float segment = t;
+            float radius = 1.8f;
+            int rgb = 0x273244;
+            byte finish = 0;
+
             if (pauldron)
-                rgb = t < .08f ? 0xC4CEDA : t < .20f ? 0x8DA4B9 : 0xC9A05D;
+            {
+                segment = (t + .10f * curve) / .30f;
+                radius = 3.3f;
+                rgb = 0xA8BCD0; finish = 1;
+                if (segment > .74f) { rgb = 0xB88C48; finish = 3; }
+            }
             else if (sleeve)
             {
                 float cuff = Math.Clamp((t - .18f) / .88f, 0, 1);
-                rgb = cuff < .16f || cuff is > .43f and < .54f ? 0x354458 :
-                    cuff is > .82f and < .91f ? 0xC9A05D :
-                    MathF.Abs(local) < .38f ? 0x547FB3 : 0xA9B8CA;
+                if (cuff < .38f)
+                {
+                    segment = cuff / .38f; radius = 2.2f; rgb = 0x899DB2; finish = 1;
+                }
+                else if (cuff > .54f)
+                {
+                    segment = (cuff - .54f) / .46f; radius = 2.5f;
+                    rgb = curve < .43f ? 0x315E9E : 0xA3B8D0; finish = (byte)(curve < .43f ? 2 : 1);
+                    if (segment > .86f) { rgb = 0xB88C48; finish = 3; }
+                }
             }
-            else if (t < .13f)
-                rgb = 0xA7B5C6; // Collar, not a floating shoulder polygon.
-            else if (t < .84f)
+            else if (t < .20f)
             {
+                segment = t / .20f;
+                rgb = 0xA3B6C9; finish = 1; radius = 1.6f;
+            }
+            else if (t < .79f)
+            {
+                // Cuirass has a raised breast/back shell, central blue inlay,
+                // a lower articulated fauld, and a darker receding flank.
+                segment = (t - .20f) / .59f;
+                radius = back ? 3.1f : 4.1f;
                 float chest = MathF.Abs(seam);
-                float chevron = back ? .15f : .18f + MathF.Max(0, .52f - t) * .70f;
-                rgb = chest < chevron ? (back ? 0x48678F : 0x477AB6) : 0xB9C8D9;
-                if (MathF.Abs(chest - chevron) < .075f && t < .58f) rgb = 0xC6A064;
-                if (t > .65f && t < .72f) rgb = 0x8499B1;
-                if (profile && chest > .75f) rgb = 0x647F9D;
+                float motif = back ? .16f : .16f + MathF.Max(0, .55f - t) * .85f;
+                bool inset = chest < motif;
+                rgb = inset ? 0x305A96 : 0xB0C2D5; finish = (byte)(inset ? 2 : 1);
+                if (MathF.Abs(chest - motif) < .075f && t < .55f)
+                { rgb = 0xC6A05A; finish = 3; }
+                if (profile && chest > .76f) rgb = 0x697D93;
+                if (t > .65f)
+                {
+                    segment = (t - .65f) / .14f;
+                    radius = 1.9f;
+                    rgb = inset ? 0x345B93 : 0x879EB6;
+                }
             }
             else if (t < .98f)
-                rgb = t < .90f ? 0xC8A062 : 0x303D50; // Belt and articulation.
+            {
+                segment = (t - .79f) / .19f; radius = 1.6f;
+                if (segment > .22f && segment < .69f) { rgb = 0xB99153; finish = 3; }
+            }
             else if (hipPlate)
-                rgb = !back && !profile && MathF.Abs(seam) < .32f ? 0x416DAB :
-                    leg < .18f ? 0x9EADC0 : 0xC2CDD8;
+            {
+                segment = leg / .29f + .10f * curve; radius = 2.6f;
+                bool tabard = !back && !profile && MathF.Abs(seam) < .30f;
+                rgb = tabard ? 0x305A96 : 0xA6B9CD; finish = (byte)(tabard ? 2 : 1);
+                if (segment > .53f && segment < .65f) { rgb = 0x34445A; finish = 0; }
+            }
             else if (knee)
-                rgb = leg < .40f ? 0xC3D1DE : 0x75899E;
+            {
+                segment = (leg - .34f) / .15f; radius = 2.7f; rgb = 0xB8C8D8; finish = 1;
+            }
             else if (boot)
-                rgb = leg < .86f ? 0xBF985A : 0x748DA9;
+            {
+                segment = (leg - .79f) / .21f; radius = 2.0f; rgb = 0x899EB5; finish = 1;
+                if (segment < .23f) { rgb = 0xB99153; finish = 3; }
+            }
             else
-                rgb = MathF.Abs(local) < .45f ? 0x486FA5 : 0xA5B7CA;
+            {
+                segment = leg < .34f ? (leg - .29f) / .05f : (leg - .49f) / .30f;
+                radius = 2.3f;
+                if (leg > .51f && leg < .77f)
+                {
+                    rgb = curve < .40f ? 0x345E9F : 0x9EB4CC;
+                    finish = (byte)(curve < .40f ? 2 : 1);
+                }
+            }
 
-            // A fixed screen-space light keeps highlights consistent as the
-            // character turns. Width-aware bevels are never painted on air.
-            float shade = 0.91f - local * .20f;
-            if (edge[i] <= 1) shade *= local < -.15f ? .79f : .53f;
-            else if (edge[i] == 2) shade *= local < 0 ? 1.16f : .91f;
-            else shade *= 1.08f;
-            if (sleeve && yaw * u > .4f) shade *= .88f;
-            output[p] = Channel(rgb & 255, shade);
-            output[p + 1] = Channel((rgb >> 8) & 255, shade);
-            output[p + 2] = Channel((rgb >> 16) & 255, shade);
+            float cap = Math.Clamp(segment, 0, 1);
+            float bevel = Math.Clamp(Math.Min(cap, 1 - cap) * 6f, 0, 1);
+            float rim = Math.Clamp((edge[i] - .5f) / 2.2f, 0, 1);
+            // Physical-looking depth proxy: a convex plate rises over the
+            // cloth layer, while gold trim is a narrow raised edge.
+            relief[i] = finish == 0 ? .22f + .40f * arch * rim :
+                .30f + radius * (.18f + .82f * MathF.Sqrt(arch)) *
+                (.22f + .78f * bevel) * (.30f + .70f * rim);
+            if (finish == 3) relief[i] += .35f * rim;
+            material[i] = rgb;
+            metal[i] = finish;
+        }
+
+        // Light the reconstructed surface from upper-left in screen space.
+        // Strong contact shadows, cool reflected light and tight specular
+        // edges are deliberately quantised for readability at native scale.
+        Vector3 light = Vector3.Normalize(new Vector3(-.66f, -.76f, .80f));
+        Vector3 halfLight = Vector3.Normalize(light + Vector3.UnitZ);
+        for (int y = 0; y < height; y++)
+        for (int x = 0; x < width; x++)
+        {
+            int i = y * width + x, p = i * 4;
+            if (alpha[i] == 0) continue;
+            float leftH = HeightAt(x - 1, y), rightH = HeightAt(x + 1, y);
+            float topH = HeightAt(x, y - 1), bottomH = HeightAt(x, y + 1);
+            Vector3 normal = Vector3.Normalize(new Vector3((leftH - rightH) * .68f,
+                (topH - bottomH) * .68f, 1f));
+            float diffuse = Math.Max(0, Vector3.Dot(normal, light));
+            float specular = MathF.Pow(Math.Max(0, Vector3.Dot(normal, halfLight)),
+                metal[i] == 1 ? 13f : metal[i] == 3 ? 18f : 23f);
+            float occlusion = metal[i] == 0 ? .78f : 1f;
+            float shade = (.37f + .81f * diffuse) * occlusion;
+            if (edge[i] <= 1) shade *= .72f;
+            float highlight = metal[i] == 0 ? 0 : specular * (metal[i] == 1 ? 88 : metal[i] == 3 ? 65 : 36);
+            int rgb = material[i];
+            output[p] = Lit(rgb & 255, shade, highlight, 8);
+            output[p + 1] = Lit((rgb >> 8) & 255, shade, highlight, 4);
+            output[p + 2] = Lit((rgb >> 16) & 255, shade, highlight, 0);
             output[p + 3] = alpha[i];
         }
+
+        float HeightAt(int x, int y) =>
+            (uint)x < (uint)width && (uint)y < (uint)height ? relief[y * width + x] : 0;
+
         return output;
 
         int Run(int x, int y, float vx, float vy)
@@ -182,6 +285,6 @@ public static class ArmourPainter
         }
     }
 
-    private static byte Channel(int value, float shade) =>
-        (byte)Math.Clamp((int)MathF.Round(value * shade), 0, 255);
+    private static byte Lit(int value, float shade, float highlight, int reflected) =>
+        (byte)Math.Clamp((int)MathF.Round(value * shade + highlight + reflected * (1 - Math.Min(1, shade))), 0, 255);
 }

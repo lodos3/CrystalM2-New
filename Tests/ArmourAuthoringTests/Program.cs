@@ -61,25 +61,39 @@ foreach (int index in Enumerable.Range(0, 8).Select(d => bank + d * 4)
         Color c = mask.GetPixel(rect[0] + x, rect[1] + y);
         int p = (y * w + x) * 4;
         geometry[p] = c.B; geometry[p+1] = c.G; geometry[p+2] = c.R; geometry[p+3] = 255;
-        if (c.G >= 128) fitted++;
+        if (c.G >= 128 && !InProtectedHead(x, y, anchors)) fitted++;
     }
     int direction = ArmourPainter.Facing(index);
     byte[] paint = ArmourPainter.Paint(w, h, anchors, direction, geometry);
     if (fitted == 0) throw new Exception($"Empty fitted reference at {index}.");
-    int blue = 0, silver = 0, painted = 0;
+    int blue = 0, silver = 0, painted = 0, protectedPixels = 0;
+    int darkest = 255, brightest = 0;
     for (int p = 0; p < paint.Length; p += 4)
     {
+        int pixel = p / 4;
+        if (InProtectedHead(pixel % w, pixel / w, anchors))
+        {
+            if (geometry[p+2] >= 128) protectedPixels++;
+            if (paint[p+3] != 0)
+                throw new Exception($"Generated armour covers the protected head at frame {index}, pixel {pixel}.");
+            continue;
+        }
         if (paint[p+3] < geometry[p+1])
             throw new Exception($"Armour loses fitted coverage at frame {index}, pixel {p/4}.");
         if (geometry[p+1] == 0 && geometry[p+2] == 0 && paint[p+3] != 0)
             throw new Exception($"Floating armour outside the reference silhouette at frame {index}.");
         if (paint[p+3] < 128) continue;
         painted++;
+        int luminance = (paint[p+2] * 3 + paint[p+1] * 6 + paint[p]) / 10;
+        darkest = Math.Min(darkest, luminance);
+        brightest = Math.Max(brightest, luminance);
         if (paint[p] > paint[p+2] + 20 && paint[p] > paint[p+1] + 10) blue++;
         if (paint[p+2] > 100 && paint[p+1] > 110 && paint[p] > 120) silver++;
     }
-    if (painted < fitted || blue == 0 || silver == 0)
-        throw new Exception($"Missing full plate materials at frame {index}.");
+    if (protectedPixels == 0)
+        throw new Exception($"No source head pixels tested at frame {index}.");
+    if (painted < fitted || blue == 0 || silver == 0 || brightest - darkest < 85)
+        throw new Exception($"Missing plate material contrast or coverage at frame {index}.");
 }
 for (int d = 0; d < 8; d++)
 {
@@ -139,3 +153,15 @@ using (var atlas = new ArmourAtlas(art, 1616))
     finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
 }
 Console.WriteLine("Verified cached runtime armour records and exported LIB byte parity.");
+
+// An independent check of the head-to-neck guard against the recorded pose.
+static bool InProtectedHead(int x, int y, PointF[] a)
+{
+    float vx = a[1].X - a[0].X, vy = a[1].Y - a[0].Y;
+    float length = MathF.Sqrt(vx * vx + vy * vy);
+    float px = x + .5f - a[0].X, py = y + .5f - a[0].Y;
+    if (length < 3) return px * px + py * py <= 36;
+    return (px * vx + py * vy) / length <= length + 1.25f ||
+        px * px + py * py <= MathF.Pow(length + 2.5f, 2);
+}
+
