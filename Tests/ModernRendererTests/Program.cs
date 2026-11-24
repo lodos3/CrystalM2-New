@@ -237,6 +237,57 @@ static class Program
         }
     }
 
+    private static void CheckInverseWingTwist()
+    {
+        // Down-right attack lunge: the forward/back shoulder projection in
+        // the 2D proxy has the opposite sign to the desired wing twist.
+        Assertions.True(WingBodyPose.TryGetTorsoFrame(158, 0, 3, false, out var lunge),
+            "Missing down-right lunge.");
+        var corrected = lunge.ForWingTwist();
+        Assertions.True(lunge.Across.Y > 0 && corrected.Across.Y < 0 && corrected.Across.X > 0,
+            "The lunge must lower the previously raised wing root and raise its counterpart.");
+        foreach (int bank in new[] { 0, 808 })
+        foreach (var (start, count, mounted) in new (int, int, bool)[]
+        {
+            (0, 4, false), (32, 6, false), (80, 6, false),
+            (136, 6, false), (184, 6, false), (232, 8, false),
+            (416, 6, false), (448, 8, true), (512, 6, true), (584, 6, true)
+        })
+        for (int direction = 0; direction < 8; direction++)
+        for (int i = 0; i < count; i++)
+        {
+            int index = bank + start + direction * count + i;
+            Assertions.True(WingBodyPose.TryGetTorsoFrame(index, bank, direction, mounted, out var body),
+                $"Missing body frame {index}.");
+            var wing = body.ForWingTwist();
+            float originalCross = body.ReferenceAcross.X * body.Across.Y - body.ReferenceAcross.Y * body.Across.X;
+            float correctedCross = wing.ReferenceAcross.X * wing.Across.Y - wing.ReferenceAcross.Y * wing.Across.X;
+            Assertions.True(MathF.Abs(originalCross + correctedCross) < .0001f &&
+                MathF.Abs(Vector2.Dot(body.ReferenceAcross, body.Across) -
+                    Vector2.Dot(wing.ReferenceAcross, wing.Across)) < .0001f,
+                $"Incorrect twist sign at {index}.");
+            Assertions.True(wing.Centre == body.Centre &&
+                Vector2.Distance(wing.NegativeShoulder + wing.PositiveShoulder,
+                    body.NegativeShoulder + body.PositiveShoulder) < .0001f &&
+                MathF.Abs(Vector2.Distance(wing.NegativeShoulder, wing.PositiveShoulder) -
+                    Vector2.Distance(body.NegativeShoulder, body.PositiveShoulder)) < .0001f &&
+                Vector2.Dot(Vector2.Normalize(wing.PositiveShoulder - wing.NegativeShoulder), wing.Across) > .9999f,
+                $"Twist changed the rig centre or shoulder separation at {index}.");
+            float angle = direction * MathF.PI / 4;
+            Vector2 nominal = new(MathF.Cos(angle), MathF.Sin(angle) * .49f);
+            Vector2 rear = new Vector2(-MathF.Sin(angle), MathF.Cos(angle) * .49f) * 1.5f;
+            float handedness = Vector2.Dot(nominal, wing.ReferenceAcross) < 0 ? -1 : 1;
+            var left = wing.SocketOffset(nominal, -1, 5.5f, rear);
+            var right = wing.SocketOffset(nominal, 1, 5.5f, rear);
+            Assertions.True(Vector2.Dot(right - left, wing.Across) * handedness >= .999f,
+                $"Corrected roots crossed at {index}.");
+            foreach (int side in new[] { -1, 1 })
+                Assertions.True(Vector2.Distance(wing.AtRest().SocketOffset(nominal, side, 5.5f, rear),
+                    body.AtRest().SocketOffset(nominal, side, 5.5f, rear)) < .0001f,
+                    "Standing attachment must remain unchanged.");
+        }
+    }
+
     private static void Main()
     {
         CheckWingBodyTracking();
@@ -244,6 +295,7 @@ static class Program
         CheckUpperBackTracking();
         CheckTorsoFrameTracking();
         CheckIndependentWingSockets();
+        CheckInverseWingTwist();
 
         Span<SpriteVertex> vertices = stackalloc SpriteVertex[6];
         Assertions.True(SpriteGeometry.WriteQuad(vertices, new Rectangle(16, 8, 32, 24),

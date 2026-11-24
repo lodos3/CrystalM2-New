@@ -42,6 +42,24 @@ public readonly record struct WingTorsoFrame(Vector2 Across, Vector2 ReferenceAc
         return currentShoulder - Centre + Transform(local);
     }
 
+    // The pose atlas shoulder line is a 2D estimate made from the sprite
+    // silhouette, not a pair of true 3D shoulder joints. In the wing rig
+    // its dynamic twist has the opposite sign (confirmed by the marked
+    // attack screenshot). Reflect the *change* about the resting axis,
+    // never the absolute facing or the entire body position.
+    public WingTorsoFrame ForWingTwist()
+    {
+        Vector2 correctedAcross = Vector2.Normalize(2 * Vector2.Dot(Across, ReferenceAcross) * ReferenceAcross - Across);
+        Vector2 midpoint = (NegativeShoulder + PositiveShoulder) * .5f;
+        float halfWidth = Vector2.Distance(NegativeShoulder, PositiveShoulder) * .5f;
+        return this with
+        {
+            Across = correctedAcross,
+            NegativeShoulder = midpoint - correctedAcross * halfWidth,
+            PositiveShoulder = midpoint + correctedAcross * halfWidth
+        };
+    }
+
     // Standing may translate with the body; spacing and twist stay neutral.
     public WingTorsoFrame AtRest() => this with
     {

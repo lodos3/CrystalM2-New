@@ -66,7 +66,7 @@ internal static class ArmourWingParticles
         if (!WingBodyPose.TryGetTorsoFrame(bodyFrame, bank, (int)direction, mounted, out var torso)) return false;
         // The rigid shoulder basis already contains the torso bank. Do not
         // apply the same body lean a second time via the secondary roll spring.
-        motion = motion with { Offset = upperBack - Shoulder(effect, mounted), TorsoFrame = torso, Roll = 0 };
+        motion = motion with { Offset = upperBack - Shoulder(effect, mounted), TorsoFrame = torso.ForWingTwist(), Roll = 0 };
         return true;
     }
 

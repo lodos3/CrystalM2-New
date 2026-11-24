@@ -94,6 +94,14 @@ internal static class ArmourWingChecks
                 throw new InvalidDataException("Missing physical torso basis.");
             motion = WingPoseMotion.Stabilize(motion, start == 0, start is 32 or 80 or 448 or 512);
             if (motion.TorsoFrame is not { } torso) throw new InvalidDataException("Missing shoulder pair.");
+            if (start != 0)
+            {
+                if (!WingBodyPose.TryGetTorsoFrame(bank + index, bank, (int)facing, mounted, out var raw))
+                    throw new InvalidDataException("Missing original body basis.");
+                Vector2 expectedAcross = 2 * Vector2.Dot(raw.Across, raw.ReferenceAcross) * raw.ReferenceAcross - raw.Across;
+                if (Vector2.Distance(torso.Across, expectedAcross) > .0001f)
+                    throw new InvalidDataException($"Live wing twist sign is incorrect at {bank + index}.");
+            }
             Vector2 shoulder = ArmourWingParticles.Shoulder(effect, mounted) + motion.Offset;
             Vector2 socket = ArmourWingParticles.BackAttachment(shoulder, facing);
             float yaw = (int)facing * MathF.PI / 4;
