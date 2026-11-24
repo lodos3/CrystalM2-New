@@ -25,6 +25,11 @@ internal static class Program
             ArmourWingChecks.Render(data, output, args[0] == "--elemental-preview");
             return;
         }
+        if (args is ["--cross-moon-preview", var destination])
+        {
+            SpellVfxAssetChecks.RenderCrossHalfMoon(destination);
+            return;
+        }
         if (args is ["--compare-spell-poses", var directory])
         {
             SpellPoseComparisons.Run(directory);

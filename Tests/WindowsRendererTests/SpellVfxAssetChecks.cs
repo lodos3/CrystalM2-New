@@ -344,6 +344,75 @@ internal static class SpellVfxAssetChecks
             time, time, 100, ref elapsed, SpellParticleFrame.ReferenceSize, 79);
     }
 
+    // Offline comparison only: the original coverage archive is never
+    // sampled by the live Cross Half Moon renderer.
+    internal static void RenderCrossHalfMoon(string destination)
+    {
+        Directory.CreateDirectory(destination);
+        SpellVfxAssets.Reload(SpellVfxAssets.InstalledDirectory);
+        const int width = 320, height = 270, label = 22;
+        Vector2 feet = new(width / 2, 180);
+        using var window = new Form { ClientSize = new Size(width, height) };
+        using var device = new RendererDevice(window.Handle, width, height, DriverType.Warp);
+        using Surface backBuffer = device.GetBackBuffer();
+        device.SetRenderTarget(backBuffer);
+        var pool = new SpellParticlePool(2048);
+        for (int direction = 0; direction < 8; direction++)
+        {
+            using var sheet = new Bitmap(width * 6, (height + label) * 2);
+            using var graphics = Graphics.FromImage(sheet);
+            graphics.Clear(Color.Black);
+            for (int pose = 0; pose < 6; pose++)
+            {
+                int x = pose * width;
+                using var original = OriginalCrossMoon(direction, pose, feet, width, height);
+                graphics.DrawString($"Original {(MirDirection)direction} / {pose + 1}", SystemFonts.DefaultFont, Brushes.White, x + 4, 3);
+                graphics.DrawImageUnscaled(original, x, label);
+
+                pool.Clear();
+                using (SpellVfxAssets.For(Spell.CrossHalfMoon))
+                {
+                    var frame = new SpellParticleFrame(pool, feet, 1200, 1,
+                        SpellParticleFrame.ReferenceSize, 79, depthY: feet.Y);
+                    SpellVfxPoseMasks.DrawSwing(frame, Spell.CrossHalfMoon, feet, direction, pose / 6f);
+                }
+                using var current = RenderCharge(device, backBuffer, pool);
+                graphics.DrawString($"Procedural / {pose + 1}", SystemFonts.DefaultFont, Brushes.White, x + 4, height + label + 3);
+                graphics.DrawImageUnscaled(current, x, height + label * 2);
+            }
+            sheet.Save(Path.Combine(destination, $"cross-half-moon-{direction}-{(MirDirection)direction}.png"),
+                System.Drawing.Imaging.ImageFormat.Png);
+        }
+    }
+
+    private static Bitmap OriginalCrossMoon(int direction, int frame, Vector2 feet, int width, int height)
+    {
+        var result = new Bitmap(width, height);
+        var pose = SpellPoseAtlas.GetPose("CrossHalfMoon", direction, frame);
+        using (var graphics = Graphics.FromImage(result)) graphics.Clear(Color.Black);
+        if (pose.FirstPlane == 0) return result;
+        var blue = SpellPoseAtlas.GetPlane(pose.FirstPlane);
+        var green = SpellPoseAtlas.GetPlane(pose.FirstPlane + 1);
+        var red = SpellPoseAtlas.GetPlane(pose.FirstPlane + 2);
+        var bp = SpellPoseAtlas.GetPage(blue.Page);
+        var gp = SpellPoseAtlas.GetPage(green.Page);
+        var rp = SpellPoseAtlas.GetPage(red.Page);
+        int ox = (int)feet.X + pose.Offset.X, oy = (int)feet.Y + pose.Offset.Y;
+        for (int y = 0; y < pose.WorldSize.Height; y++)
+        for (int x = 0; x < pose.WorldSize.Width; x++)
+        {
+            int dx = ox + x, dy = oy + y;
+            if ((uint)dx >= (uint)width || (uint)dy >= (uint)height) continue;
+            int sx = x * blue.Source.Width / pose.WorldSize.Width;
+            int sy = y * blue.Source.Height / pose.WorldSize.Height;
+            byte b = bp[(blue.Source.Y + sy) * SpellPoseAtlas.PageSize + blue.Source.X + sx];
+            byte g = gp[(green.Source.Y + sy) * SpellPoseAtlas.PageSize + green.Source.X + sx];
+            byte r = rp[(red.Source.Y + sy) * SpellPoseAtlas.PageSize + red.Source.X + sx];
+            result.SetPixel(dx, dy, Color.FromArgb(r, g, b));
+        }
+        return result;
+    }
+
     private static SpellParticlePool SampleCharge()
     {
         var pool = new SpellParticlePool(2048);
