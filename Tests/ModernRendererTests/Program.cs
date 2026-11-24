@@ -22,8 +22,48 @@ static class Assertions
 
 static class Program
 {
+    private static void CheckWingBodyTracking()
+    {
+        static void Check(int frame, int bank, int facing, bool mounted, Vector2 expected)
+        {
+            Assertions.True(WingBodyPose.TryGetDelta(frame, bank, facing, mounted, out Vector2 actual),
+                $"Missing baked shoulder for body frame {frame}.");
+            Assertions.True(Vector2.Distance(actual, expected) < .025f,
+                $"Body frame {frame} wing translation differs from the baked pose: {actual} vs {expected}.");
+        }
+
+        // Right-facing male, idle, walk, run, attack and struck, from poses.json.
+        Check(8, 0, 2, false, Vector2.Zero);
+        Check(44, 0, 2, false, new(.975f, 1.325f));
+        Check(92, 0, 2, false, new(.65f, 1.325f));
+        Check(149, 0, 2, false, new(-14.05f, 7f));
+        Check(152, 0, 2, false, new(18.025f, 18f));
+        Check(366, 0, 2, false, new(-16.75f, 7.675f));
+        Check(957, 808, 2, false, new(-11.65f, 6.35f));
+        Check(424, 0, 2, true, Vector2.Zero);
+        // Validate every actual bank entry and all eight direction baselines.
+        foreach (int bank in new[] { 0, 808 })
+        {
+            for (int direction = 0; direction < 8; direction++)
+            {
+                Check(bank + direction * 4, bank, direction, false, Vector2.Zero);
+                Check(bank + 416 + direction * 4, bank, direction, true, Vector2.Zero);
+            }
+            for (int i = 0; i < 808; i++)
+                Assertions.True(WingBodyPose.TryGetDelta(bank + i, bank, 0, false, out var delta) &&
+                    float.IsFinite(delta.X) && float.IsFinite(delta.Y), $"Invalid shoulder data for {bank+i}.");
+        }
+
+        Assertions.True(!WingBodyPose.TryGetDelta(808, 0, 0, false, out _),
+            "Never read the other gender's frame as a male pose.");
+        Assertions.True(!WingBodyPose.TryGetDelta(0, 512, 0, false, out _),
+            "Alternate animation bank cannot be mistaken for classic CArmour.");
+    }
+
     private static void Main()
     {
+        CheckWingBodyTracking();
+
         Span<SpriteVertex> vertices = stackalloc SpriteVertex[6];
         Assertions.True(SpriteGeometry.WriteQuad(vertices, new Rectangle(16, 8, 32, 24),
             64, 64, new Vector2(7, -3), Matrix4x4.Identity, Vector4.One, 100, 100),

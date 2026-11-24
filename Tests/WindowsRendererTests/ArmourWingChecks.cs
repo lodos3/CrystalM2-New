@@ -18,7 +18,16 @@ internal static class ArmourWingChecks
         var pool = new SpellParticlePool(ArmourWingParticles.ParticleCapacity);
         using var armour = new LegacyMirLibReader(File.OpenRead(Path.Combine(data, "CArmour", "00.Lib")));
         string[] labels = ["Silver", "Gold", "Phoenix", "Frost", "Moon Moth", "Celestial Electric", "Fel Fire", "Demonic Bone", "Archangel", "Dawn Seraph"];
-        using var sheet = new Bitmap(labels.Length * previewWidth, 30 + 8 * previewHeight);
+        // First eight rows are the original direction comparison. Additional
+        // rows exercise body motion at a fixed wing animation time.
+        (MirDirection Facing, int BodyFrame)[] extra =
+        [
+            (MirDirection.Right, 44), (MirDirection.Right, 92),
+            (MirDirection.Right, 149), (MirDirection.Right, 152),
+            (MirDirection.Right, 366), (MirDirection.Left, 174),
+            (MirDirection.Right, 310)
+        ];
+        using var sheet = new Bitmap(labels.Length * previewWidth, 30 + (8 + extra.Length) * previewHeight);
         using var canvas = Graphics.FromImage(sheet);
         canvas.Clear(Color.FromArgb(22, 25, 30));
         var origin = new Vector2(previewWidth / 2f - 24, 112);
@@ -34,17 +43,21 @@ internal static class ArmourWingChecks
             !ArmourWings.TrySelect("5", out var electric) || electric != ArmourWings.CelestialElectric)
             throw new InvalidOperationException("Invalid wing preview selector mapping.");
         for (int id = 0; id < labels.Length; id++)
-        for (int row = 0; row < 8; row++)
+        for (int row = 0; row < 8 + extra.Length; row++)
         {
             if (!ArmourWings.TrySelect(id.ToString(), out var effect) || !effect.HasValue) throw new InvalidDataException();
-            MirDirection facing = (MirDirection)row;
-            int pose = (int)facing * 4;
+            if (row >= 8 && id < 2) continue; // Legacy baked wings use a separate pose index.
+            MirDirection facing = row < 8 ? (MirDirection)row : extra[row - 8].Facing;
+            int pose = row < 8 ? (int)facing * 4 : extra[row - 8].BodyFrame;
             if (!armour.TryReadFrame(pose, out var actor)) throw new InvalidDataException("Missing actor pose.");
             using var body = new Texture(device, actor.Width, actor.Height);
             body.BeginUpload().Data.Write(actor.Bgra);
             body.EndUpload();
             device.Clear(Color.FromArgb(22, 25, 30));
-            ArmourWingParticles.Emit(pool, effect.Value, id, pose, ArmourWingParticles.Shoulder(effect.Value, false), facing, 480, 101);
+            Vector2 trackedShoulder = ArmourWingParticles.Shoulder(effect.Value, false);
+            if (id >= 2 && WingBodyPose.TryGetDelta(pose, 0, (int)facing, false, out var motion))
+                trackedShoulder += motion;
+            ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101);
             if (pool.Active.Length < 3 || pool.Active.Length >= pool.Capacity)
                 throw new InvalidOperationException($"Invalid particle count for {labels[id]}.");
             bool behind = id >= 2 && facing is (MirDirection.Down or MirDirection.DownLeft or MirDirection.DownRight);
@@ -52,21 +65,21 @@ internal static class ArmourWingChecks
             int near = ArmourWingParticles.NearSide(facing);
             if (split)
             {
-                ArmourWingParticles.Emit(pool, effect.Value, id, pose, ArmourWingParticles.Shoulder(effect.Value, false), facing, 480, 101, -near);
+                ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, -near);
                 Wings();
             }
             else if (behind) Wings();
             device.Blend = SpriteBlendMode.Alpha;
             device.Sprite.Draw(body, null, new Vector3(origin.X + actor.OffsetX, origin.Y + actor.OffsetY, 0), Vector4.One);
             if (split)
-                ArmourWingParticles.Emit(pool, effect.Value, id, pose, ArmourWingParticles.Shoulder(effect.Value, false), facing, 480, 101, near);
+                ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, near);
             if (!behind) Wings();
             using var image = device.Capture(surface);
             canvas.DrawImageUnscaled(image, id * previewWidth, 30 + row * previewHeight);
             if (row == 0) canvas.DrawString($"{id}   {labels[id]}", SystemFonts.MessageBoxFont!, Brushes.White, id * previewWidth + 12, 8);
         }
         sheet.Save(output, ImageFormat.Png);
-        Console.WriteLine($"Rendered {labels.Length} wing IDs in all eight facings through the game particle renderer.");
+        Console.WriteLine($"Rendered {labels.Length} wing IDs in all eight facings and sampled action frames through the game particle renderer.");
         void Wings() => device.SpellParticles.Draw(pool.Active, origin, 480, false, emissiveOverlay: true, exposure: 1.22f);
 
         void CheckGeneratedVolume()

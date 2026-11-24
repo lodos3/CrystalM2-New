@@ -592,6 +592,20 @@ namespace Client.MirGraphics
             return true;
         }
 
+        // Metadata-only query for pose attachments. Empty index slots must not
+        // be interpreted as sprite headers at the beginning of the LIB file.
+        internal bool TryGetFrameBounds(int index, out Rectangle bounds)
+        {
+            bounds = Rectangle.Empty;
+            if (!_initialized) Initialize();
+            if (_indexList == null || (uint)index >= (uint)_indexList.Length ||
+                (_generatedAtlas == null && _indexList[index] <= 0)) return false;
+            var image = GetImageMetadata(index);
+            if (image == null || image.Width <= 0 || image.Height <= 0) return false;
+            bounds = new Rectangle(image.X, image.Y, image.Width, image.Height);
+            return true;
+        }
+
         public Point GetOffSet(int index)
         {
             if (!_initialized) Initialize();

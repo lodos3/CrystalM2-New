@@ -5076,7 +5076,50 @@ namespace Client.MirObjects
                 WingLibrary.DrawBlend(DrawWingFrame + WingOffset, DrawLocation, DrawColour, true);
         }
 
-        private Vector2 WingShoulder => ArmourWingParticles.Shoulder(WingEffect, RidingMount);
+        private Vector2 WingShoulder
+        {
+            get
+            {
+                Vector2 shoulder = ArmourWingParticles.Shoulder(WingEffect, RidingMount);
+                if (WingEffect < ArmourWings.Phoenix) return shoulder;
+                int bodyFrame = DrawFrame + ArmourOffSet;
+                if (_wingFamily == 0 && WingBodyPose.TryGetDelta(bodyFrame, ArmourOffSet,
+                    (int)Direction, RidingMount, out Vector2 delta))
+                    return shoulder + delta;
+
+                // Alternate archer/assassin banks have different frame layouts.
+                // Track their actual head sprite centre against the matching
+                // classic idle head. Unlike an armour rectangle, a hair frame
+                // does not include long robes, outstretched arms or shadows.
+                MLibrary[] hair = _wingFamily == 1 ? Libraries.AHair :
+                    _wingFamily == 2 ? Libraries.ARHair : Libraries.CHair;
+                int classicReference = (Gender == MirGender.Male ? 0 : 808) +
+                    (RidingMount ? 416 : 0) + (int)Direction * 4;
+                if (hair is { Length: > 0 } && Libraries.CHair is { Length: > 0 } &&
+                    hair[0] != null && Libraries.CHair[0] != null &&
+                    hair[0].TryGetFrameBounds(DrawFrame + HairOffSet, out Rectangle currentHead) &&
+                    Libraries.CHair[0].TryGetFrameBounds(classicReference, out Rectangle idleHead))
+                {
+                    return shoulder + Centre(currentHead) - Centre(idleHead);
+                }
+
+                // Only if the head metadata is unavailable, use the matching
+                // naked body header as a coarse fallback. Do not sample the
+                // equipped armour's crop (which differs between armour sets).
+                MLibrary[] bodies = _wingFamily == 1 ? Libraries.AArmours :
+                    _wingFamily == 2 ? Libraries.ARArmours : Libraries.CArmours;
+                if (bodies is { Length: > 0 } && Libraries.CArmours is { Length: > 0 } &&
+                    bodies[0] != null && Libraries.CArmours[0] != null &&
+                    bodies[0].TryGetFrameBounds(bodyFrame, out Rectangle currentBody) &&
+                    Libraries.CArmours[0].TryGetFrameBounds(classicReference, out Rectangle idleBody))
+                    return shoulder + UpperBody(currentBody) - UpperBody(idleBody);
+
+                return shoulder;
+
+                static Vector2 Centre(Rectangle r) => new(r.X + r.Width * .5f, r.Y + r.Height * .5f);
+                static Vector2 UpperBody(Rectangle r) => new(r.X + r.Width * .5f, r.Y + r.Height * .25f);
+            }
+        }
 
         internal bool TryGetWingLight(out Point point, out Color colour)
         {
