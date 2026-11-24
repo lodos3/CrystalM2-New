@@ -242,6 +242,18 @@ internal sealed class PreviewSequence
     private void SampleWeapon(SpellParticlePool pool, PreviewRig rig, int elapsed, bool followThrough)
     {
         int step = FrameSet.Player[followThrough ? MirAction.Attack4 : MirAction.Attack1].Interval;
+        // The live Attack1 path draws these spells through DrawSwing, not
+        // the older WeaponSweep presentation. Preview that same path.
+        if (!followThrough && SpellVfxPoseMasks.IsWeaponSwing(_spell))
+        {
+            pool.Advance(elapsed);
+            using var profile = SpellVfxAssets.For(_spell);
+            var frame = new SpellParticleFrame(pool, rig.Centre, elapsed, 1,
+                SpellParticleFrame.ReferenceSize, Seed, depthY: rig.Centre.Y);
+            int pose = Math.Clamp(elapsed / Math.Max(1, step), 0, 5);
+            SpellVfxPoseMasks.DrawSwing(frame, _spell, rig.Centre, (int)rig.Direction, pose / 6f);
+            return;
+        }
         for (int tick = 0; tick <= elapsed; tick += step)
         {
             pool.Advance(tick);
