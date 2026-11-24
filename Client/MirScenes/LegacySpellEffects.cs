@@ -231,8 +231,8 @@ internal static class LegacySpellEffects
         {
             // A narrow organic projectile with a moving tapered core and independent wake.
             var trail = new SpellParticleFrame(pool, head, now, 1, size, (uint)frame, depthY: head.Y + 24);
-            Vector2 side = new(-heading.Y, heading.X);
-            Vector2 from = head - heading * 24 + side * MathF.Sin(frame * .9f) * 5;
+            Vector2 tongueSide = new(-heading.Y, heading.X);
+            Vector2 from = head - heading * 24 + tongueSide * MathF.Sin(frame * .9f) * 5;
             trail.Thread(from, head, 2.5f, 5f, 0xA34876, .85f, emitter: "Procedural.CatTongue.Trail");
             trail.Thread(from + heading * 5, head, .8f, 2.4f, 0xF6ADBE, .8f, Layer.EmissiveCore, emitter: "Procedural.CatTongue.Core");
             trail.Sprite(head, 13, 8, Shape.Wisp, 0xFFB6D2, .75f, rotation: MathF.Atan2(heading.Y, heading.X),
