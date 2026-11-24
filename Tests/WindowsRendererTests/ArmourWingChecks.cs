@@ -111,9 +111,11 @@ internal static class ArmourWingChecks
             body.EndUpload();
             device.Clear(Color.FromArgb(22, 25, 30));
             Vector2 trackedShoulder = ArmourWingParticles.Shoulder(effect.Value, false);
-            if (id >= 2 && WingBodyPose.TryGetDelta(pose, 0, (int)facing, false, out var motion))
-                trackedShoulder += motion;
-            ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101);
+            WingPoseMotion motion = WingPoseMotion.Zero;
+            if (id >= 2 && WingBodyPose.TryGetMotion(pose, 0, (int)facing, false, out motion))
+                trackedShoulder += motion.Offset;
+            ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101,
+                torsoYaw: motion.Yaw, torsoRoll: motion.Roll);
             if (pool.Active.Length < 3 || pool.Active.Length >= pool.Capacity)
                 throw new InvalidOperationException($"Invalid particle count for {labels[id]}.");
             bool behind = id >= 2 && facing is (MirDirection.Down or MirDirection.DownLeft or MirDirection.DownRight);
@@ -122,14 +124,14 @@ internal static class ArmourWingChecks
             int near = ArmourWingParticles.NearSide(facing);
             if (split)
             {
-                ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, -near);
+                ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, -near, motion.Yaw, motion.Roll);
                 Wings();
             }
             else if (behind) Wings();
             device.Blend = SpriteBlendMode.Alpha;
             device.Sprite.Draw(body, null, new Vector3(origin.X + actor.OffsetX, origin.Y + actor.OffsetY, 0), Vector4.One);
             if (split)
-                ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, near);
+                ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, near, motion.Yaw, motion.Roll);
             if (split || !behind) Wings();
             using var image = device.Capture(surface);
             canvas.DrawImageUnscaled(image, id * previewWidth, 30 + row * previewHeight);
@@ -149,8 +151,9 @@ internal static class ArmourWingChecks
                 Vector2 attachment = ArmourWingParticles.BackAttachment(shoulder, facing);
                 float yaw = (int)facing * MathF.PI / 4;
                 Vector2 rear = new(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f);
-                if (Vector2.Dot(attachment - shoulder, rear) < 2)
-                    throw new InvalidDataException($"Wing {effect} is not attached behind the shoulder in {facing}.");
+                float rearDistance = Vector2.Dot(attachment - shoulder, rear) / rear.LengthSquared();
+                if (rearDistance < 5.59f || rearDistance > 6.41f)
+                    throw new InvalidDataException($"Wing {effect} rear depth is not reduced by 20% in {facing}.");
                 if (facing is MirDirection.Right or MirDirection.Left)
                 {
                     float offset = (attachment.X - shoulder.X) *
