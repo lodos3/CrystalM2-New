@@ -194,6 +194,29 @@ internal sealed class GraphicsOptionsPage : MirControl
             AddValue("Blue", 0, colourRow + 70, light.Blue, "");
             var swatch = new MirControl { Parent = optics, Location = new Point(0, colourRow + 96), Size = new Size(229, 18), NotControl = true };
             swatch.BeforeDraw += (_, _) => DXManager.Device.Ui.Fill(swatch.DisplayRectangle, light.Colour);
+            if (source == LightSource.MapAnimation)
+            {
+                var dropOff = new MirControl { Parent = emitterPanel, Size = emitterPanel.Size, Visible = false };
+                // Keep the colour preview available while adding a dedicated shape page.
+                swatch.Size = new Size(72, 18);
+                AddButton(optics, "Shape drop-off", new Rectangle(80, colourRow + 94, 149, 21), () =>
+                {
+                    optics.Visible = false;
+                    dropOff.Visible = true;
+                });
+                _content = dropOff;
+                Caption("Animated light drop-off", 0, 0);
+                AddValue("Top width", 0, 24, light.TopWidth, "%", hint: "Horizontal width at the top of the authored animation light. 100% is unchanged.");
+                AddValue("Bottom width", 0, 48, light.BottomWidth, "%", hint: "Horizontal width at the bottom of the authored animation light. 100% is unchanged.");
+                AddButton(dropOff, "Test light", new Rectangle(0, 216, 96, 21),
+                    () => GameScene.Scene?.MapControl?.PreviewLight(source));
+                AddButton(dropOff, "Back", new Rectangle(107, 216, 122, 21), () =>
+                {
+                    dropOff.Visible = false;
+                    optics.Visible = true;
+                });
+                _content = optics;
+            }
             AddButton(optics, "Test light", new Rectangle(0, 216, 96, 21),
                 () => GameScene.Scene?.MapControl?.PreviewLight(source));
             AddButton(optics, "Back to light", new Rectangle(107, 216, 122, 21), () =>

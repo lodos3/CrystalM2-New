@@ -92,8 +92,8 @@ internal static partial class WarriorSpellEffects
                 ProjectCrescent(pool, look, feet, facing, 0, fields.Read(tuning.HalfMoonLift), fields.Read(tuning.HalfMoonRadius), fields.Read(tuning.HalfMoonWidth), now, life);
                 break;
             case Spell.CrossHalfMoon when cut:
-                ProjectCrescent(pool, look, feet, facing, fields.Read(tuning.CrossHalfMoonYaw), fields.Read(tuning.CrossHalfMoonLift), fields.Read(tuning.CrossHalfMoonRadius), fields.Read(tuning.CrossHalfMoonWidth), now, life, sweep: fields.Read(tuning.CrossHalfMoonSweep), stacked: true);
-                ProjectCrescent(pool, look, feet, facing, MathF.PI - fields.Read(tuning.CrossHalfMoonYaw2), fields.Read(tuning.CrossHalfMoonLift2), fields.Read(tuning.CrossHalfMoonRadius2), fields.Read(tuning.CrossHalfMoonWidth2), now, life, sweep: fields.Read(tuning.CrossHalfMoonSweep2), stacked: true);
+                ProjectCrescent(pool, look, feet, facing, fields.Read(tuning.CrossHalfMoonYaw), fields.Read(tuning.CrossHalfMoonLift), fields.Read(tuning.CrossHalfMoonRadius) * 1.85f, fields.Read(tuning.CrossHalfMoonWidth) * 1.65f, now, life, sweep: fields.Read(tuning.CrossHalfMoonSweep), stacked: true);
+                ProjectCrescent(pool, look, feet, facing, MathF.PI - fields.Read(tuning.CrossHalfMoonYaw2), fields.Read(tuning.CrossHalfMoonLift2), fields.Read(tuning.CrossHalfMoonRadius2) * 1.85f, fields.Read(tuning.CrossHalfMoonWidth2) * 1.65f, now, life, sweep: fields.Read(tuning.CrossHalfMoonSweep2), stacked: true);
                 effect.Add(feet + facing * fields.Read(tuning.CrossHalfMoonWarriorSparkOffset) - Vector2.UnitY * fields.Read(tuning.CrossHalfMoonWarriorSparkOffset2), facing * fields.Read(tuning.CrossHalfMoonWarriorSparkVelocity), fields.Read(tuning.CrossHalfMoonWarriorSparkShape), fields.Read(tuning.CrossHalfMoonWarriorSparkSize), life,
                     fields.Read(tuning.CrossHalfMoonWarriorSparkLayer), aspect: fields.Read(tuning.CrossHalfMoonWarriorSparkAspect), rotation: angle, core: fields.Read(tuning.CrossHalfMoonWarriorSparkCore), alpha: fields.Read(tuning.CrossHalfMoonWarriorSparkAlpha), emitter: "WarriorSpellEffects.Weapons.WeaponSweep.6");
                 break;
@@ -114,7 +114,7 @@ internal static partial class WarriorSpellEffects
                     Layer layer = rear ? fields.Read(tuning.TwinDrakeBladeLayer) : fields.Read(tuning.TwinDrakeBladeLayer2);
                     float groundY = feet.Y + (rear ? fields.Read(tuning.TwinDrakeBladeGroundY) : fields.Read(tuning.TwinDrakeBladeGroundY2));
                     strike.Thread(root, tendril, fields.Read(tuning.TwinDrakeBladeThreadStartWidth), fields.Read(tuning.TwinDrakeBladeThreadEndWidth),
-                        i % 4 == 0 ? White : Ice, fields.Read(tuning.TwinDrakeBladeThreadAlpha), layer,
+                        i % 3 == 1 ? 0x3498FF : 0xF4FCFF, fields.Read(tuning.TwinDrakeBladeThreadAlpha), layer,
                         light: i == 7, sortY: groundY, emitter: "WarriorSpellEffects.Weapons.WeaponSweep.7");
                     if (i % 2 == 0)
                     {

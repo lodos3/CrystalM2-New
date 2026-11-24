@@ -83,10 +83,11 @@ internal static class SpellVfxPoseMasks
         float mix = SpellParticleFrame.Ease(time - first);
         float Blend(float x, float y) => x + (y - x) * mix;
         float turn = Blend(a.Turn, b.Turn);
-        float radius = Blend(a.Radius, b.Radius);
-        float width = Blend(a.Width, b.Width);
-        float lift = Blend(a.Lift, b.Lift);
-        float span = Blend(a.Span, b.Span);
+        // Increase the actual world-space coverage, not just texture size.
+        float radius = Blend(a.Radius, b.Radius) * 1.85f;
+        float width = Blend(a.Width, b.Width) * 1.65f;
+        float lift = Blend(a.Lift, b.Lift) * 1.16f;
+        float span = Blend(a.Span, b.Span) * 1.12f;
         float energy = Blend(a.Energy, b.Energy);
 
         // Three separate, overlapping fans open at different heights and

@@ -10,7 +10,7 @@ internal static partial class SpellVfxBladeParticles
 {
     private const int FlameEmissionInterval = 28;
     private static readonly SpellParticleColourCurve FireCooling = new(
-        (0, 0xFFE389), (.22f, 0xFFA432), (.58f, 0xF34A14), (1, 0x731909));
+        (0, 0xFFF4C8), (.18f, 0xFFC04A), (.52f, 0xF34A14), (1, 0x731909));
     private static readonly SpellParticleColourCurve SmokeCooling = new(
         (0, 0xCE5030), (.4f, 0x8B301C), (1, 0x421E1A));
 

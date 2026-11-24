@@ -53,9 +53,13 @@ internal static class SpellVfxAssetChecks
             Check(surfaces.Length >= 24 && surfaces.All(p => p.RibbonTextureU.HasValue),
                 "Each Cross Half Moon pose must contain multiple textured cutting surfaces.");
             if (pose is >= 2 and <= 4)
+            {
                 Check(surfaces.Any(p => p.Ground && p.GroundDepth < feet.Y) &&
                     surfaces.Any(p => !p.Ground && p.GroundDepth >= feet.Y),
                     "The release must wrap both behind and in front of the warrior.");
+                Check(surfaces.Max(p => MathF.Abs(p.Origin.X - feet.X)) > 65,
+                    "The Cross Half Moon release must extend well beyond the previous short sweep.");
+            }
             var offset = new Vector2(23, -17);
             var moved = Sample(feet + offset, direction, pose);
             Check(moved.Length == particles.Length && particles.Zip(moved).All(pair =>
@@ -63,6 +67,16 @@ internal static class SpellVfxAssetChecks
                 MathF.Abs(pair.First.GroundDepth + offset.Y - pair.Second.GroundDepth) < .001f &&
                 pair.First.Colour == pair.Second.Colour),
                 "Swing geometry and depth must follow the actor without random flicker.");
+        }
+
+        foreach (var phase in new[] { SpellVisualPhase.Contact, SpellVisualPhase.Hit, SpellVisualPhase.Impact })
+        {
+            pool.Clear();
+            var visual = new SpellVisual(Spell.CrossHalfMoon, phase);
+            WarriorSpellEffects.DrawFrame(pool, visual, feet, Vector2.UnitX, 1200, 1000, 600);
+            Check(pool.Active.IsEmpty, "Cross Half Moon must not draw a separate target hit effect.");
+            LegacySpellEffects.Emit(pool, visual, feet, Vector2.UnitX, 1200);
+            Check(pool.Active.IsEmpty, "The legacy fallback must not draw Cross Half Moon target claws.");
         }
 
         SpellParticle[] Sample(Vector2 position, int direction, int pose)

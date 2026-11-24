@@ -169,7 +169,7 @@ internal sealed class PreviewSequence
             AddFrame("Departure", SpellVisualPhase.Departure);
             AddFrame("Arrival", SpellVisualPhase.Arrival, atTarget: true);
         }
-        else if (standalone || WarriorSpellEffects.UsesWeaponArt(_spell))
+        else if (_spell != Spell.CrossHalfMoon && (standalone || WarriorSpellEffects.UsesWeaponArt(_spell)))
         {
             var phase = LegacySpellEffects.ImpactPhase(_spell);
             AddFrame(phase == SpellVisualPhase.Contact ? "Contact" : "Impact", phase,

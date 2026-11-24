@@ -60,6 +60,13 @@ internal static class GraphicsTuning
         public readonly Value Direction = new(source + "LightDirection", 0, 0, 360);
         public readonly Value Beam = new(source + "LightBeam", 65, 12, 175);
         public readonly Value Blur = new(source + "LightBlur", 4, 0, 192);
+        public readonly Value TopWidth = source == LightSource.MapAnimation
+            ? new(source + "LightTopWidth", 100, 10, 300) : null;
+        public readonly Value BottomWidth = source == LightSource.MapAnimation
+            ? new(source + "LightBottomWidth", 100, 10, 300) : null;
+        public float TopWidthScale => (TopWidth?.Current ?? 100) / 100f;
+        public float BottomWidthScale => (BottomWidth?.Current ?? 100) / 100f;
+        public float WidthExtent => Math.Max(1f, Math.Max(TopWidthScale, BottomWidthScale));
         public readonly Value GlowRadius = IsEffectLight(source)
             ? new(source + "LightGlowRadius", source == LightSource.MapAnimation ? 160 : 128, 0, 1024) : null;
         public readonly Value GlowStrength = IsEffectLight(source)

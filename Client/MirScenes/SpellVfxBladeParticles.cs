@@ -71,10 +71,10 @@ internal static partial class SpellVfxBladeParticles
                 float across = MathF.Sin(i * 2.4f + phase) * wake.Width * .85f;
                 Vector2 point = feet + wake.At(along * 1.2f, across);
                 float width = (38 + wake.Width * 1.3f) * (1 - .35f * MathF.Abs(along));
-                frame.Sprite(point, width * 1.65f, width * 1.2f, Shape.Wisp, 0xB94314, .40f * fade,
+                frame.Sprite(point, width * 1.65f, width * 1.2f, Shape.Wisp, 0xB94314, .24f * fade,
                     Layer.EmissiveCore, wake.Angle, emitter: "Blade.Wake-glow");
                 frame.Clip(point, width, width * .60f, Shape.FireSequence, phase * .36f + i * .19f,
-                    i % 3 == 0 ? 0xC34814 : 0x7C260E, .42f * fade, Layer.EmissiveCore, wake.Angle + across * .018f,
+                    i % 3 == 0 ? 0xC34814 : 0x7C260E, .30f * fade, Layer.EmissiveCore, wake.Angle + across * .018f,
                     emitter: "Blade.Wake-glow");
             }
         }
@@ -83,7 +83,9 @@ internal static partial class SpellVfxBladeParticles
             Vector2 edge = blade.Tip - blade.Hilt;
             float angle = MathF.Atan2(edge.Y, edge.X);
             Vector2 from = blade.Hilt + edge * .28f;
-            Ribbon(frame, from, blade.Tip, 1.65f, .62f, 0xFF9B36, fade * .7f, "Blade.Ignition");
+            Ribbon(frame, from, blade.Tip, 1.65f, .62f, 0xFF7624, fade * .82f, "Blade.Ignition");
+            frame.Thread(from, blade.Tip, .85f, .24f, 0xFFF2BF, fade * .95f,
+                Layer.EmissiveCore, emitter: "Blade.Ignition");
             for (int i = 0; i < 8; i++)
             {
                 Vector2 point = Vector2.Lerp(from, blade.Tip, (i + .5f) / 8);
@@ -109,7 +111,7 @@ internal static partial class SpellVfxBladeParticles
             float taper = 1 - MathF.Abs(u) * .62f;
             Vector2 point = feet + core.At(u, (frame.Unit(i + 317) - .5f) * core.Width * .85f);
             float pulse = .83f + .17f * MathF.Sin(progress * 18 + i * 1.31f);
-            frame.Clip(point, (9 + core.Length * .39f) * taper * pulse, (5 + core.Width * 1.96f) * taper * pulse * spread,
+            frame.Clip(point, (9 + core.Length * .39f) * taper * pulse, (4 + core.Width * 1.42f) * taper * pulse * spread,
                 Shape.FireSequence, phase + i * .137f, i % 3 == 0 ? 0xFFDE73 : i % 3 == 1 ? 0xFF9A23 : 0xF55410,
                 fade * taper * .76f, Layer.EmissiveCore, core.Angle + u * .31f + .23f * MathF.Sin(phase * 3 + i), light: i == 4,
                 emitter: "Blade.Hot-core");
@@ -119,7 +121,18 @@ internal static partial class SpellVfxBladeParticles
                 Vector2 current = feet + core.At(u, 0);
                 float thickness = (5 + core.Width * 1.3f) * taper * spread;
                 Ribbon(frame, prior, current, thickness, thickness * .93f, 0xFF4F0C, fade * taper * .62f, "Blade.Heat-sheet");
-                Ribbon(frame, prior, current, thickness * .43f, thickness * .4f, 0xFFAA29, fade * taper * .68f, "Blade.Heat-sheet");
+                Ribbon(frame, prior, current, thickness * .43f, thickness * .32f, 0xFFB336, fade * taper * .82f, "Blade.Heat-sheet");
+                frame.Thread(prior, current, thickness * .19f, thickness * .10f,
+                    0xFFF3C6, fade * taper * .94f, Layer.EmissiveCore, emitter: "Blade.Heat-sheet");
+                // Small pointed flame serrations follow the guide, rather than
+                // increasing a soft orange billboard around the blade.
+                float side = i % 2 == 0 ? -1 : 1;
+                Vector2 tooth = current + core.Normal * (side * thickness * (1.05f + frame.Unit(i + 601) * .65f)) -
+                    core.Axis * (2 + frame.Unit(i + 602) * 5);
+                frame.Thread(prior, tooth, thickness * .30f, .16f, 0xFF7A25,
+                    fade * taper * .78f, Layer.Emissive, emitter: "Blade.Flame-teeth");
+                frame.Thread(Vector2.Lerp(prior, current, .45f), tooth, thickness * .12f, .08f,
+                    0xFFE5A0, fade * taper * .86f, Layer.EmissiveCore, emitter: "Blade.Flame-teeth");
             }
         }
 
@@ -197,8 +210,8 @@ internal static partial class SpellVfxBladeParticles
         if (pose < 5)
         {
             float afterglow = 1 - Frame.Ease((progress - .5f) * 3);
-            frame.Sprite(torso, 42, 110, Shape.Wisp, 0x72AEFF, afterglow, Layer.EmissiveCore, emitter: "Blade.Body-glow");
-            frame.Sprite(torso, 24, 85, Shape.Wisp, 0xBEDFFF, afterglow, Layer.EmissiveCore, emitter: "Blade.Body-glow");
+            frame.Sprite(torso, 42, 110, Shape.Wisp, 0x2674DF, afterglow * .46f, Layer.EmissiveCore, emitter: "Blade.Body-glow");
+            frame.Sprite(torso, 24, 85, Shape.Wisp, 0xF0FAFF, afterglow * .72f, Layer.EmissiveCore, emitter: "Blade.Body-glow");
             if (pose == 0)
                 Bolt(frame, head, crown, new Vector2(-3, 0), .66f * (1 - poseTime), 891, "Blade.Body-glow");
         }
@@ -264,7 +277,7 @@ internal static partial class SpellVfxBladeParticles
                 float sparkSize = 1.25f + frame.Unit(index + 10) * 1.45f;
                 float alpha = fork.Brightness * (1 - distance * .37f) * (.57f + frame.Unit(index + 11) * .42f);
                 frame.Sprite(along + jitter, sparkSize, sparkSize, Shape.Flash,
-                    i % 5 < 3 ? 0xF5FAFF : 0xADCBFF, alpha, Layer.EmissiveCore,
+                    i % 5 < 3 ? 0xF5FAFF : 0x429BFF, alpha, Layer.EmissiveCore,
                     emitter: "Blade.Lightning-sparks");
             }
         }
@@ -340,7 +353,7 @@ internal static partial class SpellVfxBladeParticles
         Vector2 centre = feet + new Vector2(guide.Centre.X, -72 + (guide.Centre.Y + 56) * .61f);
         float radius = 25 * (1 - gather) + 6;
         float burst = Frame.Ease(progress * 3.9f) * (1 - .56f * Frame.Ease((progress - .57f) / .43f));
-        frame.Sprite(centre, 69 + radius, 80 + radius * 1.24f, Shape.Orb, 0x226DE0, burst * .79f,
+        frame.Sprite(centre, 69 + radius, 80 + radius * 1.24f, Shape.Orb, 0x225AC9, burst * .42f,
             Layer.Emissive, light: true, emitter: "Blade.Activation-halo");
 
         for (int i = 0; i < 4; i++)
@@ -348,9 +361,9 @@ internal static partial class SpellVfxBladeParticles
             float angle = i * MathF.Tau / 4 + progress * 2;
             Vector2 point = centre + Frame.Ellipse(angle, radius, radius * .78f);
             float alpha = i == 0 ? .89f : .64f * (1 - gather * .62f);
-            frame.Sprite(point, 9 + gather * 7, 14 + gather * 7, Shape.Orb, 0x77B9FF, alpha,
+            frame.Sprite(point, 9 + gather * 7, 14 + gather * 7, Shape.Orb, 0x349BFF, alpha,
                 Layer.Emissive, emitter: "Blade.Activation-orbs");
-            frame.Sprite(point, 4 + gather * 4, 7 + gather * 4, Shape.Flash, 0xC7EBFF, alpha,
+            frame.Sprite(point, 4 + gather * 4, 7 + gather * 4, Shape.Flash, 0xF5FCFF, alpha,
                 Layer.EmissiveCore, emitter: "Blade.Activation-orbs");
         }
 
@@ -361,7 +374,7 @@ internal static partial class SpellVfxBladeParticles
             float length = (31 + frame.Unit(i + 210) * 28) * (1 - .37f * gather);
             Vector2 start = centre + radial * (4 + radius * .24f);
             Vector2 end = centre + radial * length;
-            frame.Thread(start, end, 2.8f, .32f, i % 4 == 0 ? 0xA6D7FF : 0x4C97F5,
+            frame.Thread(start, end, 2.8f, .32f, i % 3 == 0 ? 0x359CFF : 0xF3FAFF,
                 burst * (.56f + frame.Unit(i + 387) * .43f), Layer.Emissive, emitter: "Blade.Activation-rays");
         }
 
@@ -388,7 +401,7 @@ internal static partial class SpellVfxBladeParticles
             for (int i = 1; i <= 9; i++)
             {
                 Vector2 point = Loop(i);
-                Lightning(frame, previous, point, 2.6f, band == 0 ? 0xAACBFF : 0x6496E9,
+                Lightning(frame, previous, point, 2.6f, band == 0 ? 0xF2FAFF : 0x3098FF,
                     fade * (band == 0 ? .78f : .49f), i * 17 + band * 89, "Blade.Target-arcs");
                 previous = point;
             }
@@ -396,7 +409,7 @@ internal static partial class SpellVfxBladeParticles
             Vector2 Loop(int i) => centre + Frame.Ellipse(rotation + i * MathF.Tau / 9,
                 16 + band * 5, 12 + band * 3) + new Vector2(0, band * 9 + (frame.Unit(i % 9 + band * 21) - .5f) * 6);
         }
-        frame.Sprite(centre + new Vector2(0, 9), 44, 27, Shape.Halo, 0x4D87DF, fade * .33f,
+        frame.Sprite(centre + new Vector2(0, 9), 44, 27, Shape.Halo, 0x2364C9, fade * .21f,
             Layer.Emissive, emitter: "Blade.Target-glow");
     }
 
@@ -435,15 +448,15 @@ internal static partial class SpellVfxBladeParticles
             Vector2 point = BoltPoint(from, to, bow, t) + normal * (crackle * MathF.Sin(t * MathF.PI));
             float falloff = 1 - t * (body ? .42f : .68f);
             float voltage = alpha * falloff;
-            frame.Thread(previous, point, (body ? 8.8f : bright ? 6f : 4.2f) * falloff,
-                (body ? 7 : 3.1f) * falloff, body ? 0x287BFF : 0x337EEA,
+            frame.Thread(previous, point, (body ? 6.6f : bright ? 4.7f : 3.6f) * falloff,
+                (body ? 5.2f : 2.6f) * falloff, body ? 0x2366D9 : 0x328FFF,
                 voltage * (body ? .74f : .42f), Layer.Emissive, emitter: layer);
             if (body)
-                frame.Thread(previous, point, 4.9f * falloff, 3.5f * falloff, 0x7CB9FF,
+                frame.Thread(previous, point, 4.9f * falloff, 3.5f * falloff, 0x58C4FF,
                     voltage * .84f, Layer.EmissiveCore, emitter: layer);
             float width = body ? 2.8f : bright ? 2.45f : 1.65f;
             frame.Thread(previous, point, width * falloff, width * .74f * falloff,
-                body ? 0xFAFDFF : bright ? 0xD5ECFF : 0xAFCFFF, voltage, Layer.EmissiveCore, emitter: layer);
+                body ? 0xFFFFFF : bright ? 0xF8FDFF : 0xE6F5FF, voltage, Layer.EmissiveCore, emitter: layer);
             previous = point;
         }
     }

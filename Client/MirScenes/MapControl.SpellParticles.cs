@@ -246,7 +246,7 @@ public sealed partial class MapControl
 
     internal void EmitSpellImpact(Spell spell, Point location)
     {
-        if (SpellVfxBladeFrames.Supports(spell)) return;
+        if (spell == Spell.CrossHalfMoon || SpellVfxBladeFrames.Supports(spell)) return;
 
         // Protective wards and Curse share the same single, aim-anchored
         // impact path. Buffs/debuffs are applied individually server-side,

@@ -375,16 +375,34 @@ float3 ShapedEmission(float2 uv)
     return source * pixel.a;
 }
 
+float3 TaperedShapedEmission(float2 uv, float4 bounds)
+{
+    // Zero constants preserve compatibility with callers using the old shader.
+    float top = C[0].z > 0 ? C[0].z : 1;
+    float bottom = C[0].w > 0 ? C[0].w : 1;
+    if (top == 1 && bottom == 1) return ShapedEmission(uv);
+    float2 extent = max(bounds.zw - bounds.xy, float2(0.0001, 0.0001));
+    float2 local = (uv - bounds.xy) / extent;
+    float width = max(0.001, lerp(top, bottom, saturate(local.y)));
+    local.x = (local.x - 0.5) / width + 0.5;
+    // Do not clamp the widened draw rectangle to the texture edge: that
+    // would produce vertical light streaks outside the tapered silhouette.
+    if (local.x < 0 || local.x > 1 || local.y < 0 || local.y > 1) return 0;
+    return ShapedEmission(bounds.xy + local * extent);
+}
+
 float4 PSShapedLight(Output input) : SV_TARGET
 {
     float3 energy;
     if (C[0].y > 1)
     {
         float2 dx = ddx(input.Uv) * 0.25, dy = ddy(input.Uv) * 0.25;
-        energy = (ShapedEmission(input.Uv - dx - dy) + ShapedEmission(input.Uv + dx - dy) +
-                  ShapedEmission(input.Uv - dx + dy) + ShapedEmission(input.Uv + dx + dy)) * 0.25;
+        energy = (TaperedShapedEmission(input.Uv - dx - dy, input.Bounds) +
+                  TaperedShapedEmission(input.Uv + dx - dy, input.Bounds) +
+                  TaperedShapedEmission(input.Uv - dx + dy, input.Bounds) +
+                  TaperedShapedEmission(input.Uv + dx + dy, input.Bounds)) * 0.25;
     }
-    else energy = ShapedEmission(input.Uv);
+    else energy = TaperedShapedEmission(input.Uv, input.Bounds);
     return float4(energy * input.Tint.rgb * input.Tint.a, 1);
 }
 

@@ -1289,6 +1289,28 @@ internal static class Program
             Near(Color.Black, image.GetPixel(11, 14), "A larger frame must keep a crisp edge with blur at zero.");
         }
 
+        device.Clear(Color.Black);
+        device.SetPixelShaderConstant(0, [new(1, 0, .35f, 1f)]);
+        device.Sprite.Draw(red, new Rectangle(0, 0, 2, 2), new Rectangle(8, 8, 16, 16), new Vector4(0, 1, 0, 1));
+        using (var image = device.Capture(shapeSurface))
+        {
+            Near(Color.Black, image.GetPixel(10, 9), "Taper must narrow the upper edge.");
+            Near(Color.Lime, image.GetPixel(10, 22), "The independent lower width must remain broad.");
+            Near(Color.Lime, image.GetPixel(16, 9), "Taper must keep the centre lit.");
+        }
+        device.Clear(Color.Black);
+        device.SetPixelShaderConstant(0, [new(1, 0, 1f, .35f)]);
+        device.Sprite.Draw(red, new Rectangle(0, 0, 2, 2), new Rectangle(8, 8, 16, 16), new Vector4(0, 1, 0, 1));
+        using (var image = device.Capture(shapeSurface))
+        {
+            Near(Color.Lime, image.GetPixel(10, 9), "Top width must be independently adjustable.");
+            Near(Color.Black, image.GetPixel(10, 22), "Bottom width must be independently adjustable.");
+        }
+        // Restore the original test input for the following Gaussian checks.
+        device.Clear(Color.Black);
+        device.SetPixelShaderConstant(0, [new(1, 0, 0, 0)]);
+        device.Sprite.Draw(red, new Rectangle(0, 0, 2, 2), new Rectangle(12, 12, 8, 8), new Vector4(0, 1, 0, 1));
+
         device.SetRenderTarget(horizontalSurface);
         device.PixelShader = ShaderEffect.GaussianLight;
         device.Blend = SpriteBlendMode.Alpha;

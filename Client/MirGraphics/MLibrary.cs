@@ -867,6 +867,7 @@ namespace Client.MirGraphics
 
             Rectangle bounds = ShapedLightPass.ScaleFrame(point, image.Width, image.Height,
                 emitter.Radius.Current, pivot);
+            bounds = ShapedLightPass.ExpandWidth(bounds, emitter);
             Rectangle footprint = bounds;
             int blur = emitter.Blur.Current;
             footprint.Inflate(blur, blur);

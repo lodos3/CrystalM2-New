@@ -291,6 +291,8 @@ internal static class LegacySpellEffects
     internal static void Emit(SpellParticlePool pool, SpellVisual visual, Vector2 feet, Vector2 facing, long now,
         int duration = 0, long? sampleTime = null, uint fieldObjectID = 0)
     {
+        if (visual.Spell == Spell.CrossHalfMoon &&
+            visual.Phase is SpellVisualPhase.Contact or SpellVisualPhase.Hit or SpellVisualPhase.Impact) return;
         using var vfxScope = SpellVfxAssets.For(visual.Spell);
         var tuning = SpellVfxAssets.Current.Legacy.Emit;
         var fields = SpellVfxAssets.Fields("Legacy", "Emit");

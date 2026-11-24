@@ -35,6 +35,14 @@ internal static class ShapedLightPass
             scaledWidth, scaledHeight);
     }
 
+    // The shader samples a centred taper inside this expanded draw rectangle.
+    // Expand before culling, filtering and pixel budgeting to avoid clipping.
+    internal static Rectangle ExpandWidth(Rectangle bounds, GraphicsTuning.Emitter emitter)
+    {
+        int width = Math.Max(bounds.Width, (int)MathF.Ceiling(bounds.Width * emitter.WidthExtent));
+        return new Rectangle(bounds.X - (width - bounds.Width) / 2, bounds.Y, width, bounds.Height);
+    }
+
     internal static bool PotentiallyVisible(Point point, Size size, GraphicsTuning.Emitter emitter)
     {
         var bounds = new Rectangle(point, size);
@@ -42,6 +50,7 @@ internal static class ShapedLightPass
         int halo = emitter.GlowRadius.Current + emitter.GlowBlur.Current;
         bounds.Inflate(Math.Max(halo, (int)MathF.Ceiling(size.Width * grow) + emitter.Blur.Current),
             Math.Max(halo, (int)MathF.Ceiling(size.Height * grow) + emitter.Blur.Current));
+        bounds = ExpandWidth(bounds, emitter);
         return bounds.IntersectsWith(new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight));
     }
 
@@ -290,7 +299,8 @@ internal static class ShapedLightPass
             {
                 device.PixelShader = shape.Shader;
                 if (shape.Shader == ShaderEffect.ShapedLight)
-                    device.SetPixelShaderConstant(0, [new(emitter.CustomColour.Current, divisor, 0, 0)]);
+                    device.SetPixelShaderConstant(0, [new(emitter.CustomColour.Current, divisor,
+                        emitter.TopWidthScale / emitter.WidthExtent, emitter.BottomWidthScale / emitter.WidthExtent)]);
                 else if (shape.Shader == ShaderEffect.ConeLight)
                     device.SetPixelShaderConstant(0, [shape.Cone]);
                 device.Sprite.Draw(shape.Texture, new Rectangle(0, 0, shape.Texture.Width, shape.Texture.Height),
