@@ -9,18 +9,19 @@ internal static class ArmourWingChecks
 {
     internal static void Render(string data, string output)
     {
+        const int previewWidth = 224, previewHeight = 180;
         using var window = new Form();
-        using var device = new RendererDevice(window.Handle, 160, 144, DriverType.Warp);
-        using var target = new Texture(device, 160, 144, true);
+        using var device = new RendererDevice(window.Handle, previewWidth, previewHeight, DriverType.Warp);
+        using var target = new Texture(device, previewWidth, previewHeight, true);
         using var surface = target.GetSurface();
         device.SetRenderTarget(surface);
         var pool = new SpellParticlePool(ArmourWingParticles.ParticleCapacity);
         using var armour = new LegacyMirLibReader(File.OpenRead(Path.Combine(data, "CArmour", "00.Lib")));
         string[] labels = ["Silver", "Gold", "Phoenix", "Frost", "Moon Moth", "Celestial Electric", "Fel Fire", "Demonic Bone", "Archangel", "Dawn Seraph"];
-        using var sheet = new Bitmap(labels.Length * 160, 30 + 8 * 144);
+        using var sheet = new Bitmap(labels.Length * previewWidth, 30 + 8 * previewHeight);
         using var canvas = Graphics.FromImage(sheet);
         canvas.Clear(Color.FromArgb(22, 25, 30));
-        var origin = new Vector2(56, 90);
+        var origin = new Vector2(previewWidth / 2f - 24, 112);
         CheckBlendKeepsColour();
         CheckNorthFelFireTips();
         CheckGeneratedVolume();
@@ -61,8 +62,8 @@ internal static class ArmourWingChecks
                 ArmourWingParticles.Emit(pool, effect.Value, id, pose, ArmourWingParticles.Shoulder(effect.Value, false), facing, 480, 101, near);
             if (!behind) Wings();
             using var image = device.Capture(surface);
-            canvas.DrawImageUnscaled(image, id * 160, 30 + row * 144);
-            if (row == 0) canvas.DrawString($"{id}   {labels[id]}", SystemFonts.MessageBoxFont!, Brushes.White, id * 160 + 12, 8);
+            canvas.DrawImageUnscaled(image, id * previewWidth, 30 + row * previewHeight);
+            if (row == 0) canvas.DrawString($"{id}   {labels[id]}", SystemFonts.MessageBoxFont!, Brushes.White, id * previewWidth + 12, 8);
         }
         sheet.Save(output, ImageFormat.Png);
         Console.WriteLine($"Rendered {labels.Length} wing IDs in all eight facings through the game particle renderer.");

@@ -79,7 +79,7 @@ internal static class ArmourWingParticles
         foreach (int side in Sides)
         {
             if (onlySide != 0 && side != onlySide) continue;
-            bool near = side == NearSide(direction);
+            bool near = profile < .001f || side == NearSide(direction);
             Vector2 root = attachment + across * (side * 5.5f);
             int opacity = (int)(218 + 12 * MathF.Sin(yaw) * side + 8 * flap);
 
@@ -113,9 +113,14 @@ internal static class ArmourWingParticles
                 float depth = thickness * (.34f + .66f * (1 - t) + .24f * MathF.Sin(t * MathF.PI)) *
                     (1 + .32f * profile) * (1 - .20f * MathF.Abs(cross));
                 float arch = tipLift * t * t;
-                return across * (side * span) + back * (sweep + camber + twist + shell * depth) +
+                // The raised outer rim widens slightly as well as receding.
+                // Match the vertical thickness offset to the projected rear
+                // axis so a south-facing wing cannot cancel its own depth.
+                float rearSign = MathF.Cos(yaw) < 0 ? -1f : 1f;
+                return across * (side * (span + shell * depth * .23f)) +
+                    back * (sweep + camber + twist + shell * depth) +
                     Vector2.UnitY * (height * .55f - 4 * u * flap + 4 * t * t - arch +
-                    shell * depth * .30f);
+                    shell * depth * .30f * rearSign);
             }
 
             int firstFrame = 0, nextFrame = 0;
