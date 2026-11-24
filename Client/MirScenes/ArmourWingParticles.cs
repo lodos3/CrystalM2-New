@@ -86,8 +86,8 @@ internal static class ArmourWingParticles
         bool felFire = effect == ArmourWings.FelFire;
         bool seraph = effect is ArmourWings.Archangel or ArmourWings.DawnSeraph;
         float north = MathF.Max(0, MathF.Cos(yaw));
-        float tipLift = felFire ? 36 * north * north : seraph ? 9 + 14 * north * north : 0;
         bool elemental = ArmourWings.IsElemental(effect);
+        float tipLift = felFire ? 36 * north * north : seraph ? 9 + 14 * north * north : 0;
         int segments = felFire || seraph || elemental ? 8 : 6;
         float thickness = effect switch
         {
@@ -113,6 +113,9 @@ internal static class ArmourWingParticles
             float spanLength = seraph ? 66 + 2 * flap : (felFire ? 60 : elemental ? 54 : 48) + 6 * flap;
             float sweepLength = (19 + 6 * flap + profile * profile * (near ? 23 : 12)) * RearDepthScale;
             float sweepCurve = (5 + 7 * profile) * RearDepthScale;
+            bool rearDiagonal = elemental && direction is (MirDirection.UpLeft or MirDirection.UpRight);
+            if (rearDiagonal)
+                sweepLength = Math.Min(sweepLength, spanLength * .40f - sweepCurve);
             // On a diagonal one wing's transverse and rear axes can cancel.
             // Keep its projected extent nonzero rather than flattening the art.
             float endpoint = across.X * side * spanLength + back.X * (sweepLength + sweepCurve);
@@ -137,6 +140,15 @@ internal static class ArmourWingParticles
                 float depth = thickness * (.34f + .66f * (1 - t) + .24f * MathF.Sin(t * MathF.PI)) *
                     (1 + .32f * profile) * (1 - .20f * MathF.Abs(cross));
                 float arch = tipLift * t * t;
+                // Lift the leading edge into a high arch without moving the shoulder
+                // socket or dragging the hanging lobes up with it.
+                if (elemental)
+                {
+                    float crown = Math.Clamp((88 - y) / 65, .15f, 1);
+                    float lift = 20 + 32 * north;
+                    if (rearDiagonal) lift += Math.Max(0, side * across.Y * spanLength) + 6;
+                    arch += lift * (t * (2 - t)) * crown;
+                }
                 // The raised outer rim widens slightly as well as receding.
                 // Match the vertical thickness offset to the projected rear
                 // axis so a south-facing wing cannot cancel its own depth.
@@ -232,130 +244,41 @@ internal static class ArmourWingParticles
                 Layer: SpellParticleLayer.EmissiveCore, FrameOnly: true));
         }
     }
-    // Orbit materials use the same RGB coverage atlas as the wing membranes.
+    // Distinct orbiting sun crests, amethyst crescents and inclined star instruments.
+    // Depth splitting follows each ornament's actual orbital position.
     private static void EmitElemental(SpellParticlePool pool, byte effect, Vector2 shoulder,
         MirDirection direction, long now, uint seed, int onlySide, float torsoYaw, float torsoRoll)
     {
-        float yaw = (int)direction * MathF.PI / 4 + torsoYaw;
-        Vector2 across = new(MathF.Cos(yaw), MathF.Sin(yaw) * .49f);
-        Vector2 back = new(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f);
-        float profile = MathF.Abs(MathF.Sin(yaw));
-        float clock = (now % 4800) * MathF.Tau / 4800 + (seed % 97) * .065f;
-        Vector2 attachment = BackAttachment(shoulder, direction, torsoYaw, torsoRoll);
+        bool solar = effect == ArmourWings.SolarAscendant, eclipse = effect == ArmourWings.Eclipse;
+        int count = solar ? 8 : eclipse ? 5 : 6;
+        int bank = WingPoseAtlas.DesignBank + effect - ArmourWings.Phoenix;
         int nearSide = NearSide(direction);
-        int light = LightColour(effect).ToArgb() & 0xFFFFFF;
-
-        // Particle colour is deliberately not full white: the cool/warm
-        // surface, luminous ridge and shadowed underside stay distinguishable.
-        void Dot(Vector2 position, float width, float height, Shape shape, int rgb, int alpha,
-            SpellParticleLayer layer = SpellParticleLayer.Emissive, float rotation = 0)
+        float phase = (now % 8200) * MathF.Tau / 8200 + (seed % 97) * .06f;
+        for (int i = 0; i < count; i++)
         {
-            int w = Math.Max(1, (int)MathF.Round(width));
-            pool.TryAdd(new SpellParticle(position, Vector2.Zero, now, 100, w,
-                Color.FromArgb(Math.Clamp(alpha, 1, 255), Color.FromArgb(unchecked((int)0xFF000000) | rgb)),
-                shape, 0, Aspect: Math.Max(1f, height) / w, Rotation: rotation, Layer: layer,
-                CastsLight: false, FrameOnly: true));
-        }
-
-        void Strip(Vector2 a, Vector2 b, float wa, float wb, Shape shape, int rgb, int alpha,
-            SpellParticleLayer layer = SpellParticleLayer.Emissive)
-        {
-            Vector2 axis = b - a;
-            if (axis.LengthSquared() < .15f) return;
-            Vector2 n = Vector2.Normalize(new Vector2(-axis.Y, axis.X));
-            Vector2 mid = (a + b) * .5f;
-            var quad = new SpriteQuad(a - mid - n * wa, b - mid - n * wb,
-                a - mid + n * wa, b - mid + n * wb);
-            pool.TryAdd(new SpellParticle(mid, Vector2.Zero, now, 100, 1,
-                Color.FromArgb(Math.Clamp(alpha, 1, 255), Color.FromArgb(unchecked((int)0xFF000000) | rgb)),
-                shape, 0, Layer: layer, CastsLight: false, FrameOnly: true, Ribbon: quad));
-        }
-
-        void AuraMaterial(Vector2 a, Vector2 b, float width, int variant)
-        {
-            Vector2 axis = b - a;
-            if (axis.LengthSquared() < .15f) return;
-            Vector2 n = Vector2.Normalize(new Vector2(-axis.Y, axis.X));
-            Vector2 mid = (a + b) * .5f;
-            var q = new SpriteQuad(a - mid - n * width, b - mid - n * width,
-                a - mid + n * width, b - mid + n * width);
-            int materialBank = WingPoseAtlas.DesignBank + effect - ArmourWings.Phoenix;
-            int frame = (int)((now / 220 + variant) % WingPoseAtlas.FrameCount(materialBank));
+            float a = i * MathF.Tau / count + phase;
+            float x = MathF.Cos(a), depth = MathF.Sin(a);
+            if (onlySide != 0 && onlySide != (depth >= 0 ? nearSide : -nearSide)) continue;
+            float radius = solar ? 32 : eclipse ? 35 : 39;
+            float altitude = solar ? -21 : eclipse ? -17 : (i % 2 == 0 ? -27 : -9);
+            var position = shoulder + new Vector2(radius * x, altitude + depth * (solar ? 27 : 17) - x * (eclipse ? 16 : 6));
+            float angle = solar ? MathF.Atan2(depth * 24, x * radius) + MathF.PI / 2 :
+                eclipse ? a + .45f : -.48f * a + i;
+            float size = (solar ? 23 : eclipse ? 30 : 27) * (.85f + .12f * depth);
+            Vector2 right = new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * size;
+            Vector2 down = new Vector2(-MathF.Sin(angle), MathF.Cos(angle)) * size;
+            var surface = new SpriteQuad(-right-down,right-down,-right+down,right+down);
+            int frame = (int)((now / 240 + i) % WingPoseAtlas.FrameCount(bank));
+            int alpha = (int)(194 + 39 * depth);
             for (int channel = 0; channel < 3; channel++)
-                pool.TryAdd(new SpellParticle(mid, Vector2.Zero, now, 100, 1,
-                    Color.FromArgb((165 << 24) | (255 << (channel * 8))),
-                    Shape.Wisp, 0, Layer: SpellParticleLayer.Emissive, Ribbon: q,
-                    CastsLight: false, FrameOnly: true)
-                    { CoveragePlane = WingPoseAtlas.Handle(materialBank, frame, channel) });
+                pool.TryAdd(new SpellParticle(position, Vector2.Zero, now, 100, 1,
+                    Color.FromArgb(alpha << 24 | 255 << (8 * channel)), Shape.Wisp, 0,
+                    Layer: SpellParticleLayer.Emissive, Ribbon: surface, CastsLight: false, FrameOnly: true)
+                    { CoveragePlane = WingPoseAtlas.Handle(bank,frame,channel) });
+            pool.TryAdd(new SpellParticle(position + right * .21f, Vector2.Zero, now, 100, 5,
+                Color.FromArgb((int)(110 + 60 * MathF.Sin(a * 3)), LightColour(effect)), Shape.Spark, 0,
+                Layer: SpellParticleLayer.EmissiveCore, CastsLight: false, FrameOnly: true));
         }
-
-        if (ArmourWings.IsAura(effect))
-        {
-            // Orbit half-selection is based on actual projected ground depth,
-            // not the facing's left/right order. Far half draws before body,
-            // near half after body. Both halves translate with the same pose.
-            const int steps = 16;
-            float pulse = .5f + .5f * MathF.Sin(clock * 2);
-            Vector2 centre = shoulder + new Vector2(0, 17);
-            for (int i = 0; i < steps; i++)
-            {
-                float a = i * MathF.Tau / steps + clock * .38f;
-                float b = a + MathF.Tau / steps;
-                float mid = (a + b) * .5f;
-                int side = MathF.Sin(mid) >= 0 ? nearSide : -nearSide;
-                if (onlySide != 0 && onlySide != side) continue;
-
-                if (effect == ArmourWings.SolarAscendant)
-                {
-                    Vector2 Ring(float q) => centre + new Vector2(MathF.Cos(q) * (28 + pulse * 2),
-                        MathF.Sin(q) * 12 - 12);
-                    Vector2 x = Ring(a), y = Ring(b);
-                    AuraMaterial(x, y, 5.2f, 0);
-                    Strip(x, y, 1.2f, 1.2f, Shape.WindRibbon, 0xFFDD7D, 195, SpellParticleLayer.EmissiveCore);
-                    if (i % 2 == 0)
-                    {
-                        Vector2 ray = new(MathF.Cos(mid) * 7, MathF.Sin(mid) * 4 - 5);
-                        Strip(x, x + ray, 2.4f, .3f, Shape.WindRibbon, 0xE99035, 190);
-                        Dot(x + ray, 4, 7, Shape.Spark, 0xFFF1BB, 170, SpellParticleLayer.EmissiveCore);
-                    }
-                }
-                else if (effect == ArmourWings.Eclipse)
-                {
-                    Vector2 Ring(float q) => centre + new Vector2(MathF.Cos(q) * 29,
-                        MathF.Sin(q) * 13 - 8);
-                    Vector2 x = Ring(a), y = Ring(b);
-                    AuraMaterial(x, y, 6.5f, 0);
-                    Strip(x, y, 1, 1, Shape.WindRibbon, 0xA15CEA, 160, SpellParticleLayer.EmissiveCore);
-                    if (i % 3 == 0)
-                    {
-                        Vector2 end = x + new Vector2(5 * MathF.Sin(mid * 3 + clock),
-                            -18 - 12 * (.5f + .5f * MathF.Cos(mid + clock)));
-                        Strip(x, end, 5, .5f, Shape.WindRibbon, 0x582875, 145);
-                        Dot(end, 5, 8, Shape.Wisp, 0xB890F8, 115, SpellParticleLayer.EmissiveCore);
-                    }
-                }
-                else
-                {
-                    // Two inclined orbital planes cross above the waist.
-                    for (int ring = 0; ring < 2; ring++)
-                    {
-                        float slope = ring == 0 ? .54f : -.54f;
-                        Vector2 Orbit(float q) => centre + new Vector2(32 * MathF.Cos(q),
-                            11 * MathF.Sin(q) + slope * 32 * MathF.Cos(q) - 15);
-                        Vector2 x = Orbit(a), y = Orbit(b);
-                        AuraMaterial(x, y, 3.4f, ring);
-                        Strip(x, y, .7f, .7f, Shape.WindRibbon, 0xBEC9FF, 175, SpellParticleLayer.EmissiveCore);
-                        if ((i + ring) % 6 == 0)
-                            Dot(x, 6, 6, Shape.Flash, ring == 0 ? 0xDCEFFF : 0xE5BEFF,
-                                190, SpellParticleLayer.EmissiveCore);
-                    }
-                }
-            }
-            return;
-        }
-
     }
-
     private static readonly int[] Sides = [-1, 1];
 }
-

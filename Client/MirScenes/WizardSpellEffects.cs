@@ -216,6 +216,21 @@ internal static partial class WizardSpellEffects
         int mantle = frost ? fields.Read(tuning.MantleColour) : spell == Spell.MeteorShower ? fields.Read(tuning.MantleColour2) : Gold;
         int core = frost ? IceWhite : Hot;
         float phase = frameIndex * fields.Read(tuning.Phase);
+        if (spell == Spell.FireBall)
+        {
+            // Rotate individual flame lobes around the flight centre. The head
+            // keeps its volume as its directional wake turns across the map.
+            for (int i = 0; i < 8; i++)
+            {
+                float theta = phase * .25f + i * MathF.Tau / 8;
+                Vector2 offset = Ellipse(theta, 14, 14);
+                frame.Clip(head + offset, 25, 27, Shape.FireSequence, phase * .18f + i * .23f,
+                    i % 3 == 0 ? mantle : rim, .96f, Layer.EmissiveCore, theta,
+                    emitter: "Wizard.FireBall.Corona");
+            }
+            frame.Sprite(head, 32, 32, Shape.Orb, core, 1f, Layer.EmissiveCore,
+                light: true, emitter: "Wizard.FireBall.HotCentre");
+        }
         if (frost) frame.Clip(head, 22, 17, Shape.FireSequence, phase * .24f, Ice, .8f, Layer.EmissiveCore, angle);
 
         // The projectile core is made of individual directional flame tongues,

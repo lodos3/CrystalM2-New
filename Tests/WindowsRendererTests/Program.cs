@@ -20,9 +20,9 @@ internal static class Program
             WingIntersectionChecks.Render(singleRoot, singleDestination, subframes);
             return;
         }
-        if (args is ["--wing-preview", var data, var output])
+        if (args is [("--wing-preview" or "--elemental-preview"), var data, var output])
         {
-            ArmourWingChecks.Render(data, output);
+            ArmourWingChecks.Render(data, output, args[0] == "--elemental-preview");
             return;
         }
         if (args is ["--compare-spell-poses", var directory])
@@ -227,6 +227,7 @@ internal static class Program
         TestSlashRibbonShader(device);
         TestSignatureSpellEffects(device);
         TestLegacySpellEffects(device);
+        TestFullParticlePool(device);
         TestWizardProjection();
         TestWarriorProjection();
         TestTaoistProjection();
@@ -434,19 +435,28 @@ internal static class Program
                 LegacySpellEffects.Emit(pool, visual, feet, Vector2.UnitX, 1000);
                 pool.Advance(now);
             }
+            foreach (ref readonly var particle in pool.Active)
+                Check(particle.CoveragePlane == 0, $"{spell} {phase} emitted a sprite coverage plane.");
             device.Clear(Color.Black);
             device.SpellParticles.Draw(pool.Active, Vector2.Zero, now, ground: true, emission: emission);
             device.SpellParticles.Draw(pool.Active, Vector2.Zero, now, ground: false, emission: emission, sizeScale: 1.28f);
             if (!emission) device.SpellParticles.Draw(pool.Active, Vector2.Zero, now, ground: false, sizeScale: 1.28f, emissiveOverlay: true);
             using var image = device.Capture(surface);
             int lit = 0;
+            int red = 0, blue = 0;
             for (int y = 8; y < image.Height - 8; y += 2)
             for (int x = 12; x < image.Width - 12; x += 2)
             {
                 Color pixel = image.GetPixel(x, y);
+                red += pixel.R;
+                blue += pixel.B;
                 if (Math.Max(pixel.R, Math.Max(pixel.G, pixel.B)) > 24) lit++;
             }
             Check(lit > 5, $"{spell} {phase} must render {(emission ? "light" : "visible art")}. Samples {lit}.");
+            if (emission && spell is (Spell.FireBall or Spell.SoulFireBall or Spell.FireWall))
+                Check(red > blue, $"{spell} must cast warm light.");
+            if (emission && spell is (Spell.FrostCrunch or Spell.Blizzard))
+                Check(blue > red, $"{spell} must cast cold light.");
         }
     }
 
@@ -1181,8 +1191,49 @@ internal static class Program
         using (var image = device.Capture(target))
         {
             Color centre = image.GetPixel(32, 32);
-            Check(centre.R > 150 && centre.G < 20, "Visual particle grading must leave the authored light colour intact.");
+            Check(centre.G > 150 && centre.R < 20, "The light must follow the graded spell colour.");
         }
+        device.Clear(Color.Black);
+        device.SpellParticles.Draw(particles, Vector2.Zero, 1000, ground: false, emission: true, grade: grade, colour: Vector3.UnitZ);
+        using (var image = device.Capture(target))
+        {
+            Color centre = image.GetPixel(32, 32);
+            Check(centre.B > 150 && centre.G < 20, "An explicit spell light colour must take precedence over hue grading.");
+        }
+    }
+
+    private static void TestFullParticlePool(RendererDevice device)
+    {
+        using var target = new Texture(device, 320, 192, true);
+        using var surface = target.GetSurface();
+        using var original = device.GetBackBuffer();
+        device.SetRenderTarget(surface);
+        try
+        {
+            var particles = new SpellParticle[2048];
+            for (int i = 0; i < particles.Length; i++)
+                particles[i] = new(new Vector2(8 + i * 17 % 300, 8 + i * 31 % 170), Vector2.Zero, 0, 1000, 8,
+                    i % 2 == 0 ? Color.OrangeRed : Color.SkyBlue, SpellParticleShape.Spark, 0,
+                    Layer: i % 3 == 0 ? SpellParticleLayer.Emissive : SpellParticleLayer.EmissiveCore);
+            int textures = device.TextureCount, maxDraws = 0;
+            long bytes = device.TextureBytes;
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            for (int frame = 0; frame < 30; frame++)
+            {
+                device.BeginFrame();
+                device.Clear(Color.Black);
+                device.SpellParticles.Draw(particles, Vector2.Zero, frame * 16, ground: false, emissiveOverlay: true);
+                device.SpellParticles.Draw(particles, Vector2.Zero, frame * 16, ground: false, emission: true);
+                device.Sprite.End();
+                maxDraws = Math.Max(maxDraws, device.DrawCalls);
+            }
+            using var image = device.Capture(surface);
+            watch.Stop();
+            Check(maxDraws <= 12 && device.TextureCount == textures && device.TextureBytes == bytes,
+                $"Full particle pool must stay batched and reuse texture memory. Peak draw calls {maxDraws}.");
+            Console.WriteLine($"2048 visible particles plus emission, 30 WARP frames at 320x192: {watch.Elapsed.TotalMilliseconds/30:F1} ms/frame, {maxDraws} peak draw calls, stable texture memory.");
+        }
+        finally { device.SetRenderTarget(original); }
     }
 
     private static void TestRuneOpacity(RendererDevice device, Surface target)

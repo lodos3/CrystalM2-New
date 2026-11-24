@@ -16,7 +16,12 @@ internal static class ShapedLightPass
     private static ParticleLight _particles;
     private readonly record struct Shape(Texture Texture, Rectangle Bounds, Vector4 Tint, ShaderEffect Shader, Vector4 Cone);
     private readonly record struct Halo(Rectangle Bounds, Vector4 Tint);
-    private readonly record struct ParticleHalo(Vector2 Position, int Tint, float Energy);
+    private readonly record struct ParticleHalo(Vector2 Position, Vector3 WeightedColour, float Weight, float Energy);
+    private static SpellParticleGrade LightGrade => SpellParticleGrade.Neutral with
+    {
+        Hue = GraphicsTuning.ParticleHue.Current * (MathF.PI / 180f),
+        HighlightColour = GraphicsTuning.ParticleCoreColour.Current / 100f
+    };
     private readonly record struct ParticleLight(SpellParticlePool Pool, Vector2 Camera, long Time,
         float Intensity, float Radius, float VisualSize, float Warmth, Vector3? Colour, Rectangle Bounds);
     private readonly record struct Filter(Scratch Scratch, Rectangle Region, int Divisor, int Padding, int Blur);
@@ -86,9 +91,12 @@ internal static class ShapedLightPass
         var screen = new Rectangle(-margin, -margin, Settings.ScreenWidth + margin * 2, Settings.ScreenHeight + margin * 2);
         Span<ParticleHalo> glowCentres = stackalloc ParticleHalo[12];
         int glowCount = 0;
+        bool halosEnabled = emitter.GlowRadius.Current > 0 && emitter.GlowStrength.Current > 0;
+        if (!halosEnabled && emitter.Shape.Current == 1) return;
+        var palette = new ParticlePalette(LightGrade, GraphicsTuning.SpellSaturation.Current / 100f);
         foreach (ref readonly SpellParticle particle in pool.Active)
         {
-            if (!particle.CastsLight || particle.LightEnergy <= 0) continue;
+            if (particle.CoveragePlane > 0 || !particle.CastsLight || particle.LightEnergy <= 0) continue;
             float age = particle.Age(now);
             Vector2 point = particle.Position(now) + camera;
             var light = particle.Bounds(point, particle.Dimensions(age, radius * (particle.Ground ? 1f : visualSize)), radius,
@@ -98,41 +106,35 @@ internal static class ShapedLightPass
 
             // Sample one soft halo per nearby group of larger emitters. Their exact silhouettes
             // still contribute to the shaped pass, including all the smaller sparks.
-            float energy = intensity * particle.LightEnergy * particle.Fade(age) * particle.Colour.A / 255f;
-            if (energy <= .025f || particle.Size < 18) continue;
-            // The three coverage planes form one coloured emitter at the same position.
-            // Only its first plane carries the combined, frame-specific halo colour.
-            Vector3 rgb;
-            if (particle.CoveragePlane > 0)
-            {
-                if (SpellPoseAtlas.GetPlane(particle.CoveragePlane).HaloColour is not { } combined) continue;
-                rgb = combined;
-            }
-            else
-            {
-                Color tintAtAge = particle.ColourAt(age);
-                rgb = new Vector3(tintAtAge.R, tintAtAge.G, tintAtAge.B) / 255f;
-            }
+            if (!halosEnabled || particle.Size < 18) continue;
+            Color tintAtAge = particle.ColourAt(age);
+            float energy = intensity * particle.LightEnergy * particle.Fade(age) * (tintAtAge.A / 255f) * (particle.Emissive ? .65f : 1f);
+            if (energy <= .025f) continue;
+            Vector3 rgb = colour ?? palette.Apply(new Vector3(tintAtAge.R, tintAtAge.G, tintAtAge.B) / 255f, particle.Layer);
             int index = -1, weakest = 0;
             for (int i = 0; i < glowCount; i++)
             {
                 if (Vector2.DistanceSquared(point, glowCentres[i].Position) < 64 * 64) { index = i; break; }
                 if (glowCentres[i].Energy < glowCentres[weakest].Energy) weakest = i;
             }
-            if (index < 0 && glowCount < glowCentres.Length)
-                index = glowCount++;
-            else
+            if (index >= 0)
             {
-                if (index < 0) index = weakest;
-                if (energy <= glowCentres[index].Energy) continue;
+                var group = glowCentres[index];
+                glowCentres[index] = new(energy > group.Energy ? point : group.Position,
+                    group.WeightedColour + rgb * energy, group.Weight + energy, Math.Max(energy, group.Energy));
+                continue;
             }
-            rgb = colour ?? rgb;
-            rgb = Vector3.Clamp(rgb * new Vector3(1 + warmth, 1, 1 - warmth), Vector3.Zero, Vector3.One);
-            Color tint = Color.FromArgb((int)(rgb.X * 255), (int)(rgb.Y * 255), (int)(rgb.Z * 255));
-            glowCentres[index] = new ParticleHalo(point, tint.ToArgb(), energy);
+            if (glowCount < glowCentres.Length) index = glowCount++;
+            else if (energy > glowCentres[weakest].Energy) index = weakest;
+            else continue;
+            glowCentres[index] = new(point, rgb * energy, energy, energy);
         }
         foreach (ParticleHalo halo in glowCentres[..glowCount])
-            AddHalo(new Point((int)halo.Position.X, (int)halo.Position.Y), Color.FromArgb(halo.Tint), halo.Energy, emitter, LightSource.Spell);
+        {
+            Vector3 rgb = Vector3.Clamp(halo.WeightedColour / halo.Weight * new Vector3(1 + warmth, 1, 1 - warmth), Vector3.Zero, Vector3.One);
+            AddHalo(new Point((int)halo.Position.X, (int)halo.Position.Y),
+                Color.FromArgb((int)(rgb.X * 255), (int)(rgb.Y * 255), (int)(rgb.Z * 255)), halo.Energy, emitter, LightSource.Spell);
+        }
         if (emitter.Shape.Current != 1 && !bounds.IsEmpty) _particles = new(pool, camera, now, intensity, radius, visualSize, warmth, colour, bounds);
     }
 
@@ -298,8 +300,12 @@ internal static class ShapedLightPass
             var (pool, camera, now, intensity, radius, visualSize, warmth, colour, _) = _particles;
             var clip = new Rectangle(-emitter.Blur.Current, -emitter.Blur.Current,
                 target.Texture.Width + emitter.Blur.Current * 2, target.Texture.Height + emitter.Blur.Current * 2);
-            device.SpellParticles.Draw(pool.Active, camera, now, true, intensity, true, radius, warmth, clip, colour, lightRadius: radius);
-            device.SpellParticles.Draw(pool.Active, camera, now, false, intensity, true, radius * visualSize, warmth, clip, colour, lightRadius: radius);
+            var grade = LightGrade;
+            float saturation = GraphicsTuning.SpellSaturation.Current / 100f;
+            device.SpellParticles.Draw(pool.Active, camera, now, true, intensity, true, radius, warmth, clip, colour,
+                lightRadius: radius, saturation: saturation, grade: grade);
+            device.SpellParticles.Draw(pool.Active, camera, now, false, intensity, true, radius * visualSize, warmth, clip, colour,
+                lightRadius: radius, saturation: saturation, grade: grade);
         }
     }
 

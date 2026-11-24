@@ -11,6 +11,24 @@ internal readonly record struct SpellParticleGrade(float Hue, float HighlightCol
     internal static SpellParticleGrade Neutral => new(0, 0, 1, 0, 0);
 }
 
+internal readonly struct ParticlePalette(SpellParticleGrade grade, float saturation)
+{
+    private readonly float _sin = MathF.Sin(grade.Hue), _cos = MathF.Cos(grade.Hue);
+
+    internal Vector3 Apply(Vector3 rgb, SpellParticleLayer layer)
+    {
+        if (grade.Hue != 0)
+        {
+            Vector3 axis = new(.57735027f);
+            rgb = rgb * _cos + Vector3.Cross(axis, rgb) * _sin + axis * (Vector3.Dot(axis, rgb) * (1 - _cos));
+        }
+        float chroma = saturation * (layer == SpellParticleLayer.EmissiveCore ? 1 + grade.HighlightColour : 1);
+        if (chroma == 1) return Vector3.Max(rgb, Vector3.Zero);
+        Vector3 grey = new(Vector3.Dot(rgb, new Vector3(.2126f, .7152f, .0722f)));
+        return Vector3.Max(grey + (rgb - grey) * chroma, Vector3.Zero);
+    }
+}
+
 internal sealed class SpellParticleRenderer
 {
     private readonly RendererDevice _device;
@@ -52,10 +70,8 @@ internal sealed class SpellParticleRenderer
             DataRectangle upload = _atlas.BeginUpload();
             upload.Data.Write(SpellParticleAtlas.Generate());
             _atlas.EndUpload();
-            // Material generation and uploads happen at renderer creation,
-            // not on the first in-game @wings selection.
-            for (int i = 0; i < WingPoseAtlas.ElementalPageCount; i++)
-                WingPage(WingPoseAtlas.FirstElementalPage + i);
+            // WingPage uploads each prepainted appearance on first display.
+            // Casting a spell only needs the shared particle atlas.
         }
         catch
         {
@@ -80,9 +96,8 @@ internal sealed class SpellParticleRenderer
         Texture previousAuxiliary = _device.AuxiliaryTexture;
         Span<Vector4> constants = stackalloc Vector4[RendererDevice.EffectConstantCount];
         _device.CopyPixelShaderConstants(constants);
-        var look = emission ? SpellParticleGrade.Neutral : grade ?? SpellParticleGrade.Neutral;
-        float sin = MathF.Sin(look.Hue), cos = MathF.Cos(look.Hue);
-        Vector3 greyAxis = new(.57735027f);
+        var look = grade ?? SpellParticleGrade.Neutral;
+        var palette = new ParticlePalette(look, saturation);
         Rectangle clip = clipping ?? new Rectangle(0, 0, _device.TargetWidth, _device.TargetHeight);
         // DrawLayer is a local function after try/finally, so its shared
         // animation and shader-mode state belongs in the enclosing Draw scope.
@@ -168,7 +183,7 @@ internal sealed class SpellParticleRenderer
             var layerBlend = _device.ArtworkBlend;
             foreach (ref readonly SpellParticle particle in layer)
             {
-                if (particle.Ground != ground || (emission && !particle.CastsLight) ||
+                if (particle.CoveragePlane > 0 || particle.Ground != ground || (emission && !particle.CastsLight) ||
                     (filter.HasValue && particle.Layer != filter.Value)) continue;
                 float age = particle.Age(now);
                 Vector2 point = particle.Position(now) + camera;
@@ -179,9 +194,9 @@ internal sealed class SpellParticleRenderer
                 if (!bounds.IntersectsWith(clip)) continue;
 
                 Vector4 tint = RendererDevice.ToVector(particle.ColourAt(age));
-                if (colour is { } rgb) tint = new Vector4(rgb, tint.W);
-                tint.X = Math.Clamp(tint.X * (1 + warmth), 0, 1);
-                tint.Z = Math.Clamp(tint.Z * (1 - warmth), 0, 1);
+                var rgb = colour ?? palette.Apply(new Vector3(tint.X, tint.Y, tint.Z), particle.Layer);
+                if (warmth != 0) rgb *= new Vector3(1 + warmth, 1, 1 - warmth);
+                tint = new Vector4(Vector3.Max(rgb, Vector3.Zero), tint.W);
                 float glowAmount = glowPass ? glowPolicy.GlowAmount(new Vector3(tint.X, tint.Y, tint.Z)) : 1f;
                 if (glowAmount <= 0f) continue;
                 float alpha = particle.Fade(age);
@@ -196,15 +211,7 @@ internal sealed class SpellParticleRenderer
                 }
                 else
                 {
-                    Vector3 visible = new(tint.X, tint.Y, tint.Z);
-                    if (look.Hue != 0)
-                        visible = visible * cos + Vector3.Cross(greyAxis, visible) * sin +
-                            greyAxis * (Vector3.Dot(greyAxis, visible) * (1 - cos));
-                    float luma = Vector3.Dot(visible, new Vector3(.2126f, .7152f, .0722f));
-                    float chroma = saturation * (particle.Layer == SpellParticleLayer.EmissiveCore ? 1 + look.HighlightColour : 1);
-                    visible = Vector3.Max(new Vector3(luma) + (visible - new Vector3(luma)) * chroma, Vector3.Zero);
-                    visible *= exposure * glowAmount;
-                    tint = new Vector4(visible, tint.W);
+                    tint = new Vector4(new Vector3(tint.X, tint.Y, tint.Z) * (exposure * glowAmount), tint.W);
                 }
                 // The normal particle shader remains in place. Only actual
                 // curved slash ribbon geometry opts into moving edge/sheen
@@ -229,9 +236,6 @@ internal sealed class SpellParticleRenderer
                     source = wing.Source;
                     atlas = WingPage(wing.Page);
                 }
-                // Positive coverage IDs belonged to legacy spell silhouettes. They are
-                // deliberately not rendered; negative IDs remain dedicated to cosmetic wings.
-                else if (particle.CoveragePlane > 0) continue;
                 // These are independent channel masks. Blending one over another as alpha
                 // would discard light from the earlier channels and change the frame hue.
                 _device.ArtworkBlend = particle.CoveragePlane != 0 && !glowPass ? SpriteBlendMode.Additive : layerBlend;

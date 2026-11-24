@@ -11179,6 +11179,7 @@ namespace Client.MirScenes
 
             int firstRow = Math.Max(1, User.Movement.Y - ViewRangeY);
             int lastRow = Math.Min(Height - 1, User.Movement.Y + ViewRangeY + 25);
+            IndexGroundSpellRows(firstRow, lastRow);
             for (int y = firstRow; y <= lastRow; y++)
             {
                 for (int x = User.Movement.X - ViewRangeX; x <= User.Movement.X + ViewRangeX; x++)
@@ -11324,7 +11325,7 @@ namespace Client.MirScenes
                 }
 
                 // Ground effects share the map's depth order and can still sit behind their caster.
-                DrawGroundSpellRow(y, firstRow, lastRow);
+                DrawGroundSpellRow(y - firstRow);
                 for (int x = User.Movement.X - ViewRangeX; x <= User.Movement.X + ViewRangeX; x++)
                 {
                     if (x < 0) continue;

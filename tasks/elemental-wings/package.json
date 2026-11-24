@@ -1,0 +1,1 @@
+{"private":true,"type":"module","scripts":{"bake":"node bake.mjs"},"dependencies":{"@resvg/resvg-js":"2.6.2"}}

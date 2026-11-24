@@ -72,7 +72,7 @@ internal static class ArmourWingChecks
         Console.WriteLine("Verified ten elemental designs across eight facings, five times, split layers and pose motion.");
     }
 
-    internal static void Render(string data, string output)
+    internal static void Render(string data, string output, bool elementalOnly = false)
     {
         const int previewWidth = 224, previewHeight = 180;
         using var window = new Form();
@@ -94,13 +94,19 @@ internal static class ArmourWingChecks
             (MirDirection.Right, 366), (MirDirection.Left, 174),
             (MirDirection.Right, 310)
         ];
-        using var sheet = new Bitmap(labels.Length * previewWidth, 30 + (8 + extra.Length) * previewHeight);
+        int first = elementalOnly ? 10 : 0;
+        MirDirection[] backViews = [MirDirection.UpLeft, MirDirection.Up, MirDirection.UpRight];
+        using var sheet = elementalOnly ? new Bitmap(5*previewWidth, 6*(previewHeight+30)) :
+            new Bitmap(labels.Length * previewWidth, 30 + (8 + extra.Length) * previewHeight);
         using var canvas = Graphics.FromImage(sheet);
         canvas.Clear(Color.FromArgb(22, 25, 30));
         var origin = new Vector2(previewWidth / 2f - 24, 112);
-        CheckBlendKeepsColour();
-        CheckNorthFelFireTips();
-        CheckGeneratedVolume();
+        if (!elementalOnly)
+        {
+            CheckBlendKeepsColour();
+            CheckNorthFelFireTips();
+            CheckGeneratedVolume();
+        }
         CheckElementalDesigns();
         if (!ArmourWings.TrySelect("auto", out var auto) || auto.HasValue ||
             !ArmourWings.TrySelect("off", out var off) || off != 0 || ArmourWings.TrySelect("20", out _) ||
@@ -110,12 +116,12 @@ internal static class ArmourWingChecks
             !ArmourWings.TrySelect("7", out var bone) || bone != ArmourWings.DemonicBone ||
             !ArmourWings.TrySelect("5", out var electric) || electric != ArmourWings.CelestialElectric)
             throw new InvalidOperationException("Invalid wing preview selector mapping.");
-        for (int id = 0; id < labels.Length; id++)
-        for (int row = 0; row < 8 + extra.Length; row++)
+        for (int id = first; id < labels.Length; id++)
+        for (int row = 0; row < (elementalOnly ? backViews.Length : 8 + extra.Length); row++)
         {
             if (!ArmourWings.TrySelect(id.ToString(), out var effect) || !effect.HasValue) throw new InvalidDataException();
             if (row >= 8 && id < 2) continue; // Legacy baked wings use a separate pose index.
-            MirDirection facing = row < 8 ? (MirDirection)row : extra[row - 8].Facing;
+            MirDirection facing = elementalOnly ? backViews[row] : row < 8 ? (MirDirection)row : extra[row - 8].Facing;
             int pose = row < 8 ? (int)facing * 4 : extra[row - 8].BodyFrame;
             if (!armour.TryReadFrame(pose, out var actor)) throw new InvalidDataException("Missing actor pose.");
             using var body = new Texture(device, actor.Width, actor.Height);
@@ -146,11 +152,34 @@ internal static class ArmourWingChecks
                 ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, near, motion.Yaw, motion.Roll);
             if (split || !behind) Wings();
             using var image = device.Capture(surface);
-            canvas.DrawImageUnscaled(image, id * previewWidth, 30 + row * previewHeight);
-            if (row == 0) canvas.DrawString($"{id}   {labels[id]}", SystemFonts.MessageBoxFont!, Brushes.White, id * previewWidth + 12, 8);
+            int x = (elementalOnly ? (id-first)%5 : id)*previewWidth;
+            int y = elementalOnly ? (row*2+(id-first)/5)*(previewHeight+30) : row*previewHeight;
+            if (elementalOnly)
+            {
+                int top = 0;
+                while (top < actor.Width * actor.Height && actor.Bgra[top * 4 + 3] == 0) top++;
+                int head = (int)origin.Y + actor.OffsetY + top / actor.Width;
+                int raisedLeft = 0, raisedRight = 0;
+                for (int py = 0; py < head - 4; py++)
+                for (int px = 0; px < image.Width; px++)
+                {
+                    var pixel = image.GetPixel(px, py);
+                    if (Math.Max(pixel.R, Math.Max(pixel.G, pixel.B)) <= 64) continue;
+                    if (px < previewWidth / 2) raisedLeft++;
+                    else raisedRight++;
+                }
+                bool high = ArmourWings.IsAura(effect.Value) ? raisedLeft + raisedRight >= 12 :
+                    raisedLeft >= 6 && raisedRight >= 6;
+                if (!high) throw new InvalidDataException($"Wing {id} sits below the head in {facing}.");
+            }
+            canvas.DrawImageUnscaled(image, x, 30 + y);
+            if (row == 0 || elementalOnly)
+                canvas.DrawString(elementalOnly ? $"{id}   {labels[id]}   ·   {facing}" : $"{id}   {labels[id]}",
+                    SystemFonts.MessageBoxFont!, Brushes.White, x + 12, y + 8);
         }
         sheet.Save(output, ImageFormat.Png);
-        Console.WriteLine($"Rendered {labels.Length} wing IDs in all eight facings and sampled action frames through the game particle renderer.");
+        Console.WriteLine(elementalOnly ? "Verified ten designs rise above the head in all three rear views." :
+            $"Rendered {labels.Length} wing IDs in all eight facings and sampled action frames through the game particle renderer.");
         void Wings() => device.SpellParticles.Draw(pool.Active, origin, 480, false, emissiveOverlay: true, exposure: 1.22f);
 
         void CheckGeneratedVolume()
@@ -185,6 +214,7 @@ internal static class ArmourWingChecks
                     var faces = all.Where(p => p.CoveragePlane < 0 && p.Layer == SpellParticleLayer.EmissiveCore && p.Ribbon.HasValue).ToArray();
                     if (shells.Length == 0 || faces.Length == 0)
                         throw new InvalidDataException($"Wing {effect} has no volume shell.");
+                    var volumeBySocket = new Dictionary<Vector2, float>();
                     foreach (var shell in shells)
                     {
                         var face = faces.First(p => p.Origin == shell.Origin &&
@@ -192,12 +222,16 @@ internal static class ArmourWingChecks
                             p.CoveragePlane == shell.CoveragePlane);
                         var s = shell.Ribbon.Value;
                         var f = face.Ribbon.Value;
-                        float separation = Vector2.Distance(s.TopLeft, f.TopLeft);
-                        if (!float.IsFinite(separation) || separation < 1)
-                            throw new InvalidDataException($"Wing {effect} collapsed to a single plane in {facing}.");
+                        float separation = Math.Max(Vector2.Distance(s.TopLeft, f.TopLeft), Vector2.Distance(s.TopRight, f.TopRight));
+                        if (!float.IsFinite(separation)) throw new InvalidDataException($"Invalid shell depth in wing {effect}.");
+                        volumeBySocket[shell.Origin] = Math.Max(separation, volumeBySocket.GetValueOrDefault(shell.Origin));
                         if (s.Bounds(shell.Origin).Width < 1 || f.Bounds(face.Origin).Width < 1)
                             throw new InvalidDataException($"Wing {effect} contains a degenerate projection in {facing}.");
                     }
+                    // The membrane and shell meet at the shoulder. Each wing
+                    // must develop visible thickness away from its socket.
+                    if (volumeBySocket.Values.Any(separation => separation < 1))
+                        throw new InvalidDataException($"Wing {effect} collapsed to a single plane in {facing}.");
                     if (facing is MirDirection.Right or MirDirection.Left)
                     {
                         int near = ArmourWingParticles.NearSide(facing);

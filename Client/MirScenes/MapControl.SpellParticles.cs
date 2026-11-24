@@ -481,16 +481,42 @@ public sealed partial class MapControl
         Math.Abs(cell.X - User.Movement.X) <= ViewRangeX + 2 &&
         Math.Abs(cell.Y - User.Movement.Y) <= ViewRangeY + 2;
 
-    private void DrawGroundSpellRow(int y, int firstRow, int lastRow)
-    {
-        if (!Settings.Effect || _spellParticles.Active.IsEmpty) return;
-        float start = y == firstRow ? float.NegativeInfinity : y * CellHeight;
-        float end = y == lastRow ? float.PositiveInfinity : (y + 1) * CellHeight;
-        int count = 0;
-        foreach (ref readonly SpellParticle particle in _spellParticles.Active)
-            if (particle.Ground && particle.Layer != SpellParticleLayer.Floor && particle.DepthAt(CMain.Time) >= start && particle.DepthAt(CMain.Time) < end)
-                _groundSpellRow[count++] = particle;
+    private int[] _groundHeads = [], _groundTails = [];
+    private int _indexedGroundRows;
+    private readonly int[] _groundNext = new int[SpellParticleCapacity];
 
+    private void IndexGroundSpellRows(int firstRow, int lastRow)
+    {
+        int rows = lastRow - firstRow + 1;
+        _indexedGroundRows = 0;
+        if (rows <= 0 || !Settings.Effect || _spellParticles.Active.IsEmpty) return;
+        _indexedGroundRows = rows;
+        if (_groundHeads.Length < rows)
+        {
+            _groundHeads = new int[rows];
+            _groundTails = new int[rows];
+        }
+        Array.Fill(_groundHeads, -1, 0, rows);
+        var particles = _spellParticles.Active;
+        for (int i = 0; i < particles.Length; i++)
+        {
+            ref readonly var p = ref particles[i];
+            if (!p.Ground || p.Layer == SpellParticleLayer.Floor) continue;
+            int row = Math.Clamp((int)MathF.Floor(p.DepthAt(CMain.Time) / CellHeight) - firstRow, 0, rows - 1);
+            if (_groundHeads[row] < 0) _groundHeads[row] = i;
+            else _groundNext[_groundTails[row]] = i;
+            _groundTails[row] = i;
+            _groundNext[i] = -1;
+        }
+    }
+
+    private void DrawGroundSpellRow(int row)
+    {
+        if ((uint)row >= (uint)_indexedGroundRows || _groundHeads[row] < 0 || !Settings.Effect) return;
+        int count = 0;
+        var particles = _spellParticles.Active;
+        for (int i = _groundHeads[row]; i >= 0; i = _groundNext[i])
+            _groundSpellRow[count++] = particles[i];
         DrawSpellParticles(_groundSpellRow.AsSpan(0, count), ground: true);
     }
 

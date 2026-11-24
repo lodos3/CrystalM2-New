@@ -85,8 +85,8 @@ internal static class SpellVfxAssetChecks
             Check(PixelsChanged(beforeImage, afterImage), "A saved override must change the D3D11 preview.");
             var roar = SpellVfxAssets.CollectEmitters(() => SampleRoar(Spell.LionRoar));
             var ring = roar.Single(item => item.Value.Particle.Shape == SpellParticleShape.WarriorRing);
-            Check(roar.Count == 9 && roar.ContainsKey("Spell.Pose-mask"),
-                "Lion Roar should expose its legacy pose and eight accent emitters separately.");
+            Check(roar.Count >= 8 && roar.Values.All(layer => layer.Particle.CoveragePlane == 0),
+                $"Lion Roar should expose its individual particle emitters without legacy sprite planes. Found {roar.Count} emitters.");
             var emitter = new JsonObject
             {
                 ["StartSize"] = new JsonObject { ["Min"] = 160, ["Max"] = 160 },
