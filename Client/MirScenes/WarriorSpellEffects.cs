@@ -53,8 +53,11 @@ internal static partial class WarriorSpellEffects
         {
             // Keep the source and reach in world pixels as the artwork size is adjusted.
             float windStrength = (fields.Read(tuning.WindStrength) + fields.Read(tuning.WindStrength2) * Ease(progress * fields.Read(tuning.WindStrength3))) * (1 - fields.Read(tuning.WindStrength4) * Ease((progress - fields.Read(tuning.WindStrength5)) / fields.Read(tuning.WindStrengthDivisor)));
+            // Fade the whole bow and its wake to zero before the cue expires.
+            windStrength *= 1 - Ease((progress - .69f) / .31f);
             var wind = new Frame(pool, feet, now, windStrength, size, seed, scalePositions: false);
-            float flight = Math.Clamp((now - start) / (float)WarriorStrikeTiming.ThrustTravel, 0, 1);
+            float flight = Math.Clamp((now - start) /
+                (float)WarriorStrikeTiming.ThrustTravelForReach(visual.ExtraReach), 0, 1);
             ThrustWind(wind, feet, facing, progress, flight, visual.ExtraReach);
             return;
         }
@@ -99,7 +102,7 @@ internal static partial class WarriorSpellEffects
                 DrakeContact(frame, feet, progress, (now - start) / 1000f);
                 break;
             case Spell.BladeAvalanche when visual.Phase == SpellVisualPhase.Swing:
-                Avalanche(frame, feet, facing, progress, (float)(now - start));
+                Avalanche(frame, feet, facing, progress, (float)(now - start), visual.ExtraReach);
                 break;
             case Spell.SlashingBurst when visual.Phase == SpellVisualPhase.Swing:
                 Burst(frame, feet, facing, progress);
@@ -464,7 +467,7 @@ internal static partial class WarriorSpellEffects
             _ => tuning.Factor4
         };
         bool edgeOn = direction is MirDirection.Up or MirDirection.DownRight;
-        float unfold = Ease(flight * tuning.Unfold);
+        float unfold = Ease(flight);
         float spread = width * (tuning.Spread + tuning.Spread2 * unfold);
         Vector2 travel = (GroundDirection(facing) * ((tuning.Travel + extraReach) * tuning.Travel2) +
             new Vector2(0, facing.Y * tuning.Y)) * (tuning.Travel3 + tuning.Travel4 * unfold);
@@ -579,7 +582,7 @@ internal static partial class WarriorSpellEffects
         }
     }
 
-    private static void Avalanche(Frame frame, Vector2 feet, Vector2 facing, float progress, float elapsed)
+    private static void Avalanche(Frame frame, Vector2 feet, Vector2 facing, float progress, float elapsed, int extraWidth)
     {
         var tuning = SpellVfxAssets.Observe(SpellVfxAssets.Current.Warrior.Avalanche);
         Vector2 heading = GroundHeading(facing);
@@ -604,22 +607,27 @@ internal static partial class WarriorSpellEffects
                 Layer.Smoke, sortY: feet.Y, emitter: "WarriorSpellEffects.Avalanche.FrostRelease");
         }
 
-        for (int lane = -1; lane <= tuning.LaneCount; lane++)
-        for (int step = 0; step < Math.Max(6, tuning.StepCount); step++)
+        int laneCount = 1 + Math.Clamp(extraWidth, 0, 1);
+        const int stepCount = 6;
+        for (int lane = -laneCount; lane <= laneCount; lane++)
+        for (int step = 0; step < stepCount; step++)
         {
             float age = (elapsed - WarriorStrikeTiming.AvalancheFirstRise -
                 step * WarriorStrikeTiming.AvalancheStepInterval - Math.Abs(lane) * 8) /
                 WarriorStrikeTiming.AvalancheDuration;
             if (age < 0 || age >= .55f) continue;
-            int index = step + (lane + 1) * tuning.Index;
+            int index = step + (lane + laneCount) * stepCount;
             float rise = Ease(age * tuning.Rise);
             float fade = 1 - Ease((age - tuning.Fade) / tuning.FadeDivisor);
             float opacity = (tuning.Opacity + tuning.Opacity2 * rise) * fade;
             float stride = (step + 1) * 24f;
-            float laneAngle = MathF.Atan2(heading.Y, heading.X) + lane * MathF.PI / 4;
+            float laneAngle = MathF.Atan2(heading.Y, heading.X) + Math.Sign(lane) * MathF.PI / 4;
             Vector2 laneHeading = new(MathF.Cos(laneAngle), MathF.Sin(laneAngle));
             laneHeading /= MathF.Max(MathF.Abs(laneHeading.X), MathF.Abs(laneHeading.Y));
-            Vector2 root = feet + ProjectGround(laneHeading * Math.Min(stride, 48) +
+            // Outer perk lanes begin two tiles along the neighbouring direction,
+            // matching the server's extra starting cells.
+            float laneReach = Math.Max(1, Math.Abs(lane));
+            Vector2 root = feet + ProjectGround(laneHeading * (Math.Min(stride, 48) * laneReach) +
                 heading * Math.Max(0, stride - 48));
             frame.Sprite(root, tuning.WarriorDustWidth + step * tuning.WarriorDustWidth2, tuning.WarriorDustHeight + step * tuning.WarriorDustHeight2, tuning.WarriorDustShape, tuning.WarriorDustColour, tuning.WarriorDustAlpha * opacity,
                 tuning.WarriorDustLayer, angle, sortY: root.Y, emitter: "WarriorSpellEffects.Avalanche.6");

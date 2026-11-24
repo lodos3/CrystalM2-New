@@ -49,7 +49,9 @@ internal static partial class SpellVfxBladeParticles
                     {
                         // The former second swing is an overlapping electric release
                         // on the same six-pose animation, not another attack.
-                        var charge = new Frame(pool, feet, now, strength, size,
+                        float chargeStrength = detailStrength * SpellVfxLegacyFrames.BladeStrength(
+                            spell, SpellVisualPhase.FollowThrough, index);
+                        var charge = new Frame(pool, feet, now, chargeStrength, size,
                             seed ^ ((uint)pose * 69069) ^ ((uint)(progress * 15) * 18311), depthY: feet.Y);
                         ChargedSweep(pool, charge, feet, Guide.Read(motion.ChargedSweep[index]), motion.BodyAxis[index],
                             direction, pose, progress);

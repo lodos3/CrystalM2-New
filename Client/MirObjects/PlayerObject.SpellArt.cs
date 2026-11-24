@@ -180,7 +180,12 @@ public partial class PlayerObject
         var cue = LegacySpellEffects.Windup(spell, Frame.Count, FrameInterval);
         if (cue.Duration <= 0) return;
 
-        int reach = spell == Spell.Thrusting && this is UserObject actor ? actor.PerkRank(spell, SpellPerk.ThrustReach) : 0;
+        int reach = this is UserObject actor ? spell switch
+        {
+            Spell.Thrusting => actor.PerkRank(spell, SpellPerk.ThrustReach),
+            Spell.BladeAvalanche => actor.PerkRank(spell, SpellPerk.AvalancheWidth),
+            _ => 0
+        } : 0;
         var visual = new SpellVisual(spell, cue.Phase, ExtraReach: reach);
         long start = CMain.Time + cue.Delay;
         if (cue.AtCell)

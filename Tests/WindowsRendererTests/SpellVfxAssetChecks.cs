@@ -248,6 +248,13 @@ internal static class SpellVfxAssetChecks
             Check(pool.Active.Length is > 0 and < 950, $"{spell} {phase} must produce a bounded particle layer for every reference pose.");
         }
 
+        pool.Clear();
+        var combined = SpellVfxAssets.CollectEmitters(() =>
+            SpellVfxBladeParticles.Draw(pool, Spell.TwinDrakeBlade, SpellVisualPhase.Swing, feet,
+                MirDirection.Right, 2, .4f, 120, SpellParticleFrame.ReferenceSize, 79));
+        Check(combined.ContainsKey("Blade.Sweep-filaments") && combined.ContainsKey("Blade.Branch-lightning"),
+            "Both Twin Drake visual layers must appear on the first and only live strike.");
+
         var before = SampleFlame();
         var emitters = SpellVfxAssets.CollectEmitters(() => SampleFlame());
         Check(emitters.Keys.ToHashSet().SetEquals(["Blade.Hot-core", "Blade.Heat-sheet", "Blade.Wake-glow", "Blade.Flame-teeth"]),

@@ -961,9 +961,7 @@ namespace Client.MirObjects
                 }
             }
 
-            bool drakeFollowThrough = CurrentAction == MirAction.Attack1 && Spell == Spell.TwinDrakeBlade &&
-                NextAction?.Action == MirAction.Attack4;
-            if (User == this && !GameScene.Observing && CMain.Time < MapControl.NextAction && !drakeFollowThrough)
+            if (User == this && !GameScene.Observing && CMain.Time < MapControl.NextAction)
                 return;
 
             if (ActionFeed.Count == 0)

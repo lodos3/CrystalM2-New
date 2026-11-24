@@ -103,8 +103,14 @@ static void CheckWarriorPerks()
         action.Params[4] is UserMagic { Spell: Spell.TwinDrakeBlade }).ToArray();
     Check(drakeHits.Length == 1 && drakeHits[0].Time == Envir.Main.Time + WarriorStrikeTiming.DrakeImpact &&
         drakeTarget.HP == drakeTarget.MaxHealth, "Twin Drake schedules exactly one landed attack.");
-    Drain(drakeCaster);
-    Check(drakeTarget.HP < drakeTarget.MaxHealth, "Twin Drake's single combined strike resolves.");
+    drakeCaster.ActionList.Remove(drakeHits[0]);
+    SetTime(drakeHits[0].Time);
+    drakeCaster.Process(drakeHits[0]);
+    Check(drakeTarget.HP < drakeTarget.MaxHealth &&
+        !drakeCaster.ActionList.Any(action => action.Type == DelayedType.Damage ||
+            (action.Type == DelayedType.Magic && action.Params.Length > 0 &&
+             action.Params[0] is UserMagic { Spell: Spell.TwinDrakeBlade })),
+        "Twin Drake's combined strike resolves without a delayed second or perk hit.");
 
     var (waveCaster, waveMap) = MakeCaster(MirClass.Warrior);
     var nearWave = MakeMonster("Near wave", waveMap, new Point(5, 4));

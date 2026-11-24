@@ -2,13 +2,14 @@
 public static class WarriorStrikeTiming
 {
     public const int ThrustDuration = 600;
-    public const int ThrustTravel = 240;
+    public const int ThrustTravel = 300;
     public const int AvalancheDuration = 1000;
     public const int AvalancheFirstRise = 35;
     public const int AvalancheStepInterval = 45;
     public const int DrakeImpact = 300;
 
     public static int ThrustImpact(int distance) => 300 + Math.Max(0, distance - 1) * 75;
+    public static int ThrustTravelForReach(int extraReach) => ThrustTravel + Math.Clamp(extraReach, 0, 1) * 75;
     public static int AvalancheImpact(int row) => 180 + Math.Max(0, row) * 90;
 
     public static bool SuppressTargetArt(Spell spell) =>

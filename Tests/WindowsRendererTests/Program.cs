@@ -682,8 +682,8 @@ internal static class Program
             "The travelling gust starts immediately at the cast origin and retains a fading wake.");
         Vector2 chest = feet - Vector2.UnitY * 36;
         SpellParticle[] earlyWind = Wind(24, Vector2.UnitX);
-        SpellParticle[] fullWind = Wind(230, Vector2.UnitX);
-        Check(earlyWind.Length > 0 && earlyWind.Max(p => p.Origin.X) < chest.X + 28 &&
+        SpellParticle[] fullWind = Wind(360, Vector2.UnitX);
+        Check(earlyWind.Length > 0 && earlyWind.Max(p => p.Origin.X) < chest.X + 35 &&
             fullWind.Min(p => p.Origin.X) < chest.X + 10 && fullWind.Max(p => p.Origin.X) > chest.X + 86 &&
             fullWind.All(p => p.FrameOnly && p.Velocity == Vector2.Zero),
             "The curl opens forward from the player while the roots of the strands stay attached.");
@@ -694,12 +694,12 @@ internal static class Program
             fullWind.Any(p => p.Shape == SpellParticleShape.WarriorSpark) &&
             fullWind.Any(p => p.Shape == SpellParticleShape.Wisp),
             "The gust uses joined, tapered strands with soft light around the curl.");
-        SpellParticle[] northWind = Wind(230, -Vector2.UnitY);
+        SpellParticle[] northWind = Wind(360, -Vector2.UnitY);
         float endOnWidth = northWind.Max(p => p.Origin.X) - northWind.Min(p => p.Origin.X);
         float sideOnWidth = fullWind.Max(p => p.Origin.Y) - fullWind.Min(p => p.Origin.Y);
         Check(northWind.Min(p => p.Origin.Y) < chest.Y - 62 &&
             endOnWidth < sideOnWidth * .53f && sideOnWidth > 59 &&
-            Wind(230, Vector2.UnitX, extraReach: 1).Max(p => p.Origin.X) > fullWind.Max(p => p.Origin.X) + 35 &&
+            Wind(375, Vector2.UnitX, extraReach: 1).Max(p => p.Origin.X) > fullWind.Max(p => p.Origin.X) + 35 &&
             Wind(-1, Vector2.UnitX).Length == 0 && Wind(thrust.Duration, Vector2.UnitX).Length == 0,
             $"The gust opens wider from the side, follows reach perks and stays inside the original release window. Widths {endOnWidth:F1} and {sideOnWidth:F1}.");
 
@@ -745,7 +745,7 @@ internal static class Program
         SpellParticle[] advancing = Sample(Spell.BladeAvalanche, SpellVisualPhase.Swing, 340, WarriorStrikeTiming.AvalancheDuration);
         SpellParticle[] spikes = advancing.Where(p => p.Shape == SpellParticleShape.IceSpire).ToArray();
         Check(initial.All(p => p.Shape != SpellParticleShape.IceSpire) && spikes.Length >= 9 &&
-            spikes.Max(p => p.Origin.X) > feet.X + 132 &&
+            advancing.Any(p => p.Shape == SpellParticleShape.WarriorDust && p.Origin.X >= feet.X + 143) &&
             advancing.Where(p => p.Shape == SpellParticleShape.WarriorDust).Select(p => p.Origin.Y).Distinct().Count() >= 5,
             "Blade Avalanche gathers at the warrior, then sends spreading lanes and rising spikes forward.");
         Check(initial.All(p => p.Shape is not (SpellParticleShape.Filament or SpellParticleShape.WarriorTripleCut)),
@@ -753,6 +753,10 @@ internal static class Program
         Check(advancing.Any(p => p.Shape == SpellParticleShape.SmokeSequence && p.Colour.B > p.Colour.R) &&
             spikes.Any(p => p.Colour.B > p.Colour.R && p.Colour.R > p.Colour.G),
             "Blade Avalanche needs cool mist and distinct violet shard tips.");
+        Check(advancing.Count(p => p.Shape == SpellParticleShape.WarriorSpark) >= 24,
+            "The wave must shed a substantial number of ice fragments.");
+        Check(Wind(570, Vector2.UnitX).Sum(p => (int)p.Colour.A) < fullWind.Sum(p => (int)p.Colour.A),
+            "The complete thrust wake must dissipate before the visual ends.");
         foreach (var spell in new[] { Spell.Thrusting, Spell.BladeAvalanche, Spell.CrossHalfMoon })
         foreach (var phase in new[] { SpellVisualPhase.Contact, SpellVisualPhase.Hit, SpellVisualPhase.Impact })
             Check(Sample(spell, phase, 180, 600).Length == 0, $"{spell} must not create duplicate target art.");
