@@ -85,7 +85,7 @@ internal static class ArmourWingParticles
 
     internal static void Emit(SpellParticlePool pool, byte effect, int bank, int pose, Vector2 shoulder,
         MirDirection direction, long now, uint seed, int onlySide = 0, float torsoYaw = 0, float torsoRoll = 0,
-        float torsoPitch = 0, WingTorsoFrame? torsoFrame = null)
+        float torsoPitch = 0, WingTorsoFrame? torsoFrame = null, float legacyLift = 0)
     {
         pool.Clear();
         if (effect is 1 or 2)
@@ -218,12 +218,17 @@ internal static class ArmourWingParticles
                 Vector2 localAcross = new(MathF.Cos(localYaw), MathF.Sin(localYaw) * .49f);
                 Vector2 localBack = new(-MathF.Sin(localYaw), MathF.Cos(localYaw) * .49f);
                 float down = height * .55f - 4 * u * flap + 4 * t * t - arch + shell * depth * .30f * rearSign * flex;
-                Vector2 projected = Rotate(localAcross * (side * (span + shell * depth * .23f * flex)) +
-                    localBack * (sweep + (camber + twist + shell * depth * flex) * RearDepthScale) +
-                    Vector2.UnitY * down, torsoRoll * flex);
-                // In particular, the lower hem at the root must not be
-                // dragged forward or backward by the pitch spring.
-                projected += lean * (down * flex);
+                // Twist is a change in horizontal depth and socket placement,
+                // not a screen-space rotation of the feather column. Retain
+                // the neutral vertical projection and lift the rearward span
+                // when the character pitches forwards. The legacy frame
+                // envelope provides an additional, bounded upward reference.
+                float lateral = side * (span + shell * depth * .23f * flex);
+                float rearward = sweep + (camber + twist + shell * depth * flex) * RearDepthScale;
+                float pitchLift = Math.Max(0, sinPitch) * Math.Max(0, sweep) * flex;
+                float rise = Math.Max(pitchLift, Math.Clamp(legacyLift, 0, 12) * flex);
+                Vector2 projected = new(localAcross.X * lateral + localBack.X * rearward,
+                    across.Y * lateral + back.Y * rearward + down - rise);
                 if ((direction is MirDirection.Left or MirDirection.Right) && u >= 0)
                 {
                     float sign = direction == MirDirection.Right ? -1f : 1f;
@@ -250,14 +255,10 @@ internal static class ArmourWingParticles
             // prevent flap, camber, pitch or padding from opening a gap.
             int top = membrane.Y, bottom = top + membrane.Height;
             Vector2 correction = Vector2.Lerp(Project(rootU, top), Project(rootU, bottom), rootTextureV);
-            // Twist the complete local wing frame with the measured shoulder
-            // line AFTER pinning the visible root. Distal yaw/pitch remain
-            // secondary motion; the torso basis never lags the body sprite.
-            Vector2 Pinned(float u, float y, float shell = 0)
-            {
-                Vector2 local = Project(u, y, shell) - correction;
-                return torsoFrame is { } body ? body.Transform(local) : local;
-            }
+            // Shoulder twist moves the two sockets independently, never
+            // rotates the entire wing in screen X/Y. The upright membrane
+            // stays pinned while its rearward span lifts and flexes.
+            Vector2 Pinned(float u, float y, float shell = 0) => Project(u, y, shell) - correction;
             for (int segment = 0; segment < segments; segment++)
             {
                 float a = Boundary(segment);

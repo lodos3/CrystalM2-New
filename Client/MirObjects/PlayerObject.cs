@@ -5077,7 +5077,8 @@ namespace Client.MirObjects
                     _wingPoseReady ? _wingPoseSmoother.Current.Yaw : 0f,
                     _wingPoseReady ? _wingPoseSmoother.Current.Roll : 0f,
                     _wingPoseReady ? _wingPoseSmoother.Current.Pitch : 0f,
-                    _wingPoseReady ? _wingPoseSmoother.Current.TorsoFrame : null);
+                    _wingPoseReady ? _wingPoseSmoother.Current.TorsoFrame : null,
+                    _wingPoseReady ? _wingPoseSmoother.Current.LegacyLift : 0f);
                 DXManager.Device.SpellParticles.Draw(_wingParticles.Active, new Vector2(DrawLocation.X, DrawLocation.Y),
                     CMain.Time, ground: false, emissiveOverlay: true, exposure: 1.22f);
                 return;
@@ -5110,6 +5111,13 @@ namespace Client.MirObjects
             bool idle = CurrentAction is MirAction.Standing or MirAction.Stance or MirAction.Stance2 or MirAction.MountStanding;
             bool locomotion = CurrentAction is MirAction.Walking or MirAction.Running or MirAction.MountWalking or MirAction.MountRunning or
                 MirAction.WalkingBow or MirAction.RunningBow or MirAction.Sneek;
+            if (!idle && _wingFamily == 0 && Frame is { EffectCount: > 0 } && target.TorsoFrame is { } torso)
+            {
+                int restCount = RidingMount ? 4 : 8;
+                int restStart = WingOffset + (RidingMount ? 448 : 0) + (int)Direction * restCount;
+                target = target with { LegacyLift = WingPoseAtlas.ReferenceLift(DrawWingFrame + WingOffset,
+                    restStart, restCount, torso.Centre.Y, torso.ReferenceCentre.Y) };
+            }
             target = WingPoseMotion.Stabilize(target, idle, locomotion);
             _wingPoseSmoother.Advance(target, CMain.Time, reset,
                 idle || locomotion ? .065f : .045f,

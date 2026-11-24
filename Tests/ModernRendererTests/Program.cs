@@ -288,6 +288,38 @@ static class Program
         }
     }
 
+    private static void CheckLegacyWingLift()
+    {
+        // The reference measures art relative to the body, not screen position.
+        Assertions.True(WingPoseAtlas.LiftFromRelativeCentres(-20, -28) == 8 &&
+            WingPoseAtlas.LiftFromRelativeCentres(-20, -12) == 0 &&
+            WingPoseAtlas.LiftFromRelativeCentres(-20, -90) == 12,
+            "Reference lift is upward only and bounded.");
+        var smoother = new WingPoseSmoother();
+        smoother.Advance(WingPoseMotion.Zero, 0, true);
+        var target = WingPoseMotion.Zero with { LegacyLift = 12 };
+        var first = smoother.Advance(target, 16, false);
+        Assertions.True(first.LegacyLift > 0 && first.LegacyLift <= .641f,
+            "Lift must ease instead of snapping between effect frames.");
+        Assertions.True(WingPoseMotion.Stabilize(target, true, false).LegacyLift == 0,
+            "Standing has no extra lift.");
+        foreach (int bank in new[] { 0, 808 })
+        foreach (int direction in Enumerable.Range(0, 8))
+        foreach (var (bodyStart, effectStart, count) in new[] { (32,64,6), (80,112,6),
+            (136,168,6), (184,216,6), (232,264,8), (416,448,6) })
+        for (int frame = 0; frame < count; frame++)
+        {
+            int index = bank + bodyStart + direction * count + frame;
+            Assertions.True(WingBodyPose.TryGetTorsoFrame(index, bank, direction, false, out var body),
+                $"Missing pose {index}.");
+            int offset = bank == 808 ? 840 : 0;
+            float lift = WingPoseAtlas.ReferenceLift(offset + effectStart + direction * count + frame,
+                offset + direction * 8, 8, body.Centre.Y, body.ReferenceCentre.Y);
+            Assertions.True(float.IsFinite(lift) && lift >= 0 && lift <= 12,
+                $"Invalid legacy lift at {index}.");
+        }
+    }
+
     private static void Main()
     {
         CheckWingBodyTracking();
@@ -296,6 +328,7 @@ static class Program
         CheckTorsoFrameTracking();
         CheckIndependentWingSockets();
         CheckInverseWingTwist();
+        CheckLegacyWingLift();
 
         Span<SpriteVertex> vertices = stackalloc SpriteVertex[6];
         Assertions.True(SpriteGeometry.WriteQuad(vertices, new Rectangle(16, 8, 32, 24),

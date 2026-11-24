@@ -72,6 +72,7 @@ public readonly record struct WingTorsoFrame(Vector2 Across, Vector2 ReferenceAc
 public readonly record struct WingPoseMotion(Vector2 Offset, float Roll, float Yaw, float Pitch = 0)
 {
     public WingTorsoFrame? TorsoFrame { get; init; }
+    public float LegacyLift { get; init; }
     public static WingPoseMotion Zero => new(Vector2.Zero, 0, 0);
 
     // Recover forward travel from its projection onto the isometric ground.
@@ -97,7 +98,7 @@ public readonly record struct WingPoseMotion(Vector2 Offset, float Roll, float Y
     {
         if (idle) return motion with
         {
-            Roll = 0, Yaw = 0, Pitch = 0, TorsoFrame = motion.TorsoFrame?.AtRest()
+            Roll = 0, Yaw = 0, Pitch = 0, LegacyLift = 0, TorsoFrame = motion.TorsoFrame?.AtRest()
         };
         return motion with
         {
@@ -115,6 +116,7 @@ public struct WingPoseSmoother
     private bool _initialized;
     private long _lastTime;
     private Vector3 _velocity;
+    private float _liftVelocity;
     public WingPoseMotion Current { get; private set; }
 
     public WingPoseMotion Advance(WingPoseMotion target, long now, bool reset,
@@ -125,7 +127,8 @@ public struct WingPoseSmoother
             _initialized = true;
             _lastTime = now;
             _velocity = Vector3.Zero;
-            return Current = target with { Roll = 0, Yaw = 0, Pitch = 0 };
+            _liftVelocity = 0;
+            return Current = target with { Roll = 0, Yaw = 0, Pitch = 0, LegacyLift = 0 };
         }
 
         float dt = (now - _lastTime) * .001f;
@@ -140,16 +143,18 @@ public struct WingPoseSmoother
         float roll = Step(Current.Roll, target.Roll, ref _velocity.X, .18f);
         float yaw = Step(Current.Yaw, target.Yaw, ref _velocity.Y, .14f);
         float pitch = Step(Current.Pitch, target.Pitch, ref _velocity.Z, .33f);
-        return Current = target with { Roll = roll, Yaw = yaw, Pitch = pitch };
+        float lift = Math.Max(0, Step(Current.LegacyLift, target.LegacyLift, ref _liftVelocity, 12, 40));
+        return Current = target with { Roll = roll, Yaw = yaw, Pitch = pitch, LegacyLift = lift };
 
-        float Step(float value, float goal, ref float velocity, float bound)
+        float Step(float value, float goal, ref float velocity, float bound, float rate = 0)
         {
+            float limit = rate > 0 ? rate : speed;
             goal = Math.Clamp(goal, -bound, bound);
             float error = value - goal;
             float temp = (velocity + omega * error) * dt;
             float unconstrained = goal + (error + temp) * decay;
             float nextVelocity = (velocity - omega * temp) * decay;
-            float next = Math.Clamp(unconstrained, value - speed * dt, value + speed * dt);
+            float next = Math.Clamp(unconstrained, value - limit * dt, value + limit * dt);
             next = Math.Clamp(next, -bound, bound);
             // A reversing target may initially move away due to inertia, but
             // the spring cannot overshoot through the target or its limits.
@@ -159,7 +164,7 @@ public struct WingPoseSmoother
                 return goal;
             }
             velocity = MathF.Abs(next - unconstrained) > .00001f
-                ? (next - value) / dt : Math.Clamp(nextVelocity, -speed, speed);
+                ? (next - value) / dt : Math.Clamp(nextVelocity, -limit, limit);
             return next;
         }
     }

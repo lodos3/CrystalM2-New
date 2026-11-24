@@ -95,13 +95,21 @@ internal static class WingIntersectionChecks
                             bool idle=seq.Name is "standing" or "stance" or "mount-standing";
                             bool move=seq.Name is "walking" or "running" or "mount-walking" or "mount-running";
                             ArmourWingParticles.TryGetBodyMotion(effect,index,bank,facing,seq.Mounted,out var targetMotion);
+                            int wingPose=(gender==1?840:0)+seq.WingStart+
+                                (seq.WingCount==0?0:d*seq.WingCount+Math.Min(seq.WingCount-1,(frame*subframes+sub)*seq.WingCount/(seq.Count*subframes)));
+                            if(!idle && seq.WingCount>0 && targetMotion.TorsoFrame is { } torso)
+                            {
+                                int restCount=seq.Mounted?4:8;
+                                int restStart=(gender==1?840:0)+(seq.Mounted?448:0)+d*restCount;
+                                targetMotion=targetMotion with { LegacyLift=WingPoseAtlas.ReferenceLift(wingPose,
+                                    restStart,restCount,torso.Centre.Y,torso.ReferenceCentre.Y) };
+                            }
                             targetMotion=WingPoseMotion.Stabilize(targetMotion,idle,move);
                             WingPoseMotion motion=smoothers[d].Advance(targetMotion,now,frame==0&&sub==0,
                                 (idle || move) ? .065f : .045f, idle || move ? .30f : .90f);
                             Vector2 shoulder=ArmourWingParticles.Shoulder(effect,seq.Mounted)+(id>=2?motion.Offset:Vector2.Zero);
                             Vector2 socket=Origin+ArmourWingParticles.BackAttachment(shoulder,facing);
-                            int wingPose=(gender==1?840:0)+seq.WingStart+
-                                (seq.WingCount==0?0:d*seq.WingCount+Math.Min(seq.WingCount-1,(frame*subframes+sub)*seq.WingCount/(seq.Count*subframes)));
+
                             bool split=id>=2&&(ArmourWings.IsAura(effect)||(facing is MirDirection.Right or MirDirection.Left));
                             bool behind=id>=2&&facing is (MirDirection.Down or MirDirection.DownLeft or MirDirection.DownRight);
                             int near=ArmourWingParticles.NearSide(facing);
@@ -133,7 +141,7 @@ internal static class WingIntersectionChecks
                             byte[] Layer(int side)
                             {
                                 device.Clear(Color.Black);
-                                ArmourWingParticles.Emit(pool,effect,id<2?id:0,id<2?wingPose:index,shoulder,facing,now,101,side,motion.Yaw,motion.Roll,motion.Pitch,motion.TorsoFrame);
+                                ArmourWingParticles.Emit(pool,effect,id<2?id:0,id<2?wingPose:index,shoulder,facing,now,101,side,motion.Yaw,motion.Roll,motion.Pitch,motion.TorsoFrame,motion.LegacyLift);
                                 if(pool.Active.Length==0){missing=true;return new byte[CellW*CellH];}
                                 device.SpellParticles.Draw(pool.Active,Origin,now,false,colour:new Vector3(1,.04f,.5f),
                                     emissiveOverlay:true,exposure:1);

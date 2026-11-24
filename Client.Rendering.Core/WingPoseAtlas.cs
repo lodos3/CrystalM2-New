@@ -41,6 +41,37 @@ public static class WingPoseAtlas
     public static Pose GetPose(int bank, int frame) => bank >= ElementalStart ? ElementalWingArt.Pose(bank - ElementalStart, frame, Pages.Length) :
         (uint)frame < Banks[bank].Length ? Banks[bank][frame] : default;
 
+    // The two original classic wing styles supply the actual frame extents.
+    // Compare their vertical centres in body-relative coordinates, so actor
+    // translation and lunging body displacement are not applied twice.
+    public static float LiftFromRelativeCentres(float rest, float current) =>
+        Math.Clamp(rest - current, 0, 12);
+
+    public static float ReferenceLift(int pose, int restStart, int restCount,
+        float bodyY, float restBodyY)
+    {
+        float total = 0;
+        int valid = 0;
+        for (int bank = 0; bank < 2; bank++)
+        {
+            var current = GetPose(bank, pose);
+            if (current.Width <= 0 || current.Height <= 0) continue;
+            float sum = 0;
+            int count = 0;
+            for (int i = 0; i < restCount; i++)
+            {
+                var rest = GetPose(bank, restStart + i);
+                if (rest.Width <= 0 || rest.Height <= 0) continue;
+                sum += rest.Y + rest.Height * .5f - restBodyY;
+                count++;
+            }
+            if (count == 0) continue;
+            total += sum / count - (current.Y + current.Height * .5f - bodyY);
+            valid++;
+        }
+        return valid == 0 ? 0 : LiftFromRelativeCentres(total / valid, 0);
+    }
+
     // Negative handles distinguish wing masks from the spell atlas. Each library has fewer than 2048 frames.
     public static int Handle(int bank, int frame, int channel) => -1 - ((bank * 2048 + frame) * 3 + channel);
     public static (int Page, Rectangle Source) Plane(int handle)

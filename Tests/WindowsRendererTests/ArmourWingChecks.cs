@@ -12,6 +12,7 @@ internal static class ArmourWingChecks
     {
         CheckTorsoAlignedRoots();
         CheckAttackLean();
+        CheckUprightAttackWings();
         CheckArtworkRootContact();
         for (int id = 10; id < 20; id++)
         {
@@ -191,6 +192,55 @@ internal static class ArmourWingChecks
         }
     }
 
+    private static void CheckUprightAttackWings()
+    {
+        var pool = new SpellParticlePool(ArmourWingParticles.ParticleCapacity);
+        for (byte effect = ArmourWings.Phoenix; effect < ArmourWings.SolarAscendant; effect++)
+        foreach (MirDirection direction in Enum.GetValues<MirDirection>())
+        foreach (int gender in new[] { 0, 808 })
+        {
+            int index = gender + 136 + (int)direction * 6 + 4;
+            if (!ArmourWingParticles.TryGetBodyMotion(effect, index, gender, direction, false, out var motion) ||
+                motion.TorsoFrame is not { } twist)
+                throw new InvalidDataException("Missing body pose for wing lift regression.");
+            Vector2 shoulder = ArmourWingParticles.Shoulder(effect, false) + motion.Offset;
+            ArmourWingParticles.Emit(pool, effect, 0, 0, shoulder, direction, 459, 101,
+                torsoFrame: twist.AtRest());
+            var rest = pool.Active.ToArray();
+            ArmourWingParticles.Emit(pool, effect, 0, 0, shoulder, direction, 459, 101,
+                torsoFrame: twist);
+            var twisted = pool.Active.ToArray();
+            ArmourWingParticles.Emit(pool, effect, 0, 0, shoulder, direction, 459, 101,
+                torsoYaw: .14f, torsoRoll: .18f, torsoPitch: .28f, torsoFrame: twist, legacyLift: 8);
+            var raised = pool.Active.ToArray();
+            if (rest.Length != twisted.Length || rest.Length != raised.Length)
+                throw new InvalidDataException("Twist or lift changed particle count.");
+            bool lifted = false;
+            for (int i = 0; i < rest.Length; i++)
+            {
+                if (rest[i].Ribbon is not { } before) continue;
+                var turn = twisted[i].Ribbon!.Value;
+                var up = raised[i].Ribbon!.Value;
+                if (before != turn)
+                    throw new InvalidDataException($"Root twist rotated the membrane for {effect}, {direction}.");
+                if (raised[i].Origin != twisted[i].Origin)
+                    throw new InvalidDataException("Distal lift moved the socket.");
+                Verify(before.TopLeft, up.TopLeft); Verify(before.TopRight, up.TopRight);
+                Verify(before.BottomLeft, up.BottomLeft); Verify(before.BottomRight, up.BottomRight);
+                if (up.BottomLeft.Y - up.TopLeft.Y < -0.001f ||
+                    up.BottomRight.Y - up.TopRight.Y < -0.001f)
+                    throw new InvalidDataException("Wing vertical axis inverted.");
+            }
+            if (!lifted) throw new InvalidDataException("Forward attack has no distal lift.");
+            void Verify(Vector2 before, Vector2 after)
+            {
+                if (after.Y > before.Y + .001f)
+                    throw new InvalidDataException($"Forward attack lowered the wing at {index}.");
+                if (before.Y - after.Y > 2) lifted = true;
+            }
+        }
+    }
+
     private static void CheckAttackLean()
     {
         var pool = new SpellParticlePool(ArmourWingParticles.ParticleCapacity);
@@ -285,9 +335,17 @@ internal static class ArmourWingChecks
         for (int row = 0; row < (elementalOnly ? backViews.Length : 8 + extra.Length); row++)
         {
             if (!ArmourWings.TrySelect(id.ToString(), out var effect) || !effect.HasValue) throw new InvalidDataException();
-            if (row >= 8 && id < 2) continue; // Legacy baked wings use a separate pose index.
             MirDirection facing = elementalOnly ? backViews[row] : row < 8 ? (MirDirection)row : extra[row - 8].Facing;
             int pose = row < 8 ? (int)facing * 4 : extra[row - 8].BodyFrame;
+            int legacyPose = pose switch
+            {
+                < 32 => (int)facing * 8 + (pose % 4) * 2,
+                >= 32 and < 128 => pose + 32,
+                >= 136 and < 296 => pose + 32,
+                >= 296 and < 416 => pose + 32,
+                >= 416 and < 464 => pose + 32,
+                _ => (int)facing * 8
+            };
             if (!armour.TryReadFrame(pose, out var actor)) throw new InvalidDataException("Missing actor pose.");
             using var body = new Texture(device, actor.Width, actor.Height);
             body.BeginUpload().Data.Write(actor.Bgra);
@@ -297,11 +355,14 @@ internal static class ArmourWingChecks
             WingPoseMotion motion = WingPoseMotion.Zero;
             if (id >= 2 && ArmourWingParticles.TryGetBodyMotion(effect.Value, pose, 0, facing, false, out motion))
             {
+                if (pose >= 32 && motion.TorsoFrame is { } torso)
+                    motion = motion with { LegacyLift = WingPoseAtlas.ReferenceLift(legacyPose,
+                        (int)facing * 8, 8, torso.Centre.Y, torso.ReferenceCentre.Y) };
                 motion = WingPoseMotion.Stabilize(motion, pose < 32, pose is >= 32 and < 128);
                 trackedShoulder += motion.Offset;
             }
-            ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101,
-                torsoYaw: motion.Yaw, torsoRoll: motion.Roll, torsoPitch: motion.Pitch, torsoFrame: motion.TorsoFrame);
+            ArmourWingParticles.Emit(pool, effect.Value, id, id < 2 ? legacyPose : pose, trackedShoulder, facing, 480, 101,
+                torsoYaw: motion.Yaw, torsoRoll: motion.Roll, torsoPitch: motion.Pitch, torsoFrame: motion.TorsoFrame, legacyLift: motion.LegacyLift);
             if (pool.Active.Length < 3 || pool.Active.Length >= pool.Capacity)
                 throw new InvalidOperationException($"Invalid particle count for {labels[id]}.");
             bool behind = id >= 2 && facing is (MirDirection.Down or MirDirection.DownLeft or MirDirection.DownRight);
@@ -310,14 +371,14 @@ internal static class ArmourWingChecks
             int near = ArmourWingParticles.NearSide(facing);
             if (split)
             {
-                ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, -near, motion.Yaw, motion.Roll, motion.Pitch, motion.TorsoFrame);
+                ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, -near, motion.Yaw, motion.Roll, motion.Pitch, motion.TorsoFrame, motion.LegacyLift);
                 Wings();
             }
             else if (behind) Wings();
             device.Blend = SpriteBlendMode.Alpha;
             device.Sprite.Draw(body, null, new Vector3(origin.X + actor.OffsetX, origin.Y + actor.OffsetY, 0), Vector4.One);
             if (split)
-                ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, near, motion.Yaw, motion.Roll, motion.Pitch, motion.TorsoFrame);
+                ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, near, motion.Yaw, motion.Roll, motion.Pitch, motion.TorsoFrame, motion.LegacyLift);
             if (split || !behind) Wings();
             using var image = device.Capture(surface);
             int x = (elementalOnly ? (id-first)%5 : id)*previewWidth;
