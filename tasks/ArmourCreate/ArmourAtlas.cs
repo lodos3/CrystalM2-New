@@ -47,7 +47,7 @@ public sealed class ArmourAtlas : IDisposable
         if ((uint)index >= (uint)Count) throw new ArgumentOutOfRangeException(nameof(index));
         if (_records.TryGetValue(index, out byte[]? record)) return record;
         var pose = _frames[index];
-        using Bitmap image = Compose(pose, _artRoot, _sheets);
+        using Bitmap image = Compose(pose, index, _artRoot, _sheets);
         var origin = pose.GetProperty("origin");
         using var stream = new MemoryStream();
         using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true))
@@ -97,7 +97,7 @@ public sealed class ArmourAtlas : IDisposable
         finally { if (File.Exists(staging)) File.Delete(staging); }
     }
 
-    public Bitmap GetPreview(int index) => Compose(_frames[index], _artRoot, _sheets);
+    public Bitmap GetPreview(int index) => Compose(_frames[index], index, _artRoot, _sheets);
 
     public void Dispose()
     {
@@ -107,7 +107,7 @@ public sealed class ArmourAtlas : IDisposable
         _records.Clear();
     }
 
-private static Bitmap Compose(JsonElement pose, string artRoot,
+private static Bitmap Compose(JsonElement pose, int index, string artRoot,
     Dictionary<int, Sheet> sheets)
 {
     int page = pose.GetProperty("page").GetInt32();
@@ -125,24 +125,12 @@ private static Bitmap Compose(JsonElement pose, string artRoot,
         rect[1]+rect[3] > sheet.Height)
         throw new InvalidDataException("CArmour pose points beyond its mask sheet.");
 
-    // The source body is drawn by the client. LIB output contains ONLY authored armour
-    // pixels, otherwise the source character would be blended twice on every frame.
+    // The generated layer contains original colours and the source pose's
+    // geometry. It is not a second copy of the underlying character.
+    byte[] geometry = sheet.Crop(rect[0], rect[1], rect[2], rect[3]);
+    byte[] overlay = ArmourPainter.Paint(rect[2], rect[3], anchors, ArmourPainter.Facing(index), geometry);
     var result = new Bitmap(rect[2], rect[3], PixelFormat.Format32bppArgb);
-    using var design = new Bitmap(result.Width, result.Height, PixelFormat.Format32bppArgb);
-    using (var paint = Graphics.FromImage(design)) ArmourPainter.Paint(paint, anchors);
-    byte[] overlay = Bgra(design);
-    for (int y = 0; y < design.Height; y++)
-    for (int x = 0; x < design.Width; x++)
-    {
-        int i = (y * design.Width + x) * 4;
-        if (overlay[i+3] == 0) continue;
-        int allow = sheet.Coverage(rect[0]+x, rect[1]+y);
-        // RGB data channels encode skin, fitted seams and loose silhouettes.
-        // Low, one-example blue coverage is allowed without reusing its original colour.
-        overlay[i+3] = (byte)(overlay[i+3] * Math.Min(255, allow*3) / 255);
-    }
-    SetBgra(design, overlay);
-    using (var canvas = Graphics.FromImage(result)) canvas.DrawImageUnscaled(design, 0, 0);
+    SetBgra(result, overlay);
     return result;
 }
 
@@ -226,10 +214,12 @@ sealed class Sheet : IDisposable
         finally { converted.UnlockBits(data); }
     }
 
-    public int Coverage(int x, int y)
+    public byte[] Crop(int x, int y, int width, int height)
     {
-        int p = (y*Width+x)*4;
-        return Math.Max(_pixels[p+2], Math.Max(_pixels[p+1], _pixels[p]));
+        var result = new byte[checked(width * height * 4)];
+        for (int row = 0; row < height; row++)
+            Buffer.BlockCopy(_pixels, ((y + row) * Width + x) * 4, result, row * width * 4, width * 4);
+        return result;
     }
 
     public void Dispose() { }

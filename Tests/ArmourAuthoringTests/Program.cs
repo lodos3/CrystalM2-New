@@ -38,31 +38,56 @@ for (int index=0; index<frames.Length; index++)
 }
 if (count != 1616) throw new Exception($"Expected 1616 mapped frames, found {count}.");
 
-foreach (int index in new[] {0, 16, 60, 824})
+// The old painter left large parts of the actual fitted silhouette transparent.
+// Test real atlas geometry across all eight standing directions, walking and
+// attack poses, on both banks. Every fitted garment pixel must remain covered.
+foreach (int bank in new[] {0, 808})
+foreach (int index in Enumerable.Range(0, 8).Select(d => bank + d * 4)
+    .Concat(Enumerable.Range(0, 8).Select(d => bank + 32 + d * 6 + 2))
+    .Concat(Enumerable.Range(0, 8).Select(d => bank + 136 + d * 6 + 2)))
 {
     var frame = frames[index];
-    int[] origin = frame.GetProperty("origin").EnumerateArray().Select(x=>x.GetInt32()).ToArray();
-    int[] rect = frame.GetProperty("rect").EnumerateArray().Select(x=>x.GetInt32()).ToArray();
+    int[] origin = frame.GetProperty("origin").EnumerateArray().Select(x => x.GetInt32()).ToArray();
+    int[] rect = frame.GetProperty("rect").EnumerateArray().Select(x => x.GetInt32()).ToArray();
     PointF[] anchors = frame.GetProperty("anchors").EnumerateArray().Select(a =>
-        new PointF(a[0].GetInt32()-origin[0],a[1].GetInt32()-origin[1])).ToArray();
-    using var design = new Bitmap(rect[2],rect[3],PixelFormat.Format32bppArgb);
-    using (var g = Graphics.FromImage(design)) ArmourPainter.Paint(g,anchors);
-    int painted=0, blue=0, white=0, gold=0;
-    for (int y=0;y<design.Height;y++)
-    for (int x=0;x<design.Width;x++)
+        new PointF(a[0].GetInt32() - origin[0], a[1].GetInt32() - origin[1])).ToArray();
+    using var mask = new Bitmap(Path.Combine(art, $"mask-{frame.GetProperty("page").GetInt32():00}.png"));
+    int w = rect[2], h = rect[3];
+    byte[] geometry = new byte[w * h * 4];
+    int fitted = 0;
+    for (int y = 0; y < h; y++)
+    for (int x = 0; x < w; x++)
     {
-        Color c=design.GetPixel(x,y);
-        if (c.A<128) continue;
-        painted++;
-        if (c.B > c.R+20 && c.B > c.G+20) blue++;
-        if (c.R>180 && c.G>180 && c.B>180) white++;
-        if (c.R>120 && c.R>c.B*1.4 && c.G>c.B) gold++;
+        Color c = mask.GetPixel(rect[0] + x, rect[1] + y);
+        int p = (y * w + x) * 4;
+        geometry[p] = c.B; geometry[p+1] = c.G; geometry[p+2] = c.R; geometry[p+3] = 255;
+        if (c.G >= 128) fitted++;
     }
-    if (painted<15 || blue<2 || white<2 || gold<1)
-        throw new Exception($"The original colour layers did not render at frame {index}: " +
-            $"pixels={painted}, blue={blue}, white={white}, gold={gold}.");
+    int direction = ArmourPainter.Facing(index);
+    byte[] paint = ArmourPainter.Paint(w, h, anchors, direction, geometry);
+    if (fitted == 0) throw new Exception($"Empty fitted reference at {index}.");
+    int blue = 0, silver = 0, painted = 0;
+    for (int p = 0; p < paint.Length; p += 4)
+    {
+        if (paint[p+3] < geometry[p+1])
+            throw new Exception($"Armour loses fitted coverage at frame {index}, pixel {p/4}.");
+        if (geometry[p+1] == 0 && geometry[p+2] == 0 && paint[p+3] != 0)
+            throw new Exception($"Floating armour outside the reference silhouette at frame {index}.");
+        if (paint[p+3] < 128) continue;
+        painted++;
+        if (paint[p] > paint[p+2] + 20 && paint[p] > paint[p+1] + 10) blue++;
+        if (paint[p+2] > 100 && paint[p+1] > 110 && paint[p] > 120) silver++;
+    }
+    if (painted < fitted || blue == 0 || silver == 0)
+        throw new Exception($"Missing full plate materials at frame {index}.");
 }
-Console.WriteLine($"Verified {count} real CArmour masks and four original armour poses.");
+for (int d = 0; d < 8; d++)
+{
+    if (ArmourPainter.Facing(d*4) != d || ArmourPainter.Facing(808+32+d*6+2) != d ||
+        ArmourPainter.Facing(136+d*6+2) != d)
+        throw new Exception("CArmour direction mapping differs from the classic frame bank.");
+}
+Console.WriteLine("Verified silhouette coverage and material generation across 48 poses.");
 
 using (var atlas = new ArmourAtlas(art, 1616))
 {
