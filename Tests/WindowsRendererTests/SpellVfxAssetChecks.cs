@@ -36,6 +36,45 @@ internal static class SpellVfxAssetChecks
             "Twin Drake Blade activation and stun must retain six non-directional frames at legacy timing.");
     }
 
+    private static void CheckCrossHalfMoonFans()
+    {
+        Vector2 feet = new(150, 150);
+        var pool = new SpellParticlePool(2048);
+        for (int direction = 0; direction < 8; direction++)
+        for (int pose = 0; pose < 6; pose++)
+        {
+            SpellParticle[] particles = Sample(feet, direction, pose);
+            Check(particles.Length > 0 && particles.Length <= 200,
+                $"Cross Half Moon direction {direction}, pose {pose}: bounded nonempty emission.");
+            Check(particles.All(p => p.FrameOnly && p.CoveragePlane == 0 &&
+                float.IsFinite(p.Origin.X) && float.IsFinite(p.Origin.Y)),
+                "Cross Half Moon must use finite frame-local procedural particles, not legacy sprite planes.");
+            var surfaces = particles.Where(p => p.Shape == SpellParticleShape.DirectionalSweep && p.Ribbon.HasValue).ToArray();
+            Check(surfaces.Length >= 24 && surfaces.All(p => p.RibbonTextureU.HasValue),
+                "Each Cross Half Moon pose must contain multiple textured cutting surfaces.");
+            if (pose is >= 2 and <= 4)
+                Check(surfaces.Any(p => p.Ground && p.GroundDepth < feet.Y) &&
+                    surfaces.Any(p => !p.Ground && p.GroundDepth >= feet.Y),
+                    "The release must wrap both behind and in front of the warrior.");
+            var offset = new Vector2(23, -17);
+            var moved = Sample(feet + offset, direction, pose);
+            Check(moved.Length == particles.Length && particles.Zip(moved).All(pair =>
+                Vector2.Distance(pair.First.Origin + offset, pair.Second.Origin) < .001f &&
+                MathF.Abs(pair.First.GroundDepth + offset.Y - pair.Second.GroundDepth) < .001f &&
+                pair.First.Colour == pair.Second.Colour),
+                "Swing geometry and depth must follow the actor without random flicker.");
+        }
+
+        SpellParticle[] Sample(Vector2 position, int direction, int pose)
+        {
+            pool.Clear();
+            using var profile = SpellVfxAssets.For(Spell.CrossHalfMoon);
+            var frame = new SpellParticleFrame(pool, position, 1200, 1, SpellParticleFrame.ReferenceSize, 79, depthY: position.Y);
+            SpellVfxPoseMasks.DrawSwing(frame, Spell.CrossHalfMoon, position, direction, pose / 6f);
+            return pool.Active.ToArray();
+        }
+    }
+
     internal static void Run()
     {
         var expected = new Dictionary<MirClass, int>
@@ -57,6 +96,7 @@ internal static class SpellVfxAssetChecks
         try
         {
             CheckBladeParticleLayers(directory);
+            CheckCrossHalfMoonFans();
             var drake = new SpellVisual(Spell.TwinDrakeBlade, SpellVisualPhase.Impact);
             var flaming = new SpellVisual(Spell.FlamingSword, SpellVisualPhase.Impact);
             int baseline = WarriorSpellEffects.PacketDuration(drake);
@@ -302,6 +342,75 @@ internal static class SpellVfxAssetChecks
         void Sample(int time) => SpellVfxBladeParticles.EmitFlameMotion(pool, feet, Vector2.UnitX, MirDirection.Right,
             pose => new WeaponMaskTrace(feet + new Vector2(-15 + pose * 8, -40), feet + new Vector2(12 + pose * 8, -50)),
             time, time, 100, ref elapsed, SpellParticleFrame.ReferenceSize, 79);
+    }
+
+    // Offline comparison only: the original coverage archive is never
+    // sampled by the live Cross Half Moon renderer.
+    internal static void RenderCrossHalfMoon(string destination)
+    {
+        Directory.CreateDirectory(destination);
+        SpellVfxAssets.Reload(SpellVfxAssets.InstalledDirectory);
+        const int width = 320, height = 270, label = 22;
+        Vector2 feet = new(width / 2, 180);
+        using var window = new Form { ClientSize = new Size(width, height) };
+        using var device = new RendererDevice(window.Handle, width, height, DriverType.Warp);
+        using Surface backBuffer = device.GetBackBuffer();
+        device.SetRenderTarget(backBuffer);
+        var pool = new SpellParticlePool(2048);
+        for (int direction = 0; direction < 8; direction++)
+        {
+            using var sheet = new Bitmap(width * 6, (height + label) * 2);
+            using var graphics = Graphics.FromImage(sheet);
+            graphics.Clear(Color.Black);
+            for (int pose = 0; pose < 6; pose++)
+            {
+                int x = pose * width;
+                using var original = OriginalCrossMoon(direction, pose, feet, width, height);
+                graphics.DrawString($"Original {(MirDirection)direction} / {pose + 1}", SystemFonts.DefaultFont, Brushes.White, x + 4, 3);
+                graphics.DrawImageUnscaled(original, x, label);
+
+                pool.Clear();
+                using (SpellVfxAssets.For(Spell.CrossHalfMoon))
+                {
+                    var frame = new SpellParticleFrame(pool, feet, 1200, 1,
+                        SpellParticleFrame.ReferenceSize, 79, depthY: feet.Y);
+                    SpellVfxPoseMasks.DrawSwing(frame, Spell.CrossHalfMoon, feet, direction, pose / 6f);
+                }
+                using var current = RenderCharge(device, backBuffer, pool);
+                graphics.DrawString($"Procedural / {pose + 1}", SystemFonts.DefaultFont, Brushes.White, x + 4, height + label + 3);
+                graphics.DrawImageUnscaled(current, x, height + label * 2);
+            }
+            sheet.Save(Path.Combine(destination, $"cross-half-moon-{direction}-{(MirDirection)direction}.png"),
+                System.Drawing.Imaging.ImageFormat.Png);
+        }
+    }
+
+    private static Bitmap OriginalCrossMoon(int direction, int frame, Vector2 feet, int width, int height)
+    {
+        var result = new Bitmap(width, height);
+        var pose = SpellPoseAtlas.GetPose("CrossHalfMoon", direction, frame);
+        using (var graphics = Graphics.FromImage(result)) graphics.Clear(Color.Black);
+        if (pose.FirstPlane == 0) return result;
+        var blue = SpellPoseAtlas.GetPlane(pose.FirstPlane);
+        var green = SpellPoseAtlas.GetPlane(pose.FirstPlane + 1);
+        var red = SpellPoseAtlas.GetPlane(pose.FirstPlane + 2);
+        var bp = SpellPoseAtlas.GetPage(blue.Page);
+        var gp = SpellPoseAtlas.GetPage(green.Page);
+        var rp = SpellPoseAtlas.GetPage(red.Page);
+        int ox = (int)feet.X + pose.Offset.X, oy = (int)feet.Y + pose.Offset.Y;
+        for (int y = 0; y < pose.WorldSize.Height; y++)
+        for (int x = 0; x < pose.WorldSize.Width; x++)
+        {
+            int dx = ox + x, dy = oy + y;
+            if ((uint)dx >= (uint)width || (uint)dy >= (uint)height) continue;
+            int sx = x * blue.Source.Width / pose.WorldSize.Width;
+            int sy = y * blue.Source.Height / pose.WorldSize.Height;
+            byte b = bp[(blue.Source.Y + sy) * SpellPoseAtlas.PageSize + blue.Source.X + sx];
+            byte g = gp[(green.Source.Y + sy) * SpellPoseAtlas.PageSize + green.Source.X + sx];
+            byte r = rp[(red.Source.Y + sy) * SpellPoseAtlas.PageSize + red.Source.X + sx];
+            result.SetPixel(dx, dy, Color.FromArgb(r, g, b));
+        }
+        return result;
     }
 
     private static SpellParticlePool SampleCharge()

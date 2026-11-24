@@ -106,6 +106,12 @@ jobs:
         run: dotnet run --project Tests/TaoistParticleTests/TaoistParticleTests.csproj --configuration Release
       - name: Validate production D3D11 shaders and compositor on real WARP
         run: dotnet run --project Tests/WindowsRendererTests/WindowsRendererTests.csproj --configuration Release
+      - name: Render all 48 Cross Half Moon poses against original coverage
+        run: dotnet run --project Tests/WindowsRendererTests/WindowsRendererTests.csproj --configuration Release -- --cross-moon-preview artifacts/cross-moon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cross-half-moon-comparisons
+          path: artifacts/cross-moon
       - name: Publish the sole Windows x64 client
         run: dotnet publish Client/Client.csproj --configuration Release --runtime win-x64 --self-contained false --output artifacts/client
       - uses: actions/upload-artifact@v4
