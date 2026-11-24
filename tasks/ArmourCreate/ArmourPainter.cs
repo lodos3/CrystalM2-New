@@ -27,7 +27,7 @@ public static class ArmourPainter
     }
 
     public static byte[] Paint(int width, int height, PointF[] anchors, int direction,
-        ReadOnlySpan<byte> geometry)
+        ReadOnlySpan<byte> geometry, bool liveSurface = false)
     {
         if (width <= 0 || height <= 0 || anchors.Length != 11 ||
             geometry.Length != checked(width * height * 4) || (uint)direction >= 8)
@@ -66,6 +66,12 @@ public static class ArmourPainter
         {
             int i = y * width + x, p = i * 4;
             float along = (x + .5f - neck.X) * dx + (y + .5f - neck.Y) * dy;
+            if (liveSurface)
+            {
+                alpha[i] = geometry[p + 3];
+                if (alpha[i] >= 96) longest = Math.Max(longest, along);
+                continue;
+            }
             // Head exclusion takes precedence over every source channel. The
             // fitted-difference mask can contain head pixels from shading changes.
             // A conservative collar cut and radial guard protect the face even
@@ -253,6 +259,17 @@ public static class ArmourPainter
             float topH = HeightAt(x, y - 1), bottomH = HeightAt(x, y + 1);
             Vector3 normal = Vector3.Normalize(new Vector3((leftH - rightH) * .68f,
                 (topH - bottomH) * .68f, 1f));
+            if (liveSurface)
+            {
+                // BGRA: material and occlusion, normal Y, normal X, coverage.
+                // Sample at native resolution with the point sampler.
+                int occlusionCode = edge[i] <= 1 ? 38 : 63;
+                output[p] = (byte)(metal[i] * 64 + occlusionCode);
+                output[p+1] = (byte)Math.Clamp((int)MathF.Round((normal.Y*.5f+.5f)*255),0,255);
+                output[p+2] = (byte)Math.Clamp((int)MathF.Round((normal.X*.5f+.5f)*255),0,255);
+                output[p+3] = alpha[i];
+                continue;
+            }
             float diffuse = Math.Max(0, Vector3.Dot(normal, light));
             float specular = MathF.Pow(Math.Max(0, Vector3.Dot(normal, halfLight)),
                 metal[i] == 1 ? 13f : metal[i] == 3 ? 18f : 23f);

@@ -51,7 +51,27 @@ namespace Client.MirGraphics
 
         public static void HandleAction(byte id, bool build)
         {
-            if (id != 1) { Report("Only g01 currently has an authored runtime design."); return; }
+            if (LiveArmourAtlas.Supports(id))
+            {
+                try
+                {
+                    if (build)
+                    {
+                        using var live = new LiveArmourAtlas(Settings.DataPath, Path.Combine(Settings.DataPath,"ArmourAuthoring"));
+                        live.Export(id,Path.Combine(Settings.DataPath,"LiveArmour"));
+                        Report($"Exported g{id:00} skin and material surface.");
+                    }
+                    else
+                    {
+                        LiveArmourRenderer.Clear();
+                        if (GameScene.Scene?.MapControl != null) GameScene.Scene.MapControl.TextureValid = false;
+                        Report($"Reloaded g{id:00} live armour.");
+                    }
+                }
+                catch (Exception ex) { Report("Live armour action failed: " + ex.Message); }
+                return;
+            }
+            if (id != 1) { Report("Runtime designs: g01 to g12."); return; }
             try
             {
                 if (build)

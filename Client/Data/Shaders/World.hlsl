@@ -154,6 +154,27 @@ float4 PrepareBlend(float4 pixel)
 }
 
 float4 PSArtwork(Output input) : SV_TARGET { return PrepareBlend(SampleArtwork(input) * input.Tint); }
+// Native-pixel material surface: R/G = normal, B = material/occlusion,
+// A = pose coverage. No baked source armour colours are used in this pass.
+float4 PSLiveArmour(Output input) : SV_TARGET
+{
+    float4 data = SpriteTexture.Sample(SpriteSampler,input.Uv);
+    if (data.a <= 0) return 0;
+    float2 xy = data.rg * 2 - 1;
+    float3 n = normalize(float3(xy,sqrt(max(.001,1-dot(xy,xy)))));
+    float packed = floor(data.b*255+.5);
+    int material = min(3,(int)floor(packed/64));
+    float ao = (packed-material*64)/63;
+    float3 light = normalize(C[4].xyz);
+    float3 halfLight=normalize(light+float3(0,0,1));
+    float diffuse=saturate(dot(n,light));
+    float power=material==1?13:material==3?18:23;
+    float spec=material==0?0:pow(saturate(dot(n,halfLight)),power)*(material==1?.34:material==3?.25:.14);
+    float3 colour=C[material].rgb*(.37+.81*diffuse)*(material==0?.78:1)*lerp(.65,1,ao);
+    colour+=spec+float3(0,.012,.025)*ao;
+    if(C[4].w>.5) colour=dot(colour,float3(.299,.587,.114)).xxx;
+    return PrepareBlend(float4(saturate(colour),data.a)*input.Tint);
+}
 float WeatherNoise(float2 p);
 
 float4 PSParticleCoverage(Output input) : SV_TARGET

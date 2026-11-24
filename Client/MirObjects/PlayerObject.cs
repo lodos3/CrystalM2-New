@@ -5029,8 +5029,14 @@ namespace Client.MirObjects
 
             if (BodyLibrary != null)
             {
-                BodyLibrary.Draw(DrawFrame + ArmourOffSet, DrawLocation, drawColour, true);
-                if (_drawGeneratedArmour) GeneratedArmourRuntime.Draw(GeneratedArmour, DrawFrame + ArmourOffSet, DrawLocation, drawColour);
+                int frame = DrawFrame + ArmourOffSet;
+                if (!_drawGeneratedArmour || !LiveArmourRenderer.TryDraw(GeneratedArmour, frame, DrawLocation, drawColour))
+                {
+                    // The old GArmour overlay remains available if the new
+                    // source is absent, incompatible, or the selected ID is g01.
+                    BodyLibrary.Draw(frame, DrawLocation, drawColour, true);
+                    if (_drawGeneratedArmour) GeneratedArmourRuntime.Draw(GeneratedArmour, frame, DrawLocation, drawColour);
+                }
             }
 
             DXManager.SetGrayscale(oldGrayScale);

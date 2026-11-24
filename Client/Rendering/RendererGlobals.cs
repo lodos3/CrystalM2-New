@@ -15,5 +15,5 @@ public enum ShaderEffect
     Artwork, Normal, Grayscale, Magic, Atmosphere, BloomExtract, BloomBlur, LightComposite, ShadowMask, ProjectedShadow,
     ShapedLight, WeatherGround, SpellArtwork, ConeLight, WeatherOcclusion, WeatherParticle, GaussianLight,
     MapColourDownsample, MapColourAverage, LightHalo, WeaponSpellMask, ParticleCoverage, WeatherTerrainMask,
-    WeatherSceneryBlur, WeatherMaskView, SpellOcclusion
+    WeatherSceneryBlur, WeatherMaskView, SpellOcclusion, LiveArmour
 }

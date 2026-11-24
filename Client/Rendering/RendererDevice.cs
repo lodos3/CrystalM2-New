@@ -244,7 +244,7 @@ public sealed unsafe class RendererDevice : IDisposable
         Context.RSSetViewport(new Viewport(TargetWidth, TargetHeight));
         Context.RSSetState(_rasterizer);
         Context.OMSetDepthStencilState(_noDepth);
-        bool artwork = _effect is ShaderEffect.Artwork or ShaderEffect.Normal or ShaderEffect.Grayscale or ShaderEffect.Magic or ShaderEffect.SpellArtwork;
+        bool artwork = _effect is ShaderEffect.Artwork or ShaderEffect.Normal or ShaderEffect.Grayscale or ShaderEffect.Magic or ShaderEffect.SpellArtwork or ShaderEffect.LiveArmour;
         bool particle = _effect == ShaderEffect.ParticleCoverage;
         SpriteBlendMode blend = artwork || particle ? _artworkBlend ?? _blend : _blend;
         Context.OMSetBlendState(_blends[(int)blend], new Color4(_blendRate, _blendRate, _blendRate, _blendRate));

@@ -36,6 +36,7 @@
     <None Include="..\.editorconfig" Link=".editorconfig" />
     <Compile Include="..\tasks\ArmourCreate\ArmourPainter.cs" Link="ArmourAuthoring\ArmourPainter.cs" />
     <Compile Include="..\tasks\ArmourCreate\ArmourAtlas.cs" Link="ArmourAuthoring\ArmourAtlas.cs" />
+    <Compile Include="..\tasks\ArmourCreate\LiveArmourAtlas.cs" Link="ArmourAuthoring\LiveArmourAtlas.cs" />
     <None Include="..\Art\CArmour\poses.json;..\Art\CArmour\mask-*.png" Link="Data\ArmourAuthoring\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Update="Data\Shaders\World.hlsl" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Update="Data\ParticleCredits.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

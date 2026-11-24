@@ -71,6 +71,21 @@ internal static class Program
 
         device.BeginFrame();
         device.Clear(Color.Black);
+        using (var material = Upload(device, Color.FromArgb(255,128,128,127)))
+        {
+            device.PixelShader = ShaderEffect.LiveArmour;
+            device.SetPixelShaderConstant(0, [new(.15f,.2f,.25f,1), new(.7f,.75f,.8f,1),
+                new(.1f,.3f,.6f,1), new(.8f,.6f,.2f,1), new(-.5f,-.6f,.8f,0)]);
+            device.Sprite.Draw(material, null, new Vector3(4,4,0), Vector4.One);
+            device.Sprite.End();
+            using var lit = device.Capture(backBuffer);
+            Check(lit.GetPixel(4,4).R > 50 && lit.GetPixel(4,4).B > 50,
+                "The live material must shade its packed normal rather than display the raw data.");
+            Near(Color.Black,lit.GetPixel(0,0),"Live armour must not affect pixels outside its quad.");
+            device.PixelShader = ShaderEffect.Artwork;
+        }
+        device.BeginFrame();
+        device.Clear(Color.Black);
         device.Sprite.Begin();
         device.Sprite.Draw(red, null, Vector3.Zero, Vector4.One);
         device.Sprite.Draw(red, null, new Vector3(4, 0, 0), Vector4.One);

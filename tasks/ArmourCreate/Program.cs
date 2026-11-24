@@ -3,6 +3,14 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using CrystalM2.ArmourCreate;
 
+if (args is ["--live", var data, var art, var output])
+{
+    using var live = new LiveArmourAtlas(data,art);
+    for(int id=2;id<=12;id++) live.Export(id,output);
+    Console.WriteLine("Exported 11 classic skin/surface library pairs.");
+    return;
+}
+
 if (args.Length is < 3 or > 4)
     throw new ArgumentException("Usage: ArmourCreate <client Data directory> <Art/CArmour directory> <new GArmour/NN.Lib> [preview.png]");
 string destination = Path.GetFullPath(args[2]);

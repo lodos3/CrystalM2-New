@@ -320,8 +320,53 @@ static class Program
         }
     }
 
-    private static void Main()
+    
+    private static void CheckLiveArmourSplit()
     {
+        // Test-only authored 24x36 sprite pixels: naked head, two hands,
+        // coloured torso, legs and disconnected checker shadow.
+        var pixels = new byte[24 * 36 * 4];
+        var dressed = new byte[pixels.Length];
+        void Rect(byte[] data, int x, int y, int w, int h, byte r, byte g, byte b)
+        {
+            for (int j=y; j<y+h; j++) for(int i=x; i<x+w; i++)
+            {
+                int p=(j*24+i)*4;
+                data[p]=b; data[p+1]=g; data[p+2]=r; data[p+3]=255;
+            }
+        }
+        foreach(var data in new[]{pixels,dressed})
+        {
+            Rect(data,10,1,5,6,202,160,119);
+            Rect(data,2,17,3,3,195,149,106);
+            Rect(data,19,17,3,3,195,149,106);
+            Rect(data,7,21,4,13,176,132,92);
+            Rect(data,14,21,4,13,176,132,92);
+        }
+        Rect(pixels,7,7,11,14,190,146,109);
+        Rect(dressed,7,7,11,14,67,99,155);
+        Rect(dressed,7,21,4,13,61,65,75);
+        Rect(dressed,14,21,4,13,61,65,75);
+        Rect(dressed,5,9,3,8,90,100,130);
+        var sourceCopy = (byte[])dressed.Clone();
+        Vector2[] anchors=[new(12,3),new(12,8),new(7,10),new(18,10),new(12,12),
+            new(12,17),new(12,21),new(9,27),new(16,27),new(9,33),new(16,33)];
+        var split = LiveArmourCoverage.Split(24,36,pixels,dressed,anchors);
+        Assertions.True(split.Skin[(3*24+12)*4+3]==255 &&
+            split.Skin[(18*24+3)*4+3]==255 && split.Skin[(18*24+20)*4+3]==255,
+            "The visible face and both hands must be preserved.");
+        Assertions.True(split.Skin[(12*24+12)*4+3]==0 &&
+            split.Armour[(12*24+12)*4+3]==255 &&
+            split.Skin[(32*24+9)*4+3]==0 && split.Armour[(32*24+9)*4+3]==255,
+            "Torso and boots belong to generated armour, never the skin layer.");
+        for(int p=3;p<pixels.Length;p+=4)
+            Assertions.True(split.Skin[p]==0 || split.Armour[p]==0,"Skin and armour must be disjoint.");
+        Assertions.True(dressed.AsSpan().SequenceEqual(sourceCopy),"Never modify the original library pixels.");
+    }
+
+private static void Main()
+    {
+        CheckLiveArmourSplit();
         CheckWingBodyTracking();
         CheckWingPoseMotion();
         CheckUpperBackTracking();
