@@ -78,6 +78,9 @@ namespace Client.MirGraphics
             Opacity = BlendingRate = 1f;
             Blending = GrayScale = false;
             LoadTextures();
+            // Initialize the shared particle atlas and new wing pages during
+            // graphics startup, rather than on the first spell cast.
+            _ = Device.SpellParticles;
             DeviceLost = false;
         }
 
