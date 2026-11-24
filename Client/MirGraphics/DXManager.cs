@@ -520,6 +520,7 @@ namespace Client.MirGraphics
 
         private static void CleanUp()
         {
+            LiveArmourRenderer.Clear();
             Device?.DiscardPending();
             LightBloomPass.DisposeAll();
             AtmosphereFogOverlay.DisposeAll();

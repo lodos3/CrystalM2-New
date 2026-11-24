@@ -42,7 +42,9 @@ internal static class LiveArmourRenderer
         if(Failed.Contains(id))return false;
         Entry entry;
         try { entry=Get(id,frame); }
-        catch(Exception ex) when(ex is IOException or ArgumentException or InvalidDataException or UnauthorizedAccessException)
+        catch(Exception ex) when(ex is IOException || ex is ArgumentException ||
+            ex is InvalidDataException || ex is UnauthorizedAccessException ||
+            ex is System.Text.Json.JsonException || ex is InvalidOperationException)
         {
             Failed.Add(id);
             GameScene.Scene?.ChatDialog?.ReceiveChat($"g{id:00} live armour unavailable: {ex.Message}",ChatType.System);
@@ -100,7 +102,7 @@ internal static class LiveArmourRenderer
 
     private static Texture Upload(int w,int h,byte[] data)
     {
-        var texture=new Texture(_owner,w,h);
+        var texture=new Texture(_owner,w,h) { IsWorldArtwork=true };
         try
         {
             var upload=texture.BeginUpload();
@@ -121,6 +123,6 @@ internal static class LiveArmourRenderer
     internal static void Clear()
     {
         while(Lru.Last!=null)Remove(Lru.Last);
-        _atlas?.Dispose();_atlas=null;Failed.Clear();
+        _atlas?.Dispose();_atlas=null;Failed.Clear();_bytes=0;_owner=null;
     }
 }

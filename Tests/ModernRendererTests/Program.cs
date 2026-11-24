@@ -348,6 +348,10 @@ static class Program
         Rect(dressed,7,21,4,13,61,65,75);
         Rect(dressed,14,21,4,13,61,65,75);
         Rect(dressed,5,9,3,8,90,100,130);
+        Rect(pixels,2,10,3,7,195,149,106);
+        Rect(dressed,2,10,3,7,195,149,106);
+        Rect(pixels,19,10,3,7,195,149,106);
+        Rect(dressed,19,10,3,7,195,149,106);
         var sourceCopy = (byte[])dressed.Clone();
         Vector2[] anchors=[new(12,3),new(12,8),new(7,10),new(18,10),new(12,12),
             new(12,17),new(12,21),new(9,27),new(16,27),new(9,33),new(16,33)];
@@ -359,6 +363,9 @@ static class Program
             split.Armour[(12*24+12)*4+3]==255 &&
             split.Skin[(32*24+9)*4+3]==0 && split.Armour[(32*24+9)*4+3]==255,
             "Torso and boots belong to generated armour, never the skin layer.");
+        Assertions.True(split.Skin[(10*24+3)*4+3]==0 &&
+            split.Skin[(10*24+20)*4+3]==0,
+            "Sleeveless reference art must not preserve whole arms.");
         for(int p=3;p<pixels.Length;p+=4)
             Assertions.True(split.Skin[p]==0 || split.Armour[p]==0,"Skin and armour must be disjoint.");
         Assertions.True(dressed.AsSpan().SequenceEqual(sourceCopy),"Never modify the original library pixels.");
