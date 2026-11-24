@@ -36,6 +36,45 @@ internal static class SpellVfxAssetChecks
             "Twin Drake Blade activation and stun must retain six non-directional frames at legacy timing.");
     }
 
+    private static void CheckCrossHalfMoonFans()
+    {
+        Vector2 feet = new(150, 150);
+        var pool = new SpellParticlePool(2048);
+        for (int direction = 0; direction < 8; direction++)
+        for (int pose = 0; pose < 6; pose++)
+        {
+            SpellParticle[] particles = Sample(feet, direction, pose);
+            Check(particles.Length > 0 && particles.Length <= 200,
+                $"Cross Half Moon direction {direction}, pose {pose}: bounded nonempty emission.");
+            Check(particles.All(p => p.FrameOnly && p.CoveragePlane == 0 &&
+                float.IsFinite(p.Origin.X) && float.IsFinite(p.Origin.Y)),
+                "Cross Half Moon must use finite frame-local procedural particles, not legacy sprite planes.");
+            var surfaces = particles.Where(p => p.Shape == SpellParticleShape.DirectionalSweep && p.Ribbon.HasValue).ToArray();
+            Check(surfaces.Length >= 24 && surfaces.All(p => p.RibbonTextureU.HasValue),
+                "Each Cross Half Moon pose must contain multiple textured cutting surfaces.");
+            if (pose is >= 2 and <= 4)
+                Check(surfaces.Any(p => p.Ground && p.GroundDepth < feet.Y) &&
+                    surfaces.Any(p => !p.Ground && p.GroundDepth >= feet.Y),
+                    "The release must wrap both behind and in front of the warrior.");
+            var offset = new Vector2(23, -17);
+            var moved = Sample(feet + offset, direction, pose);
+            Check(moved.Length == particles.Length && particles.Zip(moved).All(pair =>
+                Vector2.Distance(pair.First.Origin + offset, pair.Second.Origin) < .001f &&
+                MathF.Abs(pair.First.GroundDepth + offset.Y - pair.Second.GroundDepth) < .001f &&
+                pair.First.Colour == pair.Second.Colour),
+                "Swing geometry and depth must follow the actor without random flicker.");
+        }
+
+        SpellParticle[] Sample(Vector2 position, int direction, int pose)
+        {
+            pool.Clear();
+            using var profile = SpellVfxAssets.For(Spell.CrossHalfMoon);
+            var frame = new SpellParticleFrame(pool, position, 1200, 1, SpellParticleFrame.ReferenceSize, 79, depthY: position.Y);
+            SpellVfxPoseMasks.DrawSwing(frame, Spell.CrossHalfMoon, position, direction, pose / 6f);
+            return pool.Active.ToArray();
+        }
+    }
+
     internal static void Run()
     {
         var expected = new Dictionary<MirClass, int>
@@ -57,6 +96,7 @@ internal static class SpellVfxAssetChecks
         try
         {
             CheckBladeParticleLayers(directory);
+            CheckCrossHalfMoonFans();
             var drake = new SpellVisual(Spell.TwinDrakeBlade, SpellVisualPhase.Impact);
             var flaming = new SpellVisual(Spell.FlamingSword, SpellVisualPhase.Impact);
             int baseline = WarriorSpellEffects.PacketDuration(drake);
