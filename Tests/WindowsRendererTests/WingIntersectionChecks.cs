@@ -132,7 +132,7 @@ internal static class WingIntersectionChecks
                             byte[] Layer(int side)
                             {
                                 device.Clear(Color.Black);
-                                ArmourWingParticles.Emit(pool,effect,id<2?id:0,id<2?wingPose:index,shoulder,facing,now,101,side,motion.Yaw,motion.Roll);
+                                ArmourWingParticles.Emit(pool,effect,id<2?id:0,id<2?wingPose:index,shoulder,facing,now,101,side,motion.Yaw,motion.Roll,motion.Pitch);
                                 if(pool.Active.Length==0){missing=true;return new byte[CellW*CellH];}
                                 device.SpellParticles.Draw(pool.Active,Origin,now,false,colour:new Vector3(1,.04f,.5f),
                                     emissiveOverlay:true,exposure:1);

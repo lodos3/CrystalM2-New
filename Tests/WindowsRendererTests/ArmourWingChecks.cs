@@ -10,6 +10,7 @@ internal static class ArmourWingChecks
     // Check production geometry, channel masks and selectors without installed LIBs.
     internal static void CheckElementalDesigns()
     {
+        CheckAttackLean();
         for (int id = 10; id < 20; id++)
         {
             if (!ArmourWings.TrySelect(id.ToString(), out byte? selection) ||
@@ -72,6 +73,29 @@ internal static class ArmourWingChecks
         Console.WriteLine("Verified ten elemental designs across eight facings, five times, split layers and pose motion.");
     }
 
+    private static void CheckAttackLean()
+    {
+        var pool = new SpellParticlePool(ArmourWingParticles.ParticleCapacity);
+        foreach (MirDirection facing in Enum.GetValues<MirDirection>())
+        {
+            Vector2 shoulder = ArmourWingParticles.Shoulder(ArmourWings.MagmaWyrm, false);
+            float yaw = (int)facing * MathF.PI / 4;
+            Vector2 forward = new(MathF.Sin(yaw), -.49f * MathF.Cos(yaw));
+            ArmourWingParticles.Emit(pool, ArmourWings.MagmaWyrm, 0, 0, shoulder, facing, 400, 1);
+            var rest = pool.Active.ToArray();
+            ArmourWingParticles.Emit(pool, ArmourWings.MagmaWyrm, 0, 0, shoulder, facing, 400, 1, torsoPitch: .28f);
+            for (int i = 0; i < rest.Length; i++)
+            {
+                if (rest[i].Ribbon is not { } before) continue;
+                var after = pool.Active[i].Ribbon!.Value;
+                if (pool.Active[i].Origin != rest[i].Origin ||
+                    Vector2.Dot(after.TopRight - before.TopRight, forward) <= 0 ||
+                    Vector2.Dot(after.BottomRight - before.BottomRight, forward) >= 0)
+                    throw new InvalidDataException($"Wing pitch must turn the crown forward and the hem back about a fixed socket in {facing}.");
+            }
+        }
+    }
+
     internal static void Render(string data, string output, bool elementalOnly = false)
     {
         const int previewWidth = 224, previewHeight = 180;
@@ -92,7 +116,9 @@ internal static class ArmourWingChecks
             (MirDirection.Right, 44), (MirDirection.Right, 92),
             (MirDirection.Right, 149), (MirDirection.Right, 152),
             (MirDirection.Right, 366), (MirDirection.Left, 174),
-            (MirDirection.Right, 310)
+            (MirDirection.Right, 310),
+            .. new[] { MirDirection.Up, MirDirection.Right, MirDirection.DownLeft }.SelectMany(
+                facing => Enumerable.Range(0, 6).Select(frame => (facing, 136 + (int)facing * 6 + frame)))
         ];
         int first = elementalOnly ? 10 : 0;
         MirDirection[] backViews = [MirDirection.UpLeft, MirDirection.Up, MirDirection.UpRight];
@@ -133,7 +159,7 @@ internal static class ArmourWingChecks
             if (id >= 2 && WingBodyPose.TryGetMotion(pose, 0, (int)facing, false, out motion))
                 trackedShoulder += motion.Offset;
             ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101,
-                torsoYaw: motion.Yaw, torsoRoll: motion.Roll);
+                torsoYaw: motion.Yaw, torsoRoll: motion.Roll, torsoPitch: motion.Pitch);
             if (pool.Active.Length < 3 || pool.Active.Length >= pool.Capacity)
                 throw new InvalidOperationException($"Invalid particle count for {labels[id]}.");
             bool behind = id >= 2 && facing is (MirDirection.Down or MirDirection.DownLeft or MirDirection.DownRight);
@@ -142,14 +168,14 @@ internal static class ArmourWingChecks
             int near = ArmourWingParticles.NearSide(facing);
             if (split)
             {
-                ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, -near, motion.Yaw, motion.Roll);
+                ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, -near, motion.Yaw, motion.Roll, motion.Pitch);
                 Wings();
             }
             else if (behind) Wings();
             device.Blend = SpriteBlendMode.Alpha;
             device.Sprite.Draw(body, null, new Vector3(origin.X + actor.OffsetX, origin.Y + actor.OffsetY, 0), Vector4.One);
             if (split)
-                ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, near, motion.Yaw, motion.Roll);
+                ArmourWingParticles.Emit(pool, effect.Value, id, pose, trackedShoulder, facing, 480, 101, near, motion.Yaw, motion.Roll, motion.Pitch);
             if (split || !behind) Wings();
             using var image = device.Capture(surface);
             int x = (elementalOnly ? (id-first)%5 : id)*previewWidth;

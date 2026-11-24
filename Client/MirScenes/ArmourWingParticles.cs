@@ -48,7 +48,8 @@ internal static class ArmourWingParticles
     } | unchecked((int)0xFF000000));
 
     internal static void Emit(SpellParticlePool pool, byte effect, int bank, int pose, Vector2 shoulder,
-        MirDirection direction, long now, uint seed, int onlySide = 0, float torsoYaw = 0, float torsoRoll = 0)
+        MirDirection direction, long now, uint seed, int onlySide = 0, float torsoYaw = 0, float torsoRoll = 0,
+        float torsoPitch = 0)
     {
         pool.Clear();
         if (effect is 1 or 2)
@@ -65,13 +66,19 @@ internal static class ArmourWingParticles
             return;
         }
         if (!ArmourWings.IsParticle(effect)) return;
+        float baseYaw = (int)direction * (MathF.PI / 4);
+        Vector2 bodyBack = new(-MathF.Sin(baseYaw), .49f * MathF.Cos(baseYaw));
+        // Rotate the vertical axis about the two shoulder sockets, then project
+        // onto the map. Signed height puts feathers either side of that hinge.
+        var (sinPitch, cosPitch) = MathF.SinCos(torsoPitch);
+        Vector2 lean = bodyBack * sinPitch + Vector2.UnitY * (cosPitch - 1);
         if (ArmourWings.IsAura(effect))
         {
-            EmitElemental(pool, effect, shoulder, direction, now, seed, onlySide, torsoYaw, torsoRoll);
+            EmitElemental(pool, effect, shoulder, direction, now, seed, onlySide, lean);
             return;
         }
 
-        float yaw = (int)direction * (MathF.PI / 4) + torsoYaw;
+        float yaw = baseYaw + torsoYaw;
         Vector2 across = new(MathF.Cos(yaw), MathF.Sin(yaw) * .49f);
         Vector2 back = new(-MathF.Sin(yaw), MathF.Cos(yaw) * .49f);
         float profile = MathF.Abs(MathF.Sin(yaw));
@@ -103,7 +110,6 @@ internal static class ArmourWingParticles
         {
             if (onlySide != 0 && side != onlySide) continue;
             bool near = profile < .001f || side == NearSide(direction);
-            float baseYaw = (int)direction * MathF.PI / 4;
             Vector2 root = attachment + new Vector2(MathF.Cos(baseYaw), MathF.Sin(baseYaw) * .49f) * (side * 5.5f);
             int opacity = (int)(218 + 12 * MathF.Sin(yaw) * side + 8 * flap);
 
@@ -159,16 +165,16 @@ internal static class ArmourWingParticles
                 float localYaw = baseYaw + torsoYaw * flex;
                 Vector2 localAcross = new(MathF.Cos(localYaw), MathF.Sin(localYaw) * .49f);
                 Vector2 localBack = new(-MathF.Sin(localYaw), MathF.Cos(localYaw) * .49f);
+                float down = height * .55f - 4 * u * flap + 4 * t * t - arch + shell * depth * .30f * rearSign * flex;
                 Vector2 projected = Rotate(localAcross * (side * (span + shell * depth * .23f * flex)) +
                     localBack * (sweep + (camber + twist + shell * depth * (.25f + .75f * flex)) * RearDepthScale) +
-                    Vector2.UnitY * (height * .55f - 4 * u * flap + 4 * t * t - arch +
-                    shell * depth * .30f * rearSign * flex), torsoRoll * flex);
+                    Vector2.UnitY * down, torsoRoll * flex);
                 if ((direction is MirDirection.Left or MirDirection.Right) && u >= 0)
                 {
                     float sign = direction == MirDirection.Right ? -1f : 1f;
                     projected.X = sign * Math.Max(0, sign * projected.X);
                 }
-                return projected;
+                return projected + lean * down;
             }
 
             int firstFrame = 0, nextFrame = 0;
@@ -247,7 +253,7 @@ internal static class ArmourWingParticles
     // Distinct orbiting sun crests, amethyst crescents and inclined star instruments.
     // Depth splitting follows each ornament's actual orbital position.
     private static void EmitElemental(SpellParticlePool pool, byte effect, Vector2 shoulder,
-        MirDirection direction, long now, uint seed, int onlySide, float torsoYaw, float torsoRoll)
+        MirDirection direction, long now, uint seed, int onlySide, Vector2 lean)
     {
         bool solar = effect == ArmourWings.SolarAscendant, eclipse = effect == ArmourWings.Eclipse;
         int count = solar ? 8 : eclipse ? 5 : 6;
@@ -261,12 +267,15 @@ internal static class ArmourWingParticles
             if (onlySide != 0 && onlySide != (depth >= 0 ? nearSide : -nearSide)) continue;
             float radius = solar ? 32 : eclipse ? 35 : 39;
             float altitude = solar ? -21 : eclipse ? -17 : (i % 2 == 0 ? -27 : -9);
-            var position = shoulder + new Vector2(radius * x, altitude + depth * (solar ? 27 : 17) - x * (eclipse ? 16 : 6));
+            float downFromShoulder = altitude + depth * (solar ? 27 : 17) - x * (eclipse ? 16 : 6);
+            var position = shoulder + new Vector2(radius * x, downFromShoulder) + lean * downFromShoulder;
             float angle = solar ? MathF.Atan2(depth * 24, x * radius) + MathF.PI / 2 :
                 eclipse ? a + .45f : -.48f * a + i;
             float size = (solar ? 23 : eclipse ? 30 : 27) * (.85f + .12f * depth);
             Vector2 right = new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * size;
             Vector2 down = new Vector2(-MathF.Sin(angle), MathF.Cos(angle)) * size;
+            right += lean * right.Y;
+            down += lean * down.Y;
             var surface = new SpriteQuad(-right-down,right-down,-right+down,right+down);
             int frame = (int)((now / 240 + i) % WingPoseAtlas.FrameCount(bank));
             int alpha = (int)(194 + 39 * depth);

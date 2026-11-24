@@ -65,9 +65,9 @@ static class Program
         Assertions.True(WingBodyPose.TryGetMotion(8, 0, 2, false, out var idle) &&
             idle == WingPoseMotion.Zero, "Idle pose is the motion reference.");
         Assertions.True(WingBodyPose.TryGetMotion(149, 0, 2, false, out var windup) &&
-            windup.Roll < -.02f && windup.Yaw > .02f, "Right attack windup must lean and turn.");
+            windup.Roll < -.02f && windup.Yaw > .02f && windup.Pitch < 0, "Right attack windup must lean and turn.");
         Assertions.True(WingBodyPose.TryGetMotion(152, 0, 2, false, out var follow) &&
-            follow.Roll > .08f && follow.Yaw < -.02f, "Right attack follow-through must lean and turn.");
+            follow.Roll > .08f && follow.Yaw < -.02f && follow.Pitch > .1f, "Right attack follow-through must lean and turn.");
         for (int direction = 0; direction < 8; direction++)
         for (int index = 0; index < 4; index++)
             Assertions.True(WingBodyPose.TryGetMotion(direction * 4 + index, 0, direction, false, out var rest) &&
@@ -78,7 +78,8 @@ static class Program
         smooth.Advance(idle, 100, true);
         var first = smooth.Advance(follow, 116, false);
         Assertions.True(first.Offset.Length() > 0 && first.Offset.Length() < follow.Offset.Length() &&
-            first.Roll > 0 && first.Roll < follow.Roll, "Pose changes must interpolate.");
+            first.Roll > 0 && first.Roll < follow.Roll &&
+            first.Pitch > 0 && first.Pitch < follow.Pitch, "Pose changes must interpolate.");
         Assertions.True(smooth.Advance(follow, 116, false) == first, "Draw passes share a sample.");
         var later = smooth.Advance(follow, 216, false);
         Assertions.True(Vector2.Distance(later.Offset, follow.Offset) < Vector2.Distance(first.Offset, follow.Offset),

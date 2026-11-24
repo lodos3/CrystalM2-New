@@ -11,7 +11,7 @@ namespace CrystalM2.Rendering.Core;
 public static class WingBodyPose
 {
     private const int GenderStride = 808;
-    private readonly record struct Sample(Vector2 Position, float Roll);
+    private readonly record struct Sample(Vector2 Position, float Roll, Vector2 Torso);
     private static readonly Lazy<Sample[]> Anchors = new(Load);
 
     // Conservative authored twist estimates from the visible windup and
@@ -63,7 +63,9 @@ public static class WingBodyPose
             if (delta.LengthSquared() < .64f) delta = Vector2.Zero;
             roll = Math.Clamp(roll * .30f, -.055f, .055f);
         }
-        motion = new WingPoseMotion(delta, roll, Math.Clamp(degrees * MathF.PI / 180f * .32f, -.14f, .14f));
+        bool attack = local is >= 136 and < 296 or >= 584 and < 632;
+        float pitch = attack ? WingPoseMotion.AttackPitch(samples[bodyFrame].Torso - samples[reference].Torso, direction) : 0;
+        motion = new WingPoseMotion(delta, roll, Math.Clamp(degrees * MathF.PI / 180f * .32f, -.14f, .14f), pitch);
         return true;
     }
 
@@ -89,7 +91,7 @@ public static class WingBodyPose
             Vector2 shoulderB = Read(points[3]);
             Vector2 torso = neck - Read(points[6]);
             float roll = torso.LengthSquared() > 1f ? MathF.Atan2(torso.X, -torso.Y) : 0f;
-            result[index++] = new Sample(neck * .35f + (shoulderA + shoulderB) * .325f, roll);
+            result[index++] = new Sample(neck * .35f + (shoulderA + shoulderB) * .325f, roll, torso);
         }
         return result;
 

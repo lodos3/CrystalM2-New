@@ -5084,7 +5084,8 @@ namespace Client.MirObjects
                 ArmourWingParticles.Emit(_wingParticles, WingEffect, _wingFamily * 2 + WingEffect - 1,
                     DrawWingFrame + WingOffset, WingShoulder, Direction, CMain.Time, ObjectID, onlySide,
                     _wingPoseReady ? _wingPoseSmoother.Current.Yaw : 0f,
-                    _wingPoseReady ? _wingPoseSmoother.Current.Roll : 0f);
+                    _wingPoseReady ? _wingPoseSmoother.Current.Roll : 0f,
+                    _wingPoseReady ? _wingPoseSmoother.Current.Pitch : 0f);
                 DXManager.Device.SpellParticles.Draw(_wingParticles.Active, new Vector2(DrawLocation.X, DrawLocation.Y),
                     CMain.Time, ground: false, emissiveOverlay: true, exposure: 1.22f);
                 return;
@@ -5105,7 +5106,13 @@ namespace Client.MirObjects
             WingPoseMotion target;
             if (_wingFamily != 0 || !WingBodyPose.TryGetMotion(DrawFrame + ArmourOffSet, ArmourOffSet,
                 (int)Direction, RidingMount, out target))
-                target = new WingPoseMotion(RawWingShoulder - baseline, 0f, 0f);
+            {
+                Vector2 travel = RawWingShoulder - baseline;
+                bool attack = CurrentAction is MirAction.Attack1 or MirAction.Attack2 or MirAction.Attack3 or
+                    MirAction.Attack4 or MirAction.MountAttack or MirAction.DashAttack or MirAction.AttackRange1 or
+                    MirAction.AttackRange2 or MirAction.AttackRange3;
+                target = new WingPoseMotion(travel, 0, 0, attack ? WingPoseMotion.AttackPitch(travel, (int)Direction) : 0);
+            }
             bool reset = !_wingPoseReady || _wingPoseEffect != WingEffect || _wingPoseFamily != _wingFamily ||
                 _wingPoseBank != ArmourOffSet || _wingPoseMounted != RidingMount || _wingPoseDirection != Direction;
             bool idle = CurrentAction is MirAction.Standing or MirAction.Stance or MirAction.Stance2 or MirAction.MountStanding;

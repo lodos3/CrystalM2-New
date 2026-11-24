@@ -2,9 +2,19 @@ using System.Numerics;
 
 namespace CrystalM2.Rendering.Core;
 
-public readonly record struct WingPoseMotion(Vector2 Offset, float Roll, float Yaw)
+public readonly record struct WingPoseMotion(Vector2 Offset, float Roll, float Yaw, float Pitch = 0)
 {
     public static WingPoseMotion Zero => new(Vector2.Zero, 0, 0);
+
+    // Recover forward travel from its projection onto the isometric ground.
+    // Positive pitch carries a point above the shoulder towards the strike.
+    public static float AttackPitch(Vector2 travel, int direction)
+    {
+        float facing = direction * (MathF.PI / 4);
+        Vector2 forward = new(MathF.Sin(facing), -.49f * MathF.Cos(facing));
+        float distance = Vector2.Dot(travel, forward) / forward.LengthSquared();
+        return Math.Clamp(MathF.Atan(distance / 43f), -.16f, .33f);
+    }
 
     // The sprite changes discretely. Never allow the interpolated root to
     // trail the current shoulder by more than a small screen-space distance.
@@ -20,7 +30,8 @@ public readonly record struct WingPoseMotion(Vector2 Offset, float Roll, float Y
         if (idle) return Zero;
         Vector2 offset = locomotion && motion.Offset.LengthSquared() < .64f ? Vector2.Zero : motion.Offset;
         return new(offset, Math.Clamp(motion.Roll, locomotion ? -.055f : -.18f, locomotion ? .055f : .18f),
-            Math.Clamp(motion.Yaw, locomotion ? -.04f : -.14f, locomotion ? .04f : .14f));
+            Math.Clamp(motion.Yaw, locomotion ? -.04f : -.14f, locomotion ? .04f : .14f),
+            locomotion ? 0 : motion.Pitch);
     }
 }
 
@@ -44,8 +55,12 @@ public struct WingPoseSmoother
         float dt = (now - _lastTime) * .001f;
         _lastTime = now;
         float weight = 1 - MathF.Exp(-dt / Math.Clamp(tau, .015f, .080f));
+        // The socket must track discrete sprite frames closely. The broad
+        // upper and lower spans can ease into the strike over a longer interval.
+        float pitchWeight = 1 - MathF.Exp(-dt / .055f);
         return Current = new WingPoseMotion(WingPoseMotion.LimitOffset(Vector2.Lerp(Current.Offset, target.Offset, weight), target.Offset, maxLag),
             Current.Roll + (target.Roll - Current.Roll) * weight,
-            Current.Yaw + (target.Yaw - Current.Yaw) * weight);
+            Current.Yaw + (target.Yaw - Current.Yaw) * weight,
+            Current.Pitch + (target.Pitch - Current.Pitch) * pitchWeight);
     }
 }
