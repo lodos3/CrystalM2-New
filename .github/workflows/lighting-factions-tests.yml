@@ -56,6 +56,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+      - name: Launcher HTTP download and retry checks
+        run: dotnet run --project Tests/LauncherDownloadTests/LauncherDownloadTests.csproj --configuration Release
       - name: Bookless five-class spell and specialisation catalog tests
         run: dotnet run --project Tests/SpellCurriculumTests/SpellCurriculumTests.csproj
       - name: Specialisation protocol round-trip tests

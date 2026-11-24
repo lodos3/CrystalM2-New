@@ -13,7 +13,10 @@ namespace Launcher
         long _totalBytes, _completedBytes;
         private int _fileCount, _currentCount;
 
-        public bool Completed, Checked, CleanFiles, LabelSwitch, ErrorFound;
+        public volatile bool Completed, ErrorFound;
+        public bool Checked, CleanFiles, LabelSwitch;
+        private string _patchFailure;
+        private readonly CancellationTokenSource _patchCancellation = new();
 
         public List<FileInformation> OldList;
         public Queue<FileInformation> DownloadList = new Queue<FileInformation>();
@@ -59,62 +62,43 @@ namespace Launcher
             try
             {
                 GetOldFileList();
-
                 if (OldList.Count == 0)
-                {
-                    MessageBox.Show(GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.PatchErr));
-                    Completed = true;
-                    return;
-                }
+                    throw new InvalidDataException("The patch manifest is empty or invalid.");
 
                 _fileCount = OldList.Count;
-                for (int i = 0; i < OldList.Count; i++)
-                    CheckFile(OldList[i]);
+                foreach (var info in OldList)
+                {
+                    _patchCancellation.Token.ThrowIfCancellationRequested();
+                    CheckFile(info);
+                }
 
                 Checked = true;
-                _fileCount = 0;
                 _currentCount = 0;
-
                 _fileCount = DownloadList.Count;
-
-                ServicePointManager.DefaultConnectionLimit = Settings.P_Concurrency;
-
                 _stopwatch = Stopwatch.StartNew();
-                for (var i = 0; i < Settings.P_Concurrency; i++)
-                    BeginDownload();
 
-
-            }
-            catch (EndOfStreamException ex)
-            {
-                MessageBox.Show(GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.EndStreamOldVersion));
-                Completed = true;
-                SaveError(ex.ToString());
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.ToString(), "Error");
-                Completed = true;
-                SaveError(ex.ToString());
-            }
-
-            _stopwatch.Stop();
-        }
-
-        private void BeginDownload()
-        {
-            if (DownloadList.Count == 0)
-            {
-                Completed = true;
+                // The existing launcher already performs downloads sequentially.
+                // Use a loop rather than recursive calls for large patch lists.
+                while (DownloadList.Count > 0)
+                {
+                    _patchCancellation.Token.ThrowIfCancellationRequested();
+                    DownloadFile(new Download { Info = DownloadList.Dequeue() });
+                }
 
                 CleanUp();
-                return;
             }
-
-            var download = new Download();
-            download.Info = DownloadList.Dequeue();
-            DownloadFile(download);
-
+            catch (OperationCanceledException) when (_patchCancellation.IsCancellationRequested) { }
+            catch (Exception ex)
+            {
+                ErrorFound = true;
+                _patchFailure = ex.GetBaseException().Message;
+                SaveError(ex.ToString());
+            }
+            finally
+            {
+                _stopwatch.Stop();
+                Completed = true;
+            }
         }
 
         private void CleanUp()
@@ -155,7 +139,7 @@ namespace Launcher
             OldList = new List<FileInformation>();
 
             byte[] data = Download(Settings.P_PatchFileName);
-            if (data != null)
+            if (data != null && data.Length >= sizeof(int))
             {
                 using MemoryStream stream = new MemoryStream(data);
                 using BinaryReader reader = new BinaryReader(stream);
@@ -167,6 +151,10 @@ namespace Launcher
                 }
                 reader.BaseStream.Seek(0,SeekOrigin.Begin);
                 int count = reader.ReadInt32();
+                // Each record occupies at least one byte. Reject impossible
+                // counts before trying to allocate or enumerate the manifest.
+                if (count <= 0 || count > data.Length - sizeof(int))
+                    throw new InvalidDataException("Invalid patch manifest file count.");
 
                 for (int i = 0; i < count; i++)
                 {
@@ -196,171 +184,102 @@ namespace Launcher
             }
         }
 
-        private int errorcount = 0;
+        private HttpClient CreatePatchClient(HttpMessageHandler handler)
+        {
+            var client = new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(5) };
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/octet-stream"));
+            if (Settings.P_NeedLogin)
+            {
+                string authInfo = Convert.ToBase64String(System.Text.Encoding.Default.GetBytes(
+                    Settings.P_Login + ":" + Settings.P_Password));
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", authInfo);
+            }
+            return client;
+        }
+
+        private Uri PatchUri(string fileName)
+        {
+            if (!Uri.TryCreate(Settings.P_Host + fileName.Replace('\\', '/'), UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+                throw new InvalidDataException("Invalid launcher patch host. Check the Host setting in Mir2Config.ini.");
+            return uri;
+        }
 
         public void DownloadFile(Download dl)
         {
             var info = dl.Info;
-            string fileName = info.FileName.Replace(@"\", "/");
-
+            string fileName = info.FileName.Replace('\\', '/');
             if (fileName != "PList.gz" && (info.Compressed != info.Length || info.Compressed == 0))
-            {
                 fileName += ".gz";
-            }
 
+            lock (ActiveDownloads) ActiveDownloads.Add(dl);
+            string staging = null;
             try
             {
-                HttpClientHandler httpClientHandler = new() { AllowAutoRedirect = true };
-                ProgressMessageHandler progressMessageHandler = new(httpClientHandler);
+                using var progress = new ProgressMessageHandler(new HttpClientHandler { AllowAutoRedirect = true });
+                progress.HttpReceiveProgress += (_, args) => dl.CurrentBytes = args.BytesTransferred;
+                using var client = CreatePatchClient(progress);
+                byte[] data = PatchDownload.FetchAsync(client, PatchUri(fileName),
+                    attempt => { dl.CurrentBytes = 0; SaveError($"Retry {attempt}/{PatchDownload.MaxAttempts - 1}: {fileName}"); },
+                    _patchCancellation.Token).GetAwaiter().GetResult();
 
-                progressMessageHandler.HttpReceiveProgress += (_, args) =>
+                if (info.Compressed > 0 && info.Compressed != info.Length)
+                    data = Functions.DecompressBytes(data);
+                if (data.LongLength != info.Length)
+                    throw new InvalidDataException($"Patch size mismatch for {info.FileName}.");
+
+                // Never let a malformed manifest write outside the client root.
+                string root = Path.GetFullPath(Settings.P_Client).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar;
+                string destination = Path.GetFullPath(Path.Combine(root, info.FileName));
+                if (!destination.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("Patch entry is outside the client directory.");
+
+                string directory = Path.GetDirectoryName(destination);
+                Directory.CreateDirectory(directory);
+                staging = destination + "." + Guid.NewGuid().ToString("N") + ".patchtmp";
+                File.WriteAllBytes(staging, data);
+                File.SetLastWriteTime(staging, info.Creation);
+                _patchCancellation.Token.ThrowIfCancellationRequested();
+
+                string extension = Path.GetExtension(destination);
+                bool executable = extension.Equals(".dll", StringComparison.OrdinalIgnoreCase) ||
+                    extension.Equals(".exe", StringComparison.OrdinalIgnoreCase) ||
+                    extension.Equals(".pdb", StringComparison.OrdinalIgnoreCase);
+                if (executable && File.Exists(destination))
                 {
-
-                    dl.CurrentBytes = args.BytesTransferred;
-
-                };
-
-                using (HttpClient client = new(progressMessageHandler))
-                {
-                    client.DefaultRequestHeaders.Accept.Clear();
-                    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                    client.DefaultRequestHeaders.AcceptCharset.Clear();
-                    client.DefaultRequestHeaders.AcceptCharset.Add(new StringWithQualityHeaderValue("utf-8"));
-
-                    if (Settings.P_NeedLogin)
+                    string backup = Path.Combine(directory, "Old__" + Path.GetFileName(destination));
+                    if (File.Exists(backup)) File.Delete(backup);
+                    File.Move(destination, backup);
+                    try { File.Move(staging, destination); }
+                    catch
                     {
-                        string authInfo = Settings.P_Login + ":" + Settings.P_Password;
-                        authInfo = Convert.ToBase64String(System.Text.Encoding.Default.GetBytes(authInfo));
-                        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", authInfo);
+                        if (!File.Exists(destination)) File.Move(backup, destination);
+                        throw;
                     }
-
-                    ActiveDownloads.Add(dl);
-
-                    var task = Task.Run(() => client.GetAsync(new Uri($"{Settings.P_Host}{fileName}"), HttpCompletionOption.ResponseHeadersRead));
-                    var response = task.Result;
-
-                    var task2 = Task.Run(() => response.Content.ReadAsByteArrayAsync());
-                    byte[] data = task2.Result;
-
-                    _currentCount++;
-                    _completedBytes += dl.CurrentBytes;
-                    dl.CurrentBytes = 0;
-                    dl.Completed = true;
-
-                    if (info.Compressed > 0 && info.Compressed != info.Length)
-                    {
-                        data = Functions.DecompressBytes(data);
-                    }
-
-                    var fileNameOut = Settings.P_Client + info.FileName;
-                    var dirName = Path.GetDirectoryName(fileNameOut);
-                    if (!Directory.Exists(dirName))
-                        Directory.CreateDirectory(dirName);
-
-                    //first remove the original file if needed
-                    string[] specialfiles = { ".dll", ".exe", ".pdb" };
-                    if (File.Exists(fileNameOut) && ( specialfiles.Contains( Path.GetExtension(fileNameOut).ToLower() )))
-                    {
-                        string oldFilename = Path.Combine(Path.GetDirectoryName(fileNameOut), ("Old__" + Path.GetFileName(fileNameOut)));
-
-                        try
-                        {
-                            //if there's another previous backup: delete it first
-                            if (File.Exists(oldFilename))
-                            {
-                                File.Delete(oldFilename);
-                            }
-                            File.Move(fileNameOut, oldFilename);
-                        }
-                        catch (UnauthorizedAccessException ex)
-                        {
-                            SaveError(ex.ToString());
-                            errorcount++;
-                            if (errorcount == 5)
-                                MessageBox.Show(GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.TooManyErrors));
-                            if (errorcount < 5)
-                                MessageBox.Show(GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.ErrorSavingFile) + fileNameOut);
-                        }
-                        catch (Exception ex)
-                        {
-                            SaveError(ex.ToString());
-                            errorcount++;
-                            if (errorcount == 5)
-                                MessageBox.Show(GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.TooManyErrors));
-                            if (errorcount < 5)
-                                MessageBox.Show(GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.ErrorSavingFile) + fileNameOut);
-                        }
-                        finally
-                        {
-                            //Might cause an infinite loop if it can never gain access
-                            Restart = true;
-                        }
-                    }
-
-                    File.WriteAllBytes(fileNameOut, data);
-                    File.SetLastWriteTime(fileNameOut, info.Creation);
+                    Restart = true;
                 }
-            }
-            catch (HttpRequestException e)
-            {
-                File.AppendAllText(@".\Error.txt",
-                                       $"[{DateTime.Now}] {info.FileName} could not be downloaded. ({e.Message}) {Environment.NewLine}");
-                ErrorFound = true;
-            }
-            catch (Exception ex)
-            {
-                SaveError(ex.ToString());
-                errorcount++;
-                if (errorcount == 5)
-                    MessageBox.Show(GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.TooManyErrors));
-                if (errorcount < 5)
-                    MessageBox.Show(GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.ErrorSavingFile) + dl.Info.FileName);
+                else File.Move(staging, destination, overwrite: true);
+
+                _currentCount++;
+                _completedBytes += info.Length;
             }
             finally
             {
-                if (ErrorFound)
-                {
-                    MessageBox.Show(GameLanguage.ClientTextMap.GetLocalization((ClientTextKeys.FileDownload_Failure), fileName));
-                }
+                if (staging != null && File.Exists(staging))
+                    try { File.Delete(staging); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+                dl.CurrentBytes = 0;
+                dl.Completed = true;
+                lock (ActiveDownloads) ActiveDownloads.Remove(dl);
             }
-
-            BeginDownload();
         }
 
         public byte[] Download(string fileName)
         {
-            using (HttpClient client = new())
-            {
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                client.DefaultRequestHeaders.AcceptCharset.Clear();
-                client.DefaultRequestHeaders.AcceptCharset.Add(new StringWithQualityHeaderValue("utf-8"));
-
-                if (Settings.P_NeedLogin)
-                {
-                    string authInfo = Settings.P_Login + ":" + Settings.P_Password;
-                    authInfo = Convert.ToBase64String(System.Text.Encoding.Default.GetBytes(authInfo));
-                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", authInfo);
-                }
-
-                string uriString = Settings.P_Host + Path.ChangeExtension(fileName, ".gz");
-
-                if (Uri.IsWellFormedUriString(uriString, UriKind.Absolute))
-                {
-                    var task = Task.Run(() => client.GetAsync(new Uri(uriString), HttpCompletionOption.ResponseHeadersRead));
-                    var response = task.Result;
-                    using Stream sm = response.Content.ReadAsStream();
-                    using MemoryStream ms = new();
-                    sm.CopyTo(ms);
-                    byte[] data = ms.ToArray();
-                    return data;
-                }
-                else
-                {
-                    MessageBox.Show(GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.LauncherHostSettingFormatError), GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.BadHostFormat));
-                    return null;
-                }
-            }
+            using var client = CreatePatchClient(new HttpClientHandler { AllowAutoRedirect = true });
+            return PatchDownload.FetchAsync(client, PatchUri(Path.ChangeExtension(fileName, ".gz")),
+                attempt => SaveError($"Retry {attempt}/{PatchDownload.MaxAttempts - 1}: patch manifest"),
+                _patchCancellation.Token).GetAwaiter().GetResult();
         }
 
         public FileInformation GetFileInformation(string fileName)
@@ -423,6 +342,7 @@ namespace Launcher
 
         private void Launch()
         {
+            if (!Completed || ErrorFound) return;
             if (ConfigForm.Visible) ConfigForm.Visible = false;
 
             Program.Launch = true;
@@ -542,7 +462,22 @@ namespace Launcher
         {
             try
             {
-                if (Completed && ActiveDownloads.Count == 0)
+                if (Completed && ErrorFound)
+                {
+                    InterfaceTimer.Enabled = false;
+                    Launch_pb.Enabled = false;
+                    ActionLabel.Text = "Update failed";
+                    CurrentFile_label.Text = "Patch server unavailable or invalid update";
+                    SpeedLabel.Text = "";
+                    CurrentFile_label.Visible = true;
+                    MessageBox.Show(this,
+                        "The client could not finish checking or downloading updates.\n\n" +
+                        _patchFailure + "\n\nCheck the launcher Host setting and your connection, then restart to retry. " +
+                        "Details are saved in Error.txt.",
+                        "Patch update failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                if (Completed)
                 {
                     ActionLabel.Text = "";
                     CurrentFile_label.Text = GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.UpToDate);
@@ -556,8 +491,6 @@ namespace Launcher
                     TotalPercent_label.Text = "100%";
                     InterfaceTimer.Enabled = false;
                     Launch_pb.Enabled = true;
-                    if (ErrorFound) MessageBox.Show(GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.FilesDownloadFailed), GameLanguage.ClientTextMap.GetLocalization(ClientTextKeys.DownloadFailed));
-                    ErrorFound = false;
 
                     if (CleanFiles)
                     {
@@ -582,30 +515,13 @@ namespace Launcher
                 var currentBytes = 0L;
                 FileInformation currentFile = null;
 
-                // Remove completed downloads..
-                for (var i = ActiveDownloads.Count - 1; i >= 0; i--)
+                int activeCount;
+                lock (ActiveDownloads)
                 {
-                    var dl = ActiveDownloads[i];
-
-                    if (dl.Completed)
-                    {
-                        ActiveDownloads.RemoveAt(i);
-                        continue;
-                    }
-                }
-
-                for (var i = ActiveDownloads.Count - 1; i >= 0; i--)
-                {
-                    var dl = ActiveDownloads[i];
-                    if (!dl.Completed)
-                        currentBytes += dl.CurrentBytes;
-                }
-
-                if (Settings.P_Concurrency == 1)
-                {
-                    // Note: Just mimic old behaviour for now until a better UI is done.
-                    if (ActiveDownloads.Count > 0)
-                        currentFile = ActiveDownloads[0].Info;
+                    activeCount = ActiveDownloads.Count;
+                    foreach (var dl in ActiveDownloads)
+                        if (!dl.Completed) currentBytes += dl.CurrentBytes;
+                    if (activeCount > 0) currentFile = ActiveDownloads[0].Info;
                 }
 
                 ActionLabel.Visible = true;
@@ -619,7 +535,7 @@ namespace Launcher
 
                 if (Settings.P_Concurrency > 1)
                 {
-                    CurrentFile_label.Text = string.Format("<Concurrent> {0}", ActiveDownloads.Count);
+                    CurrentFile_label.Text = string.Format("<Concurrent> {0}", activeCount);
                     SpeedLabel.Text = ToSize(currentBytes / _stopwatch.Elapsed.TotalSeconds);
                 }
                 else
@@ -665,7 +581,11 @@ namespace Launcher
 
         private void AMain_FormClosed(object sender, FormClosedEventArgs e)
         {
-            MoveOldFilesToCurrent();
+            _patchCancellation.Cancel();
+            // Do not race the worker while it is installing a staged file.
+            // RepairOldFiles restores an interrupted executable replacement
+            // before the next patch check.
+            if (Completed) MoveOldFilesToCurrent();
 
             Launch_pb?.Dispose();
             Close_pb?.Dispose();
