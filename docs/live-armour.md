@@ -15,3 +15,8 @@ dotnet run --project tasks/ArmourCreate/ArmourCreate.csproj -- --live-one "path/
 Use --live to export all 98 pairs. Output filenames gNN_HeadHands.Lib and gNN_Surface.Lib are unchanged; use a new directory. Draw the two complementary layers at their original offset. Source archives are never overwritten.
 
 Validation: Tests/ModernRendererTests includes exact alpha conservation, skin protection, deterministic palette mapping, tone order and gamut tests. Build and inspect the client in all directions and animations; verify the appearance of warm cloth versus metal, skin, and original shadow handling. The chosen palettes are initial artistic tuning, not physically measured materials.
+
+## Local build via GitHub Desktop
+
+Select `CrystalM2-New` and `master`, then Fetch origin and Pull origin when offered. The History tab should show the original-frame recolour implementation and monotonic tone correction. Rebuild the client using the existing local Release configuration. No server changes are needed for these palettes.
+
