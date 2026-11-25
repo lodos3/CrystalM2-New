@@ -60,8 +60,10 @@ public static class ArmourRecolour
             Rgb(p.Trim)*warm+Rgb(p.Cloth)*cloth)/Math.Max(.0001f,total);
         // Stage 4: monotone, bounded tone curve preserves the painted
         // highlights and shadows. No neighbourhood blur or geometry changes.
-        float value=Math.Clamp(y+(p.Tone-1)*y*(1-y)*1.35f,0,1);
         float preserve=Smooth(.035f,.16f,y)*(1-Smooth(.76f,.975f,y));
+        // Feather the tone curve to identity at the protected endpoints;
+        // abrupt cutoffs would invert some near-black/near-white shades.
+        float value=Math.Clamp(y+(p.Tone-1)*y*(1-y)*1.35f*preserve,0,1);
         // Retain some native chroma; move toward the palette without clipping
         // channels. Work in a constant-luminance plane and compress chroma
         // only when necessary to stay inside the RGB gamut.
