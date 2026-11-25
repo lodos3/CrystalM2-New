@@ -9,6 +9,11 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        if (args is ["--original-armour", var dataRoot, var poses, var preview])
+        {
+            OriginalArmourChecks.Render(dataRoot, poses, preview);
+            return;
+        }
         if (args is ["--wing-intersections", var root, var destination])
         {
             WingIntersectionChecks.Render(root, destination, 4);
@@ -25,9 +30,9 @@ internal static class Program
             ArmourWingChecks.Render(data, output, args[0] == "--elemental-preview");
             return;
         }
-        if (args is ["--cross-moon-preview", var destination])
+        if (args is ["--cross-moon-preview", var crossMoonDestination])
         {
-            SpellVfxAssetChecks.RenderCrossHalfMoon(destination);
+            SpellVfxAssetChecks.RenderCrossHalfMoon(crossMoonDestination);
             return;
         }
         if (args is ["--compare-spell-poses", var directory])
@@ -73,6 +78,8 @@ internal static class Program
         device.Clear(Color.Black);
         using (var material = Upload(device, Color.FromArgb(255,128,128,127)))
         {
+            Span<Vector4> previousConstants = stackalloc Vector4[RendererDevice.EffectConstantCount];
+            device.CopyPixelShaderConstants(previousConstants);
             device.PixelShader = ShaderEffect.LiveArmour;
             device.SetPixelShaderConstant(0, [new(.15f,.2f,.25f,1), new(.7f,.75f,.8f,1),
                 new(.1f,.3f,.6f,1), new(.8f,.6f,.2f,1), new(-.5f,-.6f,.8f,0)]);
@@ -83,6 +90,7 @@ internal static class Program
                 "The live material must shade its packed normal rather than display the raw data.");
             Near(Color.Black,lit.GetPixel(0,0),"Live armour must not affect pixels outside its quad.");
             device.PixelShader = ShaderEffect.Artwork;
+            device.SetPixelShaderConstant(0,previousConstants);
         }
         device.BeginFrame();
         device.Clear(Color.Black);

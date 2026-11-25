@@ -158,7 +158,12 @@ float4 PSArtwork(Output input) : SV_TARGET { return PrepareBlend(SampleArtwork(i
 // A = pose coverage. No baked source armour colours are used in this pass.
 float4 PSLiveArmour(Output input) : SV_TARGET
 {
-    float4 data = SpriteTexture.Sample(SpriteSampler,input.Uv);
+    // Fetch categorical material IDs at native texels. Linear filtering a
+    // packed gold/cloth boundary could otherwise invent a blue inlay there.
+    uint width, height;
+    SpriteTexture.GetDimensions(width, height);
+    int2 pixel = clamp(int2(input.Uv * float2(width, height)), int2(0,0), int2(width-1,height-1));
+    float4 data = SpriteTexture.Load(int3(pixel,0));
     if (data.a <= 0) return 0;
     float2 xy = data.rg * 2 - 1;
     float3 n = normalize(float3(xy,sqrt(max(.001,1-dot(xy,xy)))));
@@ -170,8 +175,10 @@ float4 PSLiveArmour(Output input) : SV_TARGET
     float diffuse=saturate(dot(n,light));
     float power=material==1?13:material==3?18:23;
     float spec=material==0?0:pow(saturate(dot(n,halfLight)),power)*(material==1?.34:material==3?.25:.14);
-    float3 colour=C[material].rgb*(.37+.81*diffuse)*(material==0?.78:1)*lerp(.65,1,ao);
-    colour+=spec+float3(0,.012,.025)*ao;
+    // The six low bits hold the painted value within each material. Preserve
+    // that range in the shadows as well as under the raised silver highlights.
+    float3 colour=C[material].rgb*(.66+.42*diffuse)*(1.25*ao);
+    colour+=spec*.18*ao+float3(0,.006,.012)*ao;
     if(C[4].w>.5) colour=dot(colour,float3(.299,.587,.114)).xxx;
     return PrepareBlend(float4(saturate(colour),data.a)*input.Tint);
 }

@@ -12,16 +12,20 @@ public sealed record LiveArmourFrame(int Width,int Height,int X,int Y,byte[] Ski
 public sealed class LiveArmourAtlas : IDisposable
 {
     public const int FrameCount=1616;
-    private readonly string _data;
+    private readonly LegacyMirLibReader _body;
     private readonly JsonDocument _poses;
     private readonly JsonElement[] _frames;
-    private readonly Dictionary<int,LegacyMirLibReader> _sources=new();
     public LiveArmourAtlas(string data,string art)
     {
-        _data=data;
         _poses=JsonDocument.Parse(File.ReadAllText(Path.Combine(art,"poses.json")));
-        _frames=_poses.RootElement.GetProperty("frames").EnumerateArray().ToArray();
-        if(_frames.Length!=FrameCount) { _poses.Dispose(); throw new InvalidDataException("Invalid classic pose count."); }
+        try
+        {
+            _frames=_poses.RootElement.GetProperty("frames").EnumerateArray().ToArray();
+            if (_frames.Length!=FrameCount) throw new InvalidDataException("Invalid classic pose count.");
+            _body=new LegacyMirLibReader(File.OpenRead(Path.Combine(data,"CArmour","00.Lib")));
+            if (_body.Count!=FrameCount) throw new InvalidDataException("Incompatible classic body library.");
+        }
+        catch { _body?.Dispose(); _poses.Dispose(); throw; }
     }
 
     public static bool Supports(int id)=>id is >=2 and <=12;
@@ -29,51 +33,22 @@ public sealed class LiveArmourAtlas : IDisposable
 
     public LiveArmourFrame Create(int id,int index)
     {
-        if((uint)index>=FrameCount) throw new ArgumentOutOfRangeException(nameof(index));
-        var naked=Open(0);
-        var fitted=Open(Source(id));
-        var hands=Open(2);
-        if(naked.Count!=FrameCount || fitted.Count!=FrameCount) throw new InvalidDataException("Incompatible classic library.");
-        var a=naked.ReadFrame(index);
-        var b=fitted.ReadFrame(index);
-        BakedShadowRepair.StripFromMask(a.Bgra,a.Width,a.Height,a.Width*4);
-        BakedShadowRepair.StripFromMask(b.Bgra,b.Width,b.Height,b.Width*4);
-        var reference=Source(id)==2?b:hands.ReadFrame(index);
-        if(!ReferenceEquals(reference,b))
-            BakedShadowRepair.StripFromMask(reference.Bgra,reference.Width,reference.Height,reference.Width*4);
-        int x=Math.Min(a.OffsetX,b.OffsetX),y=Math.Min(a.OffsetY,b.OffsetY);
-        int w=Math.Max(a.OffsetX+a.Width,b.OffsetX+b.Width)-x;
-        int h=Math.Max(a.OffsetY+a.Height,b.OffsetY+b.Height)-y;
-        if(w<=0||h<=0||w>320||h>320) throw new InvalidDataException("Oversized live armour pose.");
-        byte[] first=Align(a),second=Align(b);
+        if (!Supports(id)) throw new ArgumentOutOfRangeException(nameof(id));
+        if ((uint)index>=FrameCount) throw new ArgumentOutOfRangeException(nameof(index));
+        var body=_body.ReadFrame(index);
+        BakedShadowRepair.StripFromMask(body.Bgra,body.Width,body.Height,body.Width*4);
+        // Leave room for pauldrons and the divided coat beyond the bare silhouette.
+        const int pad=16;
+        int w=body.Width+pad*2,h=body.Height+pad*2,x=body.OffsetX-pad,y=body.OffsetY-pad;
+        if (w>320 || h>320) throw new InvalidDataException("Oversized live armour pose.");
+        byte[] naked=new byte[w*h*4];
+        for(int row=0;row<body.Height;row++)
+            Buffer.BlockCopy(body.Bgra,row*body.Width*4,naked,((row+pad)*w+pad)*4,body.Width*4);
         var anchors=_frames[index].GetProperty("anchors").EnumerateArray()
             .Select(p=>new Vector2(p[0].GetInt32()-x,p[1].GetInt32()-y)).ToArray();
-        var split=LiveArmourCoverage.Split(w,h,first,second,anchors,Align(reference));
-        var surface=ArmourPainter.Paint(w,h,anchors.Select(p=>new PointF(p.X,p.Y)).ToArray(),
-            ArmourPainter.Facing(index),split.Armour,liveSurface:true);
-        return new(w,h,x,y,split.Skin,surface);
-
-        byte[] Align(LegacySpriteFrame frame)
-        {
-            byte[] dst=new byte[w*h*4];
-            // Reference clothes can have a different trim extent. Align
-            // only their intersection with the chosen pose, never shift it.
-            int left=Math.Max(x,frame.OffsetX),right=Math.Min(x+w,frame.OffsetX+frame.Width);
-            int top=Math.Max(y,frame.OffsetY),bottom=Math.Min(y+h,frame.OffsetY+frame.Height);
-            if(right<=left||bottom<=top)return dst;
-            for(int row=top;row<bottom;row++)
-                Buffer.BlockCopy(frame.Bgra,((row-frame.OffsetY)*frame.Width+left-frame.OffsetX)*4,dst,
-                    ((row-y)*w+left-x)*4,(right-left)*4);
-            return dst;
-        }
-    }
-
-    private LegacyMirLibReader Open(int id)
-    {
-        if(_sources.TryGetValue(id,out var existing))return existing;
-        var reader=new LegacyMirLibReader(File.OpenRead(Path.Combine(_data,"CArmour",$"{id:00}.Lib")));
-        if(reader.Count!=FrameCount){reader.Dispose();throw new InvalidDataException("Incompatible classic library.");}
-        _sources.Add(id,reader);return reader;
+        var skin=new byte[naked.Length];
+        var surface=OriginalArmour.Paint(id,w,h,naked,skin,anchors,ArmourPainter.Facing(index));
+        return new(w,h,x,y,skin,surface);
     }
 
     // Native v2 output with zero shadow metadata; data surface is intentionally
@@ -128,7 +103,7 @@ public sealed class LiveArmourAtlas : IDisposable
     }
     public void Dispose()
     {
-        foreach(var reader in _sources.Values)reader.Dispose();
-        _sources.Clear();_poses.Dispose();
+        _body.Dispose();
+        _poses.Dispose();
     }
 }

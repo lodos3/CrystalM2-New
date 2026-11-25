@@ -35,6 +35,8 @@
   <ItemGroup>
     <None Include="..\.editorconfig" Link=".editorconfig" />
     <Compile Include="..\tasks\ArmourCreate\ArmourPainter.cs" Link="ArmourAuthoring\ArmourPainter.cs" />
+    <Compile Include="..\tasks\ArmourCreate\OriginalArmour.cs" Link="ArmourAuthoring\OriginalArmour.cs" />
+    <EmbeddedResource Include="..\Art\CArmour\OriginalPlate.png" LogicalName="CrystalM2.OriginalPlate" />
     <Compile Include="..\tasks\ArmourCreate\ArmourAtlas.cs" Link="ArmourAuthoring\ArmourAtlas.cs" />
     <Compile Include="..\tasks\ArmourCreate\LiveArmourAtlas.cs" Link="ArmourAuthoring\LiveArmourAtlas.cs" />
     <None Include="..\Art\CArmour\poses.json;..\Art\CArmour\mask-*.png" Link="Data\ArmourAuthoring\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

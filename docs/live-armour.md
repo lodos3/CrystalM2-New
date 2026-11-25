@@ -1,12 +1,23 @@
-# Live classic armour (experimental)
-Use existing generated appearance commands: g01 remains the original GArmour design; g02–g12 use the corresponding installed CArmour/01.Lib–11.Lib plus 00.Lib. No packet or item-stat changes. The original draw order for hair, weapons, mounts and wings stays intact. Alternate animation families remain unsupported as before.
+# Live classic armour
 
-The CPU constructs pose coverage, distinct exposed-skin pixels and a material relief texture on demand. It uses the original frame origin and GArmour pose anchors. The GPU shades the material and its encoded surface normals on each draw. No coloured source armour pixels enter the material texture. Hand candidates use the corresponding source and a shared sleeveless reference (02.Lib), restricted to two small connected distal patches. The skin/hand segmentation is inferred from 2D artwork and requires visual review; do not treat it as ground-truth anatomy. The fitted silhouette constrains design shape, and changing palettes is not equivalent to authoring a new 3D mesh. Cache limit 192 frame pairs / 32 MiB; device replacement/reload invalidates it. Original libraries are not overwritten.
+Use the GM command `@arm PlayerName g02` to wear the original plate set and `@arm PlayerName off` to restore equipped armour. The live slots g02–g12 use one original armour family with different palettes, shoulder widths and split-skirt lengths. The separate g01 generator keeps its existing appearance and file format.
 
-Export all 11 pairs:
+The live renderer uses CArmour/00.Lib for the naked animation poses and exposed skin. The nine painted parts in `Art/CArmour/OriginalPlate.png` supply the front, back and side cuirass, pauldron, bracer, belt, coat-tail, greave and boot. Each frame fits them to the torso and limb anchors. Direction selects the torso view and overlap order. The original cutouts can extend beyond the naked outline at the shoulders and waist. Compositing uses filtered transparent edges at the native sprite resolution.
+
+The shader applies the selected palette and lights each part using its painted value and relief. Cached poses retain the existing limit of 192 frame pairs or 32 MiB. The client releases these resources on device replacement or reload. Live generation uses the classic 1,616-frame male/female bank. Limb tracking, especially hand positions in overlapping or fallen poses, is estimated from two-dimensional sprites.
+
+[Native-size and enlarged g02 renders](../Art/CArmour/original-live-preview.png)
+
+Export the live skin and material libraries with:
+
 ```powershell
-dotnet run --project tasks/ArmourCreate/ArmourCreate.csproj -- --live "path/to/Data" "Art/CArmour" "path/to/output"
+dotnet run --project tasks/ArmourCreate -c Release -- --live "path/to/Data" "Art/CArmour" "path/to/new/output"
 ```
-The generated Surface.Lib contains packed shader data, not visible armour artwork. The HeadHands.Lib is an ordinary v2 archive without shadow metadata. Source libraries must contain the classic 1616 frames. Original RGB art is read only for anatomical extraction and coverage. The source data is not included in Git. Use local installed game assets.
 
-Validation: run Tests/ModernRendererTests and Tests/WindowsRendererTests, plus Tests/ArmourAuthoringTests to check old GArmour. Inspect exports through a LIB viewer across both genders and every direction, particularly attacks, raised fists, deaths and mounts; review face and glove occlusion before enabling for production.
+The exporter keeps the existing numbered names and verifies the resulting v2 archives. The surface stores normal X/Y in R/G, the material index and painted value in B, and silhouette coverage in A. The skin library contains the exposed head and hands.
+
+To inspect the actual renderer at native size and enlarged, using locally installed game data:
+
+```powershell
+dotnet run --project Tests/WindowsRendererTests -c Release -- --original-armour "path/to/Data" "Art/CArmour" "original-armour.png"
+```
