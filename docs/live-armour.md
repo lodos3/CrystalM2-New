@@ -1,15 +1,17 @@
-# Pattern-driven live classic armour (experimental)
+# Multiscale donor armour synthesis (experimental)
 
-g01 retains the original GArmour renderer. g02–g12 use same-index donor frames from installed CArmour/01.Lib–11.Lib. No item-stat, packet or server change. The skin extraction, actor placement, original draw order and 192-frame / 32 MiB GPU cache are retained.
+g01 remains original GArmour. g02–g99 resolve 98 deterministic recipes using the 11 existing classic CArmour libraries. Installed custom GArmour/13.Lib–99.Lib files retain priority. No packet format, item-stat or server changes. The design identity is fixed by appearance ID, not frame or time.
 
-The new surface compositor replaces synthetic plate lines with original artwork. Each base shape has a stable four-section recipe: chest, shoulder/sleeve, waist and lower armour. Plate and robe donors are grouped separately. Anatomical anchor distances and leg segments control the blend; original native pixel coordinates, source values and irregular trim are preserved. Donors are clipped to the base coverage, not stretched from an idle frame. Optional missing donor art falls back to the original fitted layer; exposed skin matches are excluded and uncertain uncovered pixels are filled with a neutral undersuit.
+The donor families are based on the supplied idle sprites: plate 01,02,04,05,06; robes 03,07,08,09,10,11. These are coarse style classifications, not manually segmented material labels. Each recipe uses four distinct donors from its family for chest, shoulders/sleeves, waist and lower armour. All donors are sampled at the corresponding original animation index and aligned to the cell origin.
 
-The shader retains source colour and shading with restrained palette influence and directional local detail response. The original pixels already contain baked shading; the added directional response is not a recovered physical normal map or a true 3D relighting model.
+The CPU decomposes each aligned donor into broad tone, mid-scale relief and fine detail using alpha/skin-aware spatial filtering. At anatomical seams only the broad band is mixed; a single donor supplies both finer bands. Original target contours and coverage are retained. Missing optional donor frames fall back to the fitted source. The head/hands extraction remains heuristic. The GPU separately estimates metal, cloth and warm ornament likelihood using luminance/chroma; four material profiles control palette influence and local directional response. This is not a physically recovered material map, nor a 3D skeleton. No arbitrary line patterns are generated.
 
-Export all 11 pairs:
+The existing lazy 192-frame / 32 MiB GPU cache is retained. CPU synthesis costs more on cache misses; runtime performance must be profiled on the target client. Original files are read only. Exported surface RGB is inspectable in an ordinary LIB viewer.
+
+Export one design:
 ```powershell
-dotnet run --project tasks/ArmourCreate/ArmourCreate.csproj -- --live "path/to/Data" "Art/CArmour" "path/to/new-output"
+dotnet run --project tasks/ArmourCreate/ArmourCreate.csproj -- --live-one "path/to/Data" "Art/CArmour" "path/to/new-output" 13
 ```
-Surface.Lib now stores inspectable donor BGRA artwork, not packed normals. Re-export into a new directory; previous exports are not compatible with the new material interpretation. Source libraries are never overwritten or distributed with Git. Both output layers retain pose offsets and omit baked shadows via the existing repair routine.
+Use --live with the same three paths to export all 98 pairs. Files are named gNN_HeadHands.Lib and gNN_Surface.Lib. Export is optional and does not override runtime rendering.
 
-Validation: run Tests/ModernRendererTests, Tests/WindowsRendererTests and Tests/ArmourAuthoringTests; visually inspect all designs in both genders, eight directions, attacks, movement, death and mounts. 2D pose landmarks and skin extraction remain estimates; the method does not guarantee perfect limb ownership on overlapping sprite pixels.
+Validation: run Tests/ModernRendererTests, Tests/WindowsRendererTests and Tests/ArmourAuthoringTests, build client/server Release and inspect all animation banks and directions in-game. Tests include design uniqueness, family compatibility, alpha conservation and preservation of high-contrast native detail. There is no guarantee of perfect material classification or limb occlusion from flattened 2D pixels.

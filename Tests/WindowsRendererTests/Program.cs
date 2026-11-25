@@ -75,7 +75,8 @@ internal static class Program
         {
             device.PixelShader = ShaderEffect.LiveArmour;
             device.SetPixelShaderConstant(0, [new(.15f,.2f,.25f,1), new(.7f,.75f,.8f,1),
-                new(.1f,.3f,.6f,1), new(.8f,.6f,.2f,1), new(-.5f,-.6f,.8f,0)]);
+                new(.1f,.3f,.6f,1), new(.8f,.6f,.2f,1), new(-.5f,-.6f,.8f,0),
+                new(.25f,.20f,.88f,.20f)]);
             device.Sprite.Draw(material, null, new Vector3(4,4,0), Vector4.One);
             device.Sprite.End();
             using var lit = device.Capture(backBuffer);

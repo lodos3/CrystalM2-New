@@ -24,8 +24,8 @@ public sealed class LiveArmourAtlas : IDisposable
         if(_frames.Length!=FrameCount) { _poses.Dispose(); throw new InvalidDataException("Invalid classic pose count."); }
     }
 
-    public static bool Supports(int id)=>id is >=2 and <=12;
-    public static int Source(int id)=>Supports(id)?id-1:throw new ArgumentOutOfRangeException(nameof(id));
+    public static bool Supports(int id)=>ArmourDesign.Supports(id);
+    public static int Source(int id)=>ArmourDesign.Resolve(id).Source;
 
     public LiveArmourFrame Create(int id,int index)
     {
@@ -51,7 +51,7 @@ public sealed class LiveArmourAtlas : IDisposable
         var split=LiveArmourCoverage.Split(w,h,first,second,anchors,Align(reference));
         var sources=new Dictionary<int,byte[]>();
         sources[Source(id)]=second; sources[2]=Align(reference);
-        var donors=ArmourPatternTransfer.Recipe(Source(id)).Select(source=>
+        var donors=ArmourDesign.Resolve(id).Donors.Select(source=>
         {
             if(sources.TryGetValue(source,out var aligned))return aligned;
             // An unavailable optional donor falls back to the fitted base;
@@ -93,8 +93,8 @@ public sealed class LiveArmourAtlas : IDisposable
     public void Export(int id,string destination)
     {
         Directory.CreateDirectory(destination);
-        string skin=Path.Combine(destination,$"{Source(id):00}_HeadHands.Lib");
-        string surface=Path.Combine(destination,$"{Source(id):00}_Surface.Lib");
+        string skin=Path.Combine(destination,$"g{id:00}_HeadHands.Lib");
+        string surface=Path.Combine(destination,$"g{id:00}_Surface.Lib");
         if(File.Exists(skin)||File.Exists(surface)) throw new IOException("Output already exists.");
         string s1=skin+"."+Guid.NewGuid().ToString("N")+".tmp";
         string s2=surface+"."+Guid.NewGuid().ToString("N")+".tmp";

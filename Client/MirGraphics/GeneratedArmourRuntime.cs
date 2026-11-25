@@ -71,7 +71,7 @@ namespace Client.MirGraphics
                 catch (Exception ex) { Report("Live armour action failed: " + ex.Message); }
                 return;
             }
-            if (id != 1) { Report("Runtime designs: g01 to g12."); return; }
+            if (id != 1) { Report("Runtime designs: g01 to g99."); return; }
             try
             {
                 if (build)

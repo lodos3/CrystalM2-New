@@ -35,6 +35,7 @@ internal static class LiveArmourRenderer
     internal static bool TryDraw(byte id,int frame,Point location,Color tint)
     {
         if(!LiveArmourAtlas.Supports(id)||DXManager.Device==null)return false;
+        if(id>=13 && File.Exists(Path.Combine(Settings.DataPath,"GArmour",$"{id:00}.Lib")))return false;
         if(!ReferenceEquals(_owner,DXManager.Device))
         {
             Clear(); _owner=DXManager.Device;
@@ -60,9 +61,20 @@ internal static class LiveArmourRenderer
         try
         {
             device.PixelShader=ShaderEffect.LiveArmour;
-            device.SetPixelShaderConstant(0,[Colour(Palettes[id-2,0]),Colour(Palettes[id-2,1]),
-                Colour(Palettes[id-2,2]),Colour(Palettes[id-2,3]),
-                new Vector4(-.66f,-.76f,.80f,DXManager.GrayScale?1:0)]);
+            var design=ArmourDesign.Resolve(id);
+            int palette=design.Palette;
+            // Material profile: tint strength, metal highlight response,
+            // ornament protection and directional relief response.
+            Vector4 material=design.Material switch
+            {
+                1=>new(.42f,.14f,.86f,.16f), // darkened steel / cloth
+                2=>new(.30f,.34f,.92f,.24f), // polished metal
+                3=>new(.50f,.23f,.90f,.20f), // coloured enamel
+                _=>new(.25f,.20f,.88f,.20f)  // natural donor finish
+            };
+            device.SetPixelShaderConstant(0,[Colour(Palettes[palette,0]),Colour(Palettes[palette,1]),
+                Colour(Palettes[palette,2]),Colour(Palettes[palette,3]),
+                new Vector4(-.66f,-.76f,.80f,DXManager.GrayScale?1:0),material]);
             DXManager.Draw(entry.Surface,null,new Vector3(origin.X,origin.Y,0),tint);
         }
         finally

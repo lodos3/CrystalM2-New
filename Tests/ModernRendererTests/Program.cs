@@ -418,10 +418,66 @@ private static void CheckArmourPatternTransfer()
         }
     }
 
+    private static void CheckArmourDesigns()
+    {
+        var keys=new HashSet<string>();
+        for(int id=2;id<=99;id++)
+        {
+            var design=ArmourDesign.Resolve(id);
+            var again=ArmourDesign.Resolve(id);
+            Assertions.True(design==again && design.Source is >=1 and <=11,
+                "Design identity must be deterministic and independent of frame.");
+            int[] donors=design.Donors;
+            Assertions.True(donors.Distinct().Count()==4 &&
+                donors.All(d=>ArmourDesign.IsRobe(d)==ArmourDesign.IsRobe(design.Source)),
+                "Do not mix incompatible silhouettes or repeat donor regions.");
+            Assertions.True(keys.Add($"{design.Source}:{string.Join(",",donors)}"),
+                "Each runtime ID must select a distinct structural recipe.");
+            Assertions.True(design.Palette is >=0 and <11 && design.Material is >=0 and <4,
+                "Material/palette indices must be bounded.");
+        }
+        Assertions.True(keys.Count==98,"All appearance IDs must have a distinct recipe.");
+        Assertions.True(!ArmourDesign.Supports(1)&&!ArmourDesign.Supports(100),
+            "Preserve original g01 and reject invalid IDs.");
+    }
+
+    private static void CheckArmourFeatureSeams()
+    {
+        const int w=32,h=40;
+        byte[] naked=new byte[w*h*4],mask=new byte[naked.Length],fitted=new byte[naked.Length];
+        byte[][] donors=Enumerable.Range(0,4).Select(_=>new byte[naked.Length]).ToArray();
+        Vector2[] a=[new(16,2),new(16,6),new(8,10),new(24,10),new(16,14),
+            new(16,20),new(16,24),new(11,31),new(21,31),new(11,38),new(21,38)];
+        // Test-only pixel fixtures: mutually opposed engraved patterns.
+        // Ordinary RGB averaging destroys contrast in their overlap.
+        for(int y=6;y<39;y++)for(int x=5;x<27;x++)
+        {
+            int p=(y*w+x)*4;mask[p+3]=fitted[p+3]=255;
+            fitted[p]=fitted[p+1]=fitted[p+2]=100;
+            for(int j=0;j<4;j++)
+            {
+                byte v=(byte)(((x+j)%2==0)?190:50);
+                donors[j][p]=donors[j][p+1]=donors[j][p+2]=v;donors[j][p+3]=255;
+            }
+        }
+        var surface=ArmourPatternTransfer.Compose(w,h,a,naked,fitted,mask,donors);
+        int strong=0, samples=0;
+        for(int y=11;y<18;y++)for(int x=10;x<22;x++)
+        {
+            int p=(y*w+x)*4;samples++;
+            if(Math.Abs(surface[p]-120)>=35)strong++;
+        }
+        Assertions.True(strong>=samples*.8f,"Seam blending must preserve one strong engraving, not average opposite detail.");
+        for(int p=3;p<mask.Length;p+=4)
+            Assertions.True(surface[p]==mask[p],"Feature synthesis must preserve exact alpha.");
+    }
+
     private static void Main()
     {
         CheckLiveArmourSplit();
         CheckArmourPatternTransfer();
+        CheckArmourDesigns();
+        CheckArmourFeatureSeams();
         CheckWingBodyTracking();
         CheckWingPoseMotion();
         CheckUpperBackTracking();

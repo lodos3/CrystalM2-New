@@ -6,8 +6,17 @@ using CrystalM2.ArmourCreate;
 if (args is ["--live", var data, var art, var output])
 {
     using var live = new LiveArmourAtlas(data,art);
-    for(int id=2;id<=12;id++) live.Export(id,output);
-    Console.WriteLine("Exported 11 classic skin/surface library pairs.");
+    for(int id=2;id<=99;id++) live.Export(id,output);
+    Console.WriteLine("Exported 98 classic skin/surface library pairs.");
+    return;
+}
+
+if (args is ["--live-one", var singleData, var singleArt, var singleOutput, var idText])
+{
+    if(!int.TryParse(idText,out int id)||!LiveArmourAtlas.Supports(id))
+        throw new ArgumentException("Live appearance ID must be 2–99.");
+    using var live=new LiveArmourAtlas(singleData,singleArt);
+    live.Export(id,singleOutput);
     return;
 }
 
