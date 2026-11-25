@@ -1,12 +1,15 @@
-# Live classic armour (experimental)
-Use existing generated appearance commands: g01 remains the original GArmour design; g02–g12 use the corresponding installed CArmour/01.Lib–11.Lib plus 00.Lib. No packet or item-stat changes. The original draw order for hair, weapons, mounts and wings stays intact. Alternate animation families remain unsupported as before.
+# Pattern-driven live classic armour (experimental)
 
-The CPU constructs pose coverage, distinct exposed-skin pixels and a material relief texture on demand. It uses the original frame origin and GArmour pose anchors. The GPU shades the material and its encoded surface normals on each draw. No coloured source armour pixels enter the material texture. Hand candidates use the corresponding source and a shared sleeveless reference (02.Lib), restricted to two small connected distal patches. The skin/hand segmentation is inferred from 2D artwork and requires visual review; do not treat it as ground-truth anatomy. The fitted silhouette constrains design shape, and changing palettes is not equivalent to authoring a new 3D mesh. Cache limit 192 frame pairs / 32 MiB; device replacement/reload invalidates it. Original libraries are not overwritten.
+g01 retains the original GArmour renderer. g02–g12 use same-index donor frames from installed CArmour/01.Lib–11.Lib. No item-stat, packet or server change. The skin extraction, actor placement, original draw order and 192-frame / 32 MiB GPU cache are retained.
+
+The new surface compositor replaces synthetic plate lines with original artwork. Each base shape has a stable four-section recipe: chest, shoulder/sleeve, waist and lower armour. Plate and robe donors are grouped separately. Anatomical anchor distances and leg segments control the blend; original native pixel coordinates, source values and irregular trim are preserved. Donors are clipped to the base coverage, not stretched from an idle frame. Optional missing donor art falls back to the original fitted layer; exposed skin matches are excluded and uncertain uncovered pixels are filled with a neutral undersuit.
+
+The shader retains source colour and shading with restrained palette influence and directional local detail response. The original pixels already contain baked shading; the added directional response is not a recovered physical normal map or a true 3D relighting model.
 
 Export all 11 pairs:
 ```powershell
-dotnet run --project tasks/ArmourCreate/ArmourCreate.csproj -- --live "path/to/Data" "Art/CArmour" "path/to/output"
+dotnet run --project tasks/ArmourCreate/ArmourCreate.csproj -- --live "path/to/Data" "Art/CArmour" "path/to/new-output"
 ```
-The generated Surface.Lib contains packed shader data, not visible armour artwork. The HeadHands.Lib is an ordinary v2 archive without shadow metadata. Source libraries must contain the classic 1616 frames. Original RGB art is read only for anatomical extraction and coverage. The source data is not included in Git. Use local installed game assets.
+Surface.Lib now stores inspectable donor BGRA artwork, not packed normals. Re-export into a new directory; previous exports are not compatible with the new material interpretation. Source libraries are never overwritten or distributed with Git. Both output layers retain pose offsets and omit baked shadows via the existing repair routine.
 
-Validation: run Tests/ModernRendererTests and Tests/WindowsRendererTests, plus Tests/ArmourAuthoringTests to check old GArmour. Inspect exports through a LIB viewer across both genders and every direction, particularly attacks, raised fists, deaths and mounts; review face and glove occlusion before enabling for production.
+Validation: run Tests/ModernRendererTests, Tests/WindowsRendererTests and Tests/ArmourAuthoringTests; visually inspect all designs in both genders, eight directions, attacks, movement, death and mounts. 2D pose landmarks and skin extraction remain estimates; the method does not guarantee perfect limb ownership on overlapping sprite pixels.

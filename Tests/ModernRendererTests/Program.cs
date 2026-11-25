@@ -371,9 +371,57 @@ static class Program
         Assertions.True(dressed.AsSpan().SequenceEqual(sourceCopy),"Never modify the original library pixels.");
     }
 
-private static void Main()
+private static void CheckArmourPatternTransfer()
+    {
+        const int w=32,h=44;
+        byte[] mask=new byte[w*h*4], naked=new byte[mask.Length], fitted=new byte[mask.Length];
+        var donors=Enumerable.Range(0,4).Select(_=>new byte[mask.Length]).ToArray();
+        Vector2[] a=[new(16,3),new(16,8),new(8,10),new(24,10),new(16,14),
+            new(16,22),new(16,25),new(11,33),new(21,33),new(11,40),new(21,40)];
+        // Test-only synthetic donor art with different irregular patterns.
+        for(int y=8;y<42;y++)for(int x=6;x<26;x++)
+        {
+            int p=(y*w+x)*4;
+            mask[p+3]=fitted[p+3]=255;
+            fitted[p]=fitted[p+1]=fitted[p+2]=70;
+            for(int k=0;k<4;k++)
+            {
+                var d=donors[k];d[p+3]=255;
+                d[p]=(byte)(20+k*40+(x*y)%29);
+                d[p+1]=(byte)(40+k*25+(x*x+y)%45);
+                d[p+2]=(byte)(80+k*30+(y*y+x)%30);
+            }
+        }
+        int exposed=(3*w+16)*4, missing=(14*w+16)*4;
+        // Missing donor pixel must fall back without opening a hole.
+        donors[0][missing+3]=0;
+        var before=donors.Select(d=>(byte[])d.Clone()).ToArray();
+        var result=ArmourPatternTransfer.Compose(w,h,a,naked,fitted,mask,donors);
+        var repeat=ArmourPatternTransfer.Compose(w,h,a,naked,fitted,mask,donors);
+        Assertions.True(result.AsSpan().SequenceEqual(repeat),"Pattern transfer must be deterministic.");
+        Assertions.True(result[exposed+3]==0&&result[missing+3]==255,"Preserve coverage, including donor gaps.");
+        for(int i=3;i<result.Length;i+=4)
+            Assertions.True(result[i]==mask[i],"No donor may extend the target silhouette.");
+        for(int i=0;i<4;i++)
+            Assertions.True(donors[i].AsSpan().SequenceEqual(before[i]),"Donor artwork is read-only.");
+        int shoulder=(10*w+8)*4, chest=(16*w+16)*4, boot=(39*w+11)*4;
+        Assertions.True(result[shoulder]>result[chest]&&result[boot]>result[shoulder],
+            "Shoulder, chest and lower armour must select different donor patterns.");
+        var varied=new HashSet<byte>();
+        for(int y=12;y<19;y++)for(int x=14;x<19;x++)varied.Add(result[(y*w+x)*4]);
+        Assertions.True(varied.Count>5,"Retain donor microdetail instead of flat bands.");
+        for(int id=1;id<=11;id++)
+        {
+            var recipe=ArmourPatternTransfer.Recipe(id);
+            Assertions.True(recipe.Length==4&&recipe.All(x=>x is >=1 and <=11)&&
+                recipe.Distinct().Count()>=3,"Each design needs a stable multi-source recipe.");
+        }
+    }
+
+    private static void Main()
     {
         CheckLiveArmourSplit();
+        CheckArmourPatternTransfer();
         CheckWingBodyTracking();
         CheckWingPoseMotion();
         CheckUpperBackTracking();

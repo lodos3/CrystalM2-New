@@ -71,7 +71,7 @@ internal static class Program
 
         device.BeginFrame();
         device.Clear(Color.Black);
-        using (var material = Upload(device, Color.FromArgb(255,128,128,127)))
+        using (var material = Upload(device, Color.FromArgb(255,128,95,53)))
         {
             device.PixelShader = ShaderEffect.LiveArmour;
             device.SetPixelShaderConstant(0, [new(.15f,.2f,.25f,1), new(.7f,.75f,.8f,1),
@@ -79,8 +79,9 @@ internal static class Program
             device.Sprite.Draw(material, null, new Vector3(4,4,0), Vector4.One);
             device.Sprite.End();
             using var lit = device.Capture(backBuffer);
-            Check(lit.GetPixel(4,4).R > 50 && lit.GetPixel(4,4).B > 50,
-                "The live material must shade its packed normal rather than display the raw data.");
+            var shaded=lit.GetPixel(4,4);
+            Check(shaded.R>shaded.B && shaded.R>90 && shaded.B<110,
+                "Donor colour and contrast must survive restrained live material tinting.");
             Near(Color.Black,lit.GetPixel(0,0),"Live armour must not affect pixels outside its quad.");
             device.PixelShader = ShaderEffect.Artwork;
         }

@@ -154,26 +154,34 @@ float4 PrepareBlend(float4 pixel)
 }
 
 float4 PSArtwork(Output input) : SV_TARGET { return PrepareBlend(SampleArtwork(input) * input.Tint); }
-// Native-pixel material surface: R/G = normal, B = material/occlusion,
-// A = pose coverage. No baked source armour colours are used in this pass.
+// Authentic donor artwork supplies its own carved detail and local value.
+// Retain original RGB and use restrained material tint + live directional
+// edge response. Do not flatten the sprite into synthetic plate bands.
 float4 PSLiveArmour(Output input) : SV_TARGET
 {
-    float4 data = SpriteTexture.Sample(SpriteSampler,input.Uv);
-    if (data.a <= 0) return 0;
-    float2 xy = data.rg * 2 - 1;
-    float3 n = normalize(float3(xy,sqrt(max(.001,1-dot(xy,xy)))));
-    float packed = floor(data.b*255+.5);
-    int material = min(3,(int)floor(packed/64));
-    float ao = (packed-material*64)/63;
-    float3 light = normalize(C[4].xyz);
-    float3 halfLight=normalize(light+float3(0,0,1));
-    float diffuse=saturate(dot(n,light));
-    float power=material==1?13:material==3?18:23;
-    float spec=material==0?0:pow(saturate(dot(n,halfLight)),power)*(material==1?.34:material==3?.25:.14);
-    float3 colour=C[material].rgb*(.37+.81*diffuse)*(material==0?.78:1)*lerp(.65,1,ao);
-    colour+=spec+float3(0,.012,.025)*ao;
-    if(C[4].w>.5) colour=dot(colour,float3(.299,.587,.114)).xxx;
-    return PrepareBlend(float4(saturate(colour),data.a)*input.Tint);
+    float4 art=SampleArtwork(input);
+    if(art.a<=0)return 0;
+    float luma=dot(art.rgb,float3(.299,.587,.114));
+    float chroma=max(art.r,max(art.g,art.b))-min(art.r,min(art.g,art.b));
+    float3 palette=lerp(C[1].rgb,C[2].rgb,saturate(chroma*1.4));
+    float3 tinted=palette*(luma/max(.16,dot(palette,float3(.299,.587,.114))));
+    float strength=.20+.10*saturate(chroma*2);
+    float3 colour=lerp(art.rgb,saturate(tinted),strength);
+    uint width,height;
+    SpriteTexture.GetDimensions(width,height);
+    float2 stepUv=1/float2(width,height);
+    float2 lo=input.Bounds.xy+stepUv*.5,hi=input.Bounds.zw-stepUv*.5;
+    float4 left=SpriteTexture.Sample(SpriteSampler,clamp(input.Uv-float2(stepUv.x,0),lo,hi));
+    float4 right=SpriteTexture.Sample(SpriteSampler,clamp(input.Uv+float2(stepUv.x,0),lo,hi));
+    float4 top=SpriteTexture.Sample(SpriteSampler,clamp(input.Uv-float2(0,stepUv.y),lo,hi));
+    float4 bottom=SpriteTexture.Sample(SpriteSampler,clamp(input.Uv+float2(0,stepUv.y),lo,hi));
+    float3 weights=float3(.299,.587,.114);
+    float dx=(dot(left.rgb,weights)-dot(right.rgb,weights))*min(left.a,right.a);
+    float dy=(dot(top.rgb,weights)-dot(bottom.rgb,weights))*min(top.a,bottom.a);
+    float response=clamp(dot(float2(dx,dy),C[4].xy)*.20,-.10,.10);
+    colour=saturate(colour*(1+response)+max(0,response)*.12);
+    if(C[4].w>.5)colour=dot(colour,weights).xxx;
+    return PrepareBlend(float4(colour,art.a)*input.Tint);
 }
 float WeatherNoise(float2 p);
 

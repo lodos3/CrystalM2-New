@@ -16,8 +16,8 @@ internal static class LiveArmourRenderer
     private static LiveArmourAtlas _atlas;
     private static long _bytes;
 
-    // Cloth, plate, inlay, trim, all linear-ish display-space values matching
-    // the existing Mir artwork pipeline. Distinct designs are material presets.
+    // Restrained colour accents for the native donor patterns. The design
+    // comes from the source artwork, not these four palette values.
     private static readonly uint[,] Palettes={
         {0x202B3D,0xB8C8D6,0x28589B,0xBF9551},
         {0x292D31,0x667D96,0x254B79,0xD1BC82},

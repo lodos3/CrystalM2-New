@@ -49,8 +49,20 @@ public sealed class LiveArmourAtlas : IDisposable
         var anchors=_frames[index].GetProperty("anchors").EnumerateArray()
             .Select(p=>new Vector2(p[0].GetInt32()-x,p[1].GetInt32()-y)).ToArray();
         var split=LiveArmourCoverage.Split(w,h,first,second,anchors,Align(reference));
-        var surface=ArmourPainter.Paint(w,h,anchors.Select(p=>new PointF(p.X,p.Y)).ToArray(),
-            ArmourPainter.Facing(index),split.Armour,liveSurface:true);
+        var sources=new Dictionary<int,byte[]>();
+        sources[Source(id)]=second; sources[2]=Align(reference);
+        var donors=ArmourPatternTransfer.Recipe(Source(id)).Select(source=>
+        {
+            if(sources.TryGetValue(source,out var aligned))return aligned;
+            // An unavailable optional donor falls back to the fitted base;
+            // never disable the whole appearance because one donor is absent.
+            if(!File.Exists(Path.Combine(_data,"CArmour",$"{source:00}.Lib")))return second;
+            var reader=Open(source);
+            if(!reader.TryReadFrame(index,out var donor)||donor==null)return second;
+            BakedShadowRepair.StripFromMask(donor.Bgra,donor.Width,donor.Height,donor.Width*4);
+            aligned=Align(donor);sources.Add(source,aligned);return aligned;
+        }).ToArray();
+        var surface=ArmourPatternTransfer.Compose(w,h,anchors,first,second,split.Armour,donors);
         return new(w,h,x,y,split.Skin,surface);
 
         byte[] Align(LegacySpriteFrame frame)
@@ -76,8 +88,8 @@ public sealed class LiveArmourAtlas : IDisposable
         _sources.Add(id,reader);return reader;
     }
 
-    // Native v2 output with zero shadow metadata; data surface is intentionally
-    // not a display-ready sprite. A normal library viewer can inspect skin.
+    // Native v2 output with zero shadow metadata. Both skin and donor
+    // surface can be inspected directly in a standard LIB viewer.
     public void Export(int id,string destination)
     {
         Directory.CreateDirectory(destination);
