@@ -1,17 +1,17 @@
-# Multiscale donor armour synthesis (experimental)
+# Original-frame multistage armour recolour
 
-g01 remains original GArmour. g02–g99 resolve 98 deterministic recipes using the 11 existing classic CArmour libraries. Installed custom GArmour/13.Lib–99.Lib files retain priority. No packet format, item-stat or server changes. The design identity is fixed by appearance ID, not frame or time.
+g01 remains the original GArmour. g02–g99 use a single installed CArmour/01.Lib–11.Lib source per design. Source identity is unchanged: source=(id-2)%11+1. Each successive group of eleven selects another palette (sapphire, crimson, obsidian, ivory, emerald, frost, amethyst, copper, teal). The final group has ten IDs. Installed custom GArmour/13.Lib–99.Lib still take precedence.
 
-The donor families are based on the supplied idle sprites: plate 01,02,04,05,06; robes 03,07,08,09,10,11. These are coarse style classifications, not manually segmented material labels. Each recipe uses four distinct donors from its family for chest, shoulders/sleeves, waist and lower armour. All donors are sampled at the corresponding original animation index and aligned to the cell origin.
+The source frame supplies all geometry, detail, offsets and alpha. Shadow removal uses the existing checker-shadow detector. The naked and sleeveless references are aligned only within the dressed frame. Existing head/hands isolation is used as a conservative protection mask; restored pixels are copied from the original dressed sprite, not pasted from another armour. Uncertain exposed skin can still be missed; material and skin classifications are estimates from flattened pixels.
 
-The CPU decomposes each aligned donor into broad tone, mid-scale relief and fine detail using alpha/skin-aware spatial filtering. At anatomical seams only the broad band is mixed; a single donor supplies both finer bands. Original target contours and coverage are retained. Missing optional donor frames fall back to the fitted source. The head/hands extraction remains heuristic. The GPU separately estimates metal, cloth and warm ornament likelihood using luminance/chroma; four material profiles control palette influence and local directional response. This is not a physically recovered material map, nor a 3D skeleton. No arbitrary line patterns are generated.
+Independent soft masks derived from original RGB control primary metal, secondary colour, warm trim and dark cloth. A monotone tone curve and gamut-limited chroma mapping retain the source shading. Exact black and white are untouched. The generated layer and restored skin have disjoint coverage. No donor compositing or procedural lines are used by the live path. The previous compositor is retained as unused legacy code for comparison.
 
-The existing lazy 192-frame / 32 MiB GPU cache is retained. CPU synthesis costs more on cache misses; runtime performance must be profiled on the target client. Original files are read only. Exported surface RGB is inspectable in an ordinary LIB viewer.
+Recolouring runs only on cache misses. Existing 192-frame/32 MiB cache and standard artwork shader, scene lighting, greyscale and tint are retained. No additional shader recolouring is applied, preventing double tinting. No protocol, equipment, or server changes.
 
 Export one design:
 ```powershell
 dotnet run --project tasks/ArmourCreate/ArmourCreate.csproj -- --live-one "path/to/Data" "Art/CArmour" "path/to/new-output" 13
 ```
-Use --live with the same three paths to export all 98 pairs. Files are named gNN_HeadHands.Lib and gNN_Surface.Lib. Export is optional and does not override runtime rendering.
+Use --live to export all 98 pairs. Output filenames gNN_HeadHands.Lib and gNN_Surface.Lib are unchanged; use a new directory. Draw the two complementary layers at their original offset. Source archives are never overwritten.
 
-Validation: run Tests/ModernRendererTests, Tests/WindowsRendererTests and Tests/ArmourAuthoringTests, build client/server Release and inspect all animation banks and directions in-game. Tests include design uniqueness, family compatibility, alpha conservation and preservation of high-contrast native detail. There is no guarantee of perfect material classification or limb occlusion from flattened 2D pixels.
+Validation: Tests/ModernRendererTests includes exact alpha conservation, skin protection, deterministic palette mapping, tone order and gamut tests. Build and inspect the client in all directions and animations; verify the appearance of warm cloth versus metal, skin, and original shadow handling. The chosen palettes are initial artistic tuning, not physically measured materials.

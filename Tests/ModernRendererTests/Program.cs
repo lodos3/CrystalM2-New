@@ -472,9 +472,64 @@ private static void CheckArmourPatternTransfer()
             Assertions.True(surface[p]==mask[p],"Feature synthesis must preserve exact alpha.");
     }
 
+    private static void CheckOriginalArmourRecolour()
+    {
+        // Authored test pixels: neutral metal, warm trim, blue panel,
+        // dark cloth, black contour, white highlight, partial alpha, skin.
+        byte[] source=[120,120,120,255, 40,140,190,255, 160,80,40,255,
+            40,40,40,255, 0,0,0,255, 255,255,255,255, 70,100,140,113,
+            90,150,202,255, 10,20,30,0, 70,90,120,255];
+        byte[] naked=new byte[source.Length],skin=new byte[source.Length];
+        source.AsSpan(28,4).CopyTo(naked.AsSpan(28,4));
+        source.AsSpan(28,4).CopyTo(skin.AsSpan(28,4));
+        // A bad isolation mask must never add pixels outside the source
+        // silhouette or replace a covered metal pixel with naked flesh.
+        skin[35]=255;skin[39]=255;
+        naked[36]=60;naked[37]=140;naked[38]=210;naked[39]=255;
+        var before=(byte[])source.Clone();
+        var variants=new HashSet<(int,int)>();
+        for(int id=2;id<=99;id++)
+        {
+            var design=ArmourRecolourDesign.Resolve(id);
+            Assertions.True(design.Source==(id-2)%11+1 &&
+                variants.Add((design.Source,design.Profile)),
+                "Each appearance uses one original source and a unique palette.");
+            var result=ArmourRecolour.Apply(source,naked,skin,design.Profile);
+            var again=ArmourRecolour.Apply(source,naked,skin,design.Profile);
+            Assertions.True(result.Surface.AsSpan().SequenceEqual(again.Surface),"Recolour is deterministic.");
+            for(int p=0;p<source.Length;p+=4)
+            {
+                Assertions.True(result.Surface[p+3]+result.Skin[p+3]==source[p+3],
+                    "Recolour and overlay together preserve every source alpha exactly.");
+                Assertions.True(result.Surface[p+3]==0||result.Skin[p+3]==0,
+                    "No double-drawn pixels.");
+            }
+            Assertions.True(result.Skin.AsSpan(28,4).SequenceEqual(source.AsSpan(28,4)) &&
+                result.Skin[35]==0 && result.Skin[39]==0,
+                "Only source-supported skin pixels are restored, never extra geometry.");
+            Assertions.True(result.Surface.AsSpan(16,8).SequenceEqual(source.AsSpan(16,8)),
+                "Black contours and white highlights must remain intact.");
+            Assertions.True(!result.Surface.AsSpan(0,12).SequenceEqual(source.AsSpan(0,12)),
+                "Palette must actually recolour the original material.");
+            // A neutral ramp uses continuous monotone tone curves. This
+            // catches collapsed shadows, inverted highlights and clipping.
+            float last=-1;
+            for(int v=0;v<=255;v++)
+            {
+                Vector3 rgb=ArmourRecolour.Colour(new Vector3(v/255f),design.Profile);
+                float luma=ArmourRecolour.Luma(rgb);
+                Assertions.True(luma>=last-.00001f && rgb.X>=0 && rgb.Y>=0 && rgb.Z>=0 &&
+                    rgb.X<=1 && rgb.Y<=1 && rgb.Z<=1,"Preserve tonal order and gamut.");
+                last=luma;
+            }
+        }
+        Assertions.True(source.AsSpan().SequenceEqual(before),"Original sprite is immutable.");
+    }
+
     private static void Main()
     {
         CheckLiveArmourSplit();
+        CheckOriginalArmourRecolour();
         CheckArmourPatternTransfer();
         CheckArmourDesigns();
         CheckArmourFeatureSeams();
