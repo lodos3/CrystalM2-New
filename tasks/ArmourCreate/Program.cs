@@ -7,7 +7,7 @@ if (args is ["--live", var data, var art, var output])
 {
     using var live = new LiveArmourAtlas(data,art);
     for(int id=2;id<=99;id++) live.Export(id,output);
-    Console.WriteLine("Exported 98 classic skin/surface library pairs.");
+    Console.WriteLine("Exported 98 classic armour sets (skin, combined surface and four colour layers).");
     return;
 }
 

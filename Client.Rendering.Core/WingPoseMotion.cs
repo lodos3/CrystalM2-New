@@ -69,6 +69,22 @@ public readonly record struct WingTorsoFrame(Vector2 Across, Vector2 ReferenceAc
     };
 }
 
+public static class WingProfilePlacement
+{
+    public static bool IsSide(int direction)=>direction is 2 or 6;
+    public static Vector2 Socket(Vector2 relative,int direction)
+    {
+        if(!IsSide(direction))return relative;
+        // In profile, projected shoulder estimates can swap vertical
+        // ordering during a weapon swing. Seat both roots below the back,
+        // and limit the independent socket displacement, not body travel.
+        return new(Math.Clamp(relative.X,-5,5),Math.Clamp(relative.Y,-1,3)+2.5f);
+    }
+    public static float SpanY(int direction,float projectedAcrossY,float lateral)
+        => (IsSide(direction)?Math.Clamp(projectedAcrossY,-.18f,.18f):projectedAcrossY)*lateral;
+    public static float Rise(int direction,float lift)=>IsSide(direction)?Math.Clamp(lift,0,2):lift;
+}
+
 public readonly record struct WingPoseMotion(Vector2 Offset, float Roll, float Yaw, float Pitch = 0)
 {
     public WingTorsoFrame? TorsoFrame { get; init; }

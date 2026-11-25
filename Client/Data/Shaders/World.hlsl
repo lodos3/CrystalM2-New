@@ -161,6 +161,26 @@ float4 PSLiveArmour(Output input) : SV_TARGET
 {
     float4 art=SampleArtwork(input);
     if(art.a<=0)return 0;
+    if(C[6].w>.5)
+    {
+        // This texture contains only one learned source-colour mask.
+        // Keep its original alpha and all other material layers untouched.
+        float y=dot(art.rgb,float3(.299,.587,.114));
+        float2 uv=(input.Uv-input.Bounds.xy)/max(input.Bounds.zw-input.Bounds.xy,float2(.0001,.0001));
+        float phase=C[6].x;
+        float wave=.5+.5*cos(6.2831853*(uv.y*1.6-phase));
+        float sheen=pow(wave,8)*smoothstep(.12,.55,y);
+        float3 hue=float3(.65,.90,1);
+        if(C[6].z>1.5)
+        {
+            float scan=pow(.5+.5*cos(6.2831853*(uv.y*3-phase)),10);
+            float spectrum=.5+.5*sin(6.2831853*(uv.x+phase));
+            hue=lerp(float3(.22,.85,1),float3(.85,.48,1),spectrum);
+            sheen=max(sheen,scan*.6)*smoothstep(.10,.45,y);
+        }
+        art.rgb=lerp(art.rgb,hue,saturate(sheen*C[6].y));
+        return PrepareBlend(art*input.Tint);
+    }
     float3 weights=float3(.299,.587,.114);
     float luma=dot(art.rgb,weights);
     float chroma=max(art.r,max(art.g,art.b))-min(art.r,min(art.g,art.b));

@@ -59,7 +59,7 @@ namespace Client.MirGraphics
                     {
                         using var live = new LiveArmourAtlas(Settings.DataPath, Path.Combine(Settings.DataPath,"ArmourAuthoring"));
                         live.Export(id,Path.Combine(Settings.DataPath,"LiveArmour"));
-                        Report($"Exported g{id:00} skin and recoloured surface.");
+                        Report($"Exported g{id:00} skin, combined surface and four independent colour layers.");
                     }
                     else
                     {

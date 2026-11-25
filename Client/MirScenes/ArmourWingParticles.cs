@@ -102,7 +102,15 @@ internal static class ArmourWingParticles
             return;
         }
         if (!ArmourWings.IsParticle(effect)) return;
-        float baseYaw = (int)direction * (MathF.PI / 4);
+        int facing=(int)direction;
+        bool sideProfile=WingProfilePlacement.IsSide(facing) && !ArmourWings.IsAura(effect);
+        if(sideProfile)
+        {
+            torsoYaw=Math.Clamp(torsoYaw,-.035f,.035f);
+            torsoPitch=Math.Clamp(torsoPitch,-.055f,.055f);
+            legacyLift=0;
+        }
+        float baseYaw = facing * (MathF.PI / 4);
         Vector2 bodyBack = new(-MathF.Sin(baseYaw), .49f * MathF.Cos(baseYaw));
         // Rotate the vertical axis about the two shoulder sockets, then project
         // onto the map. Signed height puts feathers either side of that hinge.
@@ -159,9 +167,10 @@ internal static class ArmourWingParticles
             if (onlySide != 0 && side != onlySide) continue;
             bool near = profile < .001f || side == NearSide(direction);
             Vector2 nominalAcross = new(MathF.Cos(baseYaw), MathF.Sin(baseYaw) * .49f);
-            Vector2 root = torsoFrame is { } torso
-                ? shoulder + torso.SocketOffset(nominalAcross, side, 5.5f, attachment - shoulder)
-                : attachment + nominalAcross * (side * 5.5f);
+            Vector2 relative = torsoFrame is { } torso
+                ? torso.SocketOffset(nominalAcross, side, 5.5f, attachment - shoulder)
+                : attachment - shoulder + nominalAcross * (side * 5.5f);
+            Vector2 root=shoulder+WingProfilePlacement.Socket(relative,facing);
             int opacity = (int)(218 + 12 * MathF.Sin(yaw) * side + 8 * flap);
 
             // Sweep the actual wing behind the actor as it turns edge-on.
@@ -226,9 +235,9 @@ internal static class ArmourWingParticles
                 float lateral = side * (span + shell * depth * .23f * flex);
                 float rearward = sweep + (camber + twist + shell * depth * flex) * RearDepthScale;
                 float pitchLift = Math.Max(0, sinPitch) * Math.Max(0, sweep) * flex;
-                float rise = Math.Max(pitchLift, Math.Clamp(legacyLift, 0, 12) * flex);
+                float rise = WingProfilePlacement.Rise(facing,Math.Max(pitchLift, Math.Clamp(legacyLift, 0, 12) * flex));
                 Vector2 projected = new(localAcross.X * lateral + localBack.X * rearward,
-                    across.Y * lateral + back.Y * rearward + down - rise);
+                    WingProfilePlacement.SpanY(facing,across.Y,lateral) + back.Y * rearward + down - rise);
                 if ((direction is MirDirection.Left or MirDirection.Right) && u >= 0)
                 {
                     float sign = direction == MirDirection.Right ? -1f : 1f;

@@ -5117,7 +5117,8 @@ namespace Client.MirObjects
             bool idle = CurrentAction is MirAction.Standing or MirAction.Stance or MirAction.Stance2 or MirAction.MountStanding;
             bool locomotion = CurrentAction is MirAction.Walking or MirAction.Running or MirAction.MountWalking or MirAction.MountRunning or
                 MirAction.WalkingBow or MirAction.RunningBow or MirAction.Sneek;
-            if (!idle && _wingFamily == 0 && Frame is { EffectCount: > 0 } && target.TorsoFrame is { } torso)
+            if (!idle && _wingFamily == 0 && Frame is { EffectCount: > 0 } && target.TorsoFrame is { } torso &&
+                (ArmourWings.IsAura(WingEffect)||!WingProfilePlacement.IsSide((int)Direction)))
             {
                 int restCount = RidingMount ? 4 : 8;
                 int restStart = WingOffset + (RidingMount ? 448 : 0) + (int)Direction * restCount;
@@ -5198,6 +5199,8 @@ namespace Client.MirObjects
                     ArmourWingParticles.BackAttachment(WingShoulder, Direction,
                         _wingPoseReady ? _wingPoseSmoother.Current.Yaw : 0f,
                         _wingPoseReady ? _wingPoseSmoother.Current.Roll : 0f);
+                if(!ArmourWings.IsAura(WingEffect)&&WingProfilePlacement.IsSide((int)Direction))
+                    attachment=WingShoulder+WingProfilePlacement.Socket(attachment-WingShoulder,(int)Direction);
                 point.Offset((int)MathF.Round(attachment.X), (int)MathF.Round(attachment.Y));
             }
             colour = ArmourWingParticles.LightColour(WingEffect);

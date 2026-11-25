@@ -1,22 +1,13 @@
-# Original-frame multistage armour recolour
+# Original armour colour layers
 
-g01 remains the original GArmour. g02–g99 use a single installed CArmour/01.Lib–11.Lib source per design. Source identity is unchanged: source=(id-2)%11+1. Each successive group of eleven selects another palette (sapphire, crimson, obsidian, ivory, emerald, frost, amethyst, copper, teal). The final group has ten IDs. Installed custom GArmour/13.Lib–99.Lib still take precedence.
+g02–g99 retain their original source mapping and nine palette groups. Each source library is analysed at 32 fixed native frames (eight idle and eight attack facings for each of two body banks). The histogram excludes isolated skin and extreme black/white; deterministic weighted clustering learns up to four chromatic families. The same model is reused across every pose and variant of that source. Actual materials are not inferred as physically measured metal or cloth.
 
-The source frame supplies all geometry, detail, offsets and alpha. Shadow removal uses the existing checker-shadow detector. The naked and sleeveless references are aligned only within the dressed frame. Existing head/hands isolation is used as a conservative protection mask; restored pixels are copied from the original dressed sprite, not pasted from another armour. Uncertain exposed skin can still be missed; material and skin classifications are estimates from flattened pixels.
+Four complementary BGRA layers map the source's learned colour families to four intentionally contrasting palette colours. Each pixel belongs to exactly one layer, preserving original alpha and location. Dark contours and near-white highlights remain unchanged. The original head/hands layer is drawn last. Frost and amethyst have a selected-layer shimmer shader; teal uses a selected-layer holographic scan. These effects preserve alpha and do not affect the skin. The existing global scene tint, filtering and greyscale remain active. Generated IDs now take precedence over stale GArmour exports for g02–g99; fallback remains available if generation fails. g01 is unchanged.
 
-Independent soft masks derived from original RGB control primary metal, secondary colour, warm trim and dark cloth. A monotone tone curve and gamut-limited chroma mapping retain the source shading. Exact black and white are untouched. The generated layer and restored skin have disjoint coverage. No donor compositing or procedural lines are used by the live path. The previous compositor is retained as unused legacy code for comparison.
+The cache still has a 32 MiB texture payload budget and 192-entry limit, but may now upload up to five textures per frame. Source colour model construction occurs on first use; profile performance and filtered edges require visual testing.
 
-Recolouring runs only on cache misses. Existing 192-frame/32 MiB cache and standard artwork shader, scene lighting, greyscale and tint are retained. No additional shader recolouring is applied, preventing double tinting. No protocol, equipment, or server changes.
+Export one design with the existing --live-one command. Exports are gNN_HeadHands.Lib, gNN_Surface.Lib (combined recolour) and gNN_Layer0.Lib through gNN_Layer3.Lib. Exported colours are static; animated shader effects are runtime-only. Use a fresh directory to avoid overwriting previous exports.
 
-Export one design:
-```powershell
-dotnet run --project tasks/ArmourCreate/ArmourCreate.csproj -- --live-one "path/to/Data" "Art/CArmour" "path/to/new-output" 13
-```
-Use --live to export all 98 pairs. Output filenames gNN_HeadHands.Lib and gNN_Surface.Lib are unchanged; use a new directory. Draw the two complementary layers at their original offset. Source archives are never overwritten.
+Side-facing physical wings (direction indices 2 and 6): constrain root offsets relative to tracked upper back, lower profile sockets, reduce vertical transverse span, suppress legacy lift and limit pitch/yaw. Other directions and orbiting auras retain their original behaviour. The mesh still pins each root to a shared strip edge. Numerical limits are initial tuning, not a measurement of the screenshot or proof of correct occlusion.
 
-Validation: Tests/ModernRendererTests includes exact alpha conservation, skin protection, deterministic palette mapping, tone order and gamut tests. Build and inspect the client in all directions and animations; verify the appearance of warm cloth versus metal, skin, and original shadow handling. The chosen palettes are initial artistic tuning, not physically measured materials.
-
-## Local build via GitHub Desktop
-
-Select `CrystalM2-New` and `master`, then Fetch origin and Pull origin when offered. The History tab should show the original-frame recolour implementation and monotonic tone correction. Rebuild the client using the existing local Release configuration. No server changes are needed for these palettes.
-
+Validation: Tests/ModernRendererTests includes colour clustering, disjoint alpha conservation, source shading endpoints, skin preservation and mirrored profile placement bounds. Real client screenshots, all animation directions and GPU profiling are still required.

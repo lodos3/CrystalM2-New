@@ -7,7 +7,7 @@ using CrystalM2.Rendering.Core;
 
 namespace CrystalM2.ArmourCreate;
 
-public sealed record LiveArmourFrame(int Width,int Height,int X,int Y,byte[] Skin,byte[] Surface);
+public sealed record LiveArmourFrame(int Width,int Height,int X,int Y,byte[] Skin,byte[] Surface,byte[][] Layers);
 
 public sealed class LiveArmourAtlas : IDisposable
 {
@@ -16,6 +16,7 @@ public sealed class LiveArmourAtlas : IDisposable
     private readonly JsonDocument _poses;
     private readonly JsonElement[] _frames;
     private readonly Dictionary<int,LegacyMirLibReader> _sources=new();
+    private readonly Dictionary<int,ArmourColourModel> _models=new();
     public LiveArmourAtlas(string data,string art)
     {
         _data=data;
@@ -29,16 +30,38 @@ public sealed class LiveArmourAtlas : IDisposable
 
     public LiveArmourFrame Create(int id,int index)
     {
+        var design=ArmourRecolourDesign.Resolve(id);
+        var original=ReadOriginal(design.Source,index);
+        if(!_models.TryGetValue(design.Source,out var model))
+        {
+            var histogram=new ArmourColourHistogram();
+            // Both sexes, every facing, plus an attack pose. Fixed sample
+            // set means every variant and animation uses identical slots.
+            foreach(int bank in new[]{0,808})
+            for(int direction=0;direction<8;direction++)
+            {
+                histogram.Add(ReadOriginal(design.Source,bank+direction*4).Parts.Surface);
+                histogram.Add(ReadOriginal(design.Source,bank+136+direction*6+2).Parts.Surface);
+            }
+            model=histogram.Build();_models.Add(design.Source,model);
+        }
+        var layers=ArmourLayeredRecolour.Apply(original.Parts,model,design.Profile);
+        return new(original.Width,original.Height,original.X,original.Y,layers.Skin,layers.Surface,layers.Layers);
+    }
+
+    private sealed record Original(int Width,int Height,int X,int Y,ArmourSourceParts Parts);
+    private Original ReadOriginal(int source,int index)
+    {
         if((uint)index>=FrameCount) throw new ArgumentOutOfRangeException(nameof(index));
         var naked=Open(0);
-        var fitted=Open(Source(id));
+        var fitted=Open(source);
         var hands=Open(2);
         if(naked.Count!=FrameCount || fitted.Count!=FrameCount) throw new InvalidDataException("Incompatible classic library.");
         var a=naked.ReadFrame(index);
         var b=fitted.ReadFrame(index);
         BakedShadowRepair.StripFromMask(a.Bgra,a.Width,a.Height,a.Width*4);
         BakedShadowRepair.StripFromMask(b.Bgra,b.Width,b.Height,b.Width*4);
-        var reference=Source(id)==2?b:hands.ReadFrame(index);
+        var reference=source==2?b:hands.ReadFrame(index);
         if(!ReferenceEquals(reference,b))
             BakedShadowRepair.StripFromMask(reference.Bgra,reference.Width,reference.Height,reference.Width*4);
         // The dressed sprite is the sole geometry source. Naked reference
@@ -49,8 +72,7 @@ public sealed class LiveArmourAtlas : IDisposable
         var anchors=_frames[index].GetProperty("anchors").EnumerateArray()
             .Select(p=>new Vector2(p[0].GetInt32()-x,p[1].GetInt32()-y)).ToArray();
         var split=LiveArmourCoverage.Split(w,h,first,second,anchors,Align(reference));
-        var recoloured=ArmourRecolour.Apply(second,first,split.Skin,ArmourRecolourDesign.Resolve(id).Profile);
-        return new(w,h,x,y,recoloured.Skin,recoloured.Surface);
+        return new(w,h,x,y,ArmourLayeredRecolour.Separate(second,first,split.Skin));
 
         byte[] Align(LegacySpriteFrame frame)
         {
@@ -79,35 +101,50 @@ public sealed class LiveArmourAtlas : IDisposable
     // surface can be inspected directly in a standard LIB viewer.
     public void Export(int id,string destination)
     {
+        if(!Supports(id))throw new ArgumentOutOfRangeException(nameof(id));
         Directory.CreateDirectory(destination);
-        string skin=Path.Combine(destination,$"g{id:00}_HeadHands.Lib");
-        string surface=Path.Combine(destination,$"g{id:00}_Surface.Lib");
-        if(File.Exists(skin)||File.Exists(surface)) throw new IOException("Output already exists.");
-        string s1=skin+"."+Guid.NewGuid().ToString("N")+".tmp";
-        string s2=surface+"."+Guid.NewGuid().ToString("N")+".tmp";
-        bool moved=false;
+        string[] names=["HeadHands","Surface","Layer0","Layer1","Layer2","Layer3"];
+        string[] output=names.Select(n=>Path.Combine(destination,$"g{id:00}_{n}.Lib")).ToArray();
+        if(output.Any(File.Exists))throw new IOException("Output already exists; select a new export directory.");
+        string[] temporary=output.Select(p=>p+"."+Guid.NewGuid().ToString("N")+".tmp").ToArray();
+        var writers=new BinaryWriter?[output.Length];
+        var offsets=output.Select(_=>new int[FrameCount]).ToArray();
+        var moved=new List<string>();
         try
         {
-            using(var a=new BinaryWriter(File.Open(s1,FileMode.CreateNew)))
-            using(var b=new BinaryWriter(File.Open(s2,FileMode.CreateNew)))
+            for(int j=0;j<writers.Length;j++)
             {
-                Header(a); Header(b);
-                var ia=new int[FrameCount]; var ib=new int[FrameCount];
-                for(int i=0;i<FrameCount;i++)
-                {
-                    var frame=Create(id,i);
-                    ia[i]=checked((int)a.BaseStream.Position); ib[i]=checked((int)b.BaseStream.Position);
-                    Write(a,frame,frame.Skin); Write(b,frame,frame.Surface);
-                }
-                Index(a,ia); Index(b,ib);
+                writers[j]=new BinaryWriter(File.Open(temporary[j],FileMode.CreateNew));
+                Header(writers[j]!);
             }
-            foreach(string path in new[]{s1,s2})
-            using(var check=new LegacyMirLibReader(File.OpenRead(path)))
-                for(int i=0;i<FrameCount;i++) _=check.ReadFrame(i);
-            File.Move(s1,skin); moved=true; File.Move(s2,surface);
+            for(int i=0;i<FrameCount;i++)
+            {
+                var frame=Create(id,i);
+                byte[][] pixels=[frame.Skin,frame.Surface,..frame.Layers];
+                for(int j=0;j<writers.Length;j++)
+                {
+                    var writer=writers[j]!;
+                    offsets[j][i]=checked((int)writer.BaseStream.Position);
+                    Write(writer,frame,pixels[j]);
+                }
+            }
+            for(int j=0;j<writers.Length;j++)
+            {
+                Index(writers[j]!,offsets[j]);writers[j]!.Dispose();writers[j]=null;
+                using var check=new LegacyMirLibReader(File.OpenRead(temporary[j]));
+                for(int i=0;i<FrameCount;i++)_=check.ReadFrame(i);
+            }
+            for(int j=0;j<output.Length;j++)
+            {
+                File.Move(temporary[j],output[j]);moved.Add(output[j]);
+            }
         }
-        catch { if(moved) File.Delete(skin); throw; }
-        finally { File.Delete(s1); File.Delete(s2); }
+        catch { foreach(string path in moved)File.Delete(path);throw; }
+        finally
+        {
+            foreach(var writer in writers)writer?.Dispose();
+            foreach(string path in temporary)File.Delete(path);
+        }
     }
     private static void Header(BinaryWriter w)
     {
@@ -128,6 +165,6 @@ public sealed class LiveArmourAtlas : IDisposable
     public void Dispose()
     {
         foreach(var reader in _sources.Values)reader.Dispose();
-        _sources.Clear();_poses.Dispose();
+        _sources.Clear();_models.Clear();_poses.Dispose();
     }
 }

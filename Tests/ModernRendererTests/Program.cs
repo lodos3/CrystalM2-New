@@ -526,10 +526,70 @@ private static void CheckArmourPatternTransfer()
         Assertions.True(source.AsSpan().SequenceEqual(before),"Original sprite is immutable.");
     }
 
+    private static void CheckLayeredArmourColours()
+    {
+        // Four distinct original colour families at several authored shades.
+        byte[] art=[30,50,150,255, 50,80,220,255, 35,140,45,255, 55,210,65,255,
+            170,70,30,255, 235,100,45,255, 45,45,45,255, 130,130,130,255,
+            90,150,202,255, 0,0,0,255, 255,255,255,255, 0,0,0,0];
+        byte[] naked=new byte[art.Length],isolated=new byte[art.Length];
+        art.AsSpan(32,4).CopyTo(naked.AsSpan(32,4));art.AsSpan(32,4).CopyTo(isolated.AsSpan(32,4));
+        var parts=ArmourLayeredRecolour.Separate(art,naked,isolated);
+        var histogram=new ArmourColourHistogram();
+        histogram.Add(parts.Surface);
+        var model=histogram.Build();
+        var layers=ArmourLayeredRecolour.Apply(parts,model,0);
+        var repeated=ArmourLayeredRecolour.Apply(parts,model,0);
+        Assertions.True(model.Count==4 && layers.Layers.Length==4,"Learn four independent original colour masks.");
+        var occupied=new HashSet<int>();
+        for(int p=0;p<art.Length;p+=4)
+        {
+            int alpha=layers.Skin[p+3],owner=-1;
+            for(int j=0;j<4;j++)
+            {
+                alpha+=layers.Layers[j][p+3];
+                if(layers.Layers[j][p+3]>0)
+                {
+                    Assertions.True(owner<0,"Colour masks cannot overlap.");
+                    owner=j;occupied.Add(j);
+                }
+                Assertions.True(layers.Layers[j].AsSpan(p,4).SequenceEqual(repeated.Layers[j].AsSpan(p,4)),
+                    "Fixed source palette gives deterministic frame assignment.");
+            }
+            Assertions.True(alpha==art[p+3],"Keep the source silhouette and alpha.");
+            if(p==32)Assertions.True(layers.Skin.AsSpan(p,4).SequenceEqual(art.AsSpan(p,4)),"Skin remains original.");
+            if(p==36||p==40)Assertions.True(layers.Surface.AsSpan(p,4).SequenceEqual(art.AsSpan(p,4)),"Preserve black and white.");
+        }
+        Assertions.True(occupied.Count==4,"All four original colour families should be populated.");
+        for(int p=0;p<24;p+=8)
+            Assertions.True(model.Classify(new Vector3(art[p+2],art[p+1],art[p])/255f)==
+                model.Classify(new Vector3(art[p+6],art[p+5],art[p+4])/255f),
+                "A material's lighter shade must not switch palette slot.");
+        var one=new ArmourColourHistogram();one.Add(new byte[]{20,40,100,255});
+        Assertions.True(one.Build().Count==1,"A genuinely single-colour source must not invent regions.");
+    }
+
+    private static void CheckSideWingProjection()
+    {
+        foreach(int direction in new[]{2,6})
+        {
+            var correction=WingProfilePlacement.Socket(new Vector2(2,-9),direction);
+            Assertions.True(correction.Y>=1.5f && correction.Y<=5.5f,"Profile wing socket cannot rise above the upper back.");
+            Assertions.True(Math.Abs(WingProfilePlacement.SpanY(direction, .49f, 60))<=10.81f,
+                "Side-on span cannot drive a wing more than eleven pixels upward/downward.");
+            Assertions.True(WingProfilePlacement.Rise(direction,12)<=2,"Legacy lift must not stack on side facings.");
+        }
+        Assertions.True(WingProfilePlacement.Socket(new Vector2(2,-9),0)==new Vector2(2,-9) &&
+            WingProfilePlacement.SpanY(0,.49f,60)==.49f*60 && WingProfilePlacement.Rise(0,12)==12,
+            "Unaffected facings retain the existing projection.");
+    }
+
     private static void Main()
     {
         CheckLiveArmourSplit();
         CheckOriginalArmourRecolour();
+        CheckLayeredArmourColours();
+        CheckSideWingProjection();
         CheckArmourPatternTransfer();
         CheckArmourDesigns();
         CheckArmourFeatureSeams();
