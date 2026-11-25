@@ -44,7 +44,7 @@ internal static class LiveArmourRenderer
         for(int i=0;i<entry.Layers.Length;i++)
         {
             var texture=entry.Layers[i];if(texture==null)continue;
-            if(i!=effect.Layer||DXManager.GrayScale||effect.Strength<=0)
+            if(i!=effect.Layer||!Settings.Effect||DXManager.GrayScale||effect.Strength<=0)
             {
                 DXManager.Draw(texture,null,position,tint);
                 continue;

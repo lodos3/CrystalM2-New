@@ -88,6 +88,21 @@ internal static class Program
         }
         device.BeginFrame();
         device.Clear(Color.Black);
+        using (var mask = Upload(device, Color.FromArgb(255,110,150,190)))
+        {
+            device.PixelShader = ShaderEffect.LiveArmour;
+            device.SetPixelShaderConstant(6,[new Vector4(.8f,.6f,1,1)]);
+            device.Sprite.Draw(mask,null,new Vector3(4,4,0),Vector4.One);
+            device.Sprite.End();
+            using var image=device.Capture(backBuffer);
+            Color shimmer=image.GetPixel(4,4);
+            Check(shimmer.B>190 && shimmer.G>150,"Layer-only shimmer must affect the selected mask.");
+            Near(Color.Black,image.GetPixel(0,0),"Layer effect must stay inside its sprite.");
+            device.SetPixelShaderConstant(6,[Vector4.Zero]);
+            device.PixelShader=ShaderEffect.Artwork;
+        }
+        device.BeginFrame();
+        device.Clear(Color.Black);
         device.Sprite.Begin();
         device.Sprite.Draw(red, null, Vector3.Zero, Vector4.One);
         device.Sprite.Draw(red, null, new Vector3(4, 0, 0), Vector4.One);

@@ -141,6 +141,14 @@ public static class ArmourLayeredRecolour
     public static ArmourColourLayers Apply(ArmourSourceParts source,ArmourColourModel model,int profile)
     {
         if((uint)profile>=Palettes.GetLength(0))throw new ArgumentOutOfRangeException(nameof(profile));
+        return Apply(source,model,[Palettes[profile,0],Palettes[profile,1],Palettes[profile,2],Palettes[profile,3]]);
+    }
+
+    // A caller can independently assign any four RGB colours without
+    // rebuilding the learned masks or altering the underlying source.
+    public static ArmourColourLayers Apply(ArmourSourceParts source,ArmourColourModel model,ReadOnlySpan<uint> colours)
+    {
+        if(colours.Length!=4)throw new ArgumentException("Provide four RGB palette slots.",nameof(colours));
         if(source.Surface.Length%4!=0||source.Skin.Length!=source.Surface.Length)
             throw new ArgumentException("Unaligned source layers.");
         var layers=Enumerable.Range(0,4).Select(_=>new byte[source.Surface.Length]).ToArray();
@@ -150,7 +158,7 @@ public static class ArmourLayeredRecolour
             byte a=source.Surface[p+3];if(a==0)continue;
             Vector3 c=new(source.Surface[p+2]/255f,source.Surface[p+1]/255f,source.Surface[p]/255f);
             int slot=model.Classify(c);
-            uint rgb=Palettes[profile,slot];
+            uint rgb=colours[slot];
             Vector3 target=new((rgb>>16&255)/255f,(rgb>>8&255)/255f,(rgb&255)/255f);
             Vector3 recoloured=Map(c,target);
             combined[p]=Byte(recoloured.Z);combined[p+1]=Byte(recoloured.Y);

@@ -83,6 +83,7 @@ namespace Client.MirObjects
         private int _wingFamily;
         private SpellParticlePool _wingParticles;
         private long _wingAnimationTick = -1;
+        private long _armourAnimationTick = -1;
         private WingPoseSmoother _wingPoseSmoother;
         private bool _wingPoseReady, _wingPoseMounted;
         private byte _wingPoseEffect;
@@ -914,6 +915,18 @@ namespace Client.MirObjects
                 }
             }
             else { _wingPoseReady = false; _wingAnimationTick = -1; }
+            // The map caches player rendering. Animated armour must
+            // invalidate it even when an actor stands still without wings.
+            if(Settings.Effect&&!Dead&&_drawGeneratedArmour&&ArmourRecolourDesign.Supports(GeneratedArmour)&&
+                ArmourLayeredRecolour.Effect(ArmourRecolourDesign.Resolve(GeneratedArmour).Profile).Strength>0)
+            {
+                if(_armourAnimationTick<0||CMain.Time-_armourAnimationTick>=50)
+                {
+                    _armourAnimationTick=CMain.Time;
+                    if(GameScene.Scene?.MapControl!=null)GameScene.Scene.MapControl.TextureValid=false;
+                }
+            }
+            else _armourAnimationTick=-1;
             ProcessWeaponSpellVisual();
 
             for (int i = 0; i < Effects.Count; i++)
