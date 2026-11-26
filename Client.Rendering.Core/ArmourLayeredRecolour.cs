@@ -256,8 +256,13 @@ public static class ArmourLayeredRecolour
         // Distinct response per layer: dominant plate, secondary cloth,
         // ornament, and accent. These are stylistic ramps, not inferred BRDFs.
         Vector3 cool=new(-.035f,-.012f,.105f),warm=new(.10f,.025f,-.065f);
-        Vector3 shadow=ZeroLuma(mid*.76f+cool*(slot==1?.55f:1.2f));
-        Vector3 highlight=ZeroLuma(mid*.42f+(slot==2?warm:cool*.45f+warm*.70f));
+        // A perpendicular chroma axis gives coloured materials a genuine
+        // split-tone response even when their base hue is already blue.
+        // Unlike a fixed blue tint, this adapts to every chosen dye.
+        Vector3 cross=Vector3.Cross(new Vector3(.299f,.587f,.114f),mid);
+        Vector3 reflected=cross.LengthSquared()>.000001f?Vector3.Normalize(cross)*.065f:ZeroLuma(cool);
+        Vector3 shadow=ZeroLuma(mid*.76f+cool*(slot==1?.55f:1.2f)+reflected);
+        Vector3 highlight=ZeroLuma(mid*.42f+(slot==2?warm:cool*.45f+warm*.70f)-reflected);
         Vector3 ramp=y<.48f?Vector3.Lerp(shadow,mid,Smooth(.10f,.48f,y)):
             Vector3.Lerp(mid,highlight,Smooth(.48f,.90f,y));
         float preserve=Smooth(.035f,.14f,y)*(1-Smooth(.78f,.975f,y));
