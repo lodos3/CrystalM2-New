@@ -920,7 +920,7 @@ namespace Client.MirObjects
             if(Settings.Effect&&!Dead&&_drawGeneratedArmour&&ArmourRecolourDesign.Supports(GeneratedArmour)&&
                 ArmourLayeredRecolour.Effect(ArmourRecolourDesign.Resolve(GeneratedArmour).Profile).Strength>0)
             {
-                if(_armourAnimationTick<0||CMain.Time-_armourAnimationTick>=50)
+                if(_armourAnimationTick<0||CMain.Time-_armourAnimationTick>=80)
                 {
                     _armourAnimationTick=CMain.Time;
                     if(GameScene.Scene?.MapControl!=null)GameScene.Scene.MapControl.TextureValid=false;

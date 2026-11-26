@@ -7,7 +7,7 @@ using CrystalM2.Rendering.Core;
 
 namespace CrystalM2.ArmourCreate;
 
-public sealed record LiveArmourFrame(int Width,int Height,int X,int Y,byte[] Skin,byte[] Surface,byte[][] Layers);
+public sealed record LiveArmourFrame(int Width,int Height,int X,int Y,byte[] Skin,byte[] Surface,byte[][] Layers,byte[] Features);
 
 public sealed class LiveArmourAtlas : IDisposable
 {
@@ -17,6 +17,10 @@ public sealed class LiveArmourAtlas : IDisposable
     private readonly JsonElement[] _frames;
     private readonly Dictionary<int,LegacyMirLibReader> _sources=new();
     private readonly Dictionary<int,ArmourColourModel> _models=new();
+    private readonly Dictionary<(int,int),LinkedListNode<((int,int) Key,Original Original,ArmourMaterialMap Map,long Bytes)>> _materialCache=new();
+    private readonly LinkedList<((int,int) Key,Original Original,ArmourMaterialMap Map,long Bytes)> _materialLru=new();
+    private long _materialBytes;
+    private const long MaterialBudget=24*1024*1024;
     public LiveArmourAtlas(string data,string art)
     {
         _data=data;
@@ -31,7 +35,7 @@ public sealed class LiveArmourAtlas : IDisposable
     public LiveArmourFrame Create(int id,int index)
     {
         var design=ArmourRecolourDesign.Resolve(id);
-        var original=ReadOriginal(design.Source,index);
+        if((uint)index>=FrameCount)throw new ArgumentOutOfRangeException(nameof(index));
         if(!_models.TryGetValue(design.Source,out var model))
         {
             var histogram=new ArmourColourHistogram();
@@ -47,8 +51,23 @@ public sealed class LiveArmourAtlas : IDisposable
             }
             model=histogram.Build();_models.Add(design.Source,model);
         }
-        var layers=ArmourLayeredRecolour.Apply(original.Parts,model,design.Profile);
-        return new(original.Width,original.Height,original.X,original.Y,layers.Skin,layers.Surface,layers.Layers);
+        var key=(design.Source,index);
+        if(!_materialCache.TryGetValue(key,out var node))
+        {
+            var input=ReadOriginal(design.Source,index);
+            var map=ArmourMaterialMap.Analyse(input.Width,input.Height,input.Parts,model);
+            long bytes=(long)input.Width*input.Height*28; // source/skin, weights, features
+            while(_materialLru.Last!=null&&_materialBytes+bytes>MaterialBudget)
+            {
+                var last=_materialLru.Last;
+                _materialCache.Remove(last.Value.Key);_materialBytes-=last.Value.Bytes;_materialLru.RemoveLast();
+            }
+            node=_materialLru.AddFirst((key,input,map,bytes));_materialCache.Add(key,node);_materialBytes+=bytes;
+        }
+        else {_materialLru.Remove(node);_materialLru.AddFirst(node);}
+        var original=node.Value.Original;
+        var layers=ArmourMaterialReconstruction.Render(original.Parts,node.Value.Map,design.Profile);
+        return new(original.Width,original.Height,original.X,original.Y,layers.Skin,layers.Surface,layers.Layers,node.Value.Map.Features);
     }
 
     private sealed record Original(int Width,int Height,int X,int Y,ArmourSourceParts Parts);
@@ -105,7 +124,7 @@ public sealed class LiveArmourAtlas : IDisposable
     {
         if(!Supports(id))throw new ArgumentOutOfRangeException(nameof(id));
         Directory.CreateDirectory(destination);
-        string[] names=["HeadHands","Surface","Layer0","Layer1","Layer2","Layer3"];
+        string[] names=["HeadHands","Surface","Layer0","Layer1","Layer2","Layer3","Structure"];
         string[] output=names.Select(n=>Path.Combine(destination,$"g{id:00}_{n}.Lib")).ToArray();
         if(output.Any(File.Exists))throw new IOException("Output already exists; select a new export directory.");
         string[] temporary=output.Select(p=>p+"."+Guid.NewGuid().ToString("N")+".tmp").ToArray();
@@ -122,7 +141,7 @@ public sealed class LiveArmourAtlas : IDisposable
             for(int i=0;i<FrameCount;i++)
             {
                 var frame=Create(id,i);
-                byte[][] pixels=[frame.Skin,frame.Surface,..frame.Layers];
+                byte[][] pixels=[frame.Skin,frame.Surface,..frame.Layers,frame.Features];
                 for(int j=0;j<writers.Length;j++)
                 {
                     var writer=writers[j]!;
@@ -167,6 +186,6 @@ public sealed class LiveArmourAtlas : IDisposable
     public void Dispose()
     {
         foreach(var reader in _sources.Values)reader.Dispose();
-        _sources.Clear();_models.Clear();_poses.Dispose();
+        _sources.Clear();_models.Clear();_materialCache.Clear();_materialLru.Clear();_materialBytes=0;_poses.Dispose();
     }
 }

@@ -18,6 +18,28 @@ public sealed class ArmourColourModel
         float y=ArmourRecolour.Luma(c);
         return new((c.X-c.Y)/(y+.16f),(c.Z-c.Y)/(y+.16f),y*.24f);
     }
+    public Vector4 Membership(Vector3 rgb)
+    {
+        Vector3 point=Feature(rgb);
+        Span<float> distances=stackalloc float[4];
+        float min=float.PositiveInfinity;
+        for(int i=0;i<_centres.Length;i++)
+        {
+            distances[i]=Vector3.DistanceSquared(point,_centres[i]);
+            min=Math.Min(min,distances[i]);
+        }
+        Span<float> weights=stackalloc float[4];weights.Clear();
+        float total=0;
+        for(int i=0;i<_centres.Length;i++)
+        {
+            // Stabilized soft assignment. In ambiguous transitions retain
+            // several contributors instead of forcing a nearest-colour edge.
+            float v=MathF.Exp(-(distances[i]-min)/.085f);
+            weights[i]=v;total+=v;
+        }
+        return new Vector4(weights[0],weights[1],weights[2],weights[3])/Math.Max(total,.00001f);
+    }
+
     public int Classify(Vector3 rgb)
     {
         Vector3 point=Feature(rgb);
@@ -125,9 +147,15 @@ public static class ArmourLayeredRecolour
 
     public static ArmourLayerEffect Effect(int profile)=>profile switch
     {
-        5=>new(2,1,.18f), // frost shimmer
-        6=>new(1,1,.22f), // arcane shimmer
-        8=>new(0,2,.22f), // holographic scan
+        0=>new(2,1,.12f), // patinated bronze
+        1=>new(2,1,.16f), // ceremonial metal
+        2=>new(2,2,.20f), // obsidian iridescence
+        3=>new(2,1,.14f), // gilded steel
+        4=>new(2,1,.10f), // weathered steel
+        5=>new(2,1,.24f), // frost
+        6=>new(1,2,.22f), // arcane
+        7=>new(2,1,.13f), // oxidised copper
+        8=>new(0,2,.27f), // spectral
         _=>new(-1,0,0)
     };
 

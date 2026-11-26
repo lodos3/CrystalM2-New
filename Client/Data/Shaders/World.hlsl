@@ -161,6 +161,27 @@ float4 PSLiveArmour(Output input) : SV_TARGET
 {
     float4 art=SampleArtwork(input);
     if(art.a<=0)return 0;
+    if(C[6].w>1.5)
+    {
+        uint mw,mh;
+        AuxiliaryTexture.GetDimensions(mw,mh);
+        int2 texel=clamp(int2(input.Uv*float2(mw,mh)),int2(0,0),int2(mw-1,mh-1));
+        float4 structure=AuxiliaryTexture.Load(int3(texel,0));
+        // BGRA map decoded as RGB: ridge, recess, repeated texture.
+        // Coverage excludes all protected anatomy and transparent pixels.
+        float phase=C[6].x;
+        float y=dot(art.rgb,float3(.299,.587,.114));
+        float wave=.5+.5*cos(6.2831853*(phase+structure.r*.35+structure.b*.20));
+        float reflectance=structure.r*(.65+.35*structure.b);
+        float3 hue=C[7].rgb;
+        if(C[6].z>1.5)
+            hue=lerp(hue,float3(.72,.48,.95),wave*.55);
+        float energy=reflectance*pow(wave,3)*C[6].y*structure.a*
+            smoothstep(.07,.25,y)*(1-smoothstep(.88,1,y));
+        float3 reflection=saturate(hue*energy*.70);
+        art.rgb=1-(1-art.rgb)*(1-reflection);
+        return PrepareBlend(art*input.Tint);
+    }
     if(C[6].w>.5)
     {
         // This texture contains only one learned source-colour mask.

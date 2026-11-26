@@ -8,7 +8,7 @@ internal static class LiveArmourRenderer
 {
     private const int MaxFrames=192;
     private const long MaxBytes=32*1024*1024;
-    private sealed record Entry(Texture Skin,Texture Surface,Texture[] Layers,int Width,int Height,int X,int Y,long Bytes);
+    private sealed record Entry(Texture Skin,Texture Surface,Texture Features,int Width,int Height,int X,int Y,long Bytes);
     private static readonly Dictionary<(byte,int),LinkedListNode<((byte,int) Key,Entry Frame)>> Cache=new();
     private static readonly LinkedList<((byte,int) Key,Entry Frame)> Lru=new();
     private static readonly HashSet<byte> Failed=new();
@@ -39,36 +39,30 @@ internal static class LiveArmourRenderer
         if(!SpriteVisibility.IsVisible(origin.X,origin.Y,entry.Width,entry.Height,Settings.ScreenWidth,Settings.ScreenHeight))
             return true;
         var position=new Vector3(origin.X,origin.Y,0);
-        var effect=ArmourLayeredRecolour.Effect(ArmourRecolourDesign.Resolve(id).Profile);
+        var design=ArmourRecolourDesign.Resolve(id);
+        var effect=ArmourLayeredRecolour.Effect(design.Profile);
         var device=DXManager.Device;
-        if(entry.Surface!=null)
-        {
+        if(entry.Features==null||!Settings.Effect||DXManager.GrayScale||effect.Strength<=0)
             DXManager.Draw(entry.Surface,null,position,tint);
-            DXManager.Draw(entry.Skin,null,position,tint);
-            return true;
-        }
-        for(int i=0;i<entry.Layers.Length;i++)
+        else
         {
-            var texture=entry.Layers[i];if(texture==null)continue;
-            if(i!=effect.Layer||!Settings.Effect||DXManager.GrayScale||effect.Strength<=0)
-            {
-                DXManager.Draw(texture,null,position,tint);
-                continue;
-            }
             ShaderEffect previous=device.PixelShader;
+            Texture previousAux=device.AuxiliaryTexture;
             Span<Vector4> constants=stackalloc Vector4[RendererDevice.EffectConstantCount];
             device.CopyPixelShaderConstants(constants);
             try
             {
+                device.AuxiliaryTexture=entry.Features;
                 device.PixelShader=ShaderEffect.LiveArmour;
-                float phase=(CMain.Time%1800)/1800f;
-                device.SetPixelShaderConstant(6,[new Vector4(phase,effect.Strength,effect.Mode,1)]);
-                DXManager.Draw(texture,null,position,tint);
+                float phase=(CMain.Time%2400)/2400f;
+                device.SetPixelShaderConstant(6,[new Vector4(phase,effect.Strength,effect.Mode,2),
+                    new Vector4(ArmourMaterialReconstruction.ReflectionColour(design.Profile),1)]);
+                DXManager.Draw(entry.Surface,null,position,tint);
             }
             finally
             {
                 device.Sprite.Flush();device.PixelShader=previous;
-                device.SetPixelShaderConstant(0,constants);
+                device.AuxiliaryTexture=previousAux;device.SetPixelShaderConstant(0,constants);
             }
         }
         DXManager.Draw(entry.Skin,null,position,tint);
@@ -80,44 +74,34 @@ internal static class LiveArmourRenderer
         var key=(id,index);
         if(Cache.TryGetValue(key,out var node))
         {
-            if(!node.Value.Frame.Skin.Disposed&&(node.Value.Frame.Surface==null||!node.Value.Frame.Surface.Disposed)&&node.Value.Frame.Layers.All(x=>x==null||!x.Disposed))
+            if(!node.Value.Frame.Skin.Disposed&&!node.Value.Frame.Surface.Disposed&&(node.Value.Frame.Features==null||!node.Value.Frame.Features.Disposed))
             { Lru.Remove(node);Lru.AddFirst(node);return node.Value.Frame; }
             Remove(node);
         }
         _atlas??=new LiveArmourAtlas(Settings.DataPath,Path.Combine(Settings.DataPath,"ArmourAuthoring"));
         var frame=_atlas.Create(id,index);
-        Texture skin=null,surface=null;
-        var layers=new Texture[4];
+        Texture skin=null,surface=null,features=null;
         try
         {
             skin=Upload(frame.Width,frame.Height,frame.Skin);
-            long bytes=(long)frame.Width*frame.Height*4;
-            bool animated=ArmourLayeredRecolour.Effect(ArmourRecolourDesign.Resolve(id).Profile).Strength>0;
-            if(!animated)
+            surface=Upload(frame.Width,frame.Height,frame.Surface);
+            long bytes=(long)frame.Width*frame.Height*8;
+            if(ArmourLayeredRecolour.Effect(ArmourRecolourDesign.Resolve(id).Profile).Strength>0)
             {
-                surface=Upload(frame.Width,frame.Height,frame.Surface);
+                features=Upload(frame.Width,frame.Height,frame.Features,false);
                 bytes+=(long)frame.Width*frame.Height*4;
             }
-            for(int i=0;animated&&i<layers.Length;i++)
-            {
-                bool populated=false;
-                for(int p=3;p<frame.Layers[i].Length;p+=4)
-                    if(frame.Layers[i][p]!=0){populated=true;break;}
-                if(!populated)continue;
-                layers[i]=Upload(frame.Width,frame.Height,frame.Layers[i]);
-                bytes+=(long)frame.Width*frame.Height*4;
-            }
-            var entry=new Entry(skin,surface,layers,frame.Width,frame.Height,frame.X,frame.Y,bytes);
+            var entry=new Entry(skin,surface,features,frame.Width,frame.Height,frame.X,frame.Y,bytes);
             while(Lru.Last!=null&&(Cache.Count>=MaxFrames||_bytes+entry.Bytes>MaxBytes))Remove(Lru.Last);
             Cache.Add(key,Lru.AddFirst((key,entry)));_bytes+=entry.Bytes;
             return entry;
         }
-        catch { skin?.Dispose();surface?.Dispose();foreach(var layer in layers)layer?.Dispose();throw; }
+        catch { skin?.Dispose();surface?.Dispose();features?.Dispose();throw; }
     }
 
-    private static Texture Upload(int w,int h,byte[] data)
+    private static Texture Upload(int w,int h,byte[] data,bool artwork=true)
     {
-        var texture=new Texture(_owner,w,h) { IsWorldArtwork=true };
+        var texture=new Texture(_owner,w,h) { IsWorldArtwork=artwork };
         try
         {
             var upload=texture.BeginUpload();
@@ -132,7 +116,7 @@ internal static class LiveArmourRenderer
     {
         Cache.Remove(node.Value.Key); Lru.Remove(node);
         var entry=node.Value.Frame;_bytes-=entry.Bytes;
-        entry.Skin.Dispose();entry.Surface?.Dispose();foreach(var layer in entry.Layers)layer?.Dispose();
+        entry.Skin.Dispose();entry.Surface.Dispose();entry.Features?.Dispose();
     }
 
     internal static void Clear()

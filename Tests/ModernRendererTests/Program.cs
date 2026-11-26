@@ -707,6 +707,65 @@ private static void CheckArmourPatternTransfer()
         Assertions.True(Math.Abs(muted.X-muted.Z)<.14f,"Dark neutral reference should remain a subdued material.");
     }
 
+    private static void CheckMaterialReconstruction()
+    {
+        const int w=16,h=16;
+        byte[] art=new byte[w*h*4],skin=new byte[art.Length];
+        for(int y=2;y<14;y++)for(int x=2;x<14;x++)
+        {
+            int p=(y*w+x)*4;
+            byte v=(byte)(x<8?80:125);
+            if(y==8)v=200; // authored engraved ridge
+            if(y==9)v=40;  // authored recess
+            art[p]=(byte)(x<8?v:Math.Min(255,v+35));art[p+1]=v;
+            art[p+2]=(byte)(x<8?Math.Min(255,v+28):v);
+            art[p+3]=(byte)(x==2?113:255);
+        }
+        int head=(3*w+7)*4;art.AsSpan(head,4).CopyTo(skin.AsSpan(head,4));art.AsSpan(head,4).Clear();
+        var source=new ArmourSourceParts(art,skin);
+        var histogram=new ArmourColourHistogram();histogram.Add(art);
+        var model=histogram.Build();
+        var map=ArmourMaterialMap.Analyse(w,h,source,model);
+        var again=ArmourMaterialMap.Analyse(w,h,source,model);
+        Assertions.True(map.Features.SequenceEqual(again.Features)&&map.Weights.SequenceEqual(again.Weights),
+            "Material extraction is deterministic.");
+        Assertions.True(map.Features[head+3]==0 && map.Weights[head/4]==Vector4.Zero,
+            "Protected anatomy must not participate in material analysis.");
+        int ridge=(8*w+5)*4,recess=(9*w+5)*4;
+        Assertions.True(map.Features[ridge+2]>map.Features[(5*w+5)*4+2] &&
+            map.Features[recess+1]>map.Features[(5*w+5)*4+1],
+            "Ridges and recesses must respond to original image structure.");
+        int soft=0;
+        foreach(Vector4 v in map.Weights)
+        {
+            float sum=v.X+v.Y+v.Z+v.W;
+            Assertions.True(sum==0||Math.Abs(sum-1)<.00001f,"Material coverage is normalized.");
+            if(v.X>.01f&&v.Y>.01f)soft++;
+        }
+        Assertions.True(soft>0,"Colour decomposition supports more than one contributing material.");
+        var ids=new HashSet<int>();
+        for(int id=2;id<=99;id++)
+        {
+            var design=ArmourRecolourDesign.Resolve(id);
+            var result=ArmourMaterialReconstruction.Render(source,map,design.Profile);
+            Assertions.True(ids.Add(id)&&result.Skin.AsSpan().SequenceEqual(skin),"Every generated appearance preserves skin.");
+            for(int p=0;p<art.Length;p+=4)
+            {
+                int alpha=0;for(int j=0;j<4;j++)alpha+=result.Layers[j][p+3];
+                Assertions.True(alpha==art[p+3]&&result.Surface[p+3]==art[p+3],
+                    "Combined and export layers preserve the original coverage.");
+                if(art[p+3]==0)Assertions.True(result.Surface.AsSpan(p,4).SequenceEqual(new byte[4]),
+                    "No effects or colour outside the material mask.");
+            }
+        }
+        var flat=new byte[art.Length];for(int p=0;p<flat.Length;p+=4)
+        {flat[p]=flat[p+1]=flat[p+2]=100;flat[p+3]=255;}
+        var flatSource=new ArmourSourceParts(flat,new byte[flat.Length]);
+        var flatMap=ArmourMaterialMap.Analyse(w,h,flatSource,model);
+        Assertions.True(flatMap.Features[(8*w+8)*4+2]==0&&flatMap.Features[(8*w+8)*4+1]==0,
+            "Do not invent relief on flat artwork.");
+    }
+
     private static void Main()
     {
         CheckLiveArmourSplit();
@@ -715,6 +774,7 @@ private static void CheckArmourPatternTransfer()
         CheckArmourAnatomicalProtection();
         CheckArmourMaterialRamps();
         CheckReferenceArmourBlend();
+        CheckMaterialReconstruction();
         CheckSideWingProjection();
         CheckArmourPatternTransfer();
         CheckArmourDesigns();
