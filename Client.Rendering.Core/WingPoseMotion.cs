@@ -75,13 +75,16 @@ public static class WingProfilePlacement
     public static Vector2 Socket(Vector2 relative,int direction)
     {
         if(!IsSide(direction))return relative;
-        // In profile, projected shoulder estimates can swap vertical
-        // ordering during a weapon swing. Seat both roots below the back,
-        // and limit the independent socket displacement, not body travel.
-        return new(Math.Clamp(relative.X,-5,5),Math.Clamp(relative.Y,-1,3)+2.5f);
+        // Raise the previous profile roots by 1–2 pixels while keeping
+        // them below the tracked upper back, including during attacks.
+        return new(Math.Clamp(relative.X,-4.5f,4.5f),Math.Clamp(relative.Y,-1,2)+1.5f);
     }
     public static float SpanY(int direction,float projectedAcrossY,float lateral)
-        => (IsSide(direction)?Math.Clamp(projectedAcrossY,-.18f,.18f):projectedAcrossY)*lateral;
+        => (IsSide(direction)?Math.Clamp(projectedAcrossY,-.14f,.14f):projectedAcrossY)*lateral;
+    // Relative to the artwork attachment, shorten only the lower feathers.
+    // Keep the projection continuous at the pinned root.
+    public static float FeatherHeight(int direction,float relativeHeight)
+        => IsSide(direction)&&relativeHeight>0?relativeHeight*.85f:relativeHeight;
     public static float Rise(int direction,float lift)=>IsSide(direction)?Math.Clamp(lift,0,2):lift;
 }
 

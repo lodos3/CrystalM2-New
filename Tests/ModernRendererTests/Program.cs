@@ -573,15 +573,34 @@ private static void CheckArmourPatternTransfer()
     {
         foreach(int direction in new[]{2,6})
         {
-            var correction=WingProfilePlacement.Socket(new Vector2(2,-9),direction);
-            Assertions.True(correction.Y>=1.5f && correction.Y<=5.5f,"Profile wing socket cannot rise above the upper back.");
-            Assertions.True(Math.Abs(WingProfilePlacement.SpanY(direction, .49f, 60))<=10.81f,
-                "Side-on span cannot drive a wing more than eleven pixels upward/downward.");
+            foreach(float y in new[]{-9f,-1f,0f,2f,3f,9f})
+            {
+                var root=WingProfilePlacement.Socket(new Vector2(2,y),direction);
+                Assertions.True(root.Y>=.5f&&root.Y<=3.5f,
+                    "Profile roots sit close to the upper back without rising above it.");
+                float previous=Math.Clamp(y,-1,3)+2.5f;
+                Assertions.True(previous-root.Y>=.999f&&previous-root.Y<=2.001f,
+                    "Raise the previous profile socket by only one to two pixels.");
+            }
+            float across=direction==2?.49f:-.49f;
+            foreach(float lateral in new[]{-60f,60f})
+            {
+                float vertical=WingProfilePlacement.SpanY(direction,across,lateral);
+                Assertions.True(Math.Abs(vertical)<=8.401f,"Limit excessive profile span.");
+                Assertions.True(Math.Abs(vertical-WingProfilePlacement.SpanY(8-direction,-across,-lateral))<.001f,
+                    "Left and right retain mirrored projection.");
+            }
+            Assertions.True(WingProfilePlacement.FeatherHeight(direction,-20)==-20 &&
+                WingProfilePlacement.FeatherHeight(direction,0)==0 &&
+                Math.Abs(WingProfilePlacement.FeatherHeight(direction,40)-34)<.001f,
+                "Shorten lower feathers only, preserving the upper crown and root.");
             Assertions.True(WingProfilePlacement.Rise(direction,12)<=2,"Legacy lift must not stack on side facings.");
         }
-        Assertions.True(WingProfilePlacement.Socket(new Vector2(2,-9),0)==new Vector2(2,-9) &&
-            WingProfilePlacement.SpanY(0,.49f,60)==.49f*60 && WingProfilePlacement.Rise(0,12)==12,
-            "Unaffected facings retain the existing projection.");
+        foreach(int direction in new[]{0,1,3,4,5,7})
+            Assertions.True(WingProfilePlacement.Socket(new Vector2(2,-9),direction)==new Vector2(2,-9) &&
+                WingProfilePlacement.SpanY(direction,.49f,60)==.49f*60 &&
+                WingProfilePlacement.FeatherHeight(direction,40)==40 && WingProfilePlacement.Rise(direction,12)==12,
+                "Unaffected facings retain their original projection.");
     }
 
     private static void Main()

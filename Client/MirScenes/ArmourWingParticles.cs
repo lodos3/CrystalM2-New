@@ -106,8 +106,8 @@ internal static class ArmourWingParticles
         bool sideProfile=WingProfilePlacement.IsSide(facing) && !ArmourWings.IsAura(effect);
         if(sideProfile)
         {
-            torsoYaw=Math.Clamp(torsoYaw,-.035f,.035f);
-            torsoPitch=Math.Clamp(torsoPitch,-.055f,.055f);
+            torsoYaw=Math.Clamp(torsoYaw,-.045f,.045f);
+            torsoPitch=Math.Clamp(torsoPitch,-.070f,.070f);
             legacyLift=0;
         }
         float baseYaw = facing * (MathF.PI / 4);
@@ -226,7 +226,10 @@ internal static class ArmourWingParticles
                 float localYaw = baseYaw + torsoYaw * flex;
                 Vector2 localAcross = new(MathF.Cos(localYaw), MathF.Sin(localYaw) * .49f);
                 Vector2 localBack = new(-MathF.Sin(localYaw), MathF.Cos(localYaw) * .49f);
-                float down = height * .55f - 4 * u * flap + 4 * t * t - arch + shell * depth * .30f * rearSign * flex;
+                // Keep the original height for all other directions. In
+                // profile, compress only the art below its physical socket.
+                float featherHeight=height+WingProfilePlacement.FeatherHeight(facing,y-artRoot.Y)-(y-artRoot.Y);
+                float down = featherHeight * .55f - 4 * u * flap + 4 * t * t - arch + shell * depth * .30f * rearSign * flex;
                 // Twist is a change in horizontal depth and socket placement,
                 // not a screen-space rotation of the feather column. Retain
                 // the neutral vertical projection and lift the rearward span
