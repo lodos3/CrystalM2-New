@@ -182,9 +182,10 @@ float4 PSLiveArmour(Output input) : SV_TARGET
         // changes chroma and only slightly lifts the source luminance.
         float hy=dot(hue,float3(.299,.587,.114));
         float3 chromatic=hue-hy;
-        float value=min(1,y+.10*sheen);
-        float3 finish=saturate(value+chromatic*.65);
-        art.rgb=lerp(art.rgb,finish,saturate(sheen*C[6].y));
+        // Screen only the reflection on the selected colour mask. A
+        // normal dye should not act as additive light across the armour.
+        float3 reflection=saturate(hue*sheen*C[6].y*.42);
+        art.rgb=1-(1-art.rgb)*(1-reflection);
         return PrepareBlend(art*input.Tint);
     }
     float3 weights=float3(.299,.587,.114);

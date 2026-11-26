@@ -681,6 +681,32 @@ private static void CheckArmourPatternTransfer()
             "A material has a multi-hue shadow/highlight response, not a single colour wash.");
     }
 
+    private static void CheckReferenceArmourBlend()
+    {
+        for(int profile=0;profile<9;profile++)
+        for(int slot=0;slot<4;slot++)
+        {
+            var ramp=ArmourLayeredRecolour.ReferenceRamp(profile,slot);
+            float previous=-1;
+            for(int i=0;i<=255;i++)
+            {
+                float y=i/255f;
+                Vector3 output=ArmourLayeredRecolour.BlendReference(new Vector3(y),ramp);
+                float value=ArmourRecolour.Luma(output);
+                Assertions.True(value>=previous-.00001f,"Soft-light value blend must remain monotonic.");
+                Assertions.True(Math.Abs(value-y)<.12f && output.X>=0&&output.Y>=0&&output.Z>=0&&
+                    output.X<=1&&output.Y<=1&&output.Z<=1,"Keep authored values and gamut.");
+                previous=value;
+            }
+            Assertions.True(ArmourLayeredRecolour.BlendReference(Vector3.Zero,ramp)==Vector3.Zero &&
+                ArmourLayeredRecolour.BlendReference(Vector3.One,ramp)==Vector3.One,
+                "No additive wash over original black or white.");
+        }
+        var muted=ArmourLayeredRecolour.BlendReference(new Vector3(.5f),
+            ArmourLayeredRecolour.ReferenceRamp(2,0));
+        Assertions.True(Math.Abs(muted.X-muted.Z)<.14f,"Dark neutral reference should remain a subdued material.");
+    }
+
     private static void Main()
     {
         CheckLiveArmourSplit();
@@ -688,6 +714,7 @@ private static void CheckArmourPatternTransfer()
         CheckLayeredArmourColours();
         CheckArmourAnatomicalProtection();
         CheckArmourMaterialRamps();
+        CheckReferenceArmourBlend();
         CheckSideWingProjection();
         CheckArmourPatternTransfer();
         CheckArmourDesigns();

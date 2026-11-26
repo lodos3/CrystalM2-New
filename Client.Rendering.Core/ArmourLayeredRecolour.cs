@@ -99,20 +99,30 @@ public sealed class ArmourColourHistogram
 
 public static class ArmourLayeredRecolour
 {
-    // Deliberately contrasting four-colour palettes, not four nearly
-    // identical tints. Slots correspond to learned source colours.
-    private static readonly uint[,] Palettes=
+    public readonly record struct DyeRamp(uint Shadow,uint Midtone,uint Highlight);
+    // Measured palette ramps from the provided original LIBs. The 18th,
+    // 50th and 82nd percentile neighbourhood medians are sampled from
+    // four chroma/value clusters, across eight idle and eight attack poses.
+    // These are colour references only; no donor geometry is transferred.
+    private static readonly DyeRamp[,] ReferencePalettes=
     {
-        {0x376BC8,0xD1A355,0xB9D9F5,0x65324D}, // sapphire, gold, ice, wine
-        {0xB52C41,0xE3B74E,0x344B78,0xD5C6B2}, // crimson, gold, navy, ivory
-        {0x353942,0xA7C8D9,0xB076D2,0x9E512F}, // obsidian, silver, violet, copper
-        {0xE7DFC5,0xD29D32,0x355A8B,0x79494B}, // ivory, gold, royal blue, burgundy
-        {0x268D61,0xB9813F,0xC2DBA0,0x564080}, // emerald, bronze, jade, violet
-        {0x5DA9D6,0xCCDFF4,0x4352A5,0xC89658}, // frost, silver, cobalt, amber
-        {0x8241BC,0x36A9B0,0xE4B668,0xD6C0EA}, // amethyst, teal, gold, lilac
-        {0xB76A31,0x356F83,0xE9C77C,0x733C64}, // copper, patina, gold, plum
-        {0x299CAB,0xE4A54A,0x845AD6,0xE1ECEA}  // teal, amber, violet, white
+        {new(0x303028,0x686858,0xB0B090),new(0x504020,0x786840,0xB89460),new(0x184048,0x305068,0x588CA0),new(0x184028,0x008080,0x508448)}, // 14.Lib
+        {new(0x403018,0x705828,0xB89448),new(0x501810,0x902818,0xB86030),new(0x701000,0xD80000,0xC83000),new(0x182828,0x184028,0x307028)}, // 17.Lib
+        {new(0x181818,0x282820,0x303028),new(0x403838,0x484050,0x686058),new(0x282018,0x504028,0x786858),new(0x808480,0xA0A0A0,0xC0C0C0)}, // 24.Lib
+        {new(0x584828,0x887048,0xB8A470),new(0x282818,0x484848,0xA0A490),new(0x502010,0x703828,0xA04830),new(0x801018,0xC83428,0xE06458)}, // 13.Lib
+        {new(0x282818,0x584828,0xA08C70),new(0x282828,0x484050,0x9894A8),new(0x503018,0x704828,0x987838),new(0x102848,0x305078,0x5880A0)}, // 27.Lib
+        {new(0x484050,0x887898,0xC8B4F0),new(0x283860,0x485890,0x6878D0),new(0x184048,0x485878,0x88B8C8),new(0x281880,0x281880,0x1048D8)}, // 18.Lib
+        {new(0x383838,0x686468,0xB8B0B8),new(0x683828,0xC06450,0xF89868),new(0x502840,0x884878,0xB86CB0),new(0x181458,0x282478,0x404090)}, // 12.Lib
+        {new(0x281810,0x282818,0x484038),new(0x401810,0x703018,0xB84830),new(0x503018,0x704818,0x986838),new(0x182810,0x303810,0x404010)}, // 25.Lib
+        {new(0x281818,0x303028,0x605850),new(0x382818,0x503828,0x705438),new(0x583018,0x884828,0xC06040),new(0x182828,0x184048,0x305068)} // 28.Lib
     };
+    public static DyeRamp ReferenceRamp(int profile,int slot)
+    {
+        if((uint)profile>=ReferencePalettes.GetLength(0)||(uint)slot>=4)
+            throw new ArgumentOutOfRangeException();
+        return ReferencePalettes[profile,slot];
+    }
+
     public static ArmourLayerEffect Effect(int profile)=>profile switch
     {
         5=>new(2,1,.18f), // frost shimmer
@@ -214,8 +224,8 @@ public static class ArmourLayeredRecolour
 
     public static ArmourColourLayers Apply(ArmourSourceParts source,ArmourColourModel model,int profile)
     {
-        if((uint)profile>=Palettes.GetLength(0))throw new ArgumentOutOfRangeException(nameof(profile));
-        return Apply(source,model,[Palettes[profile,0],Palettes[profile,1],Palettes[profile,2],Palettes[profile,3]]);
+        if((uint)profile>=ReferencePalettes.GetLength(0))throw new ArgumentOutOfRangeException(nameof(profile));
+        return ApplyCore(source,model,profile,default);
     }
 
     // A caller can independently assign any four RGB colours without
@@ -223,6 +233,11 @@ public static class ArmourLayeredRecolour
     public static ArmourColourLayers Apply(ArmourSourceParts source,ArmourColourModel model,ReadOnlySpan<uint> colours)
     {
         if(colours.Length!=4)throw new ArgumentException("Provide four RGB palette slots.",nameof(colours));
+        return ApplyCore(source,model,-1,colours);
+    }
+
+    private static ArmourColourLayers ApplyCore(ArmourSourceParts source,ArmourColourModel model,int profile,ReadOnlySpan<uint> colours)
+    {
         if(source.Surface.Length%4!=0||source.Skin.Length!=source.Surface.Length)
             throw new ArgumentException("Unaligned source layers.");
         var layers=Enumerable.Range(0,4).Select(_=>new byte[source.Surface.Length]).ToArray();
@@ -232,8 +247,8 @@ public static class ArmourLayeredRecolour
             byte a=source.Surface[p+3];if(a==0)continue;
             Vector3 c=new(source.Surface[p+2]/255f,source.Surface[p+1]/255f,source.Surface[p]/255f);
             int slot=model.Classify(c);
-            uint rgb=colours[slot];
-            Vector3 recoloured=MaterialColour(c,rgb,slot);
+            Vector3 recoloured=profile>=0?BlendReference(c,ReferenceRamp(profile,slot)):
+                MaterialColour(c,colours[slot],slot);
             combined[p]=Byte(recoloured.Z);combined[p+1]=Byte(recoloured.Y);
             combined[p+2]=Byte(recoloured.X);combined[p+3]=a;
             combined.AsSpan(p,4).CopyTo(layers[slot].AsSpan(p,4));
@@ -284,6 +299,38 @@ public static class ArmourLayeredRecolour
         }
         return Vector3.Clamp(new Vector3(tone)+chroma*s,Vector3.Zero,Vector3.One);
     }
+    // Soft-light changes value instead of replacing the source surface;
+    // the reference gradient supplies a colour blend at that retained value.
+    // Bounded chroma compression protects highlights from RGB clipping.
+    public static Vector3 BlendReference(Vector3 original,DyeRamp dye)
+    {
+        float y=ArmourRecolour.Luma(original);
+        if(y<=.035f||y>=.975f)return original;
+        Vector3 shadow=Decode(dye.Shadow),mid=Decode(dye.Midtone),light=Decode(dye.Highlight);
+        float preserve=Smooth(.035f,.15f,y)*(1-Smooth(.80f,.975f,y));
+        float midValue=ArmourRecolour.Luma(mid);
+        // Soft light in the authored artwork's display colour space.
+        // A fixed material midtone, not a changing curve coefficient,
+        // retains monotonicity; reference highlights provide hue only.
+        float soft=midValue<=.5f?y-(1-2*midValue)*y*(1-y):
+            y+(2*midValue-1)*(SoftD(y)-y);
+        float value=y+(soft-y)*(.42f*preserve);
+        Vector3 hue=y<.5f?Vector3.Lerp(ZeroLuma(shadow),ZeroLuma(mid),Smooth(.08f,.5f,y)):
+            Vector3.Lerp(ZeroLuma(mid),ZeroLuma(light),Smooth(.5f,.92f,y));
+        // Retain the native chromatic detail rather than a solid dye
+        // overlay. Reflections follow the reference artwork's own hues.
+        Vector3 chroma=Vector3.Lerp(ZeroLuma(original),hue,.72f*preserve);
+        float scale=1;
+        Limit(chroma.X);Limit(chroma.Y);Limit(chroma.Z);
+        void Limit(float c)
+        {
+            if(c>0)scale=Math.Min(scale,(1-value)/c);
+            else if(c<0)scale=Math.Min(scale,value/-c);
+        }
+        return Vector3.Clamp(new Vector3(value)+chroma*scale,Vector3.Zero,Vector3.One);
+    }
+    private static float SoftD(float y)=>y<=.25f?((16*y-12)*y+4)*y:MathF.Sqrt(y);
+    private static Vector3 Decode(uint rgb)=>new((rgb>>16&255)/255f,(rgb>>8&255)/255f,(rgb&255)/255f);
     private static Vector3 ZeroLuma(Vector3 v)=>v-new Vector3(ArmourRecolour.Luma(v));
 
     private static float Smooth(float a,float b,float x)
