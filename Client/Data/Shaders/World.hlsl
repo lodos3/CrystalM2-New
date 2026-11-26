@@ -169,7 +169,7 @@ float4 PSLiveArmour(Output input) : SV_TARGET
         float2 uv=(input.Uv-input.Bounds.xy)/max(input.Bounds.zw-input.Bounds.xy,float2(.0001,.0001));
         float phase=C[6].x;
         float wave=.5+.5*cos(6.2831853*(uv.y*1.6-phase));
-        float sheen=pow(wave,8)*smoothstep(.12,.55,y);
+        float sheen=pow(wave,8)*smoothstep(.16,.58,y);
         float3 hue=float3(.65,.90,1);
         if(C[6].z>1.5)
         {
@@ -178,7 +178,13 @@ float4 PSLiveArmour(Output input) : SV_TARGET
             hue=lerp(float3(.22,.85,1),float3(.85,.48,1),spectrum);
             sheen=max(sheen,scan*.6)*smoothstep(.10,.45,y);
         }
-        art.rgb=lerp(art.rgb,hue,saturate(sheen*C[6].y));
+        // Preserve the authored light/dark information. Metallic shimmer
+        // changes chroma and only slightly lifts the source luminance.
+        float hy=dot(hue,float3(.299,.587,.114));
+        float3 chromatic=hue-hy;
+        float value=min(1,y+.10*sheen);
+        float3 finish=saturate(value+chromatic*.65);
+        art.rgb=lerp(art.rgb,finish,saturate(sheen*C[6].y));
         return PrepareBlend(art*input.Tint);
     }
     float3 weights=float3(.299,.587,.114);

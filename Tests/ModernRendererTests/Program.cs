@@ -603,11 +603,91 @@ private static void CheckArmourPatternTransfer()
                 "Unaffected facings retain their original projection.");
     }
 
+    private static void CheckArmourAnatomicalProtection()
+    {
+        const int w=24,h=36;
+        byte[] art=new byte[w*h*4],naked=new byte[art.Length],isolated=new byte[art.Length];
+        void Pixel(byte[] a,int x,int y,byte r,byte g,byte b,byte alpha=255)
+        {
+            int p=(y*w+x)*4;a[p]=b;a[p+1]=g;a[p+2]=r;a[p+3]=alpha;
+        }
+        Vector2[] anchors=[new(12,3),new(12,8),new(7,10),new(18,10),new(12,12),
+            new(12,17),new(12,21),new(9,27),new(16,27),new(9,33),new(16,33)];
+        Pixel(art,12,2,22,25,33);Pixel(naked,12,2,130,115,100); // dark head detail
+        Pixel(art,13,4,192,142,98);Pixel(naked,13,4,180,135,93);
+        Pixel(art,13,5,94,85,89,120);Pixel(naked,13,5,120,100,90); // shaded jaw
+        Pixel(art,3,18,184,130,92);Pixel(naked,3,18,184,130,92);
+        Pixel(isolated,3,18,184,130,92);
+        Pixel(art,4,18,90,79,82);Pixel(naked,4,18,116,91,72); // adjacent finger
+        Pixel(art,20,18,184,130,92);Pixel(naked,20,18,184,130,92);
+        Pixel(art,12,12,192,142,98);Pixel(naked,12,12,170,125,88); // copper breastplate
+        Pixel(art,12,14,35,80,130);Pixel(naked,12,14,180,135,93);
+        Pixel(isolated,23,35,200,140,100); // stray mask outside source
+        var parts=ArmourLayeredRecolour.Separate(w,h,art,naked,isolated,anchors);
+        var protectedPixels=new[]{(12,2),(13,4),(13,5),(3,18),(4,18),(20,18)};
+        foreach(var (x,y) in protectedPixels)
+        {
+            int p=(y*w+x)*4;
+            Assertions.True(parts.Skin.AsSpan(p,4).SequenceEqual(art.AsSpan(p,4))&&parts.Surface[p+3]==0,
+                "Head, hands and shaded boundaries are excluded before learning the armour palette.");
+        }
+        int chest=(12*w+12)*4;
+        Assertions.True(parts.Surface.AsSpan(chest,4).SequenceEqual(art.AsSpan(chest,4)),
+            "A similar warm armour colour outside the head/hand region must remain available for recolouring.");
+        var histogram=new ArmourColourHistogram();histogram.Add(parts.Surface);
+        var model=histogram.Build();
+        for(int profile=0;profile<9;profile++)
+        {
+            var result=ArmourLayeredRecolour.Apply(parts,model,profile);
+            for(int p=0;p<art.Length;p+=4)
+            {
+                int alpha=result.Skin[p+3];
+                for(int j=0;j<4;j++)alpha+=result.Layers[j][p+3];
+                Assertions.True(alpha==art[p+3],"Protected skin and four masks conserve authored alpha.");
+            }
+            foreach(var (x,y) in protectedPixels)
+            {
+                int p=(y*w+x)*4;
+                Assertions.True(result.Skin.AsSpan(p,4).SequenceEqual(art.AsSpan(p,4)) &&
+                    result.Layers.All(layer=>layer[p+3]==0),"No material or effect layer can contain protected pixels.");
+            }
+        }
+    }
+
+    private static void CheckArmourMaterialRamps()
+    {
+        // Each target is a different hue. Shadows and highlights must retain
+        // the source value ordering rather than becoming flat colour blocks.
+        foreach(uint dye in new uint[]{0x376BC8,0xD1A355,0xB9D9F5,0x65324D,0x353942})
+        for(int slot=0;slot<4;slot++)
+        {
+            float last=-1;
+            for(int i=0;i<=255;i++)
+            {
+                float y=i/255f;
+                var c=ArmourLayeredRecolour.MaterialColour(new Vector3(y),dye,slot);
+                float value=ArmourRecolour.Luma(c);
+                Assertions.True(value>=last-.00001f && c.X>=0&&c.X<=1&&c.Y>=0&&c.Y<=1&&c.Z>=0&&c.Z<=1,
+                    "Material gradient must preserve relief order and stay in gamut.");
+                Assertions.True(Math.Abs(value-y)<.09f,"Do not erase native shading.");
+                last=value;
+            }
+        }
+        var dark=ArmourLayeredRecolour.MaterialColour(new Vector3(.25f),0x376BC8,0);
+        var light=ArmourLayeredRecolour.MaterialColour(new Vector3(.72f),0x376BC8,0);
+        Vector3 a=dark-new Vector3(ArmourRecolour.Luma(dark));
+        Vector3 b=light-new Vector3(ArmourRecolour.Luma(light));
+        Assertions.True(Vector3.Distance(Vector3.Normalize(a),Vector3.Normalize(b))>.04f,
+            "A material has a multi-hue shadow/highlight response, not a single colour wash.");
+    }
+
     private static void Main()
     {
         CheckLiveArmourSplit();
         CheckOriginalArmourRecolour();
         CheckLayeredArmourColours();
+        CheckArmourAnatomicalProtection();
+        CheckArmourMaterialRamps();
         CheckSideWingProjection();
         CheckArmourPatternTransfer();
         CheckArmourDesigns();

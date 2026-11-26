@@ -35,13 +35,15 @@ public sealed class LiveArmourAtlas : IDisposable
         if(!_models.TryGetValue(design.Source,out var model))
         {
             var histogram=new ArmourColourHistogram();
-            // Both sexes, every facing, plus an attack pose. Fixed sample
+            // Both sexes, every facing, walking and two attacks. Fixed sample
             // set means every variant and animation uses identical slots.
             foreach(int bank in new[]{0,808})
             for(int direction=0;direction<8;direction++)
             {
                 histogram.Add(ReadOriginal(design.Source,bank+direction*4).Parts.Surface);
+                histogram.Add(ReadOriginal(design.Source,bank+32+direction*6+2).Parts.Surface);
                 histogram.Add(ReadOriginal(design.Source,bank+136+direction*6+2).Parts.Surface);
+                histogram.Add(ReadOriginal(design.Source,bank+184+direction*6+3).Parts.Surface);
             }
             model=histogram.Build();_models.Add(design.Source,model);
         }
@@ -72,7 +74,7 @@ public sealed class LiveArmourAtlas : IDisposable
         var anchors=_frames[index].GetProperty("anchors").EnumerateArray()
             .Select(p=>new Vector2(p[0].GetInt32()-x,p[1].GetInt32()-y)).ToArray();
         var split=LiveArmourCoverage.Split(w,h,first,second,anchors,Align(reference));
-        return new(w,h,x,y,ArmourLayeredRecolour.Separate(second,first,split.Skin));
+        return new(w,h,x,y,ArmourLayeredRecolour.Separate(w,h,second,first,split.Skin,anchors));
 
         byte[] Align(LegacySpriteFrame frame)
         {
