@@ -2,16 +2,28 @@ using System.Numerics;
 
 namespace CrystalM2.Rendering.Core;
 
-// Keep the source identity of every existing g02–g99 appearance. Each
-// group of eleven advances to a new palette; no donor libraries are mixed.
+// Expanded catalogue of the thirty inspected original armour designs.
+// Preserve g02–g12, reuse the remaining IDs for new source/finish combinations.
 public readonly record struct ArmourRecolourDesign(int Source,int Profile)
 {
+    public const int SourceCount=30;
+    public const int ProfileCount=9;
     public static bool Supports(int id)=>id is >=2 and <=99;
     public static ArmourRecolourDesign Resolve(int id)
     {
         if(!Supports(id))throw new ArgumentOutOfRangeException(nameof(id));
-        return new((id-2)%11+1,(id-2)/11);
+        int source=(id-2)%SourceCount+1;
+        int tier=(id-2)/SourceCount;
+        int offset=tier==3?1:tier*3;
+        return new(source,(offset+(source-1)/11)%ProfileCount);
     }
+
+    // The first two body banks in the inspected 16–30 archives follow
+    // the classic pose layout. Do not read the extra animation banks.
+    public static bool AcceptsClassicPrefix(int source,int frameCount)
+        => source is >=0 and <=SourceCount && (frameCount==1616||
+            (source is >=16 and <=29 && frameCount==8080)||
+            (source==30&&frameCount==6464));
 }
 
 public sealed record ArmourRecolourResult(byte[] Surface,byte[] Skin);

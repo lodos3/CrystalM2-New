@@ -33,8 +33,13 @@ public sealed class LiveArmourAtlas : IDisposable
     public static int Source(int id)=>ArmourRecolourDesign.Resolve(id).Source;
 
     public LiveArmourFrame Create(int id,int index)
+        => Create(ArmourRecolourDesign.Resolve(id),index);
+
+    public LiveArmourFrame Create(ArmourRecolourDesign design,int index)
     {
-        var design=ArmourRecolourDesign.Resolve(id);
+        if(design.Source is <1 or >ArmourRecolourDesign.SourceCount||
+            design.Profile is <0 or >=ArmourRecolourDesign.ProfileCount)
+            throw new ArgumentOutOfRangeException(nameof(design));
         if((uint)index>=FrameCount)throw new ArgumentOutOfRangeException(nameof(index));
         if(!_models.TryGetValue(design.Source,out var model))
         {
@@ -77,7 +82,8 @@ public sealed class LiveArmourAtlas : IDisposable
         var naked=Open(0);
         var fitted=Open(source);
         var hands=Open(2);
-        if(naked.Count!=FrameCount || fitted.Count!=FrameCount) throw new InvalidDataException("Incompatible classic library.");
+        if(naked.Count!=FrameCount || !ArmourRecolourDesign.AcceptsClassicPrefix(source,fitted.Count))
+            throw new InvalidDataException("Incompatible classic library.");
         var a=naked.ReadFrame(index);
         var b=fitted.ReadFrame(index);
         BakedShadowRepair.StripFromMask(a.Bgra,a.Width,a.Height,a.Width*4);
@@ -114,18 +120,27 @@ public sealed class LiveArmourAtlas : IDisposable
     {
         if(_sources.TryGetValue(id,out var existing))return existing;
         var reader=new LegacyMirLibReader(File.OpenRead(Path.Combine(_data,"CArmour",$"{id:00}.Lib")));
-        if(reader.Count!=FrameCount){reader.Dispose();throw new InvalidDataException("Incompatible classic library.");}
+        if(!ArmourRecolourDesign.AcceptsClassicPrefix(id,reader.Count))
+        {reader.Dispose();throw new InvalidDataException($"Incompatible classic pose prefix in CArmour/{id:00}.Lib.");}
         _sources.Add(id,reader);return reader;
     }
 
     // Native v2 output with zero shadow metadata. Both skin and recoloured
     // surface can be inspected directly in a standard LIB viewer.
     public void Export(int id,string destination)
+        => Export(ArmourRecolourDesign.Resolve(id),destination,$"g{id:00}");
+
+    public void ExportSource(int source,int profile,string destination)
+        => Export(new ArmourRecolourDesign(source,profile),destination,$"source{source:00}_finish{profile:00}");
+
+    private void Export(ArmourRecolourDesign design,string destination,string prefix)
     {
-        if(!Supports(id))throw new ArgumentOutOfRangeException(nameof(id));
+        if(design.Source is <1 or >ArmourRecolourDesign.SourceCount||
+            design.Profile is <0 or >=ArmourRecolourDesign.ProfileCount)
+            throw new ArgumentOutOfRangeException(nameof(design));
         Directory.CreateDirectory(destination);
         string[] names=["HeadHands","Surface","Layer0","Layer1","Layer2","Layer3","Structure"];
-        string[] output=names.Select(n=>Path.Combine(destination,$"g{id:00}_{n}.Lib")).ToArray();
+        string[] output=names.Select(n=>Path.Combine(destination,$"{prefix}_{n}.Lib")).ToArray();
         if(output.Any(File.Exists))throw new IOException("Output already exists; select a new export directory.");
         string[] temporary=output.Select(p=>p+"."+Guid.NewGuid().ToString("N")+".tmp").ToArray();
         var writers=new BinaryWriter?[output.Length];
@@ -140,7 +155,7 @@ public sealed class LiveArmourAtlas : IDisposable
             }
             for(int i=0;i<FrameCount;i++)
             {
-                var frame=Create(id,i);
+                var frame=Create(design,i);
                 byte[][] pixels=[frame.Skin,frame.Surface,..frame.Layers,frame.Features];
                 for(int j=0;j<writers.Length;j++)
                 {

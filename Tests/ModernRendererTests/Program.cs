@@ -491,7 +491,7 @@ private static void CheckArmourPatternTransfer()
         for(int id=2;id<=99;id++)
         {
             var design=ArmourRecolourDesign.Resolve(id);
-            Assertions.True(design.Source==(id-2)%11+1 &&
+            Assertions.True(design.Source is >=1 and <=30 && design.Profile is >=0 and <=8 &&
                 variants.Add((design.Source,design.Profile)),
                 "Each appearance uses one original source and a unique palette.");
             var result=ArmourRecolour.Apply(source,naked,skin,design.Profile);
@@ -524,6 +524,18 @@ private static void CheckArmourPatternTransfer()
             }
         }
         Assertions.True(source.AsSpan().SequenceEqual(before),"Original sprite is immutable.");
+        var catalogue=Enumerable.Range(2,98).Select(ArmourRecolourDesign.Resolve).ToArray();
+        Assertions.True(catalogue.Distinct().Count()==98&&catalogue.Select(d=>d.Source).Distinct().Count()==30&&
+            catalogue.Select(d=>d.Profile).Distinct().Count()==9,
+            "All thirty compatible source designs and nine finishes must participate, with no duplicate recipe.");
+        for(int id=2;id<=12;id++)
+            Assertions.True(ArmourRecolourDesign.Resolve(id)==new ArmourRecolourDesign(id-1,0),
+                "Retain the first eleven original appearance recipes.");
+        Assertions.True(ArmourRecolourDesign.AcceptsClassicPrefix(16,8080)&&
+            ArmourRecolourDesign.AcceptsClassicPrefix(30,6464)&&
+            !ArmourRecolourDesign.AcceptsClassicPrefix(1,8080)&&
+            !ArmourRecolourDesign.AcceptsClassicPrefix(16,3200),
+            "Only inspected extended archive layouts or classic-length archives are accepted.");
     }
 
     private static void CheckLayeredArmourColours()

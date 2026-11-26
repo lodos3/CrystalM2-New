@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using CrystalM2.ArmourCreate;
+using CrystalM2.Rendering.Core;
 
 if (args is ["--live", var data, var art, var output])
 {
@@ -17,6 +18,16 @@ if (args is ["--live-one", var singleData, var singleArt, var singleOutput, var 
         throw new ArgumentException("Live appearance ID must be 2–99.");
     using var live=new LiveArmourAtlas(singleData,singleArt);
     live.Export(id,singleOutput);
+    return;
+}
+
+if (args is ["--material-source", var sourceData, var sourceArt, var sourceOutput, var sourceText, var profileText])
+{
+    if(!int.TryParse(sourceText,out int source)||source is <1 or >ArmourRecolourDesign.SourceCount||
+        !int.TryParse(profileText,out int profile)||profile is <0 or >=ArmourRecolourDesign.ProfileCount)
+        throw new ArgumentException("Source must be 1–30 and finish must be 0–8.");
+    using var live=new LiveArmourAtlas(sourceData,sourceArt);
+    live.ExportSource(source,profile,sourceOutput);
     return;
 }
 
