@@ -778,6 +778,23 @@ private static void CheckArmourPatternTransfer()
             "Do not invent relief on flat artwork.");
     }
 
+    private static void CheckCanonicalWingHeight()
+    {
+        Assertions.True(WingMembraneHeight.TipLift(true,false)==30&&
+            WingMembraneHeight.TipLift(false,true)==20&&WingMembraneHeight.ElementalCrown==44,
+            "Arch height is a fixed design property.");
+        foreach(float u in new[]{0f,.25f,.5f,.75f,1f})
+        foreach(float flap in new[]{-1f,0f,1f})
+        {
+            float top=WingMembraneHeight.Vertical(-40,u,flap,20);
+            float bottom=WingMembraneHeight.Vertical(60,u,flap,20);
+            Assertions.True(Math.Abs(bottom-top-55)<.001f,"Vertical scale is constant.");
+            Assertions.True(WingMembraneHeight.AttackLift(.33f,u)<=5&&
+                WingMembraneHeight.AttackLift(-.33f,u)==0,"Bounded forward flex.");
+        }
+        Assertions.True(WingMembraneHeight.AttackLift(.33f,0)==0,"Never lift the root.");
+    }
+
     private static void Main()
     {
         CheckLiveArmourSplit();
@@ -788,6 +805,7 @@ private static void CheckArmourPatternTransfer()
         CheckReferenceArmourBlend();
         CheckMaterialReconstruction();
         CheckSideWingProjection();
+        CheckCanonicalWingHeight();
         CheckArmourPatternTransfer();
         CheckArmourDesigns();
         CheckArmourFeatureSeams();

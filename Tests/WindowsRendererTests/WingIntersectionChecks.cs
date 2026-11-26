@@ -28,7 +28,7 @@ internal static class WingIntersectionChecks
     private const int CellW=192,CellH=168,SheetW=CellW*4,SheetH=CellH*2;
     private static readonly Vector2 Origin=new(CellW/2f-24,112);
 
-    internal static void Render(string input,string destination,int subframes)
+    internal static void Render(string input,string destination,int subframes,bool firstOnly=false)
     {
         if(subframes is <1 or >4)throw new ArgumentOutOfRangeException(nameof(subframes),"Use 1-4 samples per body frame.");
         string[] paths=File.Exists(input)?[input]:
@@ -43,7 +43,7 @@ internal static class WingIntersectionChecks
         device.SetRenderTarget(surface);
         var pool=new SpellParticlePool(ArmourWingParticles.ParticleCapacity);
         using var report=new StreamWriter(Path.Combine(destination,"intersections.csv"));
-        report.WriteLine("armour,wing,gender,action,direction,body_frame,subframe,body_pixels,far_overlap,near_overlap,near_overlap_outside_socket,root_lag_px,missing_wing_art");
+        report.WriteLine("armour,wing,gender,action,direction,body_frame,subframe,body_pixels,far_overlap,near_overlap,near_overlap_outside_socket,root_lag_px,missing_wing_art,raw_wing_height,visible_wing_height,raw_wing_top_from_socket,raw_wing_bottom_from_socket,raw_wing_width");
         long samplesRendered=0,missingFrames=0;
         foreach(string path in paths)
         {
@@ -83,7 +83,7 @@ internal static class WingIntersectionChecks
                     var smoothers=new WingPoseSmoother[8];
                     byte[] sheet=new byte[SheetW*SheetH];
                     long now=0;
-                    for(int frame=0;frame<seq.Count;frame++)
+                    for(int frame=0;frame<(firstOnly?1:seq.Count);frame++)
                     for(int sub=0;sub<subframes;sub++)
                     {
                         Array.Clear(sheet);
@@ -117,6 +117,7 @@ internal static class WingIntersectionChecks
                             byte[] far=split?Layer(-near):behind?Layer(0):new byte[CellW*CellH];
                             byte[] front=split?Layer(near):!behind?Layer(0):new byte[CellW*CellH];
                             int bodyCount=0,farOverlap=0,nearOverlap=0,outside=0;
+                            int rawTop=CellH,rawBottom=-1,visibleTop=CellH,visibleBottom=-1,rawLeft=CellW,rawRight=-1;
                             int cellX=d%4*CellW,cellY=d/4*CellH;
                             for(int y=0;y<CellH;y++)for(int x=0;x<CellW;x++)
                             {
@@ -129,18 +130,29 @@ internal static class WingIntersectionChecks
                                     nearOverlap++;
                                     if(Vector2.DistanceSquared(new Vector2(x,y),socket)>144)outside++;
                                 }
+                                int raw=Math.Max(far[i],front[i]);
+                                if(raw>=32)
+                                {
+                                    rawTop=Math.Min(rawTop,y);rawBottom=Math.Max(rawBottom,y);
+                                    rawLeft=Math.Min(rawLeft,x);rawRight=Math.Max(rawRight,x);
+                                }
                                 int intensity=Math.Max(body?0:far[i],front[i]);
+                                if(intensity>=32){visibleTop=Math.Min(visibleTop,y);visibleBottom=Math.Max(visibleBottom,y);}
                                 // Index 0 white, 1 black, 2-129 pink; near
                                 // overlap remains visible on the black silhouette.
                                 byte colour=intensity>=12?(byte)(2+intensity*127/255):body?(byte)1:(byte)0;
                                 sheet[(cellY+y)*SheetW+cellX+x]=colour;
                             }
-                            report.WriteLine(FormattableString.Invariant($"{armourName},{id},{gender},{seq.Name},{d},{index},{sub},{bodyCount},{farOverlap},{nearOverlap},{outside},{Vector2.Distance(targetMotion.Offset,motion.Offset):F3},{missing}"));
+                            int rawHeight=Math.Max(0,rawBottom-rawTop+1),visibleHeight=Math.Max(0,visibleBottom-visibleTop+1);
+                            float topFromSocket=rawHeight==0?0:rawTop-socket.Y,bottomFromSocket=rawHeight==0?0:rawBottom-socket.Y;
+                            report.WriteLine(FormattableString.Invariant($"{armourName},{id},{gender},{seq.Name},{d},{index},{sub},{bodyCount},{farOverlap},{nearOverlap},{outside},{Vector2.Distance(targetMotion.Offset,motion.Offset):F3},{missing},{rawHeight},{visibleHeight},{topFromSocket:F2},{bottomFromSocket:F2},{Math.Max(0,rawRight-rawLeft+1)}"));
                             samplesRendered++;if(missing)missingFrames++;
 
                             byte[] Layer(int side)
                             {
                                 device.Clear(Color.Black);
+                                // No authored wing sequence for legacy fishing actions.
+                                if(id<2&&seq.WingCount==0){missing=true;return new byte[CellW*CellH];}
                                 ArmourWingParticles.Emit(pool,effect,id<2?id:0,id<2?wingPose:index,shoulder,facing,now,101,side,motion.Yaw,motion.Roll,motion.Pitch,motion.TorsoFrame,motion.LegacyLift);
                                 if(pool.Active.Length==0){missing=true;return new byte[CellW*CellH];}
                                 device.SpellParticles.Draw(pool.Active,Origin,now,false,colour:new Vector3(1,.04f,.5f),

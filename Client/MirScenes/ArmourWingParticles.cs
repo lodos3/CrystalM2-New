@@ -138,9 +138,9 @@ internal static class ArmourWingParticles
         int artWidth = membrane.Width + 2 * membrane.X;
         bool felFire = effect == ArmourWings.FelFire;
         bool seraph = effect is ArmourWings.Archangel or ArmourWings.DawnSeraph;
-        float north = MathF.Max(0, MathF.Cos(yaw));
+        // Vertical artwork profile is shared across every facing.
         bool elemental = ArmourWings.IsElemental(effect);
-        float tipLift = felFire ? 36 * north * north : seraph ? 9 + 14 * north * north : 0;
+        float tipLift = WingMembraneHeight.TipLift(felFire,seraph);
         int segments = felFire || seraph || elemental ? 8 : 6;
         Vector2 artRoot = ArtworkRoot(effect);
         int rootColumn = (int)artRoot.X - membrane.X;
@@ -211,14 +211,12 @@ internal static class ArmourWingParticles
                 if (elemental)
                 {
                     float crown = Math.Clamp((88 - y) / 65, .15f, 1);
-                    float lift = 20 + 32 * north;
-                    if (rearDiagonal) lift += Math.Max(0, side * across.Y * spanLength) + 6;
-                    arch += lift * (t * (2 - t)) * crown;
+                    arch += WingMembraneHeight.ElementalCrown * (t * (2 - t)) * crown;
                 }
                 // The raised outer rim widens slightly as well as receding.
                 // Match the vertical thickness offset to the projected rear
                 // axis so a south-facing wing cannot cancel its own depth.
-                float rearSign = MathF.Cos(yaw) < 0 ? -1f : 1f;
+                // The depth shell shares the same upright silhouette.
                 // Distal deformation with a fixed root and a minimum rear
                 // half-plane in profile. Rotation cannot swing the socket.
                 float free = Math.Clamp((t - .12f) / .88f, 0, 1);
@@ -226,10 +224,7 @@ internal static class ArmourWingParticles
                 float localYaw = baseYaw + torsoYaw * flex;
                 Vector2 localAcross = new(MathF.Cos(localYaw), MathF.Sin(localYaw) * .49f);
                 Vector2 localBack = new(-MathF.Sin(localYaw), MathF.Cos(localYaw) * .49f);
-                // Keep the original height for all other directions. In
-                // profile, compress only the art below its physical socket.
-                float featherHeight=height+WingProfilePlacement.FeatherHeight(facing,y-artRoot.Y)-(y-artRoot.Y);
-                float down = featherHeight * .55f - 4 * u * flap + 4 * t * t - arch + shell * depth * .30f * rearSign * flex;
+                float down = WingMembraneHeight.Vertical(height,u,flap,arch);
                 // Twist is a change in horizontal depth and socket placement,
                 // not a screen-space rotation of the feather column. Retain
                 // the neutral vertical projection and lift the rearward span
@@ -237,10 +232,10 @@ internal static class ArmourWingParticles
                 // envelope provides an additional, bounded upward reference.
                 float lateral = side * (span + shell * depth * .23f * flex);
                 float rearward = sweep + (camber + twist + shell * depth * flex) * RearDepthScale;
-                float pitchLift = Math.Max(0, sinPitch) * Math.Max(0, sweep) * flex;
-                float rise = WingProfilePlacement.Rise(facing,Math.Max(pitchLift, Math.Clamp(legacyLift, 0, 12) * flex));
-                Vector2 projected = new(localAcross.X * lateral + localBack.X * rearward,
-                    WingProfilePlacement.SpanY(facing,across.Y,lateral) + back.Y * rearward + down - rise);
+                // Rotate horizontal depth only. Do not project span into
+                // vertical scale or use the facing-dependent legacy lift.
+                float rise=WingMembraneHeight.AttackLift(torsoPitch,flex);
+                Vector2 projected = new(localAcross.X * lateral + localBack.X * rearward,down-rise);
                 if ((direction is MirDirection.Left or MirDirection.Right) && u >= 0)
                 {
                     float sign = direction == MirDirection.Right ? -1f : 1f;

@@ -9,6 +9,11 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        if (args is ["--wing-first-poses", var bodyLibrary, var reviewDirectory])
+        {
+            WingIntersectionChecks.Render(bodyLibrary,reviewDirectory,1,firstOnly:true);
+            return;
+        }
         if (args is ["--wing-intersections", var root, var destination])
         {
             WingIntersectionChecks.Render(root, destination, 4);

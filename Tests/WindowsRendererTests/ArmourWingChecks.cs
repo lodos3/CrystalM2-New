@@ -14,6 +14,7 @@ internal static class ArmourWingChecks
         CheckAttackLean();
         CheckUprightAttackWings();
         CheckArtworkRootContact();
+        CheckDirectionalMembraneHeight();
         for (int id = 10; id < 20; id++)
         {
             if (!ArmourWings.TrySelect(id.ToString(), out byte? selection) ||
@@ -76,6 +77,35 @@ internal static class ArmourWingChecks
         Console.WriteLine("Verified ten elemental designs across eight facings, five times, split layers and pose motion.");
     }
 
+    private static void CheckDirectionalMembraneHeight()
+    {
+        var pool=new SpellParticlePool(ArmourWingParticles.ParticleCapacity);
+        // Physical wings: exact same native membrane height per side,
+        // fixed phase and neutral pitch. Compare the actual emitted mesh.
+        for(byte effect=ArmourWings.Phoenix;effect<ArmourWings.SolarAscendant;effect++)
+        foreach(int time in new[]{0,233,719,1530,3100})
+        foreach(int side in new[]{-1,1})
+        {
+            float? reference=null;
+            foreach(MirDirection facing in Enum.GetValues<MirDirection>())
+            {
+                ArmourWingParticles.Emit(pool,effect,0,0,new Vector2(24,-31),facing,time,101,side);
+                float min=float.PositiveInfinity,max=float.NegativeInfinity;
+                foreach(var particle in pool.Active)
+                {
+                    if(particle.Layer!=SpellParticleLayer.EmissiveCore||particle.Ribbon is not { } q)continue;
+                    min=Math.Min(min,Math.Min(Math.Min(q.TopLeft.Y,q.TopRight.Y),Math.Min(q.BottomLeft.Y,q.BottomRight.Y)));
+                    max=Math.Max(max,Math.Max(Math.Max(q.TopLeft.Y,q.TopRight.Y),Math.Max(q.BottomLeft.Y,q.BottomRight.Y)));
+                }
+                float height=max-min;
+                if(!float.IsFinite(height)||height<=0)throw new InvalidDataException("Missing wing membrane.");
+                reference??=height;
+                if(Math.Abs(height-reference.Value)>.01f)
+                    throw new InvalidDataException($"Wing {effect} changes intrinsic height in {facing}: {height:F2} vs {reference:F2}.");
+            }
+        }
+    }
+
     private static void CheckTorsoAlignedRoots()
     {
         var pool = new SpellParticlePool(ArmourWingParticles.ParticleCapacity);
@@ -128,7 +158,7 @@ internal static class ArmourWingChecks
                     if (Vector2.Distance(root, particle.Origin) > .01f)
                         throw new InvalidDataException("Twist detached the visible artwork root.");
                     roots[i] = root;
-                    Vector2 expected = shoulder + torso.SocketOffset(nominal, side, 5.5f, socket - shoulder);
+                    Vector2 expected = shoulder + WingProfilePlacement.Socket(torso.SocketOffset(nominal, side, 5.5f, socket - shoulder),(int)facing);
                     if (Vector2.Distance(root, expected) > .01f)
                         throw new InvalidDataException($"Wing {effect} missed its shoulder socket at {bank + index}.");
                     found = true;
@@ -137,8 +167,10 @@ internal static class ArmourWingChecks
                 if (!found) throw new InvalidDataException("Missing root seam.");
             }
             Vector2 axis = Vector2.Normalize(roots[1] - roots[0]);
-            if (MathF.Abs(Vector2.Dot(axis, torso.Across)) < .9999f ||
-                Vector2.Distance(roots[0], roots[1]) < .999f)
+            // Lateral sockets are individually clamped to the torso.
+            if (!WingProfilePlacement.IsSide((int)facing) &&
+                (MathF.Abs(Vector2.Dot(axis, torso.Across)) < .9999f ||
+                Vector2.Distance(roots[0], roots[1]) < .999f))
                 throw new InvalidDataException($"Wing roots are not aligned to the shoulders at {bank + index}.");
         }
     }
@@ -165,7 +197,7 @@ internal static class ArmourWingChecks
                 if (Vector2.Distance(socket, shoulder) > 1.501f)
                     throw new InvalidDataException("A physical socket must be seated within the torso.");
                 float yaw = (int)facing * MathF.PI / 4;
-                Vector2 expected = socket + new Vector2(MathF.Cos(yaw), MathF.Sin(yaw) * .49f) * (side * 5.5f);
+                Vector2 expected = shoulder + WingProfilePlacement.Socket(socket - shoulder + new Vector2(MathF.Cos(yaw), MathF.Sin(yaw) * .49f) * (side * 5.5f),(int)facing);
                 ArmourWingParticles.Emit(pool, effect, 0, 0, shoulder, facing, time, 101, side,
                     torsoYaw: .14f, torsoRoll: -.18f, torsoPitch: .28f);
                 int left = 0, right = 0;
@@ -236,7 +268,7 @@ internal static class ArmourWingChecks
             {
                 if (after.Y > before.Y + .001f)
                     throw new InvalidDataException($"Forward attack lowered the wing at {index}.");
-                if (before.Y - after.Y > 2) lifted = true;
+                if (before.Y - after.Y > (WingProfilePlacement.IsSide((int)direction)?.5f:2f)) lifted = true;
             }
         }
     }

@@ -88,6 +88,22 @@ public static class WingProfilePlacement
     public static float Rise(int direction,float lift)=>IsSide(direction)?Math.Clamp(lift,0,2):lift;
 }
 
+// Shared upright screen projection. A facing rotates the horizontal
+// wing scaffold, not its vertical scale. The canonical arch is a design
+// property, never a per-direction size multiplier.
+public static class WingMembraneHeight
+{
+    public const float ElementalCrown=44f;
+    public static float TipLift(bool felFire,bool seraph)=>felFire?30f:seraph?20f:0f;
+    public static float Vertical(float height,float u,float flap,float arch)
+    {
+        float t=Math.Clamp(u,0,1);
+        return height*.55f-4*u*flap+4*t*t-arch;
+    }
+    public static float AttackLift(float pitch,float flex)
+        => Math.Clamp(Math.Max(0,MathF.Sin(pitch))*20,0,5)*Math.Clamp(flex,0,1);
+}
+
 public readonly record struct WingPoseMotion(Vector2 Offset, float Roll, float Yaw, float Pitch = 0)
 {
     public WingTorsoFrame? TorsoFrame { get; init; }
